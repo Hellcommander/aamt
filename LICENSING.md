@@ -1,8 +1,9 @@
 # Licensing
 
-This tree is **AI-Assisted Modding Tools (AAMT)**. Licenses are split so original
-tools stay permissive, third-party code keeps its own terms, and nothing in this
-repo can relicense someone else's mod, game, or generated output.
+This tree is **Asset & Mod Tools (AAMT)** by Gregory Armstrong (Arendeth). Licenses are
+split so original tools stay permissive, third-party code keeps its own terms,
+and nothing in this repo can relicense someone else's mod, game, or generated
+output.
 
 Read this file before copying code between folders or publishing a fork.
 
@@ -20,6 +21,14 @@ MIT is used because it is permissive. It does **not** copyleft, share-alike, or
 force downstream mods onto AAMT's license. Do not add GPL, AGPL, LGPL, MPL, or
 CC-BY-SA code into original AAMT sources — those terms would conflict with MIT
 and with proprietary game tooling.
+
+## No warranty
+
+AAMT is **unofficial experimental tooling**, provided **AS IS** with **no warranty**
+of any kind (see [LICENSE](LICENSE)). It is not a finished or perfect toolset.
+Use at your own risk. Keep backups of game installs and mods. The authors are
+not liable for data loss, broken mods, ToS issues, or anything else that
+follows from using these tools.
 
 ## Generated output
 

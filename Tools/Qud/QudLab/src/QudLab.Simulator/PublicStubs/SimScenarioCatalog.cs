@@ -1,9 +1,9 @@
 namespace QudLab.Simulator;
 
-/// <summary>MIT catalog stub. Full scenario list ships in the private pack.</summary>
+/// <summary>MIT catalog. Full list is loaded from the private pack DLL when present.</summary>
 public static class SimScenarioCatalog
 {
-    public static IReadOnlyList<SimScenarioInfo> All { get; } =
+    public static IReadOnlyList<SimScenarioInfo> Fallback { get; } =
     [
         new SimScenarioInfo
         {
@@ -13,6 +13,8 @@ public static class SimScenarioCatalog
             SupportsStress = false
         }
     ];
+
+    public static IReadOnlyList<SimScenarioInfo> All => SimulatorFactory.GetScenarios();
 }
 
 public sealed class SimScenarioInfo

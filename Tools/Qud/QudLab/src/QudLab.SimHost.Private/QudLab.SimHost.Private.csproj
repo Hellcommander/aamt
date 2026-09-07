@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Maintainer-only. Compiles gitignored SimHost Program.cs to portable net8.0 IL. -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <OutputType>Library</OutputType>
+    <AssemblyName>QudLab.SimHost.Private</AssemblyName>
+    <RootNamespace>QudLab.SimHost</RootNamespace>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\QudLab.SimHost\Program.cs" />
+    <ProjectReference Include="..\QudLab.Core\QudLab.Core.csproj" />
+    <ProjectReference Include="..\QudLab.Simulator.Private\QudLab.Simulator.Private.csproj" />
+  </ItemGroup>
+
+  <Target Name="CopyToPrivatePack" AfterTargets="Build">
+    <MakeDir Directories="$(MSBuildThisFileDirectory)..\..\pack\private" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(MSBuildThisFileDirectory)..\..\pack\private" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

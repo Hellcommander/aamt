@@ -5,6 +5,7 @@ artifacts/
 *.user
 *.dll
 *.pdb
+pack/
 Workspace/Qud.Install.props
 Workspace/assembly-refs.json
 omnisharp.json
@@ -13,6 +14,7 @@ omnisharp.json
 # Restricted simulator / SimHost / Unity LoadFrom host — download-only (LICENSE-PROPRIETARY.md).
 # PublicStubs/ remain tracked so the MIT tree compiles without the pack.
 src/QudLab.Simulator/*.cs
+!src/QudLab.Simulator/SimulatorFactory.cs
 src/QudLab.SimHost/Program.cs
 UnityProject/Assets/QudLab/Scripts/QudManagedHost.cs
 UnityProject/Assets/QudLab/Scripts/QudManagedHost.cs.meta

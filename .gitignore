@@ -166,6 +166,7 @@ Tools/TerrariaMods/
 
 # --- Qud Lab private simulator (access-gated; PublicStubs stay tracked) ---
 Tools/Qud/QudLab/src/QudLab.Simulator/*.cs
+!Tools/Qud/QudLab/src/QudLab.Simulator/SimulatorFactory.cs
 Tools/Qud/QudLab/src/QudLab.SimHost/Program.cs
 Tools/Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudManagedHost.cs
 Tools/Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudManagedHost.cs.meta
@@ -173,7 +174,7 @@ Tools/Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudRestrictedObjectSim.cs
 Tools/Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudRestrictedObjectSim.cs.meta
 Tools/Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudZoneGetProbe.cs
 Tools/Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudZoneGetProbe.cs.meta
-Tools/Qud/QudLab/Workspace/Qud.Install.props
+Tools/Qud/QudLab/pack/
 Tools/Qud/QudLab/Workspace/assembly-refs.json
 Tools/Qud/QudLab/UnityProject/Library/
 Tools/Qud/QudLab/UnityProject/Temp/

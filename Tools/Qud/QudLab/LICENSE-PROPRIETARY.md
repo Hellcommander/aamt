@@ -1,6 +1,6 @@
 # Qud Lab — Proprietary Core License
 
-Copyright (c) 2026 Qud Lab authors. All rights reserved.
+Copyright (c) 2026 Gregory Armstrong (Arendeth). All rights reserved.
 
 ## Scope
 
@@ -49,5 +49,6 @@ hooks; it does not ship those mods.
 
 ## Disclaimer
 
-Provided as-is for mod development tooling. Freehold Games / Caves of Qud
-remain the property of their respective owners. This tool is unofficial.
+Provided as-is for mod development tooling, **with no warranty**. Use at your
+own risk. This is unofficial experimental software, not a perfect toolset.
+Freehold Games / Caves of Qud remain the property of their respective owners.

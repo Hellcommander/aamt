@@ -723,7 +723,7 @@ public sealed class ModAssistantServer : IModAssistantHost
                                     break;
                                 }
 
-                                var sim = new RestrictedSimulator(lab, cacheProvider: () => _cacheProvider());
+                                var sim = SimulatorFactory.Create(lab, cacheProvider: () => _cacheProvider());
                                 snap = sim.RunTurnsAsync(req).GetAwaiter().GetResult();
                                 if (cache is not null)
                                 {
@@ -734,7 +734,7 @@ public sealed class ModAssistantServer : IModAssistantHost
 
                             if (remote && cache is not null && snap is not null)
                             {
-                                var apply = new RestrictedSimulator(new LabHost());
+                                var apply = SimulatorFactory.Create(new LabHost());
                                 apply.ApplySnapshotToCache(cache, snap, scenario);
                                 CacheIO.Save(cache);
                             }

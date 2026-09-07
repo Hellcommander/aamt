@@ -1,6 +1,7 @@
 ﻿using QudLab.Ai;
 using QudLab.Assistant;
 using QudLab.Core;
+using QudLab.Core.Abstractions;
 using QudLab.Core.Cache;
 using QudLab.Core.Install;
 using QudLab.Core.Logs;
@@ -434,7 +435,7 @@ static class Program
         };
 
         QudLab.Core.Abstractions.SimSnapshot snap;
-        RestrictedSimulator? localSim = null;
+        IRestrictedSimulator? localSim = null;
 
         if (remote)
         {
@@ -449,7 +450,7 @@ static class Program
         }
         else
         {
-            localSim = new RestrictedSimulator(_host, cacheProvider: () => _cache ?? CacheIO.Load());
+            localSim = SimulatorFactory.Create(_host, cacheProvider: () => _cache ?? CacheIO.Load());
             snap = await localSim.RunTurnsAsync(request);
         }
 
@@ -470,7 +471,7 @@ static class Program
 
         if (_cache is not null)
         {
-            (localSim ?? new RestrictedSimulator(_host)).ApplySnapshotToCache(_cache, snap, scenario);
+            (localSim ?? SimulatorFactory.Create(_host)).ApplySnapshotToCache(_cache, snap, scenario);
             CacheIO.Save(_cache);
         }
 

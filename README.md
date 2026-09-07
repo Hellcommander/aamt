@@ -1,8 +1,13 @@
-# AI-Assisted Modding Tools (AAMT)
+# Asset & Mod Tools (AAMT)
 
-Unofficial multi-game modding toolkit. Original AAMT code is **MIT** so it does
-not copyleft or relicense your mods. Game data and third-party sources are
-**not** in this repo.
+Unofficial tools to **make mods, manage them, and use beside installed games**
+(planners, choosers, labs). Original AAMT sources are MIT; generated mods are
+yours; Qud Lab's simulator pack and third-party clones are not MIT and are not
+in this repo. See [LICENSING.md](LICENSING.md).
+
+**No warranty.** This is experimental, unofficial tooling — not a finished or
+perfect toolset. Use at your own risk. Keep backups. The authors are not liable
+for broken installs, lost data, or anything you do with it.
 
 The public tree is ~**22 MB** of scripts and docs. A full local workspace can be
 **tens of GB** (generated assets, reference art, third-party clones). Git ignores

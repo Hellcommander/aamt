@@ -12,5 +12,6 @@ public static class LicenseNotice
     public const string Disclaimer =
         "Qud Lab requires a legitimate Steam or GOG install of Caves of Qud. " +
         "It does not redistribute game assemblies or assets. " +
-        "It must not be used as a standalone Caves of Qud runtime or arena game.";
+        "It must not be used as a standalone Caves of Qud runtime or arena game. " +
+        "NO WARRANTY — unofficial experimental tooling, use at your own risk.";
 }

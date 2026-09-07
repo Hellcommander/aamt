@@ -499,7 +499,7 @@ public sealed class LabAiTools
         if (!gate.Ok)
             return "gate: " + gate.Message;
 
-        var sim = new RestrictedSimulator(lab, cacheProvider: _cache);
+        var sim = SimulatorFactory.Create(lab, cacheProvider: _cache);
         var snap = sim.RunTurnsAsync(new SimRequest
         {
             BlueprintOrSpecies = blueprint,

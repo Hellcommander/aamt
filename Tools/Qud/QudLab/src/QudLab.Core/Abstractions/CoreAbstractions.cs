@@ -1,5 +1,6 @@
 namespace QudLab.Core.Abstractions;
 
+using QudLab.Core.Cache;
 using QudLab.Core.Install;
 
 /// <summary>Closed-core seams used by the Unity shell and CLI. Fill implementations over time.</summary>
@@ -39,6 +40,7 @@ public interface IRestrictedSimulator
     bool IsReady { get; }
     string Status { get; }
     Task<SimSnapshot> RunTurnsAsync(SimRequest request, CancellationToken ct = default);
+    void ApplySnapshotToCache(IntelligenceCache cache, SimSnapshot snap, string? scenario = null);
 }
 
 public sealed class SimRequest

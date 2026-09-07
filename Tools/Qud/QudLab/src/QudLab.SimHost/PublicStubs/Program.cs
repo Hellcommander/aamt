@@ -1,15 +1,11 @@
+using QudLab.Simulator;
+
 namespace QudLab.SimHost;
 
-/// <summary>MIT stub when Program.cs from the private pack is absent.</summary>
+/// <summary>
+/// MIT loader. Runs the private SimHost DLL when the pack is installed (portable net8.0 IL).
+/// </summary>
 static class Program
 {
-    static int Main(string[] args)
-    {
-        _ = args;
-        Console.Error.WriteLine(
-            "QudLab SimHost is part of the access-gated private pack.");
-        Console.Error.WriteLine(
-            "Unpack it with Tools/Qud/QudLab/Fetch-PrivatePack.ps1 (see LICENSE-PROPRIETARY.md).");
-        return 2;
-    }
+    static Task<int> Main(string[] args) => SimulatorFactory.RunSimHostAsync(args);
 }

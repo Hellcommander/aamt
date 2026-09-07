@@ -8,13 +8,13 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <!-- Private pack drops RestrictedSimulator.cs next to this csproj. PublicStubs are MIT fallbacks. -->
-    <QudLabHasPrivateSim Condition="Exists('$(MSBuildThisFileDirectory)RestrictedSimulator.cs')">true</QudLabHasPrivateSim>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(QudLabHasPrivateSim)' == 'true'">
-    <Compile Remove="PublicStubs\**" />
-    <None Include="PublicStubs\**" />
+  <!-- Always MIT stubs + loader. Private *.cs stay gitignored and compile in Simulator.Private. -->
+  <ItemGroup>
+    <Compile Include="PublicStubs\**\*.cs" />
+    <Compile Include="SimulatorFactory.cs" />
   </ItemGroup>
 
 </Project>

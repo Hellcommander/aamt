@@ -10,12 +10,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <QudLabHasPrivateSimHost Condition="Exists('$(MSBuildThisFileDirectory)Program.cs')">true</QudLabHasPrivateSimHost>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(QudLabHasPrivateSimHost)' == 'true'">
-    <Compile Remove="PublicStubs\**" />
-    <None Include="PublicStubs\**" />
+  <ItemGroup>
+    <Compile Include="PublicStubs\**\*.cs" />
   </ItemGroup>
 
 </Project>
