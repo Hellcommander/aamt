@@ -1,0 +1,56 @@
+{
+  "iconSize": 48,
+  "borderColor": [0.4, 0.8, 1.0, 0.9],
+  "backgroundShape": "circle",
+  "flashOnApply": true,
+  
+  "enableGlow": true,
+  "glowIntensity": 1.2,
+  "enablePulse": true,
+  "pulseSpeed": 1.5,
+  "enableRotation": false,
+  "rotationSpeed": 1.0,
+  
+  "borderWidth": 3.0,
+  "enableBorderGlow": true,
+  "borderGlowIntensity": 1.5,
+  
+  "enableBackground": true,
+  "backgroundOpacity": 0.85,
+  "enableBackgroundBlur": false,
+  "backgroundBlurStrength": 0.1,
+  
+  "enableFadeIn": true,
+  "fadeInDuration": 0.4,
+  "enableFadeOut": true,
+  "fadeOutDuration": 0.6,
+  "enableScaleIn": true,
+  "scaleInDuration": 0.3,
+  "enableScaleOut": true,
+  "scaleOutDuration": 0.4,
+  
+  "showStackCount": false,
+  "stackCountStyle": "number",
+  "stackCountColor": [1.0, 1.0, 1.0],
+  "stackCountScale": 0.8,
+  
+  "uiName": "frost_nova_ui",
+  "description": "UI configuration for the frost nova status effect with glowing border and pulsing animation.",
+  
+  "tags": [
+    "frost",
+    "nova",
+    "ui",
+    "glow",
+    "pulse",
+    "combat"
+  ],
+  
+  "metadata": {
+    "author": "Magi-Tech UI System",
+    "version": "1.0.0",
+    "license": "MIT",
+    "style": "frost",
+    "priority": "high"
+  }
+} 

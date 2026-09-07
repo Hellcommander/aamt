@@ -1,0 +1,20 @@
+{
+  "id": "grid",
+  "title": "Spell Grid",
+  "description": "Triangle hex: one spell docked on the north edge, mods and triggers on the vertices.",
+  "entry": "index.html",
+  "mod": "arendeth.arcane-conduit",
+  "hub": true,
+  "kind": "menu",
+  "width": 1600,
+  "height": 900,
+  "transparent": true,
+  "capturesInput": true,
+  "pausesGame": false,
+  "permissions": {
+    "nativeBridge": true,
+    "filesystem": false,
+    "network": false
+  },
+  "accent": "#7B5CFF"
+}

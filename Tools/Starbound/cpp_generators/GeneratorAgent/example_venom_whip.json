@@ -1,0 +1,53 @@
+{
+  "id": "venom_whip",
+  "weaponType": "whip",
+  "segmentCount": 16,
+  "segmentLength": 0.3,
+  "segmentRadius": 0.02,
+  "segmentShape": "cylinder",
+  "taperProfile": "linear",
+  "jointFlexibility": 0.9,
+  "articulationLimits": {
+    "twist": 45.0,
+    "swing": 60.0
+  },
+  "materialType": "leather",
+  "colorPrimary": [0.15, 0.05, 0.02],
+  "colorSecondary": [0.9, 0.7, 0.5],
+  "noiseDetail": 0.3,
+  "textureScale": 2.0,
+  "ornamentation": true,
+  "endAttachment": "blade",
+  
+  "segmentSpacing": 0.05,
+  "enableJoints": true,
+  "jointDamping": 0.2,
+  "enableCollision": true,
+  "collisionRadius": 0.025,
+  "enablePhysics": true,
+  "physicsMass": 0.1,
+  
+  "description": "A deadly venom whip with razor-sharp blade attachment. This weapon is crafted from supple leather and features intricate ornamentation.",
+  
+  "tags": [
+    "whip",
+    "venom",
+    "leather",
+    "blade",
+    "deadly",
+    "flexible"
+  ],
+  
+  "metadata": {
+    "author": "Magi-Tech Weapon System",
+    "version": "1.0.0",
+    "license": "MIT",
+    "damage": "high",
+    "range": "medium",
+    "difficulty": "expert"
+  },
+  
+  "enableCaching": true,
+  "enableHotReload": true,
+  "enableParallelProcessing": true
+} 

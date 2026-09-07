@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\QudLab.Simulator\QudLab.Simulator.csproj" />
+    <ProjectReference Include="..\QudLab.Core\QudLab.Core.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <QudLabHasPrivateSimHost Condition="Exists('$(MSBuildThisFileDirectory)Program.cs')">true</QudLabHasPrivateSimHost>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(QudLabHasPrivateSimHost)' == 'true'">
+    <Compile Remove="PublicStubs\**" />
+    <None Include="PublicStubs\**" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,54 @@
+<Window x:Class="ApiMigratorGui.PathPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Choose folder" Height="400" Width="680"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
+        MinHeight="340" MinWidth="560"
+        ShowInTaskbar="False">
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="PromptText" Grid.Row="0" TextWrapping="Wrap" Margin="0,0,0,10"
+                   Text="Enter or paste a folder path. Native Browse dialogs crash on this machine, so this picker avoids them." />
+
+        <TextBox x:Name="PathTextBox" Grid.Row="1" Margin="0,0,0,8" FontFamily="Consolas" FontSize="12" />
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
+            <Button x:Name="UseLocalModsButton" Content="Local Mods" Click="UseLocalMods_Click"
+                    Padding="8,3" Margin="0,0,6,0" ToolTip="Fill default local Mods path" />
+            <Button x:Name="UseWorkshopButton" Content="Workshop" Click="UseWorkshop_Click"
+                    Padding="8,3" Margin="0,0,6,0" ToolTip="Fill default Workshop content path" />
+            <Button x:Name="UseManagedButton" Content="Managed" Click="UseManaged_Click"
+                    Padding="8,3" Margin="0,0,6,0" ToolTip="Fill default CoQ Managed path" />
+            <Button Content="Pick file in folder…" Click="PickFileInFolder_Click"
+                    Padding="8,3"
+                    ToolTip="Open a normal file dialog; the parent folder of the chosen file is used" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="3" Text="Workshop mod / recent folder:" FontWeight="SemiBold" Margin="0,0,0,4" />
+        <TextBox x:Name="WorkshopFilterBox" Grid.Row="4" Margin="0,0,0,4"
+                 TextChanged="WorkshopFilterBox_TextChanged"
+                 ToolTip="Type to filter Workshop mods by id or title" />
+        <ComboBox x:Name="WorkshopModCombo" Grid.Row="5" Margin="0,0,0,8"
+                  DisplayMemberPath="Display" SelectionChanged="WorkshopModCombo_SelectionChanged"
+                  ToolTip="Pick a Steam Workshop content subfolder (333640/id) or a recent folder" />
+
+        <TextBlock x:Name="TipText" Grid.Row="6" TextWrapping="Wrap" Foreground="#666" FontSize="11"
+                   VerticalAlignment="Top"
+                   Text="Tip: paste a path from Explorer’s address bar, pick a Workshop mod, or pick any file inside the folder." />
+
+        <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+            <Button Content="OK" IsDefault="True" Click="Ok_Click" Width="88" Padding="8,4" Margin="0,0,8,0" />
+            <Button Content="Cancel" IsCancel="True" Click="Cancel_Click" Width="88" Padding="8,4" />
+        </StackPanel>
+    </Grid>
+</Window>

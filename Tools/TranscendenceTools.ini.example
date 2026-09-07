@@ -1,0 +1,64 @@
+# Transcendence / AAMT Tools Configuration
+# Copy to TranscendenceTools.ini (same folder as this file) and edit.
+# Environment variables always override these values when set.
+#
+#   copy TranscendenceTools.ini.example TranscendenceTools.ini
+#
+# You can use either a flat file (legacy) or [Paths] / [SD] sections.
+# Environment variables: %ProgramFiles%, %USERPROFILE%, etc. are expanded.
+
+[Paths]
+# Game install (folder with Transcendence.tdb / Extensions)
+TranscendencePath = D:\games\Steam\steamapps\common\Transcendence
+
+# Dwarf Fortress install (folder with data/vanilla — used by Tools/DwarfFortress/)
+DwarfFortressPath = E:\SteamLibrary\steamapps\common\Dwarf Fortress
+
+# Soulash 2 install (folder with data/mods/core_2 — used by Tools/Soulash2/SkillCreator/)
+Soulash2Path = E:\SteamLibrary\steamapps\common\Soulash 2
+
+# Soulash 2 Steam Workshop content (app 2399160)
+Soulash2WorkshopPath = E:\SteamLibrary\steamapps\workshop\content\2399160
+
+# Blender executable OR the version folder that contains blender.exe
+BlenderPath = E:\tools\Blender Foundation\Blender 5.2\blender.exe
+
+# Optional comma/semicolon-separated roots to scan for Blender */blender.exe
+# (used only when BlenderPath is missing or invalid)
+BlenderRoots = E:\tools\Blender Foundation, D:\tools\Blender Foundation, %ProgramFiles%\Blender Foundation
+
+# Shared generator output root (ship packs, living weapons, etc.)
+OutputDir = C:\Output
+
+# Miniconda / Python used by GPU tools when not using the caller interpreter
+PythonPath = E:\tools\miniconda3\python.exe
+
+# Pixelorama pixel-art editor (AI host: Shared/pixelorama_client.py)
+PixeloramaExe = D:\tools\Orama Interactive\Pixelorama\Pixelorama.exe
+
+[SD]
+# Local SD3.5 server tree (contains server.py / start_server.bat)
+SDRoot = E:\tools\sd3.5\sd3.5
+
+# Python that has torch+diffusers for SD (usually Miniconda)
+SDPython = E:\tools\miniconda3\python.exe
+
+# API port (sd_http_client / lifecycle)
+SDPort = 1338
+
+# Where SD writes images (optional; default = <SDRoot>\outputs)
+; SDOutputsDir = E:\tools\sd3.5\sd3.5\outputs
+
+# Idle auto-shutdown seconds for on-demand server (0 = never)
+; SDIdleShutdownSec = 180
+
+[Audio]
+StableAudioDir = E:\tools\stable-audio
+AudioLibraryDir = D:\assets\audio
+AudioIndexDir = D:\assets\audio\_aamt_index
+
+# ---------------------------------------------------------------------------
+# Legacy flat style (still supported — same keys without sections):
+# ---------------------------------------------------------------------------
+# TranscendencePath = D:\games\Steam\steamapps\common\Transcendence
+# BlenderPath = E:\tools\Blender Foundation\Blender 5.2\blender.exe

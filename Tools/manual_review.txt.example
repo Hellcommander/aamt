@@ -1,0 +1,35 @@
+# Manual Review Items
+# This file contains issues that require manual review and the best AI to fix
+# Format: file, issue description, optional context and code
+
+file: D:\path\to\source\ComplexFile.cpp
+issue: Template instantiation error with C++20 - need to update template syntax
+context: The template uses old C++17 syntax that doesn't work in C++20
+code:
+template<typename T>
+void Process(T* item) {
+    // Old code that needs updating
+}
+
+---
+
+file: D:\path\to\source\AnotherFile.cpp
+issue: Complex smart pointer migration - multiple nested pointers need conversion
+context: File has multiple levels of pointer indirection that need careful conversion
+code:
+ICCItem* pItem = GetItem();
+ICCItem* pResult = pItem->Process();
+pResult->Discard(&CC);
+
+---
+
+file: D:\path\to\source\ThirdFile.cpp
+issue: Lambda expression needs C++20 update - capture semantics changed
+context: Lambda uses old capture syntax that needs updating for C++20
+
+---
+
+# General issue (applies to all files)
+issue: Update all range-based for loops to use C++20 syntax
+context: Some loops may need explicit type or const qualifiers
+

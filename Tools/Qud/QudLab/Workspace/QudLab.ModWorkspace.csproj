@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="Qud.Install.props" />
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <AssemblyName>QudLab.ModWorkspace</AssemblyName>
+    <RootNamespace>XRL</RootNamespace>
+    <EnableDefaultCompileItems>true</EnableDefaultCompileItems>
+  </PropertyGroup>
+</Project>

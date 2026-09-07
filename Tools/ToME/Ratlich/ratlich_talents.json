@@ -1,0 +1,27 @@
+[
+  {
+    "id": "T_RAT_LICH_CUNNING",
+    "name": "Rat Lich Cunning",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-ratlich-race\\data\\races\\ratlich_talents.lua"
+  },
+  {
+    "id": "T_RAT_LICH_ILLUSORY_GUISE",
+    "name": "Illusory Guise",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-ratlich-race\\data\\races\\ratlich_talents.lua"
+  },
+  {
+    "id": "T_RAT_LICH_RACE_EQUIP_TAIL_WEAPON",
+    "name": "Equip Tail Weapon",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-ratlich-race\\data\\races\\ratlich_talents.lua"
+  },
+  {
+    "id": "T_RAT_LICH_DARK_FEED_RUSH",
+    "name": "Dark Feed Rush",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-ratlich-race\\data\\races\\ratlich_talents.lua"
+  },
+  {
+    "id": "T_RAT_LICH_SUMMON_UNDEAD_RATS",
+    "name": "Summon Undead Rats",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-ratlich-race\\data\\races\\ratlich_talents.lua"
+  }
+]

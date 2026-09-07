@@ -1,0 +1,22 @@
+{
+  "game_dir": "D:\\games\\Steam\\steamapps\\common\\Grim Dawn",
+  "mod": "survivalmode",
+  "out_name": "SurvivalPlayground",
+  "class_mods": [
+    "dom",
+    "grimarillion",
+    "Rebirth"
+  ],
+  "content_mods": [
+    "dom",
+    "grimarillion",
+    "Rebirth",
+    "Riftwalk",
+    "ShatteredAffixes",
+    "Wereform Buffs"
+  ],
+  "portal_mods": [
+    "ReignOfTerror"
+  ],
+  "notes": "Mod folders: dom, Riftwalk, ReignOfTerror (updated). Order from merge_rules (low→high): Shattered 60, DoM 70, RoT 80, Grim 90, Rebirth 92, Wereform 96. Riftwalk 100 enabled:false. See profiles/merge_rules/README.md."
+}

@@ -1,0 +1,232 @@
+{
+  "version": "1.0.0",
+  "effects": [
+    {
+      "id": "nova_burst_01",
+      "type": "fx",
+      "style": "novaDrift",
+      "visual": {
+        "coreColor": "#ff66ff",
+        "rimColor": "#ffffff",
+        "shockwaveColor": "#ff99ff",
+        "bloomColor": "#ffccff",
+        "distortionStrength": 0.04,
+        "distortionType": "heatHaze",
+        "noiseType": "perlin",
+        "noiseSpeed": 1.2,
+        "noiseScale": 4.0,
+        "spriteSize": 64,
+        "frames": 12,
+        "layers": ["core", "shockwave", "bloom", "particles"],
+        "coreGlow": {
+          "enabled": true,
+          "intensity": 3.0,
+          "pulse": true,
+          "expand": true
+        },
+        "shockwave": {
+          "enabled": true,
+          "ringCount": 1,
+          "thickness": 0.02,
+          "expandSpeed": 2.0
+        },
+        "bloom": {
+          "enabled": true,
+          "intensity": 1.5,
+          "radius": 1.2
+        },
+        "chromaticAberration": false
+      },
+      "particles": {
+        "burstCount": 24,
+        "burstSpeedMin": 0.8,
+        "burstSpeedMax": 2.4,
+        "lifetimeMin": 0.2,
+        "lifetimeMax": 0.6,
+        "sizeMin": 0.02,
+        "sizeMax": 0.08,
+        "blend": "additive",
+        "motionPattern": "radialBurst",
+        "coreParticles": {
+          "enabled": true,
+          "count": 8,
+          "speedMin": 0.1,
+          "speedMax": 0.3,
+          "lifeMin": 0.4,
+          "lifeMax": 0.8
+        },
+        "shockwaveParticles": {
+          "enabled": false
+        }
+      },
+      "timing": {
+        "coreExpandTime": 0.12,
+        "shockwaveExpandTime": 0.18,
+        "fadeOutTime": 0.3,
+        "easeIn": "easeOut",
+        "easeOut": "easeIn"
+      },
+      "export": {
+        "unid": "&fxNovaBurst01;",
+        "transcendence": {
+          "as": "explosion",
+          "rotationFrames": 1,
+          "ticksPerFrame": 1
+        },
+        "resourcePaths": {
+          "sprite": "Resources/FX/nova_burst_01.png",
+          "particleProfile": "Resources/FX/nova_burst_01_particles.json"
+        }
+      }
+    },
+    {
+      "id": "plasma_explosion",
+      "type": "explosion",
+      "style": "novaDrift",
+      "visual": {
+        "coreColor": "#ff6600",
+        "rimColor": "#ffaa00",
+        "shockwaveColor": "#ffcc00",
+        "bloomColor": "#ff8800",
+        "distortionStrength": 0.06,
+        "distortionType": "turbulent",
+        "noiseType": "voronoi",
+        "noiseSpeed": 1.5,
+        "noiseScale": 3.0,
+        "spriteSize": 128,
+        "frames": 16,
+        "layers": ["core", "shockwave", "bloom", "distortion", "particles", "debris"],
+        "coreGlow": {
+          "enabled": true,
+          "intensity": 4.0,
+          "pulse": true,
+          "expand": true
+        },
+        "shockwave": {
+          "enabled": true,
+          "ringCount": 2,
+          "thickness": 0.03,
+          "expandSpeed": 2.5
+        },
+        "bloom": {
+          "enabled": true,
+          "intensity": 2.0,
+          "radius": 1.5
+        },
+        "chromaticAberration": true
+      },
+      "particles": {
+        "burstCount": 40,
+        "burstSpeedMin": 1.0,
+        "burstSpeedMax": 3.0,
+        "lifetimeMin": 0.3,
+        "lifetimeMax": 0.8,
+        "sizeMin": 0.03,
+        "sizeMax": 0.12,
+        "blend": "additive",
+        "motionPattern": "spiral",
+        "coreParticles": {
+          "enabled": true,
+          "count": 12,
+          "speedMin": 0.15,
+          "speedMax": 0.4,
+          "lifeMin": 0.5,
+          "lifeMax": 1.0
+        },
+        "shockwaveParticles": {
+          "enabled": true,
+          "count": 16,
+          "ringRadius": 0.6,
+          "expandSpeed": 2.0
+        }
+      },
+      "timing": {
+        "coreExpandTime": 0.15,
+        "shockwaveExpandTime": 0.25,
+        "fadeOutTime": 0.4,
+        "easeIn": "easeOut",
+        "easeOut": "easeIn"
+      },
+      "export": {
+        "unid": "&fxPlasmaExplosion;",
+        "transcendence": {
+          "as": "explosion",
+          "rotationFrames": 1,
+          "ticksPerFrame": 1
+        },
+        "resourcePaths": {
+          "sprite": "Resources/FX/plasma_explosion.png",
+          "distortionMap": "Resources/FX/plasma_explosion_distort.png",
+          "particleProfile": "Resources/FX/plasma_explosion_particles.json"
+        }
+      }
+    },
+    {
+      "id": "energy_impact",
+      "type": "impact",
+      "style": "novaDrift",
+      "visual": {
+        "coreColor": "#00ffff",
+        "rimColor": "#ffffff",
+        "shockwaveColor": "#88ffff",
+        "bloomColor": "#aaffff",
+        "distortionStrength": 0.03,
+        "distortionType": "radial",
+        "noiseType": "simplex",
+        "noiseSpeed": 0.8,
+        "noiseScale": 5.0,
+        "spriteSize": 48,
+        "frames": 8,
+        "layers": ["core", "shockwave", "particles"],
+        "coreGlow": {
+          "enabled": true,
+          "intensity": 2.5,
+          "pulse": false,
+          "expand": true
+        },
+        "shockwave": {
+          "enabled": true,
+          "ringCount": 1,
+          "thickness": 0.015,
+          "expandSpeed": 1.8
+        },
+        "bloom": {
+          "enabled": false
+        }
+      },
+      "particles": {
+        "burstCount": 16,
+        "burstSpeedMin": 0.6,
+        "burstSpeedMax": 1.8,
+        "lifetimeMin": 0.15,
+        "lifetimeMax": 0.5,
+        "sizeMin": 0.015,
+        "sizeMax": 0.06,
+        "blend": "additive",
+        "motionPattern": "radialBurst",
+        "coreParticles": {
+          "enabled": false
+        }
+      },
+      "timing": {
+        "coreExpandTime": 0.08,
+        "shockwaveExpandTime": 0.12,
+        "fadeOutTime": 0.2,
+        "easeIn": "easeOut",
+        "easeOut": "linear"
+      },
+      "export": {
+        "unid": "&fxEnergyImpact;",
+        "transcendence": {
+          "as": "impact",
+          "rotationFrames": 1,
+          "ticksPerFrame": 1
+        },
+        "resourcePaths": {
+          "sprite": "Resources/FX/energy_impact.png"
+        }
+      }
+    }
+  ]
+}
+

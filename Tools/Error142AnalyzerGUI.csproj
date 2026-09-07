@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <StartupObject>Error142Analyzer.Error142AnalyzerGUI</StartupObject>
+    <DefineConstants>$(DefineConstants);WORLDGEN_SIMULATOR_NOT_INCLUDED</DefineConstants>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <OutputPath>$(MSBuildThisFileDirectory)TerrariaMods\bin\$(Configuration)\$(TargetFramework)\</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="TerrariaMods\**" />
+    <Compile Remove="obj\**" />
+    <Compile Remove="bin\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Error142Simulator.cs" />
+    <Compile Remove="Error142SimulatorGUI.cs" />
+    <Compile Remove="WorldGenSimulator.cs" />
+    <Compile Remove="WorldGenSimulatorGUI.cs" />
+    <Compile Remove="MultiModWorldGenAnalyzer.cs" />
+    <Compile Remove="TmodFileReader.cs" />
+    <Compile Remove="WorldGenExecutionSimulator.cs" />
+    <Compile Remove="TestTmodFile.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- GUI doesn't need tModLoader reference directly, only the analyzer does -->
+  </ItemGroup>
+
+</Project>

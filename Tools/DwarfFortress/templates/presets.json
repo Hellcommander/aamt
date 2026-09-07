@@ -1,0 +1,625 @@
+{
+  "schema_version": 1,
+  "body_presets": {
+    "humanoid_civ": {
+      "body_fragments": [
+        "HUMANOID_NECK",
+        "2EYES",
+        "2EARS",
+        "NOSE",
+        "2LUNGS",
+        "HEART",
+        "GUTS",
+        "ORGANS",
+        "HUMANOID_JOINTS",
+        "THROAT",
+        "NECK",
+        "SPINE",
+        "BRAIN",
+        "SKULL",
+        "5FINGERS",
+        "5TOES",
+        "MOUTH",
+        "TONGUE",
+        "FACIAL_FEATURES",
+        "TEETH",
+        "RIBCAGE"
+      ],
+      "detail_plans": [
+        "STANDARD_MATERIALS",
+        "STANDARD_TISSUES",
+        "VERTEBRATE_TISSUE_LAYERS:SKIN:FAT:MUSCLE:BONE:CARTILAGE",
+        "HEAD_HAIR_TISSUE_LAYERS",
+        "FACIAL_HAIR_TISSUES",
+        "STANDARD_HEAD_POSITIONS",
+        "HUMANOID_HEAD_POSITIONS",
+        "HUMANOID_RIBCAGE_POSITIONS",
+        "HUMANOID_RELSIZES"
+      ],
+      "graphics_profile": "humanoid",
+      "intelligent": true,
+      "equips": true,
+      "can_open_doors": true,
+      "site_controllable": true,
+      "culture_preset": "dwarf_industry"
+    },
+    "winged_humanoid": {
+      "body_fragments": [
+        "HUMANOID_NECK",
+        "2WINGS",
+        "2EYES",
+        "2EARS",
+        "NOSE",
+        "2LUNGS",
+        "HEART",
+        "GUTS",
+        "ORGANS",
+        "HUMANOID_JOINTS",
+        "THROAT",
+        "NECK",
+        "SPINE",
+        "BRAIN",
+        "SKULL",
+        "5FINGERS",
+        "5TOES",
+        "MOUTH",
+        "TONGUE",
+        "FACIAL_FEATURES",
+        "TEETH",
+        "RIBCAGE"
+      ],
+      "detail_plans": [
+        "STANDARD_MATERIALS",
+        "STANDARD_TISSUES",
+        "VERTEBRATE_TISSUE_LAYERS:SKIN:FAT:MUSCLE:BONE:CARTILAGE",
+        "STANDARD_HEAD_POSITIONS",
+        "HUMANOID_HEAD_POSITIONS",
+        "HUMANOID_RIBCAGE_POSITIONS",
+        "HUMANOID_RELSIZES"
+      ],
+      "graphics_profile": "humanoid",
+      "intelligent": true,
+      "equips": true,
+      "can_open_doors": true,
+      "site_controllable": true,
+      "culture_preset": "elf_nature"
+    },
+    "quadruped_grasp": {
+      "body_fragments": [
+        "QUADRUPED_NECK_FRONT_GRASP",
+        "2EYES",
+        "2EARS",
+        "NOSE",
+        "2LUNGS",
+        "HEART",
+        "GUTS",
+        "ORGANS",
+        "THROAT",
+        "NECK",
+        "SPINE",
+        "BRAIN",
+        "SKULL",
+        "MOUTH",
+        "TONGUE",
+        "TEETH",
+        "RIBCAGE",
+        "TAIL"
+      ],
+      "detail_plans": [
+        "STANDARD_MATERIALS",
+        "STANDARD_TISSUES",
+        "VERTEBRATE_TISSUE_LAYERS:SKIN:FAT:MUSCLE:BONE:CARTILAGE",
+        "STANDARD_HEAD_POSITIONS"
+      ],
+      "graphics_profile": "simple",
+      "intelligent": true,
+      "equips": true,
+      "can_open_doors": true,
+      "site_controllable": true,
+      "culture_preset": "none"
+    },
+    "insectoid": {
+      "body_fragments": [
+        "INSECT_4LEGS_2ARMS",
+        "UPPERBODY_PINCERS",
+        "2EYES",
+        "HEART",
+        "GUTS",
+        "BRAIN",
+        "MOUTH",
+        "2_ANTENNAE"
+      ],
+      "detail_plans": [
+        "CHITIN_MATERIALS",
+        "CHITIN_TISSUES",
+        "EXOSKELETON_TISSUE_LAYERS:CHITIN:FAT:MUSCLE"
+      ],
+      "graphics_profile": "simple",
+      "intelligent": true,
+      "equips": true,
+      "can_open_doors": true,
+      "site_controllable": true,
+      "culture_preset": "hive"
+    },
+    "serpentine": {
+      "body_fragments": [
+        "BASIC_1PARTBODY",
+        "BASIC_HEAD_NECK",
+        "2EYES",
+        "NOSE",
+        "HEART",
+        "GUTS",
+        "ORGANS",
+        "SPINE",
+        "BRAIN",
+        "SKULL",
+        "MOUTH",
+        "FORKED_TONGUE",
+        "TEETH",
+        "RIBCAGE",
+        "TAIL"
+      ],
+      "detail_plans": [
+        "STANDARD_MATERIALS",
+        "STANDARD_TISSUES",
+        "VERTEBRATE_TISSUE_LAYERS:SKIN:FAT:MUSCLE:BONE:CARTILAGE",
+        "STANDARD_HEAD_POSITIONS"
+      ],
+      "graphics_profile": "simple",
+      "intelligent": true,
+      "equips": false,
+      "can_open_doors": true,
+      "site_controllable": false,
+      "culture_preset": "none",
+      "body_size_adult": 40000
+    },
+    "avian_folk": {
+      "body_fragments": [
+        "HUMANOID_NECK",
+        "2WINGS",
+        "2EYES",
+        "2EARS",
+        "2LUNGS",
+        "HEART",
+        "GUTS",
+        "ORGANS",
+        "GIZZARD",
+        "HUMANOID_JOINTS",
+        "THROAT",
+        "NECK",
+        "SPINE",
+        "BRAIN",
+        "SKULL",
+        "5FINGERS",
+        "4TOES",
+        "BEAK",
+        "TONGUE",
+        "RIBCAGE"
+      ],
+      "detail_plans": [
+        "STANDARD_MATERIALS",
+        "STANDARD_TISSUES",
+        "VERTEBRATE_TISSUE_LAYERS:SKIN:FAT:MUSCLE:BONE:CARTILAGE",
+        "STANDARD_HEAD_POSITIONS",
+        "HUMANOID_HEAD_POSITIONS",
+        "HUMANOID_RIBCAGE_POSITIONS",
+        "HUMANOID_RELSIZES"
+      ],
+      "graphics_profile": "humanoid",
+      "intelligent": true,
+      "equips": true,
+      "can_open_doors": true,
+      "site_controllable": true,
+      "culture_preset": "aerie",
+      "body_size_adult": 50000,
+      "color": [
+        6,
+        0,
+        1
+      ]
+    },
+    "avian": {
+      "body_fragments": [
+        "HUMANOID_ARMLESS_NECK",
+        "2WINGS",
+        "2EYES",
+        "2LUNGS",
+        "HEART",
+        "GUTS",
+        "ORGANS",
+        "GIZZARD",
+        "THROAT",
+        "NECK",
+        "SPINE",
+        "BRAIN",
+        "SKULL",
+        "4TOES",
+        "BEAK",
+        "TONGUE",
+        "RIBCAGE"
+      ],
+      "detail_plans": [
+        "STANDARD_MATERIALS",
+        "STANDARD_TISSUES",
+        "VERTEBRATE_TISSUE_LAYERS:SKIN:FAT:MUSCLE:BONE:CARTILAGE",
+        "STANDARD_HEAD_POSITIONS"
+      ],
+      "graphics_profile": "simple",
+      "intelligent": false,
+      "equips": false,
+      "can_open_doors": false,
+      "site_controllable": false,
+      "culture_preset": "aerie",
+      "body_size_adult": 8000,
+      "color": [
+        6,
+        0,
+        0
+      ]
+    },
+    "aquatic": {
+      "body_fragments": [
+        "BASIC_2PARTBODY",
+        "BASIC_HEAD",
+        "SIDE_FINS",
+        "DORSAL_FIN",
+        "TAIL",
+        "2EYES",
+        "HEART",
+        "GUTS",
+        "ORGANS",
+        "SPINE",
+        "BRAIN",
+        "SKULL",
+        "MOUTH",
+        "RIBCAGE",
+        "GENERIC_TEETH"
+      ],
+      "detail_plans": [
+        "STANDARD_MATERIALS",
+        "STANDARD_TISSUES",
+        "VERTEBRATE_TISSUE_LAYERS:SKIN:FAT:MUSCLE:BONE:CARTILAGE",
+        "STANDARD_HEAD_POSITIONS"
+      ],
+      "graphics_profile": "simple",
+      "intelligent": false,
+      "equips": false,
+      "can_open_doors": false,
+      "site_controllable": false,
+      "culture_preset": "depths",
+      "body_size_adult": 30000,
+      "color": [
+        1,
+        0,
+        1
+      ]
+    },
+    "arachnid": {
+      "body_fragments": [
+        "SPIDER",
+        "2EYES",
+        "HEART",
+        "GUTS",
+        "BRAIN",
+        "MOUTH",
+        "2_ANTENNAE"
+      ],
+      "detail_plans": [
+        "CHITIN_MATERIALS",
+        "CHITIN_TISSUES",
+        "EXOSKELETON_TISSUE_LAYERS:CHITIN:FAT:MUSCLE"
+      ],
+      "graphics_profile": "simple",
+      "intelligent": true,
+      "equips": false,
+      "can_open_doors": true,
+      "site_controllable": false,
+      "culture_preset": "hive",
+      "body_size_adult": 20000,
+      "color": [
+        0,
+        0,
+        1
+      ]
+    },
+    "amorphous": {
+      "body_fragments": [
+        "BASIC_1PARTBODY_THOUGHT",
+        "MOUTH"
+      ],
+      "detail_plans": [
+        "STANDARD_MATERIALS",
+        "STANDARD_TISSUES",
+        "VERTEBRATE_TISSUE_LAYERS:SKIN:FAT:MUSCLE:BONE:CARTILAGE"
+      ],
+      "graphics_profile": "simple",
+      "intelligent": true,
+      "equips": false,
+      "can_open_doors": true,
+      "site_controllable": false,
+      "culture_preset": "none",
+      "body_size_adult": 20000,
+      "color": [
+        5,
+        0,
+        0
+      ]
+    },
+    "centauroid": {
+      "body_fragments": [
+        "HAND_FOOT_CENTAUR_NECK",
+        "TAIL",
+        "2EYES",
+        "2EARS",
+        "NOSE",
+        "2LUNGS",
+        "HEART",
+        "GUTS",
+        "ORGANS",
+        "THROAT",
+        "NECK",
+        "SPINE",
+        "BRAIN",
+        "SKULL",
+        "4FINGERS",
+        "4TOES",
+        "MOUTH",
+        "TONGUE",
+        "TEETH",
+        "RIBCAGE"
+      ],
+      "detail_plans": [
+        "STANDARD_MATERIALS",
+        "STANDARD_TISSUES",
+        "VERTEBRATE_TISSUE_LAYERS:SKIN:FAT:MUSCLE:BONE:CARTILAGE",
+        "STANDARD_HEAD_POSITIONS",
+        "HUMANOID_HEAD_POSITIONS"
+      ],
+      "graphics_profile": "humanoid",
+      "intelligent": true,
+      "equips": true,
+      "can_open_doors": true,
+      "site_controllable": true,
+      "culture_preset": "none",
+      "body_size_adult": 120000,
+      "color": [
+        4,
+        0,
+        0
+      ]
+    },
+    "hoofed_humanoid": {
+      "body_fragments": [
+        "HUMANOID_NECK_HOOF",
+        "2EYES",
+        "2EARS",
+        "NOSE",
+        "2LUNGS",
+        "HEART",
+        "GUTS",
+        "ORGANS",
+        "HUMANOID_JOINTS",
+        "THROAT",
+        "NECK",
+        "SPINE",
+        "BRAIN",
+        "SKULL",
+        "5FINGERS",
+        "MOUTH",
+        "TONGUE",
+        "FACIAL_FEATURES",
+        "TEETH",
+        "RIBCAGE",
+        "2HEAD_HORN"
+      ],
+      "detail_plans": [
+        "STANDARD_MATERIALS",
+        "STANDARD_TISSUES",
+        "VERTEBRATE_TISSUE_LAYERS:SKIN:FAT:MUSCLE:BONE:CARTILAGE",
+        "STANDARD_HEAD_POSITIONS",
+        "HUMANOID_HEAD_POSITIONS",
+        "HUMANOID_RIBCAGE_POSITIONS",
+        "HUMANOID_RELSIZES"
+      ],
+      "graphics_profile": "humanoid",
+      "intelligent": true,
+      "equips": true,
+      "can_open_doors": true,
+      "site_controllable": true,
+      "culture_preset": "none",
+      "body_size_adult": 80000,
+      "color": [
+        6,
+        0,
+        0
+      ]
+    },
+    "tentacled": {
+      "body_fragments": [
+        "BASIC_2PARTBODY",
+        "BASIC_HEAD",
+        "2_HEAD_CLUBBED_TENTACLES",
+        "2EYES",
+        "HEART",
+        "GUTS",
+        "ORGANS",
+        "BRAIN",
+        "SKULL",
+        "MOUTH",
+        "TONGUE"
+      ],
+      "detail_plans": [
+        "STANDARD_MATERIALS",
+        "STANDARD_TISSUES",
+        "VERTEBRATE_TISSUE_LAYERS:SKIN:FAT:MUSCLE:BONE:CARTILAGE",
+        "STANDARD_HEAD_POSITIONS"
+      ],
+      "graphics_profile": "simple",
+      "intelligent": true,
+      "equips": true,
+      "can_open_doors": true,
+      "site_controllable": true,
+      "culture_preset": "depths",
+      "body_size_adult": 70000,
+      "color": [
+        5,
+        0,
+        1
+      ]
+    },
+    "shelled_quadruped": {
+      "body_fragments": [
+        "QUADRUPED_NECK",
+        "TAIL",
+        "2EYES",
+        "NOSE",
+        "2LUNGS",
+        "HEART",
+        "GUTS",
+        "ORGANS",
+        "THROAT",
+        "NECK",
+        "SPINE",
+        "BRAIN",
+        "SKULL",
+        "BEAK",
+        "RIBCAGE",
+        "SHELL"
+      ],
+      "detail_plans": [
+        "STANDARD_MATERIALS",
+        "STANDARD_TISSUES",
+        "VERTEBRATE_TISSUE_LAYERS:SKIN:FAT:MUSCLE:BONE:CARTILAGE",
+        "STANDARD_HEAD_POSITIONS"
+      ],
+      "graphics_profile": "simple",
+      "intelligent": false,
+      "equips": false,
+      "can_open_doors": false,
+      "site_controllable": false,
+      "culture_preset": "none",
+      "body_size_adult": 40000,
+      "color": [
+        2,
+        0,
+        0
+      ]
+    },
+    "hematophyte": {
+      "body_mode": "custom",
+      "body_fragments": [],
+      "detail_plans": [],
+      "bodygloss": [
+        "MAW"
+      ],
+      "graphics_profile": "simple",
+      "intelligent": true,
+      "equips": true,
+      "can_open_doors": true,
+      "site_controllable": true,
+      "culture_preset": "elf_nature",
+      "body_size_adult": 90000,
+      "color": [
+        2,
+        0,
+        1
+      ]
+    }
+  },
+  "culture_presets": [
+    "none",
+    "dwarf_industry",
+    "elf_nature",
+    "goblin_raid",
+    "aerie",
+    "hive",
+    "depths"
+  ],
+  "phonology_presets": [
+    "harsh",
+    "liquid",
+    "guttural"
+  ],
+  "graphics_profiles": [
+    "humanoid",
+    "simple"
+  ],
+  "preset_info": {
+    "humanoid_civ": {
+      "label": "Humanoid folk",
+      "playable": true,
+      "plan": "humanoid"
+    },
+    "winged_humanoid": {
+      "label": "Winged humanoid",
+      "playable": true,
+      "plan": "winged"
+    },
+    "hoofed_humanoid": {
+      "label": "Hoofed humanoid",
+      "playable": true,
+      "plan": "hoofed"
+    },
+    "avian_folk": {
+      "label": "Avian folk (beak + hands + wings)",
+      "playable": true,
+      "plan": "avian"
+    },
+    "centauroid": {
+      "label": "Centauroid",
+      "playable": true,
+      "plan": "centaur"
+    },
+    "quadruped_grasp": {
+      "label": "Quadruped with front grasp",
+      "playable": true,
+      "plan": "quadruped"
+    },
+    "insectoid": {
+      "label": "Insectoid (4 legs + 2 arms)",
+      "playable": true,
+      "plan": "insectoid"
+    },
+    "tentacled": {
+      "label": "Tentacled (clubbed grasp)",
+      "playable": true,
+      "plan": "tentacled"
+    },
+    "hematophyte": {
+      "label": "Hematophyte (custom plant\u2013animal vines + maw)",
+      "playable": true,
+      "plan": "hematophyte",
+      "body_mode": "custom"
+    },
+    "arachnid": {
+      "label": "Arachnid",
+      "playable": false,
+      "plan": "arachnid"
+    },
+    "avian": {
+      "label": "Bird (armless)",
+      "playable": false,
+      "plan": "avian"
+    },
+    "aquatic": {
+      "label": "Aquatic / fish",
+      "playable": false,
+      "plan": "aquatic"
+    },
+    "serpentine": {
+      "label": "Serpentine",
+      "playable": false,
+      "plan": "serpentine"
+    },
+    "amorphous": {
+      "label": "Amorphous blob",
+      "playable": false,
+      "plan": "amorphous"
+    },
+    "shelled_quadruped": {
+      "label": "Shelled quadruped",
+      "playable": false,
+      "plan": "shelled"
+    }
+  }
+}

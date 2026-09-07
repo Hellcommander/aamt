@@ -1,0 +1,82 @@
+{
+  "id": "inferno_bolt",
+  "flameType": "inferno_bolt",
+  "flameShape": "cone",
+  "blendMode": "additive",
+  "noiseType": "curl",
+  "trailType": "ribbon",
+  
+  "speed": 30.0,
+  "length": 1.5,
+  "width": 0.3,
+  "flameHeight": 1.2,
+  "flameWidthVariation": 0.6,
+  
+  "coreColor": [1.0, 0.5, 0.2],
+  "outerColor": [1.0, 0.1, 0.0],
+  "glowColor": [1.0, 0.4, 0.0],
+  "emberColor": [1.0, 0.4, 0.1, 0.8],
+  
+  "flickerIntensity": 0.8,
+  "flickerSpeed": 4.0,
+  "turbulenceStrength": 1.5,
+  "turbulenceScale": 3.0,
+  "oscillationFreq": 1.2,
+  "oscillationAmplitude": 0.15,
+  
+  "trailLength": 1.0,
+  "trailWidth": 0.15,
+  "trailOpacity": 0.9,
+  "enableTrailFade": true,
+  "trailFadeSpeed": 1.2,
+  
+  "emberCount": 80,
+  "emberLifetime": 0.4,
+  "emberSize": 0.06,
+  "emberSpeed": 1.2,
+  "enableEmberFade": true,
+  "emberFadeSpeed": 1.5,
+  
+  "shaderType": "inferno",
+  "shaderIntensity": 1.2,
+  "enableDistortion": true,
+  "distortionStrength": 0.2,
+  "enableBlur": false,
+  "blurStrength": 0.1,
+  "enableHeatDistortion": true,
+  "heatDistortionStrength": 0.15,
+  
+  "enablePhysics": true,
+  "physicsMass": 0.15,
+  "physicsDrag": 0.1,
+  "physicsLift": 0.05,
+  "enableCollision": true,
+  "collisionRadius": 0.15,
+  
+  "enableCaching": true,
+  "enableHotReload": true,
+  "enableParallelProcessing": true,
+  "lodLevel": 0,
+  
+  "description": "A powerful inferno bolt that creates intense flames with dynamic trails and ember particles. The projectile has high damage potential and creates impressive visual effects.",
+  
+  "tags": [
+    "inferno",
+    "bolt",
+    "fire",
+    "projectile",
+    "high_damage",
+    "visual_effects"
+  ],
+  
+  "metadata": {
+    "author": "Magi-Tech Flame Projectile System",
+    "version": "1.0.0",
+    "license": "MIT",
+    "damage": "very_high",
+    "range": "medium",
+    "difficulty": "expert",
+    "category": "fire_magic",
+    "tier": "epic"
+  }
+} 

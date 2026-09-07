@@ -1,0 +1,282 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Transcendence Integration Examples
+Example XML snippets showing how to integrate generated assets into Transcendence extensions.
+-->
+
+<TranscendenceModule apiVersion="57">
+
+<!--
+========================================
+PROJECTILE INTEGRATION
+========================================
+-->
+
+<!-- Example: Using generated projectile in a weapon -->
+<ItemType UNID="&itCustomPlasmaCannon;"
+    name="Custom Plasma Cannon"
+    level="5"
+    value="5000"
+    frequency="common">
+    
+    <Image imageID="&rsWeapons;" imageX="0" imageY="0" imageWidth="96" imageHeight="96"/>
+    
+    <Weapon
+        type="projectile"
+        damage="plasma:15"
+        speed="120"
+        lifetime="900"
+        fireRate="30"
+        powerUse="200"
+        sound="&snLaserCannon;">
+        
+        <!-- Reference generated projectile image -->
+        <Projectile imageID="&fxPlasmaBolt;"/>
+        
+        <!-- Reference generated impact FX -->
+        <Effect>
+            <Image imageID="&fxPlasmaImpact;"/>
+        </Effect>
+    </Weapon>
+</ItemType>
+
+<!-- Example: Generated projectile image definition -->
+<Image UNID="&fxPlasmaBolt;">
+    <ImageDesc
+        bitmap="Resources/Projectiles/plasma_bolt.png"
+        bitmask="none"
+        frameCount="1"
+        ticksPerFrame="1"
+        rotationCount="1"
+    />
+</Image>
+
+<!--
+========================================
+SHIELD INTEGRATION
+========================================
+-->
+
+<!-- Example: Using generated shield -->
+<ShieldType UNID="&shEnergyShieldMk2;"
+    name="Energy Shield Mk2"
+    maxHP="120"
+    rechargeRate="6.0"
+    rechargeDelay="450">
+    
+    <!-- Reference generated shield sprite -->
+    <Image imageID="&rsEnergyShieldMk2;"/>
+    
+    <!-- Reference generated shield aura -->
+    <Aura auraID="&auSolarWindShield;"/>
+    
+    <!-- Shield properties from registry -->
+    <Visual
+        radius="1.6"
+        thickness="0.08"
+        color="#66ccff"
+        glowColor="#aaffff"/>
+    
+    <!-- FX from registry -->
+    <FX
+        hitFlashDuration="0.12"
+        hitPulseStrength="1.6"
+        impactParticleCount="12"/>
+    
+    <!-- Sound references -->
+    <Sound hit="&snShieldHit;" break="&snShieldBreak;" recharge="&snShieldRecharge;"/>
+</ShieldType>
+
+<!-- Example: Generated shield image -->
+<Image UNID="&rsEnergyShieldMk2;">
+    <ImageDesc
+        bitmap="Resources/Shields/energy_shield_mk2.png"
+        bitmask="none"
+        frameCount="1"
+        ticksPerFrame="1"
+        rotationCount="1"
+    />
+</Image>
+
+<!--
+========================================
+ARMOR INTEGRATION
+========================================
+-->
+
+<!-- Example: Using generated armor -->
+<ArmorType UNID="&arReinforcedPlatingMk1;"
+    name="Reinforced Plating Mk1">
+    
+    <!-- Armor slots from registry -->
+    <Slots>
+        <Slot name="front" maxHP="50">
+            <Reduction type="kinetic" value="0.2"/>
+            <Reduction type="laser" value="0.1"/>
+            <Reduction type="plasma" value="0.15"/>
+        </Slot>
+        <Slot name="left" maxHP="50">
+            <Reduction type="kinetic" value="0.2"/>
+            <Reduction type="laser" value="0.1"/>
+            <Reduction type="plasma" value="0.15"/>
+        </Slot>
+        <Slot name="right" maxHP="50">
+            <Reduction type="kinetic" value="0.2"/>
+            <Reduction type="laser" value="0.1"/>
+            <Reduction type="plasma" value="0.15"/>
+        </Slot>
+        <Slot name="rear" maxHP="50">
+            <Reduction type="kinetic" value="0.2"/>
+            <Reduction type="laser" value="0.1"/>
+            <Reduction type="plasma" value="0.15"/>
+        </Slot>
+    </Slots>
+    
+    <!-- Reference generated armor overlay -->
+    <Visual
+        overlay="Resources/Armor/reinforced_plating_overlay.png"
+        normalMap="Resources/Armor/reinforced_plating_normal.png"/>
+</ArmorType>
+
+<!--
+========================================
+FX INTEGRATION
+========================================
+-->
+
+<!-- Example: Using generated FX for explosion -->
+<EffectType UNID="&efNovaBurst01;"
+    name="Nova Burst"
+    type="explosion">
+    
+    <!-- Reference generated FX spritesheet -->
+    <Image imageID="&fxNovaBurst01;"/>
+    
+    <!-- Distortion from registry -->
+    <Distortion strength="0.04" frequency="2.6" type="heatHaze"/>
+    
+    <!-- Particle system from registry -->
+    <Particles particleProfile="Resources/FX/nova_burst_01_particles.json"/>
+</EffectType>
+
+<!-- Example: Generated FX image -->
+<Image UNID="&fxNovaBurst01;">
+    <ImageDesc
+        bitmap="Resources/FX/nova_burst_01.png"
+        bitmask="none"
+        frameCount="12"
+        ticksPerFrame="1"
+        rotationCount="1"
+    />
+</Image>
+
+<!--
+========================================
+SHIELD AURA INTEGRATION
+========================================
+-->
+
+<!-- Example: Using generated shield aura -->
+<AuraType UNID="&auSolarWindShield;"
+    name="Solar Wind Shield Aura">
+    
+    <!-- Visual properties from registry -->
+    <Visual
+        radiusMin="1.2"
+        radiusMax="2.4"
+        baseColor="#66ccff"
+        windColor="#aaffff"/>
+    
+    <!-- Alpha noise from registry -->
+    <AlphaNoise
+        speed="1.8"
+        scale="3.2"
+        strength="0.6"/>
+    
+    <!-- Distortion from registry -->
+    <Distortion
+        strength="0.05"
+        frequency="2.6"
+        type="heatHaze"/>
+    
+    <!-- Particle system from registry -->
+    <Particles
+        orbitCount="24"
+        orbitSpeedMin="0.4"
+        orbitSpeedMax="1.6"
+        gravityStrength="0.8"/>
+    
+    <!-- Behavior from registry -->
+    <Behavior
+        projectileInfluence="true"
+        projectileOrbitTime="0.3"
+        projectileInfluenceRadius="2.0"
+        projectileGravityStrength="0.6"
+        shieldScaleWithHP="true"/>
+    
+    <!-- Reference generated aura sprite -->
+    <Image imageID="&rsSolarWindShield;"/>
+</AuraType>
+
+<!-- Example: Generated aura image -->
+<Image UNID="&rsSolarWindShield;">
+    <ImageDesc
+        bitmap="Resources/Auras/solar_wind_shield.png"
+        bitmask="none"
+        frameCount="12"
+        ticksPerFrame="1"
+        rotationCount="1"
+    />
+</Image>
+
+<!--
+========================================
+COMPLETE INTEGRATION EXAMPLE
+========================================
+-->
+
+<!-- Example: Ship with all generated assets -->
+<ShipClass UNID="&scCustomShip;"
+    name="Custom Ship"
+    class="&scPlayerShip;">
+    
+    <!-- Ship image -->
+    <Image imageID="&rsCustomShip;"/>
+    
+    <!-- Generated shield -->
+    <Shield shieldID="&shEnergyShieldMk2;"/>
+    
+    <!-- Generated armor -->
+    <Armor armorID="&arReinforcedPlatingMk1;"/>
+    
+    <!-- Weapons with generated projectiles -->
+    <Weapon deviceID="&itCustomPlasmaCannon;" count="2"/>
+    
+    <!-- Generated shield aura (via shield) -->
+    <!-- Aura is automatically applied through shield definition -->
+</ShipClass>
+
+<!--
+========================================
+UNID ENTITY DECLARATIONS
+========================================
+-->
+
+<!-- Add these to your extension's entity declarations -->
+<!--
+<!ENTITY itCustomPlasmaCannon        "0xD001A000">
+<!ENTITY fxPlasmaBolt                "0xD001A001">
+<!ENTITY fxPlasmaImpact              "0xD001A002">
+<!ENTITY shEnergyShieldMk2           "0xD001A003">
+<!ENTITY rsEnergyShieldMk2           "0xD001A004">
+<!ENTITY auSolarWindShield           "0xD001A005">
+<!ENTITY rsSolarWindShield           "0xD001A006">
+<!ENTITY arReinforcedPlatingMk1      "0xD001A007">
+<!ENTITY efNovaBurst01               "0xD001A008">
+<!ENTITY fxNovaBurst01               "0xD001A009">
+<!ENTITY scCustomShip                "0xD001A00A">
+<!ENTITY rsCustomShip                "0xD001A00B">
+-->
+
+</TranscendenceModule>
+

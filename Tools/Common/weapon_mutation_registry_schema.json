@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Weapon Mutation Registry Schema",
+  "description": "Schema for Nova Drift-inspired weapon mutation system with 2-slot limit",
+  "type": "object",
+  "required": ["version", "mutations"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version"
+    },
+    "mutations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "tier", "name", "effects", "tradeoffs"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique mutation identifier"
+          },
+          "tier": {
+            "type": "string",
+            "enum": ["minor", "major", "corrupt"],
+            "description": "Mutation tier: minor (small buff), major (noticeable change), corrupt (game-changing with risk)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name"
+          },
+          "description": {
+            "type": "string",
+            "description": "Tooltip description"
+          },
+          "slotCost": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2,
+            "description": "Slot cost (minor=1, major=1-2, corrupt=2)"
+          },
+          "instability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Instability penalty (corrupt mutations only)"
+          },
+          "effects": {
+            "type": "object",
+            "description": "Positive effects",
+            "properties": {
+              "damageMultiplier": {"type": "number", "description": "Damage multiplier (e.g., 1.15 = +15%)"},
+              "fireRateMultiplier": {"type": "number", "description": "Fire rate multiplier"},
+              "projectileSpeedMultiplier": {"type": "number", "description": "Projectile speed multiplier"},
+              "rangeMultiplier": {"type": "number", "description": "Range multiplier"},
+              "accuracyMultiplier": {"type": "number", "description": "Accuracy multiplier"},
+              "piercing": {"type": "integer", "description": "Additional piercing count"},
+              "splitOnImpact": {"type": "integer", "description": "Number of projectiles on split"},
+              "homing": {"type": "boolean", "description": "Enable homing behavior"},
+              "procChance": {"type": "number", "description": "Proc chance (0-1)"},
+              "procEffect": {
+                "type": "string",
+                "enum": ["slow", "stun", "burn", "freeze", "shock", "explode"],
+                "description": "Proc effect type"
+              },
+              "behaviorChange": {
+                "type": "string",
+                "description": "Behavior modification (e.g., 'phase_through_shields', 'orb_creation')"
+              },
+              "synergyBonus": {
+                "type": "object",
+                "description": "Bonus effects when combined with specific mutations",
+                "properties": {
+                  "with": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Mutation IDs that trigger synergy"
+                  },
+                  "effect": {
+                    "type": "string",
+                    "description": "Synergy effect description"
+                  },
+                  "damageMultiplier": {"type": "number"},
+                  "fireRateMultiplier": {"type": "number"},
+                  "procChance": {"type": "number"}
+                }
+              },
+              "conditionalEffect": {
+                "type": "object",
+                "description": "Effect that only applies under certain conditions",
+                "properties": {
+                  "condition": {"type": "string"},
+                  "effect": {"type": "string"}
+                }
+              }
+            }
+          },
+          "tradeoffs": {
+            "type": "object",
+            "description": "Negative effects or opportunity costs",
+            "properties": {
+              "damagePenalty": {"type": "number", "description": "Damage penalty (e.g., -0.05 = -5%)"},
+              "fireRatePenalty": {"type": "number", "description": "Fire rate penalty"},
+              "rangePenalty": {"type": "number", "description": "Range penalty"},
+              "accuracyPenalty": {"type": "number", "description": "Accuracy penalty"},
+              "recoilIncrease": {"type": "number", "description": "Recoil increase"},
+              "heatBuildUp": {"type": "number", "description": "Heat buildup rate"},
+              "cooldownPenalty": {"type": "number", "description": "Cooldown penalty"},
+              "misfireChance": {"type": "number", "description": "Misfire chance (0-1)"},
+              "selfDamageChance": {"type": "number", "description": "Self damage chance (0-1)"},
+              "ammoConsumption": {"type": "number", "description": "Ammo consumption multiplier"}
+            }
+          },
+          "compatibility": {
+            "type": "object",
+            "description": "Compatibility rules for stacking",
+            "properties": {
+              "synergizesWith": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Mutation IDs that synergize well"
+              },
+              "conflictsWith": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Mutation IDs that conflict"
+              },
+              "requires": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Required mutation IDs"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["damage", "speed", "utility", "behavior", "proc", "range", "accuracy"]
+                },
+                "description": "Mutation tags for categorization"
+              }
+            }
+          },
+          "weaponTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["all", "projectile", "beam", "missile", "mine", "railgun", "plasma", "laser"]
+            },
+            "description": "Weapon types this mutation can apply to"
+          },
+          "rarity": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Drop/spawn rarity (0-1)"
+          },
+          "export": {
+            "type": "object",
+            "properties": {
+              "unid": {"type": "string"},
+              "transcendenceXml": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
+

@@ -1,0 +1,33 @@
+{
+  "id": "grimarillion",
+  "match": ["grimarillion"],
+  "mode": "content",
+  "enabled": true,
+  "priority": 90,
+  "class_priority": 90,
+  "items_mode": "merge",
+  "conflict_merge": true,
+  "conflict_merge_prefixes": [
+    "records/creatures/enemies/",
+    "records/skills/",
+    "records/items/",
+    "records/ui/"
+  ],
+  "prefer_field_substrings": [
+    "loot",
+    "drop",
+    "tdyn",
+    "merchant",
+    "store",
+    "factions",
+    "conversion",
+    "blueprint",
+    "artifact",
+    "augment",
+    "skillTree",
+    "skillCtrlPane",
+    "mastery"
+  ],
+  "keep_base_field_substrings": [],
+  "notes": "Priority 90 with field-merge vs earlier packs (DoM). vs Rebirth (later): Rebirth field-merges on top — Grim loot/merchant fields kept via Rebirth keep_base; Grim unique class trees unaffected. Custom D3/Zenith/TQ paths are unique."
+}

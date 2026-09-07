@@ -1,0 +1,1080 @@
+#!/usr/bin/env python3
+"""
+⚠️ DEPRECATED - This script has been superseded by generate_vortex_professional.py
+
+DO NOT USE THIS SCRIPT. Use generate_vortex_professional.py instead.
+
+All features from this script have been merged into the unified generator with improvements:
+- 4x supersampling (was 2x)
+- 16 frames (was 8)
+- High-resolution support (64x64, 96x96)
+- Multi-AI support
+- Quality assessment integration
+- Performance optimizations
+
+This script is kept for reference only.
+"""
+"""
+High-Quality Space-Time Vortex Asset Generator using Ollama
+Generates premium visual assets for the Space-Time Vortex mutation.
+"""
+
+import os
+import sys
+import json
+import time
+import re
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+import math
+
+# Import audio generator for white hole sounds
+_audio_gen_path = os.path.join(os.path.dirname(__file__), "qud_audio_generator.py")
+AUDIO_GENERATOR_AVAILABLE = False
+QudAudioGenerator = None
+np = None
+sf = None
+try:
+    import numpy as np
+    import soundfile as sf
+    if os.path.exists(_audio_gen_path):
+        try:
+            sys.path.insert(0, os.path.dirname(__file__))
+            from qud_audio_generator import QudAudioGenerator
+            AUDIO_GENERATOR_AVAILABLE = True
+        except ImportError:
+            AUDIO_GENERATOR_AVAILABLE = False
+except ImportError:
+    AUDIO_GENERATOR_AVAILABLE = False
+
+# Import audio generator for white hole sounds
+_audio_gen_path = os.path.join(os.path.dirname(__file__), "qud_audio_generator.py")
+AUDIO_GENERATOR_AVAILABLE = False
+QudAudioGenerator = None
+np = None
+try:
+    import numpy as np
+    import soundfile as sf
+    if os.path.exists(_audio_gen_path):
+        try:
+            sys.path.insert(0, os.path.dirname(__file__))
+            from qud_audio_generator import QudAudioGenerator
+            AUDIO_GENERATOR_AVAILABLE = True
+        except ImportError:
+            AUDIO_GENERATOR_AVAILABLE = False
+except ImportError:
+    AUDIO_GENERATOR_AVAILABLE = False
+
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    try:
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        if hasattr(sys.stderr, 'reconfigure'):
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, ValueError):
+        pass
+
+# Import Ollama integration
+_ollama_path = os.path.join(os.path.dirname(__file__), "..", "Shared", "ollama_integration.py")
+OLLAMA_INTEGRATION_AVAILABLE = False
+call_ollama = None
+test_ollama_connection = None
+TASK_VISUAL = "visual"
+
+if os.path.exists(_ollama_path):
+    try:
+        shared_dir = os.path.join(os.path.dirname(__file__), "..", "Shared")
+        if shared_dir not in sys.path:
+            sys.path.insert(0, shared_dir)
+        from ollama_integration import call_ollama, test_ollama_connection
+        OLLAMA_INTEGRATION_AVAILABLE = True
+    except ImportError as e:
+        OLLAMA_INTEGRATION_AVAILABLE = False
+        print(f"Warning: Could not import Ollama integration: {e}")
+
+# Import model router if available
+_model_router_path = os.path.join(os.path.dirname(__file__), "..", "Common", "ollama_model_router.py")
+if os.path.exists(_model_router_path):
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Common"))
+        from ollama_model_router import get_visual_model, TASK_VISUAL
+        MODEL_ROUTER_AVAILABLE = True
+    except ImportError:
+        MODEL_ROUTER_AVAILABLE = False
+        TASK_VISUAL = "visual"
+else:
+    MODEL_ROUTER_AVAILABLE = False
+    TASK_VISUAL = "visual"
+
+
+class VortexAssetGenerator:
+    """Generates high-quality Space-Time Vortex assets using Ollama."""
+    
+    def __init__(self, mod_path: Path, ollama_url: str = "http://localhost:11434", model: str = None):
+        self.mod_path = Path(mod_path)
+        self.textures_path = self.mod_path / "Textures"
+        self.visuals_path = self.mod_path / "Visuals"
+        self.sounds_path = self.mod_path / "Sounds"
+        self.textures_path.mkdir(exist_ok=True)
+        self.visuals_path.mkdir(exist_ok=True)
+        self.sounds_path.mkdir(exist_ok=True)
+        
+        self.ollama_url = ollama_url
+        
+        # Initialize audio generator if available
+        self.audio_gen = None
+        if AUDIO_GENERATOR_AVAILABLE:
+            try:
+                self.audio_gen = QudAudioGenerator()
+            except Exception as e:
+                print(f"  Warning: Could not initialize audio generator: {e}")
+        if model is None:
+            preferred_visual_model = "wizardlm-uncensored:latest"
+            if OLLAMA_INTEGRATION_AVAILABLE:
+                available_models = self._get_available_models()
+                if preferred_visual_model in available_models:
+                    model = preferred_visual_model
+                elif available_models:
+                    wizardlm_models = [m for m in available_models if 'wizardlm' in m.lower() and 'uncensored' in m.lower()]
+                    if not wizardlm_models:
+                        wizardlm_models = [m for m in available_models if 'wizardlm' in m.lower()]
+                    if wizardlm_models:
+                        model = wizardlm_models[0]
+                    elif MODEL_ROUTER_AVAILABLE:
+                        model = get_visual_model()
+                    else:
+                        model = available_models[0]
+                elif MODEL_ROUTER_AVAILABLE:
+                    model = get_visual_model()
+                else:
+                    model = preferred_visual_model
+            else:
+                model = preferred_visual_model
+        self.model = model
+        
+        # Test Ollama connection - REQUIRED for high-quality assets
+        if OLLAMA_INTEGRATION_AVAILABLE:
+            print("Testing Ollama connection...")
+            self.ollama_available = test_ollama_connection()
+            if not self.ollama_available:
+                raise RuntimeError("Ollama is not available. Please start Ollama before running this script.")
+        else:
+            raise RuntimeError("Ollama integration module not found. Cannot generate high-quality assets without Ollama.")
+    
+    def _get_available_models(self) -> List[str]:
+        """Get list of available Ollama models."""
+        try:
+            import requests
+            response = requests.get(f"{self.ollama_url}/api/tags", timeout=3)
+            if response.status_code == 200:
+                data = response.json()
+                return [model["name"] for model in data.get("models", [])]
+        except:
+            pass
+        return []
+    
+    def generate_vortex_icon_design(self) -> Dict:
+        """Use Ollama to generate a high-quality design for the Space-Time Vortex icon."""
+        prompt = """Design a Space-Time Vortex icon for Caves of Qud.
+
+Return ONLY valid JSON with these exact fields:
+{
+  "symbol": {
+    "shape": "spiral singularity with event horizon",
+    "complexity": "high",
+    "distinctiveElements": ["spiral pattern", "event horizon ring", "void center"]
+  },
+  "colorScheme": {
+    "primary": "#4a90e2",
+    "secondary": "#7bb3f0",
+    "glow": "#00ffff",
+    "void": "#000033",
+    "outline": "#1a1a4a"
+  }
+}
+
+Use blue/purple colors for a mental mutation. Return JSON ONLY."""
+        
+        try:
+            print("  Calling Ollama for Space-Time Vortex icon design...")
+            start_time = time.time()
+            response = call_ollama(
+                prompt=prompt,
+                task_type=TASK_VISUAL,
+                response_length="standard",
+                system_prompt="You are a pixel art designer specializing in roguelike game icons. Always return valid JSON only.",
+                model_name=self.model
+            )
+            elapsed = time.time() - start_time
+            print(f"  Ollama response received in {elapsed:.1f} seconds")
+            
+            if response:
+                # Try to extract and clean JSON
+                json_start = response.find('{')
+                json_end = response.rfind('}') + 1
+                if json_start >= 0 and json_end > json_start:
+                    json_str = response[json_start:json_end]
+                    
+                    # Try to repair common JSON issues
+                    # Fix unquoted keys
+                    import re
+                    json_str = re.sub(r'(\w+):', r'"\1":', json_str)
+                    # Fix already quoted keys (double quotes)
+                    json_str = re.sub(r'""(\w+)"":', r'"\1":', json_str)
+                    
+                    try:
+                        design = json.loads(json_str)
+                        if 'symbol' in design and 'colorScheme' in design:
+                            print("  [OK] Ollama generated icon design")
+                            return design
+                        else:
+                            raise ValueError("Ollama response missing required fields (symbol, colorScheme)")
+                    except json.JSONDecodeError as je:
+                        print(f"  WARNING: JSON parse error: {je}")
+                        print(f"  Response snippet: {json_str[:200]}")
+                        raise ValueError(f"Invalid JSON from Ollama: {je}")
+                else:
+                    raise ValueError("Could not extract JSON from Ollama response")
+            else:
+                raise ValueError("Ollama returned empty response")
+        except Exception as e:
+            print(f"  ERROR: Ollama generation failed: {e}")
+            raise
+    
+    def generate_vortex_design(self) -> Dict:
+        """Use Ollama to generate a high-quality design for the space-time vortex visual."""
+        prompt = """Design a space-time vortex visual for Caves of Qud - a spacetime distortion/warping effect, NOT a crushing black hole.
+
+Return ONLY valid JSON with these exact fields:
+{
+  "shape": {
+    "type": "spacetime distortion vortex",
+    "distortionRings": 6,
+    "warpingEffect": "spiral distortion",
+    "centerType": "spacetime tear"
+  },
+  "colorScheme": {
+    "distortion": "#4a90e2",
+    "warp": "#7bb3f0",
+    "tear": "#00ffff",
+    "glow": "#88ccff",
+    "outline": "#1a4a7a"
+  }
+}
+
+Use blue/cyan colors for spacetime distortion effects. A space-time vortex shows spacetime warping, not crushing gravity. Return JSON ONLY."""
+        
+        try:
+            print("  Calling Ollama for space-time vortex visual design...")
+            response = call_ollama(
+                prompt=prompt,
+                task_type=TASK_VISUAL,
+                response_length="standard",
+                system_prompt="You are a pixel art designer specializing in game visual effects. Design spacetime distortion/warping effects, not crushing black holes. Always return valid JSON only.",
+                model_name=self.model
+            )
+            
+            if response:
+                json_start = response.find('{')
+                json_end = response.rfind('}') + 1
+                if json_start >= 0 and json_end > json_start:
+                    json_str = response[json_start:json_end]
+                    design = json.loads(json_str)
+                    if 'shape' in design and 'colorScheme' in design:
+                        print("  [OK] Ollama generated space-time vortex design")
+                        return design
+                    else:
+                        raise ValueError("Ollama response missing required fields (shape, colorScheme)")
+                else:
+                    raise ValueError("Could not extract JSON from Ollama response")
+            else:
+                raise ValueError("Ollama returned empty response")
+        except Exception as e:
+            print(f"  ERROR: Ollama generation failed: {e}")
+            raise
+    
+    def generate_white_hole_design(self) -> Dict:
+        """Use Ollama to generate a high-quality design for the white hole visual (spacetime expulsion)."""
+        prompt = """Design a white hole visual for Caves of Qud - spacetime expulsion/rupture effect.
+
+Return ONLY valid JSON with these exact fields:
+{
+  "shape": {
+    "type": "spacetime expulsion",
+    "rays": 8,
+    "rayLength": "medium",
+    "centerSize": "small"
+  },
+  "colorScheme": {
+    "center": "#ffffff",
+    "core": "#e0ffff",
+    "rays": "#88ffff",
+    "glow": "#ccffff",
+    "outline": "#00ffff"
+  }
+}
+
+Use white/cyan/light-blue colors for spacetime expulsion/rupture. Return JSON ONLY."""
+        
+        try:
+            print("  Calling Ollama for white hole visual design...")
+            response = call_ollama(
+                prompt=prompt,
+                task_type=TASK_VISUAL,
+                response_length="standard",
+                system_prompt="You are a pixel art designer specializing in game visual effects. Always return valid JSON only.",
+                model_name=self.model
+            )
+            
+            if response:
+                json_start = response.find('{')
+                json_end = response.rfind('}') + 1
+                if json_start >= 0 and json_end > json_start:
+                    json_str = response[json_start:json_end]
+                    design = json.loads(json_str)
+                    if 'shape' in design and 'colorScheme' in design:
+                        print("  [OK] Ollama generated white hole design")
+                        return design
+                    else:
+                        raise ValueError("Ollama response missing required fields (shape, colorScheme)")
+                else:
+                    raise ValueError("Could not extract JSON from Ollama response")
+            else:
+                raise ValueError("Ollama returned empty response")
+        except Exception as e:
+            print(f"  ERROR: Ollama generation failed: {e}")
+            raise
+    
+    def hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
+        """Convert hex color to RGB tuple."""
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    
+    def render_vortex_icon(self, design: Dict, size: Tuple[int, int] = (64, 64)) -> Image.Image:
+        """Render the Space-Time Vortex icon based on design."""
+        img = Image.new('RGBA', size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        center_x, center_y = size[0] // 2, size[1] // 2
+        
+        if 'colorScheme' in design:
+            # Use Ollama design
+            cs = design['colorScheme']
+            primary = self.hex_to_rgb(cs.get('primary', '#4a90e2'))
+            secondary = self.hex_to_rgb(cs.get('secondary', '#7bb3f0'))
+            glow = self.hex_to_rgb(cs.get('glow', '#00ffff'))
+            void = self.hex_to_rgb(cs.get('void', '#000033'))
+            outline = self.hex_to_rgb(cs.get('outline', '#1a1a4a'))
+            
+            # Outer glow
+            for i in range(5, 0, -1):
+                radius = center_x - (i * 2)
+                if radius > 0:
+                    alpha = int(30 * (1 - i / 5))
+                    glow_color = (*glow, alpha)
+                    draw.ellipse([center_x - radius, center_y - radius, center_x + radius, center_y + radius],
+                               fill=glow_color, outline=None)
+            
+            # Main spiral
+            self._draw_spiral(draw, center_x, center_y, size[0] - 8, primary, secondary, outline, arms=2, clockwise=True)
+            
+            # Event horizon rings
+            for i in range(3, 0, -1):
+                radius = center_x - (i * 6)
+                if radius > 0:
+                    alpha = int(180 * (1 - i / 3))
+                    ring_color = (*primary, alpha)
+                    draw.ellipse([center_x - radius, center_y - radius, center_x + radius, center_y + radius],
+                               fill=None, outline=ring_color, width=2)
+            
+            # Void center
+            draw.ellipse([center_x - 4, center_y - 4, center_x + 4, center_y + 4],
+                        fill=void, outline=outline, width=1)
+        else:
+            raise ValueError("Design missing colorScheme - Ollama generation failed")
+        
+        return img
+    
+    def _draw_spiral(self, draw: ImageDraw.Draw, cx: int, cy: int, max_radius: int,
+                    color1: Tuple[int, int, int], color2: Tuple[int, int, int],
+                    outline: Tuple[int, int, int], arms: int = 2, clockwise: bool = True, 
+                    rotation_offset: float = 0.0):
+        """Draw a THICK, HIGH-QUALITY spiral pattern with rotation support."""
+        points_per_arm = 80  # More points for smoother spiral
+        for arm in range(arms):
+            angle_offset = (2 * math.pi * arm) / arms + rotation_offset
+            for i in range(points_per_arm):
+                t = i / points_per_arm
+                # More spiral turns for dramatic effect
+                angle = angle_offset + (t * 6 * math.pi * (1 if clockwise else -1))
+                radius = t * (max_radius / 2 - 6)
+                x = int(cx + radius * math.cos(angle))
+                y = int(cy + radius * math.sin(angle))
+                
+                if 0 <= x < draw.im.size[0] and 0 <= y < draw.im.size[1]:
+                    # Interpolate color with higher saturation
+                    r = int(color1[0] * (1 - t) + color2[0] * t)
+                    g = int(color1[1] * (1 - t) + color2[1] * t)
+                    b = int(color1[2] * (1 - t) + color2[2] * t)
+                    
+                    # Draw THICKER dots for more visible spiral
+                    size = 3 if t < 0.3 else 2  # Larger at center
+                    draw.ellipse([x - size, y - size, x + size, y + size], 
+                               fill=(r, g, b), outline=None)
+                    
+                    # Add glow around each point
+                    if t < 0.5:  # Only glow on inner half
+                        alpha = int(80 * (1 - t * 2))
+                        draw.ellipse([x - size - 1, y - size - 1, x + size + 1, y + size + 1],
+                                   fill=(*color2, alpha), outline=None)
+    
+    def render_vortex(self, design: Dict, size: Tuple[int, int] = (48, 48), frame: int = 0, frame_count: int = 4) -> Image.Image:
+        """Render high-quality space-time vortex visual showing spacetime distortion/warping."""
+        img = Image.new('RGBA', size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        center_x, center_y = size[0] // 2, size[1] // 2
+        # Consistent rotation and subtle pulse for spacetime distortion
+        rotation = (frame / frame_count) * (2 * math.pi)
+        pulse = 0.95 + (0.05 * math.sin(frame * 2 * math.pi / frame_count))
+        
+        if design and 'colorScheme' in design:
+            cs = design['colorScheme']
+            # Space-time vortex colors: blue/cyan for spacetime distortion
+            distortion = self.hex_to_rgb(cs.get('distortion', '#4a90e2'))
+            warp = self.hex_to_rgb(cs.get('warp', '#7bb3f0'))
+            tear = self.hex_to_rgb(cs.get('tear', '#00ffff'))
+            glow = self.hex_to_rgb(cs.get('glow', '#88ccff'))
+            outline = self.hex_to_rgb(cs.get('outline', '#1a4a7a'))
+            
+            # Spacetime distortion outer glow (consistent across frames)
+            for i in range(8, 0, -1):
+                radius = int((center_x - i * 2) * pulse)
+                if radius > 0:
+                    alpha = int(70 * (1 - i / 8))
+                    glow_color = (*glow, alpha)
+                    draw.ellipse([center_x - radius, center_y - radius, center_x + radius, center_y + radius],
+                               fill=glow_color, outline=None)
+            
+            # Spacetime warping/distortion spiral - shows spacetime being twisted
+            for arm in range(3):  # 3 arms for spacetime distortion
+                arm_offset = (2 * math.pi * arm / 3) + rotation
+                
+                # Draw spacetime distortion spiral
+                points_per_arm = 120
+                for i in range(points_per_arm):
+                    t = i / points_per_arm
+                    angle = arm_offset + (t * 8 * math.pi)
+                    radius = t * (center_x - 8)
+                    x = int(center_x + radius * math.cos(angle))
+                    y = int(center_y + radius * math.sin(angle))
+                    
+                    if 0 <= x < size[0] and 0 <= y < size[1]:
+                        # Color gradient: distortion (outer) to warp (inner) to tear (center)
+                        if t < 0.5:
+                            # Inner half: warp to tear
+                            inner_t = t * 2
+                            r = int(warp[0] * (1 - inner_t) + tear[0] * inner_t)
+                            g = int(warp[1] * (1 - inner_t) + tear[1] * inner_t)
+                            b = int(warp[2] * (1 - inner_t) + tear[2] * inner_t)
+                        else:
+                            # Outer half: distortion to warp
+                            outer_t = (t - 0.5) * 2
+                            r = int(distortion[0] * (1 - outer_t) + warp[0] * outer_t)
+                            g = int(distortion[1] * (1 - outer_t) + warp[1] * outer_t)
+                            b = int(distortion[2] * (1 - outer_t) + warp[2] * outer_t)
+                        
+                        # Thickness increases toward center (spacetime compression)
+                        thickness = int(4 * (1 - t * 0.5))
+                        
+                        # Main distortion point
+                        draw.ellipse([x - thickness, y - thickness, x + thickness, y + thickness],
+                                   fill=(r, g, b), outline=None)
+                        
+                        # Glow around distortion (inner half)
+                        if t < 0.6:
+                            glow_size = thickness + 2
+                            alpha = int(120 * (1 - t))
+                            draw.ellipse([x - glow_size, y - glow_size, x + glow_size, y + glow_size],
+                                       fill=(*glow, alpha), outline=None)
+            
+            # Spacetime distortion rings (warping effect, not event horizon)
+            for i in range(6, 0, -1):
+                ring_pulse = 1.0 + (0.08 * math.sin(frame * 2 * math.pi / frame_count + i * math.pi / 6))
+                radius = int((center_x - i * 3) * ring_pulse)
+                if radius > 0:
+                    alpha = int(240 * (1 - i / 6))
+                    ring_color = (*warp, alpha)
+                    draw.ellipse([center_x - radius, center_y - radius, center_x + radius, center_y + radius],
+                               fill=None, outline=ring_color, width=2)
+            
+            # Spacetime tear center (bright cyan, not void)
+            center_size = 6
+            draw.ellipse([center_x - center_size - 2, center_y - center_size - 2, 
+                         center_x + center_size + 2, center_y + center_size + 2],
+                        fill=(*tear, 80), outline=None)
+            draw.ellipse([center_x - center_size, center_y - center_size, 
+                         center_x + center_size, center_y + center_size],
+                        fill=tear, outline=warp, width=2)
+            
+            # Apply smooth filter for consistency
+            img = img.filter(ImageFilter.SMOOTH)
+        else:
+            raise ValueError("Design missing colorScheme - Ollama generation failed")
+        
+        return img
+    
+    def render_white_hole(self, design: Dict, size: Tuple[int, int] = (48, 48), frame: int = 0, frame_count: int = 4) -> Image.Image:
+        """Render white hole visual matching detailed physics-accurate design:
+        - Deep near-black core with star-field flecks
+        - Bright horizon ring with Fresnel glow (teal → violet → white-hot)
+        - Spiral filaments and ribbon-like streams
+        - Ejected matter with blue-shifting
+        - Rotation and frame drag effects
+        """
+        img = Image.new('RGBA', size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        center_x, center_y = size[0] // 2, size[1] // 2
+        # Rotation and frame drag (slow outer, fast inner)
+        outer_rotation = (frame / frame_count) * (2 * math.pi) * 0.5  # Slow rotation
+        inner_rotation = (frame / frame_count) * (2 * math.pi) * 2.0   # Fast inner rotation (shear effect)
+        pulse = 0.9 + (0.1 * math.sin(frame * 2 * math.pi / frame_count))  # Pulse effect
+        eruption = 1.0 + (0.3 * math.sin(frame * 4 * math.pi / frame_count)) if (frame % (frame_count // 2) == 0) else 1.0  # Occasional eruptions
+        
+        if design and 'colorScheme' in design:
+            cs = design['colorScheme']
+            # Color palette: teal → violet → white-hot for horizon ring
+            teal = self.hex_to_rgb('#008080')
+            violet = self.hex_to_rgb('#8b00ff')
+            white_hot = self.hex_to_rgb('#ffffff')
+            deep_black = (5, 5, 15)  # Near-black with subtle blue tint
+            
+            # Outer distortion glow
+            for i in range(10, 0, -1):
+                radius = int((center_x - i * 1.5) * pulse)
+                if radius > 0:
+                    alpha = int(50 * (1 - i / 10))
+                    # Subtle chromatic aberration effect
+                    color_shift = int(i * 2)
+                    glow_color = (min(255, 100 + color_shift), min(255, 150 + color_shift), min(255, 200 + color_shift), alpha)
+                    draw.ellipse([center_x - radius, center_y - radius, center_x + radius, center_y + radius],
+                               fill=glow_color, outline=None)
+            
+            # BRIGHT HORIZON RING with Fresnel glow (teal → violet → white-hot gradient)
+            horizon_radius = center_x - 8
+            ring_segments = 32
+            for i in range(ring_segments):
+                angle = (2 * math.pi * i / ring_segments) + outer_rotation
+                # Color gradient around ring: teal → violet → white-hot
+                if i < ring_segments / 3:
+                    # Teal section
+                    t = i / (ring_segments / 3)
+                    r = int(teal[0] * (1 - t) + violet[0] * t)
+                    g = int(teal[1] * (1 - t) + violet[1] * t)
+                    b = int(teal[2] * (1 - t) + violet[2] * t)
+                elif i < 2 * ring_segments / 3:
+                    # Violet section
+                    t = (i - ring_segments / 3) / (ring_segments / 3)
+                    r = int(violet[0] * (1 - t) + white_hot[0] * t)
+                    g = int(violet[1] * (1 - t) + white_hot[1] * t)
+                    b = int(violet[2] * (1 - t) + white_hot[2] * t)
+                else:
+                    # White-hot section
+                    t = (i - 2 * ring_segments / 3) / (ring_segments / 3)
+                    r = int(white_hot[0] * (1 - t) + teal[0] * t)
+                    g = int(white_hot[1] * (1 - t) + teal[1] * t)
+                    b = int(white_hot[2] * (1 - t) + teal[2] * t)
+                
+                # Draw bright horizon ring segment with Fresnel glow
+                x = int(center_x + horizon_radius * math.cos(angle))
+                y = int(center_y + horizon_radius * math.sin(angle))
+                if 0 <= x < size[0] and 0 <= y < size[1]:
+                    # Bright core
+                    draw.ellipse([x - 3, y - 3, x + 3, y + 3], fill=(r, g, b, 255), outline=None)
+                    # Fresnel glow
+                    for glow_layer in range(2, 0, -1):
+                        glow_size = 3 + glow_layer
+                        glow_alpha = int(150 * (1 - glow_layer / 2))
+                        draw.ellipse([x - glow_size, y - glow_size, x + glow_size, y + glow_size],
+                                   fill=(r, g, b, glow_alpha), outline=None)
+            
+            # Spiral filaments and ribbon-like streams (fast inner rotation, frame drag)
+            for arm in range(4):  # 4 arms for more detail
+                arm_offset = (2 * math.pi * arm / 4) + inner_rotation
+                
+                # Draw ribbon-like spiral stream
+                points_per_arm = 120
+                for i in range(points_per_arm):
+                    t = i / points_per_arm
+                    # Spiral outward with frame drag (shear effect)
+                    angle = arm_offset - (t * 8 * math.pi)  # Counter-clockwise expulsion
+                    radius = t * (center_x - 10)
+                    x = int(center_x + radius * math.cos(angle))
+                    y = int(center_y + radius * math.sin(angle))
+                    
+                    if 0 <= x < size[0] and 0 <= y < size[1]:
+                        # Blue-shifted gradient: white-hot → teal → violet
+                        if t < 0.3:
+                            # Inner: white-hot to teal
+                            inner_t = t / 0.3
+                            r = int(white_hot[0] * (1 - inner_t) + teal[0] * inner_t)
+                            g = int(white_hot[1] * (1 - inner_t) + teal[1] * inner_t)
+                            b = int(white_hot[2] * (1 - inner_t) + teal[2] * inner_t)
+                        else:
+                            # Outer: teal to violet
+                            outer_t = (t - 0.3) / 0.7
+                            r = int(teal[0] * (1 - outer_t) + violet[0] * outer_t)
+                            g = int(teal[1] * (1 - outer_t) + violet[1] * outer_t)
+                            b = int(teal[2] * (1 - outer_t) + violet[2] * outer_t)
+                        
+                        # Ribbon thickness (wider near center)
+                        thickness = int(4 * (1 - t * 0.7))
+                        
+                        # Main filament point
+                        alpha = int(255 * (1 - t * 0.5))
+                        draw.ellipse([x - thickness, y - thickness, x + thickness, y + thickness],
+                                   fill=(r, g, b, alpha), outline=None)
+                        
+                        # Temporal trail (ghosted echo)
+                        if t < 0.6:
+                            trail_size = thickness + 1
+                            trail_alpha = int(80 * (1 - t * 1.5))
+                            draw.ellipse([x - trail_size, y - trail_size, x + trail_size, y + trail_size],
+                                       fill=(r, g, b, trail_alpha), outline=None)
+            
+            # Ejected matter (blue-shifted shards and motes)
+            if frame % 3 == 0:  # Spawn ejected matter periodically
+                for shard in range(6):
+                    shard_angle = (2 * math.pi * shard / 6) + outer_rotation
+                    shard_distance = center_x - 5 + int(5 * math.sin(frame * math.pi / 2))
+                    shard_x = int(center_x + shard_distance * math.cos(shard_angle))
+                    shard_y = int(center_y + shard_distance * math.sin(shard_angle))
+                    if 0 <= shard_x < size[0] and 0 <= shard_y < size[1]:
+                        # Blue-shifted glowing shard
+                        shard_size = 2
+                        draw.ellipse([shard_x - shard_size, shard_y - shard_size,
+                                    shard_x + shard_size, shard_y + shard_size],
+                                   fill=(100, 200, 255, 200), outline=None)
+                        # Afterimage trail
+                        trail_x = int(shard_x - 3 * math.cos(shard_angle))
+                        trail_y = int(shard_y - 3 * math.sin(shard_angle))
+                        if 0 <= trail_x < size[0] and 0 <= trail_y < size[1]:
+                            draw.ellipse([trail_x - 1, trail_y - 1, trail_x + 1, trail_y + 1],
+                                       fill=(100, 200, 255, 100), outline=None)
+            
+            # Deep near-black core with star-field flecks
+            core_size = 6
+            # Core well with depth
+            for i in range(4, 0, -1):
+                layer_size = core_size * (i / 4)
+                alpha = int(180 * (1 - i / 4))
+                draw.ellipse([center_x - layer_size, center_y - layer_size,
+                             center_x + layer_size, center_y + layer_size],
+                            fill=(*deep_black, alpha), outline=None)
+            
+            # Star-field flecks in core
+            import random
+            random.seed(42)  # Consistent star pattern
+            for star in range(8):
+                star_angle = random.random() * 2 * math.pi
+                star_radius = random.random() * (core_size - 2)
+                star_x = int(center_x + star_radius * math.cos(star_angle))
+                star_y = int(center_y + star_radius * math.sin(star_angle))
+                if 0 <= star_x < size[0] and 0 <= star_y < size[1]:
+                    draw.ellipse([star_x - 1, star_y - 1, star_x + 1, star_y + 1],
+                               fill=(200, 220, 255, 180), outline=None)
+            
+            # Bright center point (white-hot singularity)
+            draw.ellipse([center_x - 2, center_y - 2, center_x + 2, center_y + 2],
+                        fill=white_hot, outline=None)
+            
+            # Apply smooth filter and slight blur for lensing effect
+            img = img.filter(ImageFilter.SMOOTH)
+        else:
+            raise ValueError("Design missing colorScheme - Ollama generation failed")
+        
+        return img
+    
+    def render_warning_marker(self, size: Tuple[int, int] = (48, 48)) -> Image.Image:
+        """Render high-quality warning marker for pre-spawn indicators."""
+        img = Image.new('RGBA', size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        center_x, center_y = size[0] // 2, size[1] // 2
+        
+        # High-quality layered outer glow (warning color - yellow/orange)
+        for i in range(6, 0, -1):
+            radius = center_x - (i * 2)
+            if radius > 0:
+                alpha = int(60 * (1 - i / 6))
+                glow_color = (255, 200, 0, alpha)
+                draw.ellipse([center_x - radius, center_y - radius, center_x + radius, center_y + radius],
+                           fill=glow_color, outline=None)
+        
+        # Outer pulsing ring with gradient
+        for i in range(3, 0, -1):
+            ring_radius = center_x - (i * 3)
+            if ring_radius > 0:
+                alpha = int(180 * (1 - i / 3))
+                ring_color = (255, 150 + i * 20, 0, alpha)
+                draw.ellipse([center_x - ring_radius, center_y - ring_radius, 
+                             center_x + ring_radius, center_y + ring_radius],
+                           fill=None, outline=ring_color, width=2)
+        
+        # Middle ring with gradient
+        for i in range(2, 0, -1):
+            mid_radius = center_x - (6 + i * 2)
+            if mid_radius > 0:
+                alpha = int(140 * (1 - i / 2))
+                mid_color = (255, 180, 0, alpha)
+                draw.ellipse([center_x - mid_radius, center_y - mid_radius,
+                             center_x + mid_radius, center_y + mid_radius],
+                           fill=None, outline=mid_color, width=1)
+        
+        # Inner pulsing dot with layered glow
+        dot_size = 5
+        for i in range(3, 0, -1):
+            layer_size = dot_size * (i / 3)
+            alpha = int(220 * (1 - i / 3))
+            layer_color = (255, 100 + i * 30, 0, alpha)
+            draw.ellipse([center_x - layer_size, center_y - layer_size,
+                         center_x + layer_size, center_y + layer_size],
+                       fill=layer_color, outline=None)
+        
+        # Bright center core
+        core_size = 3
+        draw.ellipse([center_x - core_size, center_y - core_size,
+                     center_x + core_size, center_y + core_size],
+                    fill=(255, 200, 0), outline=(255, 255, 255), width=1)
+        
+        # High-quality warning symbol (exclamation mark) with shadow
+        try:
+            font_size = 22
+            font = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", font_size)
+        except:
+            try:
+                font = ImageFont.truetype("arial.ttf", font_size)
+            except:
+                font = ImageFont.load_default()
+        
+        # Shadow
+        draw.text((center_x - 3, center_y - 9), "!", fill=(0, 0, 0, 150), font=font)
+        # Main text
+        draw.text((center_x - 4, center_y - 10), "!", fill=(255, 255, 255), font=font)
+        
+        # Apply smooth filter
+        img = img.filter(ImageFilter.SMOOTH)
+        
+        return img
+    
+    def _generate_white_hole_ambient(self):
+        """Generate ambient bed: low harmonic drone with slow pitch modulation and metallic undertones."""
+        if not AUDIO_GENERATOR_AVAILABLE or np is None or self.audio_gen is None:
+            return None
+        
+        duration = 10.0  # Loopable ambient
+        t = np.linspace(0, duration, int(self.audio_gen.sample_rate * duration))
+        
+        # Low harmonic drone (base frequency ~60Hz)
+        base_freq = 60
+        signal = 0.3 * np.sin(2 * np.pi * base_freq * t)
+        signal += 0.2 * np.sin(2 * np.pi * base_freq * 2 * t)  # Harmonic
+        signal += 0.15 * np.sin(2 * np.pi * base_freq * 3 * t)  # Harmonic
+        
+        # Slow pitch modulation (vast energy implication)
+        pitch_mod = 1.0 + 0.05 * np.sin(2 * np.pi * 0.1 * t)  # Very slow modulation
+        signal = signal * pitch_mod
+        
+        # Metallic undertones (higher frequencies)
+        metallic = 0.1 * np.sin(2 * np.pi * 200 * t)
+        metallic += 0.05 * np.sin(2 * np.pi * 400 * t)
+        signal += metallic
+        
+        # Subtle envelope to prevent clicks
+        envelope = 0.5 + 0.5 * np.sin(2 * np.pi * 0.05 * t)  # Very slow fade
+        signal *= envelope
+        
+        # Normalize
+        signal = signal / (np.max(np.abs(signal)) + 1e-8) * 0.4
+        
+        return signal
+    
+    def _generate_white_hole_active(self):
+        """Generate active voice: sharp whoosh with crystalline chimes and reversed reverb hits."""
+        if not AUDIO_GENERATOR_AVAILABLE or np is None or self.audio_gen is None:
+            return None
+        
+        duration = 2.0
+        t = np.linspace(0, duration, int(self.audio_gen.sample_rate * duration))
+        
+        # Sharp whoosh (expulsion sound)
+        whoosh_freq = 300
+        whoosh = np.sin(2 * np.pi * whoosh_freq * t)
+        whoosh += 0.6 * np.sin(2 * np.pi * whoosh_freq * 2 * t)
+        whoosh_envelope = np.exp(-t * 3) * (1 - np.exp(-t * 20))
+        whoosh *= whoosh_envelope
+        
+        # Crystalline chimes (high frequencies)
+        chime_times = [0.1, 0.3, 0.5, 0.7]
+        chimes = np.zeros(len(t))
+        np.random.seed(42)  # Consistent chimes
+        for chime_time in chime_times:
+            chime_idx = int(chime_time * self.audio_gen.sample_rate)
+            if chime_idx < len(t):
+                chime_duration = 0.3
+                chime_t = np.linspace(0, chime_duration, int(self.audio_gen.sample_rate * chime_duration))
+                chime_freq = 800 + 200 * np.random.random()
+                chime = np.sin(2 * np.pi * chime_freq * chime_t)
+                chime *= np.exp(-chime_t * 5)
+                if chime_idx + len(chime) <= len(chimes):
+                    chimes[chime_idx:chime_idx + len(chime)] += chime * 0.3
+        
+        # Reversed reverb hits (time-weirdness)
+        reverb_hits = np.zeros(len(t))
+        np.random.seed(43)  # Consistent reverb
+        for hit_time in [0.2, 0.6, 1.0]:
+            hit_idx = int(hit_time * self.audio_gen.sample_rate)
+            if hit_idx < len(t):
+                hit_duration = 0.4
+                hit_t = np.linspace(0, hit_duration, int(self.audio_gen.sample_rate * hit_duration))
+                # Reverse envelope (starts quiet, gets loud - reversed reverb)
+                hit = np.random.normal(0, 0.1, len(hit_t))
+                hit_envelope = 1 - np.exp(-hit_t * 3)  # Reverse of normal
+                hit *= hit_envelope
+                if hit_idx + len(hit) <= len(reverb_hits):
+                    reverb_hits[hit_idx:hit_idx + len(hit)] += hit
+        
+        signal = whoosh + chimes + reverb_hits
+        
+        # Normalize
+        signal = signal / (np.max(np.abs(signal)) + 1e-8) * 0.7
+        
+        return signal
+    
+    def _generate_white_hole_ejection(self):
+        """Generate ejection sound: whoosh with Doppler effect (pitch sweep)."""
+        if not AUDIO_GENERATOR_AVAILABLE or np is None or self.audio_gen is None:
+            return None
+        
+        duration = 1.5
+        t = np.linspace(0, duration, int(self.audio_gen.sample_rate * duration))
+        
+        # Doppler sweep: pitch starts high, drops (object moving away)
+        start_freq = 600
+        end_freq = 200
+        freq_sweep = start_freq + (end_freq - start_freq) * (t / duration)
+        
+        # Whoosh with frequency sweep
+        signal = np.sin(2 * np.pi * freq_sweep * t)
+        signal += 0.5 * np.sin(2 * np.pi * freq_sweep * 2 * t)
+        
+        # Envelope: quick attack, slower decay
+        envelope = np.exp(-t * 2) * (1 - np.exp(-t * 30))
+        signal *= envelope
+        
+        # Add blue-shifted particle sounds
+        particle_times = [0.1, 0.3, 0.5, 0.7, 0.9]
+        np.random.seed(44)  # Consistent particles
+        for particle_time in particle_times:
+            particle_idx = int(particle_time * self.audio_gen.sample_rate)
+            if particle_idx < len(t):
+                particle_duration = 0.2
+                particle_t = np.linspace(0, particle_duration, int(self.audio_gen.sample_rate * particle_duration))
+                particle_freq = 1000 + 500 * np.random.random()  # High frequency (blue-shifted)
+                particle = np.sin(2 * np.pi * particle_freq * particle_t)
+                particle *= np.exp(-particle_t * 8)
+                if particle_idx + len(particle) <= len(signal):
+                    signal[particle_idx:particle_idx + len(particle)] += particle * 0.2
+        
+        # Normalize
+        signal = signal / (np.max(np.abs(signal)) + 1e-8) * 0.6
+        
+        return signal
+    
+    def generate_all_assets(self) -> Dict[str, int]:
+        """Generate all Space-Time Vortex assets using Ollama (REQUIRED)."""
+        results = {
+            'icon': 0,
+            'black_hole_frames': 0,
+            'white_hole_frames': 0,
+            'warning_marker': 0,
+            'sounds_created': 0
+        }
+        
+        print("Generating HIGH-RESOLUTION Space-Time Vortex assets with Ollama...")
+        print("NOTE: This requires Ollama to be running for high-quality AI-generated designs.")
+        print("NOTE: Using larger resolutions (64x64, 96x96) for tile scaling mod support.")
+        print()
+        
+        # Generate icon at higher resolution for tile scaling mod
+        print("1. Generating mutation icon (96x96 for tile scaling mod)...")
+        icon_design = self.generate_vortex_icon_design()
+        icon_img = self.render_vortex_icon(icon_design, (96, 96))
+        icon_path = self.textures_path / "Space-Time Vortex_icon.png"
+        icon_img.save(icon_path, 'PNG')
+        print(f"   [OK] Created: {icon_path.name} (96x96 high-res)")
+        results['icon'] = 1
+        
+        # Also save to Visuals
+        visuals_icon_path = self.visuals_path / "Space-Time Vortex_icon.png"
+        icon_img.save(visuals_icon_path, 'PNG')
+        
+        # Generate space-time vortex visuals (spacetime distortion, not black hole)
+        print()
+        print("2. Generating space-time vortex visuals (64x64 for tile scaling mod, 8 frames)...")
+        vortex_design = self.generate_vortex_design()
+        frame_count = 8
+        for i in range(frame_count):
+            frame_img = self.render_vortex(vortex_design, (64, 64), i, frame_count)
+            frame_path = self.textures_path / f"BlackHole_frame{i:02d}.png"
+            frame_img.save(frame_path, 'PNG')
+            results['black_hole_frames'] += 1
+        
+        # Main vortex visual (use middle frame)
+        main_vortex = self.render_vortex(vortex_design, (64, 64), 4, 8)
+        main_path = self.textures_path / "BlackHole_visual.png"
+        main_vortex.save(main_path, 'PNG')
+        
+        # Also save to Visuals
+        visuals_vortex_path = self.visuals_path / "BlackHole_visual.png"
+        main_vortex.save(visuals_vortex_path, 'PNG')
+        
+        print(f"   [OK] Created {frame_count} frames + main visual (64x64 high-res, spacetime distortion)")
+        
+        # Generate white hole visuals at higher resolution for tile scaling mod
+        print()
+        print("3. Generating white hole visuals (64x64 for tile scaling mod, 8 frames)...")
+        white_hole_design = self.generate_white_hole_design()
+        for i in range(frame_count):
+            frame_img = self.render_white_hole(white_hole_design, (64, 64), i, frame_count)
+            frame_path = self.textures_path / f"WhiteHole_frame{i:02d}.png"
+            frame_img.save(frame_path, 'PNG')
+            results['white_hole_frames'] += 1
+        
+        # Main white hole visual (use middle frame)
+        main_white_hole = self.render_white_hole(white_hole_design, (64, 64), 4, 8)
+        main_path = self.textures_path / "WhiteHole_visual.png"
+        main_white_hole.save(main_path, 'PNG')
+        
+        # Also save to Visuals
+        visuals_white_hole_path = self.visuals_path / "WhiteHole_visual.png"
+        main_white_hole.save(visuals_white_hole_path, 'PNG')
+        
+        print(f"   [OK] Created {frame_count} frames + main visual (64x64 high-res, smooth animation)")
+        
+        # Generate warning marker at higher resolution for tile scaling mod
+        print()
+        print("4. Generating warning marker (64x64 for tile scaling mod)...")
+        warning_img = self.render_warning_marker((64, 64))
+        warning_path = self.textures_path / "VortexWarning_marker.png"
+        warning_img.save(warning_path, 'PNG')
+        
+        # Also save to Visuals
+        visuals_warning_path = self.visuals_path / "VortexWarning_marker.png"
+        warning_img.save(visuals_warning_path, 'PNG')
+        
+        print(f"   [OK] Created: {warning_path.name} (64x64 high-res)")
+        results['warning_marker'] = 1
+        
+        # 5. Generate white hole sounds
+        if self.audio_gen and AUDIO_GENERATOR_AVAILABLE and np is not None:
+            try:
+                print()
+                print("5. Generating white hole sounds...")
+                
+                # Ambient bed: low harmonic drone with slow pitch modulation and metallic undertones
+                ambient = self._generate_white_hole_ambient()
+                if ambient is not None:
+                    ambient_path = self.sounds_path / "WhiteHole_ambient.ogg"
+                    sf.write(str(ambient_path), ambient, self.audio_gen.sample_rate)
+                    print(f"   [OK] Created: {ambient_path.name}")
+                    results['sounds_created'] = results.get('sounds_created', 0) + 1
+                
+                # Active voice: sharp whoosh with crystalline chimes and reversed reverb
+                active = self._generate_white_hole_active()
+                if active is not None:
+                    active_path = self.sounds_path / "WhiteHole_active.ogg"
+                    sf.write(str(active_path), active, self.audio_gen.sample_rate)
+                    print(f"   [OK] Created: {active_path.name}")
+                    results['sounds_created'] = results.get('sounds_created', 0) + 1
+                
+                # Ejection sound: whoosh with Doppler effect
+                ejection = self._generate_white_hole_ejection()
+                if ejection is not None:
+                    ejection_path = self.sounds_path / "WhiteHole_ejection.ogg"
+                    sf.write(str(ejection_path), ejection, self.audio_gen.sample_rate)
+                    print(f"   [OK] Created: {ejection_path.name}")
+                    results['sounds_created'] = results.get('sounds_created', 0) + 1
+            except Exception as e:
+                print(f"   [WARNING] Sound generation failed: {e}")
+                print(f"   [INFO] Install numpy and soundfile: pip install numpy soundfile")
+        else:
+            print()
+            print("5. Skipping sound generation (audio generator not available)")
+            print("   [INFO] Install dependencies: pip install numpy soundfile")
+        
+        return results
+
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Generate high-quality Space-Time Vortex assets using Ollama")
+    parser.add_argument("mod_path", help="Path to mod directory")
+    parser.add_argument("--ollama-url", default="http://localhost:11434", help="Ollama API URL")
+    parser.add_argument("--model", help="Ollama model to use (default: auto-detect)")
+    
+    args = parser.parse_args()
+    
+    mod_path = Path(args.mod_path)
+    if not mod_path.exists():
+        print(f"ERROR: Mod path does not exist: {mod_path}")
+        return 1
+    
+    print("=" * 60)
+    print("Space-Time Vortex Asset Generator (Ollama)")
+    print("=" * 60)
+    print(f"Mod: {mod_path.name}")
+    print(f"Path: {mod_path}")
+    print()
+    
+    try:
+        generator = VortexAssetGenerator(mod_path, args.ollama_url, args.model)
+        results = generator.generate_all_assets()
+        
+        print()
+        print("=" * 60)
+        print("Summary")
+        print("=" * 60)
+        print(f"Icon: {results['icon']}")
+        print(f"Space-time vortex frames: {results['black_hole_frames']}")
+        print(f"White hole frames: {results['white_hole_frames']}")
+        print(f"Warning marker: {results['warning_marker']}")
+        if results.get('sounds_created', 0) > 0:
+            print(f"Sounds: {results['sounds_created']}")
+        print()
+        print("Assets saved to:")
+        print(f"  - {generator.textures_path}")
+        print(f"  - {generator.visuals_path}")
+        if results.get('sounds_created', 0) > 0:
+            print(f"  - {generator.sounds_path}")
+        print()
+        
+        return 0
+    except Exception as e:
+        print()
+        print("=" * 60)
+        print("ERROR")
+        print("=" * 60)
+        print(f"Failed to generate assets: {e}")
+        import traceback
+        traceback.print_exc()
+        print()
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

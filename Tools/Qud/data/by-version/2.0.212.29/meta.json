@@ -1,0 +1,12 @@
+{
+  "gameFileVersion": "2.0.212.29",
+  "steamBetaKey": "lang-experimental",
+  "steamBuildId": "24228288",
+  "notes": "Updated by compile-rules.",
+  "updated": "2026-08-17 23:48:51",
+  "files": [
+    "obsolete_api_dump.json",
+    "curated_rewrite_rules.json",
+    "charts/"
+  ]
+}

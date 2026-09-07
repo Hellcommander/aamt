@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <Prefer32Bit>false</Prefer32Bit>
+    <UseWPF>true</UseWPF>
+    <!-- No UseWindowsForms: FolderBrowserDialog / OpenFolderDialog hard-crash on Browse here. -->
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ApiMigratorGui</RootNamespace>
+    <AssemblyName>ApiMigratorGui</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ApiMigrator.Core\ApiMigrator.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,319 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Transcendence Shield and Armor Registry Schema",
+  "description": "Data-driven shield and armor system registry schema for visual, mechanics, effects, and export configuration",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Registry schema version",
+      "default": "1.0.0"
+    },
+    "shields": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/shieldProfile"
+      }
+    },
+    "armor": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/armorProfile"
+      }
+    }
+  },
+  "definitions": {
+    "shieldProfile": {
+      "type": "object",
+      "required": ["id", "type", "maxStrength", "visual", "export"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique shield identifier (e.g., 'energy_shield_mk2')"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["shield", "barrier", "bubble"],
+          "default": "shield",
+          "description": "Shield type category"
+        },
+        "maxStrength": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum shield strength (HP)"
+        },
+        "rechargeRate": {
+          "type": "number",
+          "minimum": 0,
+          "default": 6.0,
+          "description": "Shield recharge rate per second"
+        },
+        "rechargeDelay": {
+          "type": "number",
+          "minimum": 0,
+          "default": 2.5,
+          "description": "Delay in seconds before recharge starts after last hit"
+        },
+        "absorptionCurve": {
+          "type": "string",
+          "enum": ["linear", "exponential", "logarithmic", "step"],
+          "default": "linear",
+          "description": "Damage absorption curve type"
+        },
+        "visual": {
+          "$ref": "#/definitions/shieldVisual"
+        },
+        "fx": {
+          "$ref": "#/definitions/shieldFX"
+        },
+        "export": {
+          "$ref": "#/definitions/shieldExport"
+        }
+      }
+    },
+    "shieldVisual": {
+      "type": "object",
+      "required": ["radius", "color"],
+      "properties": {
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Shield radius (relative to ship size, typically 1.0-2.0)"
+        },
+        "thickness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.08,
+          "description": "Shield rim thickness (0.0-1.0)"
+        },
+        "color": {
+          "type": "string",
+          "description": "Base shield color (hex format)"
+        },
+        "glowColor": {
+          "type": "string",
+          "description": "Glow/core color (hex format)"
+        },
+        "damagedColor": {
+          "type": "string",
+          "description": "Color when damaged (hex format)"
+        },
+        "pulseFrequency": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.9,
+          "description": "Pulse animation frequency (Hz)"
+        },
+        "pulseStrength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.5,
+          "description": "Pulse intensity (0.0-1.0)"
+        },
+        "distortionStrength": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.0,
+          "description": "Visual distortion strength (0.0 = none, 1.0 = max)"
+        },
+        "waveFrequency": {
+          "type": "number",
+          "minimum": 0,
+          "default": 4.0,
+          "description": "Distortion wave frequency"
+        },
+        "waveSpeed": {
+          "type": "number",
+          "default": 2.0,
+          "description": "Distortion wave speed"
+        },
+        "particleProfile": {
+          "type": "string",
+          "description": "Reference to particle profile ID"
+        },
+        "spriteStrip": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use sprite strip fallback instead of shader"
+        },
+        "spriteFrames": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 8,
+          "description": "Number of frames in sprite strip (if spriteStrip = true)"
+        },
+        "normalMap": {
+          "type": "boolean",
+          "default": false,
+          "description": "Generate normal map for lighting"
+        }
+      }
+    },
+    "shieldFX": {
+      "type": "object",
+      "properties": {
+        "hitFlashDuration": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.12,
+          "description": "Hit flash duration in seconds"
+        },
+        "hitPulseStrength": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1.6,
+          "description": "Hit pulse intensity multiplier"
+        },
+        "impactParticleCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 12,
+          "description": "Number of impact particles on hit"
+        },
+        "breakParticleCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 30,
+          "description": "Number of particles on shield break"
+        },
+        "sound": {
+          "type": "object",
+          "properties": {
+            "hit": {"type": "string", "description": "Sound ID for shield hit"},
+            "break": {"type": "string", "description": "Sound ID for shield break"},
+            "recharge": {"type": "string", "description": "Sound ID for recharge start"},
+            "low": {"type": "string", "description": "Sound ID for low shield warning"}
+          }
+        }
+      }
+    },
+    "armorProfile": {
+      "type": "object",
+      "required": ["id", "slots", "export"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique armor identifier"
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/armorSlot"
+          },
+          "description": "Armor plating slots (front, left, right, rear, top, bottom)"
+        },
+        "visual": {
+          "$ref": "#/definitions/armorVisual"
+        },
+        "export": {
+          "$ref": "#/definitions/armorExport"
+        }
+      }
+    },
+    "armorSlot": {
+      "type": "object",
+      "required": ["slot", "maxHp"],
+      "properties": {
+        "slot": {
+          "type": "string",
+          "enum": ["front", "left", "right", "rear", "top", "bottom", "all"],
+          "description": "Armor slot identifier"
+        },
+        "maxHp": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Maximum hit points for this slot"
+        },
+        "damageReduction": {
+          "type": "object",
+          "properties": {
+            "kinetic": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.0},
+            "laser": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.0},
+            "plasma": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.0},
+            "ion": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.0},
+            "thermo": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.0}
+          },
+          "description": "Damage reduction per damage type (0.0 = none, 1.0 = immune)"
+        },
+        "visualDamage": {
+          "type": "object",
+          "properties": {
+            "scorchMarks": {"type": "boolean", "default": true},
+            "dents": {"type": "boolean", "default": true},
+            "cracks": {"type": "boolean", "default": false}
+          }
+        }
+      }
+    },
+    "armorVisual": {
+      "type": "object",
+      "properties": {
+        "baseColor": {
+          "type": "string",
+          "description": "Base armor color (hex format)"
+        },
+        "damagedColor": {
+          "type": "string",
+          "description": "Damaged armor color (hex format)"
+        },
+        "overlayTexture": {
+          "type": "string",
+          "description": "Path to armor overlay texture"
+        },
+        "normalMap": {
+          "type": "string",
+          "description": "Path to armor normal map"
+        }
+      }
+    },
+    "shieldExport": {
+      "type": "object",
+      "required": ["unid"],
+      "properties": {
+        "unid": {
+          "type": "string",
+          "pattern": "^&[a-zA-Z0-9_]+;$",
+          "description": "Transcendence UNID (e.g., '&shEnergyShieldMk2;')"
+        },
+        "transcendenceXml": {
+          "type": "boolean",
+          "default": true,
+          "description": "Generate Transcendence XML"
+        },
+        "resourcePaths": {
+          "type": "object",
+          "properties": {
+            "sprite": {"type": "string", "description": "Path to shield sprite"},
+            "normalMap": {"type": "string", "description": "Path to normal map"},
+            "distortionMap": {"type": "string", "description": "Path to distortion map"}
+          }
+        }
+      }
+    },
+    "armorExport": {
+      "type": "object",
+      "required": ["unid"],
+      "properties": {
+        "unid": {
+          "type": "string",
+          "pattern": "^&[a-zA-Z0-9_]+;$",
+          "description": "Transcendence UNID"
+        },
+        "transcendenceXml": {
+          "type": "boolean",
+          "default": true
+        },
+        "resourcePaths": {
+          "type": "object",
+          "properties": {
+            "overlay": {"type": "string", "description": "Path to armor overlay texture"},
+            "normalMap": {"type": "string", "description": "Path to armor normal map"}
+          }
+        }
+      }
+    }
+  }
+}
+

@@ -1,0 +1,53 @@
+{
+  "id": "iron_centipede",
+  "segmentCount": 20,
+  "segmentLength": 0.5,
+  "taperProfile": "linear",
+  "segmentRadius": 0.2,
+  "segmentType": "cylinder",
+  "headType": "mandible",
+  "tailType": "spike",
+  "articulationStiffness": 0.7,
+  "noiseDetail": 0.4,
+  "armorPlates": true,
+  "plateDetailLevel": 2,
+  "colorPrimary": [0.3, 0.3, 0.35],
+  "colorSecondary": [0.1, 0.1, 0.1],
+  "materialRoughness": 0.6,
+  "materialMetallic": 0.8,
+  "animationProfile": "slither",
+  "aiProfile": "predator",
+  
+  "segmentSpacing": 0.1,
+  "enableJoints": true,
+  "jointFlexibility": 0.5,
+  "enableArmor": true,
+  "armorThickness": 0.05,
+  "enableSpikes": false,
+  "spikeCount": 0,
+  "spikeLength": 0.1,
+  
+  "description": "A fearsome iron-plated centipede with metallic armor and powerful mandibles. This creature is highly aggressive and hunts in dark environments.",
+  
+  "tags": [
+    "centipede",
+    "armored",
+    "predator",
+    "metallic",
+    "aggressive",
+    "underground"
+  ],
+  
+  "metadata": {
+    "author": "Magi-Tech Creature System",
+    "version": "1.0.0",
+    "license": "MIT",
+    "difficulty": "hard",
+    "biome": "underground",
+    "rarity": "uncommon"
+  },
+  
+  "enableCaching": true,
+  "enableHotReload": true,
+  "enableParallelProcessing": true
+} 

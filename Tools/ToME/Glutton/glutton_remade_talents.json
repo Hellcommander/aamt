@@ -1,0 +1,967 @@
+[
+  {
+    "id": "GLUTTON_AMALGAM_CORE",
+    "name": "Amalgam Core",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\amalgam_core.lua"
+  },
+  {
+    "id": "GLUTTON_UNIFIED_METABOLISM",
+    "name": "Unified Metabolism",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\amalgam_core.lua"
+  },
+  {
+    "id": "GLUTTON_CONSUME_RESOURCES",
+    "name": "Consume Resources",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\amalgam_core.lua"
+  },
+  {
+    "id": "GLUTTON_AMALGAM_OVERFLOW",
+    "name": "Amalgam Overflow",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\amalgam_core.lua"
+  },
+  {
+    "id": "GLUTTON_HARVEST_CORPSE",
+    "name": "Harvest Corpse",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corpse_larder.lua"
+  },
+  {
+    "id": "GLUTTON_CONSUME_STORED_CORPSE",
+    "name": "Consume Stored Corpse",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corpse_larder.lua"
+  },
+  {
+    "id": "GLUTTON_PRESERVATION_TECHNIQUES",
+    "name": "Preservation Techniques",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corpse_larder.lua"
+  },
+  {
+    "id": "GLUTTON_CORPSE_EXPLOSION",
+    "name": "Corpse Explosion",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corpse_larder.lua"
+  },
+  {
+    "id": "GLUTTON_CONSUME_CORPSE",
+    "name": "Consume Corpse",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corpse_larder.lua"
+  },
+  {
+    "id": "GLUTTON_PRESERVE_CORPSE",
+    "name": "Preserve Corpse",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corpse_larder.lua"
+  },
+  {
+    "id": "GLUTTON_REANIMATE_MEAL",
+    "name": "Reanimate Meal",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corpse_larder.lua"
+  },
+  {
+    "id": "GLUTTON_ACID_SPIT",
+    "name": "Acid Spit",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corrosive_hunt.lua"
+  },
+  {
+    "id": "GLUTTON_HUNGRY_LUNGE",
+    "name": "Hungry Lunge",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corrosive_hunt.lua"
+  },
+  {
+    "id": "GLUTTON_DISSOLVING_TRAIL",
+    "name": "Dissolving Trail",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corrosive_hunt.lua"
+  },
+  {
+    "id": "GLUTTON_PREDATORY_LEAP",
+    "name": "Predatory Leap",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corrosive_hunt.lua"
+  },
+  {
+    "id": "GLUTTON_DEVOUR",
+    "name": "Devour",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\digestion.lua"
+  },
+  {
+    "id": "GLUTTON_RETCH",
+    "name": "Retch",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\digestion.lua"
+  },
+  {
+    "id": "GLUTTON_GNAW",
+    "name": "Gnaw",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\digestion.lua"
+  },
+  {
+    "id": "GLUTTON_CORROSIVE_STOMACH",
+    "name": "Corrosive Stomach",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\digestion.lua"
+  },
+  {
+    "id": "GLUTTON_RAPID_DIGESTION",
+    "name": "Rapid Digestion",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\digestion.lua"
+  },
+  {
+    "id": "GLUTTON_CONSUME_ESSENCE",
+    "name": "Consume Essence",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\essence_consumption.lua"
+  },
+  {
+    "id": "GLUTTON_DIGEST_ESSENCE",
+    "name": "Digest Essence",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\essence_consumption.lua"
+  },
+  {
+    "id": "GLUTTON_ESSENCE_MASTERY",
+    "name": "Essence Mastery",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\essence_consumption.lua"
+  },
+  {
+    "id": "GLUTTON_APEX_PREDATOR",
+    "name": "Apex Predator",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\essence_consumption.lua"
+  },
+  {
+    "id": "GLUTTON_VOMIT_ATTACK",
+    "name": "Vomit Attack",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\expulsion.lua"
+  },
+  {
+    "id": "GLUTTON_EXPEL_ITEM",
+    "name": "Expel Item",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\expulsion.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_SPRAY",
+    "name": "Bile Spray",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\expulsion.lua"
+  },
+  {
+    "id": "GLUTTON_REGURGITATE",
+    "name": "Regurgitate",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\expulsion.lua"
+  },
+  {
+    "id": "GLUTTON_SENSE_HUNTERS",
+    "name": "Sense Hunters",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\faction_hunting.lua"
+  },
+  {
+    "id": "GLUTTON_HUNT_FACTION",
+    "name": "Hunt Faction",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\faction_hunting.lua"
+  },
+  {
+    "id": "GLUTTON_FACTION_DEVOURER_TALENT",
+    "name": "Faction Devourer",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\faction_hunting.lua"
+  },
+  {
+    "id": "GLUTTON_FORBIDDEN_DIGESTION",
+    "name": "Forbidden Digestion",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_DISSOLVE_SKILL",
+    "name": "Dissolve Skill",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_MAW_TAINT",
+    "name": "Maw Taint",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_VORACIOUS_APPETITE",
+    "name": "Voracious Appetite",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_CONSUME_ITEM",
+    "name": "Consume Item",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_METABOLIC_EFFICIENCY",
+    "name": "Metabolic Efficiency",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_ACID_BLOOD",
+    "name": "Acid Blood",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_ENDLESS_HUNGER",
+    "name": "Endless Hunger",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_HUNGERS_GRIP",
+    "name": "Hunger's Grip",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_CURSED_METABOLISM",
+    "name": "Cursed Metabolism",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_MAWS_RESILIENCE",
+    "name": "Maw's Resilience",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_DESPERATE_HUNGER",
+    "name": "Desperate Hunger",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_HUNGER_SENSE",
+    "name": "Hunger Sense",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_NUTRIENT_EXTRACTION",
+    "name": "Nutrient Extraction",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_ADAPTIVE_METABOLISM",
+    "name": "Adaptive Metabolism",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_PERFECT_DIGESTION",
+    "name": "Perfect Digestion",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\gluttony.lua"
+  },
+  {
+    "id": "GLUTTON_RAGE_STOMACH",
+    "name": "Rage Stomach",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_SPELL_STOMACH",
+    "name": "Spell Stomach",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTION_LOOP",
+    "name": "Digestion Loop",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_PROPHETIC_INDIGESTION",
+    "name": "Prophetic Indigestion",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_CONSUMED_MEMORIES",
+    "name": "Consumed Memories",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_SCHOLARS_PALATE",
+    "name": "Scholar's Palate",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_AMBUSH_STOMACH",
+    "name": "Ambush Stomach",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_PARASITIC_ROOTS",
+    "name": "Parasitic Roots",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_CORRUPTED_RADIANCE",
+    "name": "Corrupted Radiance",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTIVE_ALCHEMY",
+    "name": "Digestive Alchemy",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_TWILIGHT_STOMACH",
+    "name": "Twilight Stomach",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_MECHANICAL_DIGESTION",
+    "name": "Mechanical Digestion",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_GESTATING_HORRORS",
+    "name": "Gestating Horrors",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_PSIONIC_STOMACH",
+    "name": "Psionic Stomach",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_BLIGHTED_STOMACH",
+    "name": "Blighted Stomach",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_PROJECTILE_STOMACH",
+    "name": "Projectile Stomach",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_powers.lua"
+  },
+  {
+    "id": "GLUTTON_DEVOUR_ESCORT",
+    "name": "Devour Escort",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_system.lua"
+  },
+  {
+    "id": "GLUTTON_ESSENCE_ECHO",
+    "name": "Essence Echo",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_system.lua"
+  },
+  {
+    "id": "GLUTTON_PREDATORY_INSTINCT",
+    "name": "Predatory Instinct",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_system.lua"
+  },
+  {
+    "id": "GLUTTON_STOLEN_DESTINY",
+    "name": "Stolen Destiny",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_escort_system.lua"
+  },
+  {
+    "id": "GLUTTON_CONSUME_TERRAIN",
+    "name": "Consume Terrain",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_talents.lua"
+  },
+  {
+    "id": "GLUTTON_OMNIVOROUS",
+    "name": "Omnivorous",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_talents.lua"
+  },
+  {
+    "id": "GLUTTON_TUNNEL_EATER",
+    "name": "Tunnel Eater",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_talents.lua"
+  },
+  {
+    "id": "GLUTTON_WORLD_EATER",
+    "name": "World Eater",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_talents.lua"
+  },
+  {
+    "id": "GLUTTON_SPAWN_FEEDER",
+    "name": "Spawn Feeder",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\glutton_talents.lua"
+  },
+  {
+    "id": "GLUTTON_MAW_DESPERATE_GNAW",
+    "name": "Desperate Gnaw",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\maw_abilities.lua"
+  },
+  {
+    "id": "GLUTTON_MAW_CORROSIVE_SECRETION",
+    "name": "Corrosive Secretion",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\maw_abilities.lua"
+  },
+  {
+    "id": "GLUTTON_MAW_PARTIAL_CONSUMPTION",
+    "name": "Partial Consumption",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\maw_abilities.lua"
+  },
+  {
+    "id": "GLUTTON_MAW_MAWS_HUNGER",
+    "name": "Maw's Hunger",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\maw_abilities.lua"
+  },
+  {
+    "id": "GLUTTON_MAW_CHILD_OF_MAW",
+    "name": "Child of the Maw",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\maw_abilities.lua"
+  },
+  {
+    "id": "GLUTTON_SOPORIFIC_BREATH",
+    "name": "Soporific Breath",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\predator_tactics.lua"
+  },
+  {
+    "id": "GLUTTON_NUMBING_SECRETION",
+    "name": "Numbing Secretion",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\predator_tactics.lua"
+  },
+  {
+    "id": "GLUTTON_PARALYZING_VENOM",
+    "name": "Paralyzing Venom",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\predator_tactics.lua"
+  },
+  {
+    "id": "GLUTTON_PREDATORS_MARK",
+    "name": "Predator's Mark",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\predator_tactics.lua"
+  },
+  {
+    "id": "GLUTTON_ROLLING_CHARGE",
+    "name": "Rolling Charge",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\rolling_mass.lua"
+  },
+  {
+    "id": "GLUTTON_CRUSHING_WEIGHT",
+    "name": "Crushing Weight",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\rolling_mass.lua"
+  },
+  {
+    "id": "GLUTTON_BELLY_SLAM",
+    "name": "Belly Slam",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\rolling_mass.lua"
+  },
+  {
+    "id": "GLUTTON_UNSTOPPABLE_MASS",
+    "name": "Unstoppable Mass",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\rolling_mass.lua"
+  },
+  {
+    "id": "GLUTTON_WORMS_EMBRACE",
+    "name": "Worm's Embrace",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\worm_cult.lua"
+  },
+  {
+    "id": "GLUTTON_CARRION_SWARM",
+    "name": "Carrion Swarm",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\worm_cult.lua"
+  },
+  {
+    "id": "GLUTTON_HORRIFIC_CONSUMPTION",
+    "name": "Horrific Consumption",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\worm_cult.lua"
+  },
+  {
+    "id": "GLUTTON_ENDLESS_MAW",
+    "name": "Endless Maw",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\worm_cult.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTED_MINDS",
+    "name": "Digested Minds",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\worm_cult.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_TSUNAMI",
+    "name": "Bile Tsunami",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\boss_abilities.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTIVE_FOG",
+    "name": "Digestive Fog",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\boss_abilities.lua"
+  },
+  {
+    "id": "GLUTTON_UNSTOPPABLE_HUNGER",
+    "name": "Unstoppable Hunger",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\boss_abilities.lua"
+  },
+  {
+    "id": "GLUTTON_ENDLESS_APPETITE",
+    "name": "Endless Appetite",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\boss_abilities.lua"
+  },
+  {
+    "id": "GLUTTON_STOMACH_QUAKE",
+    "name": "Stomach Quake",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\boss_abilities.lua"
+  },
+  {
+    "id": "GLUTTON_UNSTABLE_RADIANCE",
+    "name": "Unstable Radiance",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\celestial.lua"
+  },
+  {
+    "id": "GLUTTON_CONSUMING_LIGHT",
+    "name": "Consuming Light",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\celestial.lua"
+  },
+  {
+    "id": "GLUTTON_DEVOURING_RADIANCE",
+    "name": "Devouring Radiance",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\celestial.lua"
+  },
+  {
+    "id": "GLUTTON_HUNGER_ECLIPSE",
+    "name": "Hunger Eclipse",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\celestial.lua"
+  },
+  {
+    "id": "GLUTTON_DEVOUR_WOUNDS",
+    "name": "Devour Wounds",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\celestial.lua"
+  },
+  {
+    "id": "GLUTTON_GASTRIC_TENTACLE",
+    "name": "Gastric Tentacle",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\dlc_cults_orcs.lua"
+  },
+  {
+    "id": "GLUTTON_ENTROPIC_HUNGER",
+    "name": "Entropic Hunger",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\dlc_cults_orcs.lua"
+  },
+  {
+    "id": "GLUTTON_WRITHING_STOMACH",
+    "name": "Writhing Stomach",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\dlc_cults_orcs.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_LAUNCHER",
+    "name": "Bile Launcher",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\dlc_cults_orcs.lua"
+  },
+  {
+    "id": "GLUTTON_ACID_TURRET",
+    "name": "Acid Turret",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\dlc_cults_orcs.lua"
+  },
+  {
+    "id": "GLUTTON_CORROSIVE_OVERCHARGE",
+    "name": "Corrosive Overcharge",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\dlc_cults_orcs.lua"
+  },
+  {
+    "id": "GLUTTON_VOID_GULLET",
+    "name": "Void Gullet",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\dlc_cults_orcs.lua"
+  },
+  {
+    "id": "GLUTTON_DEMENTED_FEAST",
+    "name": "Demented Feast",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\dlc_cults_orcs.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_INJECTOR",
+    "name": "Bile Injector",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\dlc_cults_orcs.lua"
+  },
+  {
+    "id": "GLUTTON_STEAM_DIGESTION",
+    "name": "Steam Digestion",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\dlc_cults_orcs.lua"
+  },
+  {
+    "id": "GLUTTON_RAVENOUS_GNAW",
+    "name": "Ravenous Gnaw",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\glutton_maw.lua"
+  },
+  {
+    "id": "GLUTTON_GNAWING_FRENZY",
+    "name": "Gnawing Frenzy",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\glutton_maw.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTIVE_SECRETION",
+    "name": "Digestive Secretion",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\glutton_maw.lua"
+  },
+  {
+    "id": "GLUTTON_ESSENCE_CONSUMPTION",
+    "name": "Essence Consumption",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\glutton_maw.lua"
+  },
+  {
+    "id": "GLUTTON_ABYSSAL_HUNGER",
+    "name": "Abyssal Hunger",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\glutton_maw.lua"
+  },
+  {
+    "id": "GLUTTON_ENHANCED_APEX_PREDATOR",
+    "name": "Enhanced Apex Predator",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\glutton_maw.lua"
+  },
+  {
+    "id": "GLUTTON_VOID_TOUCHED_MAW",
+    "name": "Void-Touched Maw",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\glutton_maw.lua"
+  },
+  {
+    "id": "GLUTTON_CONSUME_EXISTENCE",
+    "name": "Consume Existence",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\glutton_maw.lua"
+  },
+  {
+    "id": "GLUTTON_SELF_CANNIBALIZE",
+    "name": "Self-Cannibalize",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\healing.lua"
+  },
+  {
+    "id": "GLUTTON_DIGEST_WOUNDS",
+    "name": "Digest Wounds",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\healing.lua"
+  },
+  {
+    "id": "GLUTTON_GORGED_POWER",
+    "name": "Gorged Power",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\healing.lua"
+  },
+  {
+    "id": "GLUTTON_BLOOD_FEAST",
+    "name": "Blood Feast",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\healing.lua"
+  },
+  {
+    "id": "GLUTTON_VAMPIRIC_HUNGER",
+    "name": "Vampiric Hunger",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\healing.lua"
+  },
+  {
+    "id": "GLUTTON_SIPHONING_BITE",
+    "name": "Siphoning Bite",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\healing.lua"
+  },
+  {
+    "id": "GLUTTON_DESPERATE_GORGE",
+    "name": "Desperate Gorge",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\healing.lua"
+  },
+  {
+    "id": "GLUTTON_MAW_ABYSS",
+    "name": "Maw of the Abyss",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_horrors.lua"
+  },
+  {
+    "id": "GLUTTON_GLUTTONOUS_FRENZY",
+    "name": "Gluttonous Frenzy",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_horrors.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTIVE_MIASMA",
+    "name": "Digestive Miasma",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_horrors.lua"
+  },
+  {
+    "id": "GLUTTON_HUNGER_ECHOES",
+    "name": "Echoes of Starvation",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_horrors.lua"
+  },
+  {
+    "id": "GLUTTON_STOMACH_TENDRIL",
+    "name": "Stomach Tendril",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_horrors.lua"
+  },
+  {
+    "id": "GLUTTON_BLADE_VOMIT",
+    "name": "Blade Vomit",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_horrors.lua"
+  },
+  {
+    "id": "GLUTTON_HUNGER_GRAVITY",
+    "name": "Gravity of Hunger",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_horrors.lua"
+  },
+  {
+    "id": "GLUTTON_STOMACH_GRIP",
+    "name": "Stomach Grip",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_techniques.lua"
+  },
+  {
+    "id": "GLUTTON_MAW_GRIP",
+    "name": "Maw Grip",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_techniques.lua"
+  },
+  {
+    "id": "GLUTTON_PREDATOR_POUNCE",
+    "name": "Predator Pounce",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_techniques.lua"
+  },
+  {
+    "id": "GLUTTON_PREDATORY_LUNGE",
+    "name": "Predatory Lunge",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_techniques.lua"
+  },
+  {
+    "id": "GLUTTON_STARVATION_CALL",
+    "name": "Call of Starvation",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_techniques.lua"
+  },
+  {
+    "id": "GLUTTON_SPIT_TEETH",
+    "name": "Spit Teeth",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_techniques.lua"
+  },
+  {
+    "id": "GLUTTON_VOMIT_MASS",
+    "name": "Vomit Mass",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\npc_techniques.lua"
+  },
+  {
+    "id": "GLUTTON_HUNGER_PULSE",
+    "name": "Hunger Pulse",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\psionic.lua"
+  },
+  {
+    "id": "GLUTTON_PSYCHIC_DEVOUR",
+    "name": "Psychic Devour",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\psionic.lua"
+  },
+  {
+    "id": "GLUTTON_STOMACH_PULL",
+    "name": "Stomach Pull",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\psionic.lua"
+  },
+  {
+    "id": "GLUTTON_HUNGER_MANIFESTATION",
+    "name": "Hunger Manifestation",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\psionic.lua"
+  },
+  {
+    "id": "GLUTTON_GLUTTONOUS_MIND",
+    "name": "Gluttonous Mind",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\psionic.lua"
+  },
+  {
+    "id": "GLUTTON_DEVOURING_THOUGHTS",
+    "name": "Devouring Thoughts",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\psionic.lua"
+  },
+  {
+    "id": "GLUTTON_FEAST_OF_TERROR",
+    "name": "Feast of Terror",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\psionic.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTIVE_BLAST",
+    "name": "Digestive Blast",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\smog_devil.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_BARRAGE",
+    "name": "Bile Barrage",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\smog_devil.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_CLOUD",
+    "name": "Bile Cloud",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\smog_devil.lua"
+  },
+  {
+    "id": "GLUTTON_SOUL_FEAST",
+    "name": "Soul Feast",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\smog_devil.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTIVE_INFERNO_SMOG",
+    "name": "Digestive Inferno",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\smog_devil.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_BOLT",
+    "name": "Bile Bolt",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\smog_devil.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTIVE_OVERDRIVE",
+    "name": "Digestive Overdrive",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\smog_devil.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_STORM",
+    "name": "Bile Storm",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\smog_devil.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_THRUST",
+    "name": "Bile Thrust",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_arcane.lua"
+  },
+  {
+    "id": "GLUTTON_GORGED_ARCANA",
+    "name": "Gorged Arcana",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_arcane.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTIVE_DISPLACEMENT",
+    "name": "Digestive Displacement",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_arcane.lua"
+  },
+  {
+    "id": "GLUTTON_GULLET_GATEWAY",
+    "name": "Gullet Gateway",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_arcane.lua"
+  },
+  {
+    "id": "GLUTTON_GASTRIC_SHIELD",
+    "name": "Gastric Shield",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_arcane.lua"
+  },
+  {
+    "id": "GLUTTON_HUNGERING_FLAME",
+    "name": "Hungering Flame",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_fire.lua"
+  },
+  {
+    "id": "GLUTTON_CONSUMING_FLAME",
+    "name": "Consuming Flame",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_fire.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_FLAME",
+    "name": "Bile Flame",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_fire.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTIVE_INFERNO",
+    "name": "Digestive Inferno",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_fire.lua"
+  },
+  {
+    "id": "GLUTTON_GLUTTONOUS_FIREBALL",
+    "name": "Gluttonous Fireball",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_fire.lua"
+  },
+  {
+    "id": "GLUTTON_BLIGHTFIRE_ORB",
+    "name": "Blightfire Orb",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_fire.lua"
+  },
+  {
+    "id": "GLUTTON_VOLATILE_FLASH",
+    "name": "Volatile Flash",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_fire.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTIVE_FREEZE",
+    "name": "Digestive Freeze",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_ice.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_BLIZZARD",
+    "name": "Bile Blizzard",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_ice.lua"
+  },
+  {
+    "id": "GLUTTON_FROZEN_MEAL",
+    "name": "Frozen Meal",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_ice.lua"
+  },
+  {
+    "id": "GLUTTON_BILEBURST_LIGHTNING",
+    "name": "Bileburst Lightning",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_lightning.lua"
+  },
+  {
+    "id": "GLUTTON_ACIDIC_LIGHTNING",
+    "name": "Acidic Lightning",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_lightning.lua"
+  },
+  {
+    "id": "GLUTTON_STORM_VOMIT",
+    "name": "Storm Vomit",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_lightning.lua"
+  },
+  {
+    "id": "GLUTTON_HUNGERING_STORM",
+    "name": "Hungering Storm",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_lightning.lua"
+  },
+  {
+    "id": "GLUTTON_BLIGHTED_TEMPEST",
+    "name": "Blighted Tempest",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_lightning.lua"
+  },
+  {
+    "id": "GLUTTON_SHOCK_BURST",
+    "name": "Shock Burst",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\spell_lightning.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_STRIKE",
+    "name": "Bile-Coated Strike",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\techniques_melee.lua"
+  },
+  {
+    "id": "GLUTTON_RAVENOUS_FLURRY",
+    "name": "Ravenous Flurry",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\techniques_melee.lua"
+  },
+  {
+    "id": "GLUTTON_STUNNING_REGURGITATION",
+    "name": "Stunning Regurgitation",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\techniques_melee.lua"
+  },
+  {
+    "id": "GLUTTON_GORGE_SLAM",
+    "name": "Gorge Slam",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\techniques_melee.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_CLEAVE",
+    "name": "Bile Cleave",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\techniques_melee.lua"
+  },
+  {
+    "id": "GLUTTON_RAVENOUS_RAGE",
+    "name": "Ravenous Rage",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\techniques_melee.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_ARROW",
+    "name": "Bile-Tipped Arrow",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\techniques_ranged.lua"
+  },
+  {
+    "id": "GLUTTON_ACID_RAIN",
+    "name": "Acid Rain",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\techniques_ranged.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_SPIT_BARRAGE",
+    "name": "Bile Spit Barrage",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\techniques_ranged.lua"
+  },
+  {
+    "id": "GLUTTON_REGURGITATE_PROJECTILE",
+    "name": "Regurgitate Projectile",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\techniques_ranged.lua"
+  },
+  {
+    "id": "GLUTTON_PARASITIC_THORNS",
+    "name": "Parasitic Thorns",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\wildgift.lua"
+  },
+  {
+    "id": "GLUTTON_BILE_BREATH",
+    "name": "Bile Breath",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\wildgift.lua"
+  },
+  {
+    "id": "GLUTTON_SUMMON_OOZE",
+    "name": "Summon Digestive Ooze",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\wildgift.lua"
+  },
+  {
+    "id": "GLUTTON_MAWS_RESOLVE",
+    "name": "Maw's Resolve",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\wildgift.lua"
+  },
+  {
+    "id": "GLUTTON_DIGESTIVE_BARRIER",
+    "name": "Digestive Barrier",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\wildgift.lua"
+  },
+  {
+    "id": "GLUTTON_HUNGER_CLASH",
+    "name": "Hunger Clash",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\wildgift.lua"
+  },
+  {
+    "id": "GLUTTON_CHILLING_BILE",
+    "name": "Chilling Bile Breath",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\wildgift.lua"
+  },
+  {
+    "id": "GLUTTON_PARASITIC_REGEN",
+    "name": "Parasitic Regeneration",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-glutton-remade\\data\\talents\\corruptions\\wildgift.lua"
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "id": "shattered_affixes",
+  "match": ["ShatteredAffixes", "Shattered Affixes"],
+  "mode": "content",
+  "enabled": true,
+  "priority": 60,
+  "class_priority": 40,
+  "items_mode": "merge",
+  "notes": "Priority 60. ~1708 overlaps with Grimarillion almost entirely non-skill (affix/loot/other). class_priority 40 — do not touch mastery trees. Applied before mega packs so Grim/Rebirth win any stray conflicts."
+}

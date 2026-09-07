@@ -1,0 +1,150 @@
+{
+  "version": "1.0.0",
+  "shields": [
+    {
+      "id": "energy_shield_mk2",
+      "type": "shield",
+      "maxStrength": 120,
+      "rechargeRate": 6.0,
+      "rechargeDelay": 2.5,
+      "absorptionCurve": "linear",
+      "visual": {
+        "radius": 1.6,
+        "thickness": 0.08,
+        "color": "#66ccff",
+        "glowColor": "#aaffff",
+        "damagedColor": "#ff6666",
+        "pulseFrequency": 0.9,
+        "pulseStrength": 0.5,
+        "distortionStrength": 0.3,
+        "waveFrequency": 4.0,
+        "waveSpeed": 2.0,
+        "particleProfile": "distortion_core",
+        "spriteStrip": false,
+        "normalMap": true
+      },
+      "fx": {
+        "hitFlashDuration": 0.12,
+        "hitPulseStrength": 1.6,
+        "impactParticleCount": 12,
+        "breakParticleCount": 30,
+        "sound": {
+          "hit": "sfxShieldHit",
+          "break": "sfxShieldBreak",
+          "recharge": "sfxShieldRecharge",
+          "low": "sfxShieldLow"
+        }
+      },
+      "export": {
+        "unid": "&shEnergyShieldMk2;",
+        "transcendenceXml": true,
+        "resourcePaths": {
+          "sprite": "Resources/Shields/energy_shield_mk2.png",
+          "normalMap": "Resources/Shields/energy_shield_mk2_normal.png"
+        }
+      }
+    },
+    {
+      "id": "plasma_barrier",
+      "type": "barrier",
+      "maxStrength": 200,
+      "rechargeRate": 4.0,
+      "rechargeDelay": 3.0,
+      "absorptionCurve": "exponential",
+      "visual": {
+        "radius": 1.8,
+        "thickness": 0.12,
+        "color": "#ff6600",
+        "glowColor": "#ffaa00",
+        "damagedColor": "#cc0000",
+        "pulseFrequency": 1.2,
+        "pulseStrength": 0.7,
+        "distortionStrength": 0.5,
+        "waveFrequency": 6.0,
+        "waveSpeed": 3.0,
+        "particleProfile": "plasma_core",
+        "spriteStrip": false
+      },
+      "fx": {
+        "hitFlashDuration": 0.15,
+        "hitPulseStrength": 2.0,
+        "impactParticleCount": 18,
+        "breakParticleCount": 40,
+        "sound": {
+          "hit": "sfxPlasmaBarrierHit",
+          "break": "sfxPlasmaBarrierBreak"
+        }
+      },
+      "export": {
+        "unid": "&shPlasmaBarrier;",
+        "transcendenceXml": true,
+        "resourcePaths": {
+          "sprite": "Resources/Shields/plasma_barrier.png"
+        }
+      }
+    }
+  ],
+  "armor": [
+    {
+      "id": "reinforced_plating_mk1",
+      "slots": [
+        {
+          "slot": "front",
+          "maxHp": 50,
+          "damageReduction": {
+            "kinetic": 0.2,
+            "laser": 0.1,
+            "plasma": 0.15
+          },
+          "visualDamage": {
+            "scorchMarks": true,
+            "dents": true,
+            "cracks": false
+          }
+        },
+        {
+          "slot": "left",
+          "maxHp": 50,
+          "damageReduction": {
+            "kinetic": 0.2,
+            "laser": 0.1,
+            "plasma": 0.15
+          }
+        },
+        {
+          "slot": "right",
+          "maxHp": 50,
+          "damageReduction": {
+            "kinetic": 0.2,
+            "laser": 0.1,
+            "plasma": 0.15
+          }
+        },
+        {
+          "slot": "rear",
+          "maxHp": 50,
+          "damageReduction": {
+            "kinetic": 0.2,
+            "laser": 0.1,
+            "plasma": 0.15
+          }
+        }
+      ],
+      "visual": {
+        "baseColor": "#888888",
+        "damagedColor": "#cc0000",
+        "overlayTexture": "Resources/Armor/reinforced_plating_overlay.png",
+        "normalMap": "Resources/Armor/reinforced_plating_normal.png"
+      },
+      "export": {
+        "unid": "&arReinforcedPlatingMk1;",
+        "transcendenceXml": true,
+        "resourcePaths": {
+          "overlay": "Resources/Armor/reinforced_plating_overlay.png",
+          "normalMap": "Resources/Armor/reinforced_plating_normal.png"
+        }
+      }
+    }
+  ]
+}
+

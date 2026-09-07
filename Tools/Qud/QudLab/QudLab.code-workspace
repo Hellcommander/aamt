@@ -1,0 +1,10 @@
+{
+  "folders": [
+    { "name": "QudLab", "path": "." },
+    { "name": "ModWorkspace (Copilot refs)", "path": "Workspace" }
+  ],
+  "settings": {
+    "dotnet.defaultSolution": "Workspace/QudLab.ModWorkspace.csproj",
+    "files.exclude": { "**/artifacts": true }
+  }
+}

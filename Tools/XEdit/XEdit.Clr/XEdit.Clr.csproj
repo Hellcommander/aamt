@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>XEdit.Clr</RootNamespace>
+    <AssemblyName>XEdit.Clr</AssemblyName>
+    <Description>AI-facing CLR around TES5Edit/xEdit (TES5Edit/TES5Edit dev-4.1.6 Starfield definitions).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\Scripts\AiAssistHost.pas" Link="Scripts\AiAssistHost.pas" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\vendor\fork.json" Link="vendor\fork.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

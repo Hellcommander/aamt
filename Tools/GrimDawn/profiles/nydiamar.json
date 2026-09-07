@@ -1,0 +1,11 @@
+{
+  "game_dir": "D:\\games\\Steam\\steamapps\\common\\Grim Dawn",
+  "source": "D:\\games\\Steam\\steamapps\\common\\Grim Dawn\\mods\\Nydiamar",
+  "out_name": "NydiamarIntegrated",
+  "include_dungeons": true,
+  "quest_prefix": "nydiamar",
+  "portal_hub": "devils_crossing",
+  "dry_run_names": false,
+  "ollama_model": null,
+  "notes": "Source: mods\\Nydiamar + sibling mods\\NydiamarDungeons. Unified Custom Game: FoA compat + quest namespace + Editor stitch prep."
+}

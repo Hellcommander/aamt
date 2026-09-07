@@ -1,0 +1,206 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Space Whale Ship Registry Schema",
+  "description": "Schema for playable space whale ship definitions",
+  "type": "object",
+  "required": ["version", "ships"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version"
+    },
+    "ships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "visual", "systems", "export"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique ship identifier"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["spaceWhale", "bioMechCarrier"],
+            "description": "Ship type classification"
+          },
+          "visual": {
+            "type": "object",
+            "required": ["silhouette", "materials", "animations"],
+            "properties": {
+              "silhouette": {
+                "type": "object",
+                "properties": {
+                  "length": {"type": "number", "description": "Ship length in units"},
+                  "width": {"type": "number", "description": "Ship width at widest point"},
+                  "height": {"type": "number", "description": "Ship height"},
+                  "profile": {
+                    "type": "string",
+                    "enum": ["streamlined", "bulky", "serpentine"],
+                    "description": "Overall shape profile"
+                  }
+                }
+              },
+              "materials": {
+                "type": "object",
+                "properties": {
+                  "skinType": {
+                    "type": "string",
+                    "enum": ["bioluminescent", "carapace", "hybrid"],
+                    "description": "Primary surface material"
+                  },
+                  "baseColor": {"type": "string", "format": "color"},
+                  "veinColor": {"type": "string", "format": "color"},
+                  "carapaceColor": {"type": "string", "format": "color"},
+                  "emissiveIntensity": {"type": "number", "minimum": 0, "maximum": 10},
+                  "subsurfaceScattering": {"type": "boolean"},
+                  "veinFlowSpeed": {"type": "number", "description": "Speed of energy flow in veins"}
+                }
+              },
+              "animations": {
+                "type": "object",
+                "properties": {
+                  "breathingEnabled": {"type": "boolean"},
+                  "breathingSpeed": {"type": "number"},
+                  "breathingAmplitude": {"type": "number"},
+                  "tailSweepEnabled": {"type": "boolean"},
+                  "gillVentCount": {"type": "integer", "minimum": 0},
+                  "gillPulseSpeed": {"type": "number"},
+                  "dorsalCrestGlow": {"type": "boolean"}
+                }
+              },
+              "modules": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {"type": "string"},
+                    "type": {
+                      "type": "string",
+                      "enum": ["head", "mid", "belly", "tail", "dorsalCrest", "gillVent"]
+                    },
+                    "position": {
+                      "type": "object",
+                      "properties": {
+                        "x": {"type": "number"},
+                        "y": {"type": "number"},
+                        "z": {"type": "number"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "systems": {
+            "type": "object",
+            "required": ["bioCore", "orbitField", "droneBay"],
+            "properties": {
+              "bioCore": {
+                "type": "object",
+                "properties": {
+                  "maxEnergy": {"type": "number"},
+                  "rechargeRate": {"type": "number"},
+                  "drainRate": {"type": "number"},
+                  "outputScaling": {"type": "boolean"}
+                }
+              },
+              "orbitField": {
+                "type": "object",
+                "properties": {
+                  "radius": {"type": "number"},
+                  "pullStrength": {"type": "number"},
+                  "collisionDamageMultiplier": {"type": "number"},
+                  "scalesWithBioCore": {"type": "boolean"},
+                  "visualStyle": {
+                    "type": "string",
+                    "enum": ["solarWind", "gravityWell", "plasmaAura"]
+                  }
+                }
+              },
+              "droneBay": {
+                "type": "object",
+                "properties": {
+                  "maxDrones": {"type": "integer"},
+                  "spawnRate": {"type": "number"},
+                  "deadZoneCapacity": {"type": "integer"},
+                  "droneTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["interceptor", "repair", "harasser", "heavy"]
+                    }
+                  }
+                }
+              },
+              "shield": {
+                "type": "object",
+                "properties": {
+                  "maxStrength": {"type": "number"},
+                  "rechargeRate": {"type": "number"},
+                  "sharedPool": {"type": "boolean"},
+                  "minionLinkEnabled": {"type": "boolean"}
+                }
+              },
+              "abilities": {
+                "type": "object",
+                "properties": {
+                  "solarWindToggle": {"type": "boolean"},
+                  "songPulse": {
+                    "type": "object",
+                    "properties": {
+                      "chargeTime": {"type": "number"},
+                      "shockwaveRadius": {"type": "number"},
+                      "pushForce": {"type": "number"},
+                      "turbulenceDuration": {"type": "number"}
+                    }
+                  },
+                  "feedingSurge": {
+                    "type": "object",
+                    "properties": {
+                      "bioCoreCost": {"type": "number"},
+                      "droneSpawnBonus": {"type": "number"},
+                      "fieldRadiusBonus": {"type": "number"},
+                      "duration": {"type": "number"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "stats": {
+            "type": "object",
+            "properties": {
+              "hullHP": {"type": "number"},
+              "armor": {"type": "number"},
+              "baseSpeed": {"type": "number"},
+              "acceleration": {"type": "number"},
+              "turnRate": {"type": "number"},
+              "mass": {"type": "number"},
+              "regenerationRate": {"type": "number"}
+            }
+          },
+          "export": {
+            "type": "object",
+            "required": ["unid"],
+            "properties": {
+              "unid": {"type": "string"},
+              "transcendenceXml": {"type": "boolean"},
+              "resourcePaths": {
+                "type": "object",
+                "properties": {
+                  "shipImage": {"type": "string"},
+                  "shipLarge": {"type": "string"},
+                  "orbitFieldFX": {"type": "string"},
+                  "breathingAnimation": {"type": "string"},
+                  "droneBayImage": {"type": "string"}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+

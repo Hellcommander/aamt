@@ -1,0 +1,574 @@
+{
+  "version": "1.0.0",
+  "mutations": [
+    {
+      "id": "lightweight_barrel",
+      "tier": "minor",
+      "name": "Lightweight Barrel",
+      "description": "Streamlined barrel increases projectile speed at the cost of stopping power.",
+      "slotCost": 1,
+      "instability": 0,
+      "effects": {
+        "projectileSpeedMultiplier": 1.15,
+        "synergyBonus": {
+          "with": ["overclock"],
+          "effect": "Speed bonus increases to +25% when combined with Overclock",
+          "projectileSpeedMultiplier": 1.25
+        }
+      },
+      "tradeoffs": {
+        "damagePenalty": 0.10,
+        "rangePenalty": 0.05
+      },
+      "compatibility": {
+        "synergizesWith": ["condensed_rounds", "overclock", "extended_range"],
+        "conflictsWith": [],
+        "tags": ["speed", "damage"]
+      },
+      "weaponTypes": ["all"],
+      "rarity": 0.3,
+      "export": {
+        "unid": "&mutLightweightBarrel;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "condensed_rounds",
+      "tier": "minor",
+      "name": "Condensed Rounds",
+      "description": "Higher density projectiles deal more damage but increase recoil.",
+      "slotCost": 1,
+      "instability": 0,
+      "effects": {
+        "damageMultiplier": 1.10,
+        "synergyBonus": {
+          "with": ["shred_mode"],
+          "effect": "Fragments gain +20% damage and +1 additional fragment",
+          "damageMultiplier": 1.20,
+          "splitOnImpact": 1
+        }
+      },
+      "tradeoffs": {
+        "recoilIncrease": 0.15,
+        "accuracyPenalty": 0.10,
+        "fireRatePenalty": 0.05
+      },
+      "compatibility": {
+        "synergizesWith": ["lightweight_barrel", "shred_mode", "burning_rounds"],
+        "conflictsWith": ["overclock"],
+        "tags": ["damage", "accuracy"]
+      },
+      "weaponTypes": ["all"],
+      "rarity": 0.3,
+      "export": {
+        "unid": "&mutCondensedRounds;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "shred_mode",
+      "tier": "major",
+      "name": "Shred Mode",
+      "description": "Bullets split into 3 fragments on impact, reducing effective range. Synergizes with damage mutations.",
+      "slotCost": 1,
+      "instability": 0,
+      "effects": {
+        "splitOnImpact": 3,
+        "damageMultiplier": 0.80,
+        "synergyBonus": {
+          "with": ["condensed_rounds"],
+          "effect": "Fragments gain +20% damage and +1 additional fragment",
+          "damageMultiplier": 1.20,
+          "splitOnImpact": 1
+        }
+      },
+      "tradeoffs": {
+        "rangePenalty": 0.20,
+        "accuracyPenalty": 0.10
+      },
+      "compatibility": {
+        "synergizesWith": ["condensed_rounds", "overclock", "entropy_bloom", "burning_rounds", "ricochet_rounds"],
+        "conflictsWith": ["phase_rounds"],
+        "tags": ["behavior", "damage", "range"]
+      },
+      "weaponTypes": ["projectile", "plasma"],
+      "rarity": 0.15,
+      "export": {
+        "unid": "&mutShredMode;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "overclock",
+      "tier": "major",
+      "name": "Overclock",
+      "description": "Dramatically increases fire rate but builds heat rapidly. Synergizes with speed mutations.",
+      "slotCost": 1,
+      "instability": 0,
+      "effects": {
+        "fireRateMultiplier": 1.20,
+        "synergyBonus": {
+          "with": ["lightweight_barrel"],
+          "effect": "Speed bonus increases to +25% when combined",
+          "projectileSpeedMultiplier": 1.25
+        }
+      },
+      "tradeoffs": {
+        "heatBuildUp": 0.25,
+        "cooldownPenalty": 0.30,
+        "accuracyPenalty": 0.10,
+        "damagePenalty": 0.05
+      },
+      "compatibility": {
+        "synergizesWith": ["lightweight_barrel", "shred_mode", "burning_rounds"],
+        "conflictsWith": ["condensed_rounds", "precision_barrel"],
+        "tags": ["speed", "damage"]
+      },
+      "weaponTypes": ["all"],
+      "rarity": 0.15,
+      "export": {
+        "unid": "&mutOverclock;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "phase_rounds",
+      "tier": "corrupt",
+      "name": "Phase Rounds",
+      "description": "Shots phase through shields but deal reduced hull damage. Small chance to misfire.",
+      "slotCost": 2,
+      "instability": 5,
+      "effects": {
+        "behaviorChange": "phase_through_shields",
+        "damageMultiplier": 0.85
+      },
+      "tradeoffs": {
+        "damagePenalty": 0.15,
+        "misfireChance": 0.05,
+        "rangePenalty": 0.10
+      },
+      "compatibility": {
+        "synergizesWith": [],
+        "conflictsWith": ["shred_mode", "ricochet_rounds"],
+        "tags": ["behavior", "utility"]
+      },
+      "weaponTypes": ["projectile", "plasma", "laser"],
+      "rarity": 0.05,
+      "export": {
+        "unid": "&mutPhaseRounds;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "entropy_bloom",
+      "tier": "corrupt",
+      "name": "Entropy Bloom",
+      "description": "On kill, spawns a volatile shard that damages enemies. Small chance to damage player. Synergizes with multi-hit mutations.",
+      "slotCost": 2,
+      "instability": 10,
+      "effects": {
+        "behaviorChange": "spawn_shard_on_kill",
+        "procChance": 1.0,
+        "procEffect": "explode",
+        "synergyBonus": {
+          "with": ["shred_mode"],
+          "effect": "Each fragment spawns its own shard on kill",
+          "procChance": 0.5
+        }
+      },
+      "tradeoffs": {
+        "selfDamageChance": 0.10
+      },
+      "compatibility": {
+        "synergizesWith": ["shred_mode", "pulsewave", "ricochet_rounds"],
+        "conflictsWith": [],
+        "tags": ["behavior", "proc"]
+      },
+      "weaponTypes": ["all"],
+      "rarity": 0.05,
+      "export": {
+        "unid": "&mutEntropyBloom;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "vortex_orb",
+      "tier": "corrupt",
+      "name": "Vortex Orb",
+      "description": "Creates a slow-moving orb that deals burn damage. Firing creates homing submunitions that feed the orb.",
+      "slotCost": 2,
+      "instability": 8,
+      "effects": {
+        "behaviorChange": "orb_creation",
+        "homing": true,
+        "damageMultiplier": 0.75,
+        "synergyBonus": {
+          "with": ["burning_rounds"],
+          "effect": "Orb gains burn aura, submunitions apply burn",
+          "procChance": 0.8,
+          "procEffect": "burn"
+        }
+      },
+      "tradeoffs": {
+        "damagePenalty": 0.25,
+        "projectileSpeedMultiplier": 0.60,
+        "fireRatePenalty": 0.10
+      },
+      "compatibility": {
+        "synergizesWith": ["burning_rounds", "homing_seeker"],
+        "conflictsWith": ["overclock", "shred_mode"],
+        "tags": ["behavior", "utility"]
+      },
+      "weaponTypes": ["projectile", "plasma"],
+      "rarity": 0.03,
+      "export": {
+        "unid": "&mutVortexOrb;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "pulsewave",
+      "tier": "major",
+      "name": "Pulsewave",
+      "description": "Fires a single intangible projectile that creates 7-10 pulses around it. Pulses have reduced damage. Synergizes with homing.",
+      "slotCost": 1,
+      "instability": 0,
+      "effects": {
+        "behaviorChange": "pulsewave",
+        "splitOnImpact": 8,
+        "damageMultiplier": 0.60,
+        "synergyBonus": {
+          "with": ["homing_seeker"],
+          "effect": "Pulses gain homing and track nearest enemy",
+          "homing": true,
+          "damageMultiplier": 1.15
+        }
+      },
+      "tradeoffs": {
+        "damagePenalty": 0.40,
+        "rangePenalty": 0.10
+      },
+      "compatibility": {
+        "synergizesWith": ["condensed_rounds", "homing_seeker", "burning_rounds", "entropy_bloom"],
+        "conflictsWith": ["shred_mode"],
+        "tags": ["behavior", "utility"]
+      },
+      "weaponTypes": ["projectile", "plasma"],
+      "rarity": 0.10,
+      "export": {
+        "unid": "&mutPulsewave;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "ricochet_rounds",
+      "tier": "major",
+      "name": "Ricochet Rounds",
+      "description": "Projectiles bounce off surfaces up to 3 times, dealing reduced damage per bounce. Synergizes with split mutations.",
+      "slotCost": 1,
+      "instability": 0,
+      "effects": {
+        "behaviorChange": "ricochet",
+        "piercing": 3,
+        "synergyBonus": {
+          "with": ["shred_mode"],
+          "effect": "Each ricochet splits into fragments",
+          "splitOnImpact": 2
+        }
+      },
+      "tradeoffs": {
+        "damagePenalty": 0.15
+      },
+      "compatibility": {
+        "synergizesWith": ["shred_mode", "burning_rounds", "entropy_bloom"],
+        "conflictsWith": ["phase_rounds"],
+        "tags": ["behavior", "utility"]
+      },
+      "weaponTypes": ["projectile", "plasma"],
+      "rarity": 0.12,
+      "export": {
+        "unid": "&mutRicochetRounds;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "homing_seeker",
+      "tier": "major",
+      "name": "Homing Seeker",
+      "description": "Projectiles gain homing capability but move slower and deal less damage. Synergizes with area-effect mutations.",
+      "slotCost": 1,
+      "instability": 0,
+      "effects": {
+        "homing": true,
+        "damageMultiplier": 0.85,
+        "synergyBonus": {
+          "with": ["pulsewave"],
+          "effect": "Pulses gain homing and track nearest enemy",
+          "homing": true,
+          "damageMultiplier": 1.15
+        }
+      },
+      "tradeoffs": {
+        "projectileSpeedMultiplier": 0.80,
+        "damagePenalty": 0.15
+      },
+      "compatibility": {
+        "synergizesWith": ["vortex_orb", "pulsewave"],
+        "conflictsWith": [],
+        "tags": ["behavior", "utility"]
+      },
+      "weaponTypes": ["projectile", "missile"],
+      "rarity": 0.12,
+      "export": {
+        "unid": "&mutHomingSeeker;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "burning_rounds",
+      "tier": "minor",
+      "name": "Burning Rounds",
+      "description": "Projectiles have a chance to ignite targets, dealing damage over time. Synergizes with multi-hit mutations.",
+      "slotCost": 1,
+      "instability": 0,
+      "effects": {
+        "procChance": 0.25,
+        "procEffect": "burn",
+        "synergyBonus": {
+          "with": ["shred_mode"],
+          "effect": "All fragments apply burn",
+          "procChance": 0.4
+        }
+      },
+      "tradeoffs": {
+        "damagePenalty": 0.05
+      },
+      "compatibility": {
+        "synergizesWith": ["shred_mode", "overclock", "pulsewave", "ricochet_rounds", "vortex_orb"],
+        "conflictsWith": [],
+        "tags": ["proc", "utility"]
+      },
+      "weaponTypes": ["all"],
+      "rarity": 0.25,
+      "export": {
+        "unid": "&mutBurningRounds;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "stun_rounds",
+      "tier": "minor",
+      "name": "Stun Rounds",
+      "description": "Projectiles have a chance to stun enemies briefly, but deal less damage.",
+      "slotCost": 1,
+      "instability": 0,
+      "effects": {
+        "procChance": 0.20,
+        "procEffect": "stun"
+      },
+      "tradeoffs": {
+        "damagePenalty": 0.08
+      },
+      "compatibility": {
+        "synergizesWith": ["burning_rounds", "shred_mode"],
+        "conflictsWith": [],
+        "tags": ["proc", "utility"]
+      },
+      "weaponTypes": ["all"],
+      "rarity": 0.25,
+      "export": {
+        "unid": "&mutStunRounds;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "extended_range",
+      "tier": "minor",
+      "name": "Extended Range",
+      "description": "Increases weapon range but reduces accuracy.",
+      "slotCost": 1,
+      "instability": 0,
+      "effects": {
+        "rangeMultiplier": 1.20
+      },
+      "tradeoffs": {
+        "accuracyPenalty": 0.10
+      },
+      "compatibility": {
+        "synergizesWith": ["lightweight_barrel", "precision_barrel"],
+        "conflictsWith": ["shred_mode"],
+        "tags": ["range", "accuracy"]
+      },
+      "weaponTypes": ["all"],
+      "rarity": 0.3,
+      "export": {
+        "unid": "&mutExtendedRange;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "precision_barrel",
+      "tier": "minor",
+      "name": "Precision Barrel",
+      "description": "Improves accuracy and range but reduces fire rate.",
+      "slotCost": 1,
+      "instability": 0,
+      "effects": {
+        "accuracyMultiplier": 1.15,
+        "rangeMultiplier": 1.10
+      },
+      "tradeoffs": {
+        "fireRatePenalty": 0.10
+      },
+      "compatibility": {
+        "synergizesWith": ["condensed_rounds", "extended_range"],
+        "conflictsWith": ["overclock"],
+        "tags": ["accuracy", "range"]
+      },
+      "weaponTypes": ["all"],
+      "rarity": 0.3,
+      "export": {
+        "unid": "&mutPrecisionBarrel;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "kinetic_blast",
+      "tier": "corrupt",
+      "name": "Kinetic Blast",
+      "description": "Innately-charging, hard-hitting, close-range weapon. Charges while moving, gains charge from speed. Fires manually or on head-on collision. Launches enemies that can collide with others for chain damage.",
+      "slotCost": 2,
+      "instability": 12,
+      "effects": {
+        "behaviorChange": "kinetic_blast",
+        "damageMultiplier": 1.30,
+        "synergyBonus": {
+          "with": ["lightweight_barrel", "overclock"],
+          "effect": "Charge rate scales with speed bonuses",
+          "fireRateMultiplier": 1.15
+        }
+      },
+      "tradeoffs": {
+        "rangePenalty": 0.50,
+        "accuracyPenalty": 0.25,
+        "fireRatePenalty": 0.40
+      },
+      "compatibility": {
+        "synergizesWith": ["lightweight_barrel", "overclock"],
+        "conflictsWith": ["extended_range", "precision_barrel"],
+        "tags": ["behavior", "damage", "utility"]
+      },
+      "weaponTypes": ["projectile", "plasma"],
+      "rarity": 0.03,
+      "export": {
+        "unid": "&mutKineticBlast;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "sticky_bomb",
+      "tier": "corrupt",
+      "name": "Sticky Bomb",
+      "description": "Bombs attach to enemies and explode after a fuse. Triggering one explodes all nearby Sticky Bombs. Stacking increases fuse times. Chain reactions increase damage and radius.",
+      "slotCost": 2,
+      "instability": 10,
+      "effects": {
+        "behaviorChange": "sticky_bomb",
+        "fireRateMultiplier": 1.15,
+        "synergyBonus": {
+          "with": ["entropy_bloom"],
+          "effect": "Sticky Bombs trigger Entropy Bloom shards on explosion",
+          "procChance": 0.5
+        }
+      },
+      "tradeoffs": {
+        "damagePenalty": 0.15,
+        "rangePenalty": 0.25,
+        "accuracyPenalty": 0.20
+      },
+      "compatibility": {
+        "synergizesWith": ["entropy_bloom", "burning_rounds"],
+        "conflictsWith": ["shred_mode", "overclock"],
+        "tags": ["behavior", "utility"]
+      },
+      "weaponTypes": ["missile", "mine"],
+      "rarity": 0.04,
+      "export": {
+        "unid": "&mutStickyBomb;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "harpoon",
+      "tier": "major",
+      "name": "Harpoon",
+      "description": "Projectiles lodge in targets and create searing hot tethers to the shooter, dealing burn damage over time. Higher impact damage but slower fire rate.",
+      "slotCost": 1,
+      "instability": 0,
+      "effects": {
+        "behaviorChange": "harpoon_tether",
+        "damageMultiplier": 1.40,
+        "procChance": 1.0,
+        "procEffect": "burn",
+        "synergyBonus": {
+          "with": ["burning_rounds"],
+          "effect": "Tether burn damage increased by 50%",
+          "procChance": 1.0,
+          "damageMultiplier": 1.50
+        }
+      },
+      "tradeoffs": {
+        "fireRatePenalty": 0.40,
+        "rangePenalty": 0.20
+      },
+      "compatibility": {
+        "synergizesWith": ["burning_rounds", "condensed_rounds"],
+        "conflictsWith": ["overclock", "shred_mode"],
+        "tags": ["behavior", "damage", "proc"]
+      },
+      "weaponTypes": ["projectile", "missile"],
+      "rarity": 0.08,
+      "export": {
+        "unid": "&mutHarpoon;",
+        "transcendenceXml": true
+      }
+    },
+    {
+      "id": "greatsword",
+      "tier": "corrupt",
+      "name": "Greatsword",
+      "description": "Deploys a single massive, indestructible sword instead of a pair. Deals more damage the more missing hull you have. Provides armor and damage reduction. Cannot create Spark Projectiles.",
+      "slotCost": 2,
+      "instability": 8,
+      "effects": {
+        "behaviorChange": "greatsword",
+        "damageMultiplier": 1.50,
+        "conditionalEffect": {
+          "condition": "low_hull",
+          "effect": "Damage scales with missing hull (up to +100% at 0% hull)"
+        },
+        "synergyBonus": {
+          "with": ["condensed_rounds"],
+          "effect": "Greatsword gains additional damage scaling",
+          "damageMultiplier": 1.70
+        }
+      },
+      "tradeoffs": {
+        "fireRatePenalty": 0.60,
+        "projectileSpeedMultiplier": 0.50,
+        "rangePenalty": 0.20
+      },
+      "compatibility": {
+        "synergizesWith": ["condensed_rounds"],
+        "conflictsWith": ["overclock", "shred_mode"],
+        "tags": ["behavior", "damage", "utility"]
+      },
+      "weaponTypes": ["projectile", "plasma"],
+      "rarity": 0.02,
+      "export": {
+        "unid": "&mutGreatsword;",
+        "transcendenceXml": true
+      }
+    }
+  ]
+}

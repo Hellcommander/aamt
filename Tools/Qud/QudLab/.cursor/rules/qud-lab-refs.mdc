@@ -1,0 +1,12 @@
+﻿---
+description: Qud Lab assembly references for Copilot
+globs:
+  - "Workspace/**/*.cs"
+  - "src/**/*.cs"
+---
+# Qud Lab refs
+- Prefer `Workspace/QudLab.ModWorkspace.csproj` (or open `QudLab.code-workspace`).
+- After game updates run `Setup.bat` or `qudlab sync-refs`.
+- With `qudlab serve`: GET `/refs`, `/type?name=XRL.World.IPart`, `/types?q=`.
+- Do not vendor CoQ DLLs. ThreadingAPI is a separate WIP mod — not part of this repo.
+- See COPILOT.md.

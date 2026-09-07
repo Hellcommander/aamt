@@ -1,0 +1,15 @@
+{
+  "asset_name": "spell_cast_animation",
+  "segment_list": ["core", "glow", "energy"],
+  "frame_count": 8,
+  "frame_width": 16,
+  "frame_height": 16,
+  "color_hints": ["purple", "gold", "ethereal blue"],
+  "quality_level": "pixel_art",
+  "animation_type": "SpellCast",
+  "pivot_rules": {
+    "x": "center",
+    "y": "center"
+  },
+  "output_dir": "output"
+}

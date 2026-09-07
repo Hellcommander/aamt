@@ -1,0 +1,118 @@
+body { margin: 0; font-family: var(--osf-font-sans); color: var(--osf-text-body); background: transparent; }
+
+.board {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: var(--osf-space-9) var(--osf-space-5);
+}
+
+.view-head h1 {
+  margin: 0;
+  font-family: var(--osf-font-display);
+  font-size: var(--osf-text-3xl);
+  color: var(--osf-text-bright);
+}
+
+.view-head p { margin: var(--osf-space-1) 0 0; color: var(--osf-text-muted); font-size: var(--osf-text-sm); }
+
+.layout {
+  display: flex;
+  gap: var(--osf-space-9);
+  align-items: flex-start;
+  margin-top: var(--osf-space-5);
+  flex-wrap: wrap;
+}
+
+.list-col { flex: 0 0 300px; display: flex; flex-direction: column; gap: var(--osf-space-5); }
+.palette-list { display: flex; flex-direction: column; gap: 4px; max-height: 520px; overflow: auto; }
+.palette-list button {
+  text-align: left;
+  border: 1px solid var(--osf-line);
+  background: var(--osf-surface-card);
+  color: var(--osf-text-body);
+  border-radius: var(--osf-radius-sm);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.palette-list button small { display: block; color: var(--osf-text-faint); font-size: var(--osf-text-xs); }
+.palette-list button.is-on { border-color: var(--osf-accent, var(--osf-sf-blue)); color: var(--osf-text-bright); }
+
+.detail { flex: 1 1 640px; padding: var(--osf-space-5); display: flex; flex-direction: column; gap: var(--osf-space-3); }
+.detail h2 { margin: 0; color: var(--osf-text-bright); font-size: var(--osf-text-xl); }
+.meta { margin: 0; color: var(--osf-text-faint); font-size: var(--osf-text-xs); letter-spacing: 0.06em; text-transform: uppercase; }
+.desc { margin: 0; color: var(--osf-text-muted); font-size: var(--osf-text-sm); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.hidden { display: none; }
+
+.banks { margin: 0; padding-left: 1.25rem; font-family: var(--osf-font-mono); font-size: var(--osf-text-sm); color: var(--osf-text-body); }
+.banks li { margin: 4px 0; cursor: pointer; }
+.banks li.is-on { color: var(--osf-text-bright); }
+.banks li.is-on::marker { color: var(--osf-accent, #7B5CFF); }
+.banks li.is-stored { color: var(--osf-text-muted); }
+.banks li.is-stored::marker { color: var(--osf-text-faint); }
+.banks li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.banks li .bank-line { flex: 1 1 auto; cursor: pointer; }
+.banks li .as-b {
+  flex: 0 0 auto;
+  border: 1px solid var(--osf-line);
+  background: transparent;
+  color: var(--osf-text-faint);
+  border-radius: var(--osf-radius-sm);
+  padding: 0 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--osf-text-xs);
+}
+.banks li.is-stored .as-b { border-color: var(--osf-accent, #7B5CFF); color: var(--osf-text-bright); }
+
+.hotkeys { display: flex; flex-wrap: wrap; gap: 8px; }
+.hotkeys button {
+  text-align: left;
+  min-width: 140px;
+  border: 1px solid var(--osf-line);
+  background: var(--osf-surface-card);
+  color: var(--osf-text-body);
+  border-radius: var(--osf-radius-sm);
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.hotkeys button small { display: block; color: var(--osf-text-faint); font-size: var(--osf-text-xs); }
+.hotkeys button.is-bound { border-color: var(--osf-accent, #7B5CFF); color: var(--osf-text-bright); }
+.hotkeys button.is-on { outline: 1px solid var(--osf-accent, #7B5CFF); }
+
+.save-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--osf-space-3); }
+.save-row input {
+  flex: 1 1 160px;
+  min-height: var(--osf-control-h-sm);
+  border: 1px solid var(--osf-line);
+  border-radius: var(--osf-radius-sm);
+  background: var(--osf-surface-input);
+  color: var(--osf-text-body);
+  padding: 0 8px;
+  font: inherit;
+}
+.save-fusion {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--osf-text-muted);
+  font-size: var(--osf-text-sm);
+}
+.save-fusion input { flex: 0 0 auto; min-height: auto; width: auto; }
+.fusion-line { color: var(--osf-accent, #7B5CFF); }
+.palette-list button .fuse-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--osf-accent, #7B5CFF);
+  border-radius: 999px;
+  color: var(--osf-accent, #7B5CFF);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

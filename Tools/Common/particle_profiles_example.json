@@ -1,0 +1,150 @@
+{
+  "version": "1.0.0",
+  "profiles": [
+    {
+      "id": "distortion_core",
+      "ambient": {
+        "count": 12,
+        "spawnShape": "disk",
+        "radiusMin": 0.1,
+        "radiusMax": 0.9,
+        "velocity": {
+          "min": -0.02,
+          "max": 0.02
+        },
+        "size": {
+          "min": 0.06,
+          "max": 0.18
+        },
+        "life": {
+          "min": 1.8,
+          "max": 3.6
+        },
+        "colorGradient": ["#66ccff", "#aaffff"],
+        "blend": "additive",
+        "motionPattern": "OrbitInwardSpiral",
+        "noiseJitter": 0.6,
+        "angularSpeed": 0.5,
+        "radialDecay": 0.01
+      },
+      "impact": {
+        "count": 18,
+        "spawnShape": "ring",
+        "speed": {
+          "min": 0.6,
+          "max": 1.6
+        },
+        "size": {
+          "min": 0.08,
+          "max": 0.28
+        },
+        "life": {
+          "min": 0.25,
+          "max": 0.6
+        },
+        "trail": true,
+        "trailLength": 0.3,
+        "colorGradient": ["#ffffff", "#66ccff"],
+        "blend": "additive",
+        "motionPattern": "RadialBurst",
+        "drag": 0.3,
+        "distortMap": "portal_shard_distort.png"
+      }
+    },
+    {
+      "id": "plasma_core",
+      "ambient": {
+        "count": 16,
+        "spawnShape": "sphere",
+        "radiusMin": 0.2,
+        "radiusMax": 0.95,
+        "velocity": {
+          "min": -0.03,
+          "max": 0.03
+        },
+        "size": {
+          "min": 0.08,
+          "max": 0.20
+        },
+        "life": {
+          "min": 2.0,
+          "max": 4.0
+        },
+        "colorGradient": ["#ff6600", "#ffaa00"],
+        "blend": "additive",
+        "motionPattern": "NoiseDrift",
+        "noiseJitter": 0.8
+      },
+      "impact": {
+        "count": 24,
+        "spawnShape": "ring",
+        "speed": {
+          "min": 0.8,
+          "max": 2.0
+        },
+        "size": {
+          "min": 0.10,
+          "max": 0.32
+        },
+        "life": {
+          "min": 0.3,
+          "max": 0.7
+        },
+        "trail": true,
+        "trailLength": 0.4,
+        "colorGradient": ["#ffffff", "#ff6600", "#ff0000"],
+        "blend": "additive",
+        "motionPattern": "RadialBurst",
+        "drag": 0.4
+      }
+    },
+    {
+      "id": "energy_swirl",
+      "ambient": {
+        "count": 8,
+        "spawnShape": "disk",
+        "radiusMin": 0.3,
+        "radiusMax": 0.85,
+        "velocity": {
+          "min": -0.015,
+          "max": 0.015
+        },
+        "size": {
+          "min": 0.05,
+          "max": 0.15
+        },
+        "life": {
+          "min": 2.5,
+          "max": 5.0
+        },
+        "colorGradient": ["#00ff00", "#88ff88"],
+        "blend": "additive",
+        "motionPattern": "OrbitInwardSpiral",
+        "angularSpeed": 0.3,
+        "radialDecay": 0.005,
+        "noiseJitter": 0.4
+      },
+      "impact": {
+        "count": 15,
+        "spawnShape": "point",
+        "speed": {
+          "min": 0.5,
+          "max": 1.5
+        },
+        "size": {
+          "min": 0.06,
+          "max": 0.24
+        },
+        "life": {
+          "min": 0.2,
+          "max": 0.5
+        },
+        "colorGradient": ["#ffffff", "#00ff00"],
+        "blend": "additive",
+        "motionPattern": "RadialBurst",
+        "drag": 0.25
+      }
+    }
+  ]
+}
+

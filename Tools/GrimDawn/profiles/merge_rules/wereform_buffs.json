@@ -1,0 +1,23 @@
+{
+  "id": "wereform_buffs",
+  "match": ["Wereform Buffs", "Wereform"],
+  "mode": "content",
+  "enabled": true,
+  "priority": 96,
+  "class_priority": 96,
+  "items_mode": "merge",
+  "conflict_merge": true,
+  "conflict_merge_prefixes": [
+    "records/skills/playerclass10/"
+  ],
+  "prefer_field_substrings": [
+    "skill",
+    "buff",
+    "damage",
+    "life",
+    "cooldown",
+    "mana"
+  ],
+  "keep_base_field_substrings": [],
+  "notes": "Priority 96. Field-merge ~38 wereform skill DBRs onto Rebirth/FoA base so non-buff fields from Rebirth are not wiped."
+}

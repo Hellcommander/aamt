@@ -1,0 +1,12 @@
+# Game extracts — regenerate locally; never publish.
+*.dump.txt
+*.dump.json
+**/obsolete_api_dump.json
+**/obsolete_api_dump_*.json
+*decompiled*.cs
+ref/
+data/backups/
+reports/
+
+# Decompiled Caves of Qud sources dropped next to these tools (dnSpy Token comments).
+/*.cs

@@ -1,0 +1,58 @@
+{
+  "_comment": "ToME Asset Generator Settings",
+  "_info": {
+    "description": "Configuration file for ToME Asset Generator",
+    "defaults": "Default values used when not specified via CLI",
+    "limits": "Engine and safety limits for validation"
+  },
+  "defaults": {
+    "output_dir": "./mods/tomegen_mod",
+    "mod_name": "tomegen_mod",
+    "template": "spell",
+    "shapes": [],
+    "seed": 12345
+  },
+  "limits": {
+    "max_frames": 32,
+    "max_sprite_size": 256,
+    "max_damage": 1000,
+    "max_radius": 10,
+    "max_duration": 20,
+    "balance_score_warning_min": 0.1,
+    "balance_score_warning_max": 0.9
+  },
+  "sprite": {
+    "default_frame_width": 64,
+    "default_frame_height": 64,
+    "default_fps": 12,
+    "sizes": [32, 48, 64],
+    "icon_size": 64
+  },
+  "balance": {
+    "weights": {
+      "damage": 0.3,
+      "area": 0.2,
+      "duration": 0.15,
+      "control": 0.15,
+      "cost": 0.2
+    },
+    "normalization": {
+      "damage_max": 100.0,
+      "area_max": 50.0,
+      "duration_max": 10.0
+    }
+  },
+  "validation": {
+    "strict_mode": false,
+    "warn_on_outliers": true,
+    "block_on_errors": true,
+    "require_manual_approval": false
+  },
+  "output": {
+    "generate_preview": true,
+    "generate_manifest": true,
+    "generate_icons": true,
+    "atomic_writes": true
+  }
+}
+

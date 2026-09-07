@@ -1,0 +1,10 @@
+{
+  "id": "dawn_of_masteries",
+  "match": ["Dawn of Masteries", "dom"],
+  "mode": "class",
+  "enabled": true,
+  "priority": 70,
+  "class_priority": 88,
+  "items_mode": "merge",
+  "notes": "Priority 70 / class 88. Extra masteries (TQ/Cat/D2/…) via unique trees. Loses shared base paths to Grimarillion (90) and Rebirth mastery rewires (94). Only ~33 mastery overlaps with Rebirth; ~306 total overlaps with Rebirth."
+}

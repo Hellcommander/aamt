@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>XEdit.Assist</RootNamespace>
+    <AssemblyName>xedit-assist</AssemblyName>
+    <Description>CLI for AI agents to inspect and patch Bethesda plugins via TES5Edit.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\XEdit.Clr\XEdit.Clr.csproj" />
+  </ItemGroup>
+
+</Project>

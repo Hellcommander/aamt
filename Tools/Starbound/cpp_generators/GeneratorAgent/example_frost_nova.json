@@ -1,0 +1,70 @@
+{
+  "id": "frost_nova",
+  "effectType": "debuff",
+  "shapeType": "ring",
+  "particleType": "ice",
+  "iconStyle": "detailed",
+  "category": "combat",
+  
+  "duration": 5.0,
+  "intensity": 0.8,
+  "fadeInTime": 0.3,
+  "fadeOutTime": 0.5,
+  "isPermanent": false,
+  "canStack": false,
+  "maxStacks": 1,
+  
+  "noiseScale": 2.0,
+  "noiseSpeed": 1.5,
+  "oscillationFreq": 0.8,
+  "coverage": 360,
+  "particleCount": 80,
+  "dissolve": true,
+  "opacity": 0.9,
+  "scale": 1.2,
+  
+  "colorPrimary": [0.4, 0.8, 1.0],
+  "colorSecondary": [0.0, 0.2, 0.5],
+  "iconColor": [1.0, 1.0, 1.0],
+  "glowColor": [0.2, 0.4, 0.8],
+  
+  "enablePulsing": true,
+  "pulseSpeed": 1.2,
+  "pulseIntensity": 0.3,
+  "enableRotation": false,
+  "rotationSpeed": 1.0,
+  "enableScaling": true,
+  "scaleSpeed": 0.8,
+  "scaleRange": 0.1,
+  
+  "shaderType": "frost",
+  "shaderIntensity": 1.0,
+  "enableDistortion": true,
+  "distortionStrength": 0.15,
+  "enableBlur": false,
+  "blurStrength": 0.1,
+  
+  "description": "A powerful frost nova that freezes enemies in place and creates a ring of ice particles. The effect slows movement and can cause damage over time.",
+  
+  "tags": [
+    "frost",
+    "nova",
+    "debuff",
+    "ice",
+    "slow",
+    "combat"
+  ],
+  
+  "metadata": {
+    "author": "Magi-Tech Status Effect System",
+    "version": "1.0.0",
+    "license": "MIT",
+    "damage": "medium",
+    "range": "area",
+    "difficulty": "intermediate"
+  },
+  
+  "enableCaching": true,
+  "enableHotReload": true,
+  "enableParallelProcessing": true
+} 

@@ -1,0 +1,68 @@
+game: "unity_game"
+engine: "Unity"
+version: "1.0.0"
+
+system_prompt: |
+  You are a local mod fixer for Unity asset bundles and C# mod scripts.
+  Provide code patches, csproj hints, and asset metadata only.
+  Always include a safe rollback patch and unit test suggestions.
+  
+  Rules:
+  - C# code must be compatible with Unity's API (UnityEngine, UnityEditor namespaces)
+  - Prefab references must use proper GUIDs or relative paths
+  - Asset metadata must be valid YAML or JSON
+  - Assembly definitions (.asmdef) must be properly configured
+  - Never modify Unity's core files or system assemblies
+
+allowed_files:
+  - "*.cs"
+  - "Assets/**/*.png"
+  - "Assets/**/*.prefab"
+  - "Assets/**/*.asset"
+  - "*.asmdef"
+  - "*.csproj"
+
+validation:
+  - command: "dotnet build"
+    description: "Build C# project"
+    required: true
+  - command: "unity -batchmode -runTests"
+    description: "Run Unity tests"
+    required: false
+  - command: "msbuild /t:Restore"
+    description: "Restore NuGet packages"
+    required: false
+
+safety:
+  sandbox: "runspace"  # Options: directory, container, runspace
+  max_changes: 100
+  timeout_seconds: 90
+  max_file_size_mb: 50
+  require_rollback: true
+
+persona:
+  tone: "concise technical assistant"
+  verbosity: "medium"
+  include_examples: true
+  include_diffs: true
+
+prompts:
+  fix_prefab_refs: |
+    Detect broken prefab references and generate a patch that rebinds or creates placeholder prefabs.
+    Include GUID mappings and asset metadata updates.
+    
+  optimize_textures: |
+    Suggest texture compression and mipmap settings for given PNGs.
+    Provide a scriptable import settings JSON for Unity.
+    
+  fix_assembly_refs: |
+    Fix missing assembly references in .asmdef files.
+    Ensure all dependencies are properly declared.
+    
+  fix_compile_errors: |
+    Fix C# compilation errors in the provided files.
+    Ensure compatibility with Unity's API version.
+    
+  generate_manifest: |
+    Generate or fix mod manifest with proper metadata, dependencies, and version info.
+

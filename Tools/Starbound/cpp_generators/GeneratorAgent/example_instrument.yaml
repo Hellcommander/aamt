@@ -1,0 +1,121 @@
+name: "Mystic Pad"
+category: "pad"
+description: "A mystical pad with ethereal qualities, perfect for ambient and atmospheric music"
+
+oscillator:
+  type: "wavetable"
+  frequency: 220.0
+  amplitude: 0.8
+  phase: 0.0
+  detune: 0.1
+  wavetablePath: "assets/wavetables/mystic_pad.wav"
+  parameters:
+    wavetableIndex: 0.5
+    interpolation: 1.0
+    sync: 0.0
+
+# ADSR Envelopes
+ampAttack: 0.5
+ampDecay: 0.3
+ampSustain: 0.7
+ampRelease: 2.0
+
+filterAttack: 0.1
+filterDecay: 0.2
+filterSustain: 0.6
+filterRelease: 1.5
+
+# Filter Configuration
+filter:
+  type: "lowpass"
+  cutoff: 1500.0
+  resonance: 0.4
+  envelopeAmount: 0.7
+  parameters:
+    drive: 0.2
+    saturation: 0.3
+
+# LFO Configuration
+lfo:
+  target: "cutoff"
+  waveform: "sine"
+  rate: 0.3
+  depth: 200.0
+  phase: 0.0
+  parameters:
+    sync: 0.0
+    retrigger: 1.0
+
+# Effects Chain
+effects:
+  - type: "reverb"
+    enabled: true
+    wetLevel: 0.4
+    dryLevel: 0.6
+    parameters:
+      roomSize: 0.8
+      damping: 0.3
+      width: 1.0
+      freeze: 0.0
+  
+  - type: "delay"
+    enabled: true
+    wetLevel: 0.3
+    dryLevel: 0.7
+    parameters:
+      delayTime: 0.5
+      feedback: 0.4
+      sync: 0.0
+  
+  - type: "chorus"
+    enabled: true
+    wetLevel: 0.5
+    dryLevel: 0.5
+    parameters:
+      rate: 0.8
+      depth: 0.3
+      mix: 0.5
+
+# Variation Settings
+variations:
+  pitchRange: [-12, 12]
+  enablePitchVariations: true
+  enableTimeVariations: false
+  enableRandomVariations: true
+  
+  timeStretch:
+    enabled: false
+    windowSize: 1024
+    overlap: 0.5
+    stretchFactor: 1.0
+  
+  randomization:
+    enabled: true
+    amount: 0.1
+    ranges:
+      frequency: 0.05
+      amplitude: 0.02
+      cutoff: 0.1
+      resonance: 0.05
+
+# Metadata
+metadata:
+  author: "Magi-Tech Audio System"
+  version: "1.0.0"
+  license: "MIT"
+  tags: "ambient, pad, ethereal, mystical"
+
+# Tags
+tags:
+  - "ambient"
+  - "pad"
+  - "ethereal"
+  - "mystical"
+  - "atmospheric"
+  - "wavetable"
+
+# Performance Settings
+enableHotReload: true
+enableCaching: true
+enableParallelProcessing: true
+maxConcurrentVoices: 8 

@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <UseWindowsForms>true</UseWindowsForms>
+    <StartupObject>WorldGenSimulator.WorldGenSimulatorGUI</StartupObject>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <OutputPath>$(MSBuildThisFileDirectory)TerrariaMods\bin\$(Configuration)\$(TargetFramework)\</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="TerrariaMods\**" />
+    <Compile Remove="obj\**" />
+    <Compile Remove="bin\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Error142Analyzer.cs" />
+    <Compile Remove="Error142AnalyzerGUI.cs" />
+    <Compile Remove="Error142Simulator.cs" />
+    <Compile Remove="Error142SimulatorGUI.cs" />
+    <Compile Remove="TestTmodFile.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference compiled tModLoader.dll for TmodFile -->
+    <Reference Include="tModLoader">
+      <HintPath>E:\SteamLibrary\steamapps\common\tModLoader\tModLoader.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference required tModLoader dependencies -->
+    <PackageReference Include="Ionic.Zlib" Version="1.9.1.5" />
+    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+  </ItemGroup>
+
+</Project>

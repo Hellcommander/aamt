@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\QudLab.Core\QudLab.Core.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <!-- Private pack drops RestrictedSimulator.cs next to this csproj. PublicStubs are MIT fallbacks. -->
+    <QudLabHasPrivateSim Condition="Exists('$(MSBuildThisFileDirectory)RestrictedSimulator.cs')">true</QudLabHasPrivateSim>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(QudLabHasPrivateSim)' == 'true'">
+    <Compile Remove="PublicStubs\**" />
+    <None Include="PublicStubs\**" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,1344 @@
+{
+  "modId": "arendeth.sfmag",
+  "title": "SFMAG",
+  "description": "Maximum Absorbency Garment simulation.",
+  "version": 1,
+  "source": {
+    "ini": "SFSE/Plugins/SFMAG.ini"
+  },
+  "settings": {
+    "groups": [
+      {
+        "id": "general",
+        "label": "General",
+        "settings": [
+          {
+            "key": "General.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "General.Flavor",
+            "label": "Flavor",
+            "type": "enum",
+            "default": "space",
+            "options": [
+              "space",
+              "casual"
+            ],
+            "optionLabels": [
+              "Space",
+              "Casual"
+            ]
+          },
+          {
+            "key": "General.ClinicalMessages",
+            "label": "Clinical Messages",
+            "type": "bool",
+            "default": true
+          }
+        ]
+      },
+      {
+        "id": "needs",
+        "label": "Needs",
+        "settings": [
+          {
+            "key": "Needs.EnableBladder",
+            "label": "Enable Bladder",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Needs.EnableBowel",
+            "label": "Enable Bowel",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Needs.BladderHoursToFull",
+            "label": "Bladder Hours To Full",
+            "type": "float",
+            "default": 4.0,
+            "min": 0.0,
+            "max": 16.0,
+            "step": 0.1
+          },
+          {
+            "key": "Needs.BowelHoursToFull",
+            "label": "Bowel Hours To Full",
+            "type": "float",
+            "default": 14.0,
+            "min": 0.0,
+            "max": 56.0,
+            "step": 0.1
+          },
+          {
+            "key": "Needs.BaselineBladderPerHour",
+            "label": "Baseline Bladder Per Hour",
+            "type": "float",
+            "default": 0.06,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Needs.BaselineBowelPerHour",
+            "label": "Baseline Bowel Per Hour",
+            "type": "float",
+            "default": 0.02,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Needs.DrinkBladder",
+            "label": "Drink Bladder",
+            "type": "float",
+            "default": 0.18,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Needs.DrinkBowel",
+            "label": "Drink Bowel",
+            "type": "float",
+            "default": 0.01,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Needs.FoodBladder",
+            "label": "Food Bladder",
+            "type": "float",
+            "default": 0.04,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Needs.FoodBowel",
+            "label": "Food Bowel",
+            "type": "float",
+            "default": 0.16,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Needs.PotionBladder",
+            "label": "Potion Bladder",
+            "type": "float",
+            "default": 0.22,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Needs.PotionBowel",
+            "label": "Potion Bowel",
+            "type": "float",
+            "default": 0.03,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Needs.AlcoholBladder",
+            "label": "Alcohol Bladder",
+            "type": "float",
+            "default": 0.28,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Needs.AlcoholSkillPenalty",
+            "label": "Alcohol Skill Penalty",
+            "type": "float",
+            "default": 12.0,
+            "min": 0.0,
+            "max": 48.0,
+            "step": 0.1
+          },
+          {
+            "key": "Needs.DigestHoursDrink",
+            "label": "Digest Hours Drink",
+            "type": "float",
+            "default": 1.5,
+            "min": 0.0,
+            "max": 6.0,
+            "step": 0.1
+          },
+          {
+            "key": "Needs.DigestHoursFood",
+            "label": "Digest Hours Food",
+            "type": "float",
+            "default": 6.0,
+            "min": 0.0,
+            "max": 24.0,
+            "step": 0.1
+          },
+          {
+            "key": "Needs.DigestHoursPotion",
+            "label": "Digest Hours Potion",
+            "type": "float",
+            "default": 0.6,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          }
+        ]
+      },
+      {
+        "id": "continence",
+        "label": "Continence",
+        "settings": [
+          {
+            "key": "Continence.AccidentsWorsenIncontinence",
+            "label": "Accidents Worsen Incontinence",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Continence.HoldingTrainsSkill",
+            "label": "Holding Trains Skill",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Continence.AccidentIncontinenceGain",
+            "label": "Accident Incontinence Gain",
+            "type": "float",
+            "default": 0.15,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Continence.HoldSkillGain",
+            "label": "Hold Skill Gain",
+            "type": "float",
+            "default": 0.08,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Continence.LeakStartAtLevel0",
+            "label": "Leak Start At Level0",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Continence.LeakStartPerIncontinence",
+            "label": "Leak Start Per Incontinence",
+            "type": "float",
+            "default": 0.14,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Continence.CombatLeakMultiplier",
+            "label": "Combat Leak Multiplier",
+            "type": "float",
+            "default": 2.2,
+            "min": 0.0,
+            "max": 8.8,
+            "step": 0.1
+          },
+          {
+            "key": "Continence.MinHoldChance",
+            "label": "Min Hold Chance",
+            "type": "float",
+            "default": 0.05,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          }
+        ]
+      },
+      {
+        "id": "accidents",
+        "label": "Accidents",
+        "settings": [
+          {
+            "key": "Accidents.CombatCanCauseAccident",
+            "label": "Combat Can Cause Accident",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Accidents.SleepCanCauseAccident",
+            "label": "Sleep Can Cause Accident",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Accidents.SleepAccidentHours",
+            "label": "Sleep Accident Hours",
+            "type": "float",
+            "default": 5.0,
+            "min": 0.0,
+            "max": 20.0,
+            "step": 0.1
+          }
+        ]
+      },
+      {
+        "id": "garment",
+        "label": "Garment",
+        "settings": [
+          {
+            "key": "Garment.EnableGarments",
+            "label": "Enable Garments",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Garment.AutoWearVirtualMAGInSpace",
+            "label": "Auto Wear Virtual MAG In Space",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Garment.DefaultClass",
+            "label": "Default Class",
+            "type": "enum",
+            "default": "Standard",
+            "hint": "Grades: Light (MAG-L ~4h), Standard (MAG-M ~10h), Overnight (MAG-H ~17h), EvaMax (MAG-X ~26h), Hybrid (MAG-C ~30h) Capacity is full-bladder / full-bowel units. Hold time ≈ WetCapacity × BladderHoursToFull.",
+            "options": [
+              "Light",
+              "Standard",
+              "Overnight",
+              "EvaMax",
+              "Hybrid"
+            ]
+          },
+          {
+            "key": "Garment.SpaceClass",
+            "label": "Space Class",
+            "type": "string",
+            "default": "EvaMax",
+            "maxLength": 64
+          },
+          {
+            "key": "Garment.PunishmentClass",
+            "label": "Punishment Class",
+            "type": "string",
+            "default": "Standard",
+            "maxLength": 64
+          },
+          {
+            "key": "Garment.LightWetCapacity",
+            "label": "Light Wet Capacity",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Garment.LightMessCapacity",
+            "label": "Light Mess Capacity",
+            "type": "float",
+            "default": 0.65,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Garment.StandardWetCapacity",
+            "label": "Standard Wet Capacity",
+            "type": "float",
+            "default": 2.4,
+            "min": 0.0,
+            "max": 9.6,
+            "step": 0.1
+          },
+          {
+            "key": "Garment.StandardMessCapacity",
+            "label": "Standard Mess Capacity",
+            "type": "float",
+            "default": 1.8,
+            "min": 0.0,
+            "max": 7.2,
+            "step": 0.1
+          },
+          {
+            "key": "Garment.OvernightWetCapacity",
+            "label": "Overnight Wet Capacity",
+            "type": "float",
+            "default": 4.2,
+            "min": 0.0,
+            "max": 16.8,
+            "step": 0.1
+          },
+          {
+            "key": "Garment.OvernightMessCapacity",
+            "label": "Overnight Mess Capacity",
+            "type": "float",
+            "default": 3.4,
+            "min": 0.0,
+            "max": 13.6,
+            "step": 0.1
+          },
+          {
+            "key": "Garment.EvaMaxWetCapacity",
+            "label": "Eva Max Wet Capacity",
+            "type": "float",
+            "default": 6.5,
+            "min": 0.0,
+            "max": 26.0,
+            "step": 0.1
+          },
+          {
+            "key": "Garment.EvaMaxMessCapacity",
+            "label": "Eva Max Mess Capacity",
+            "type": "float",
+            "default": 4.8,
+            "min": 0.0,
+            "max": 19.2,
+            "step": 0.1
+          },
+          {
+            "key": "Garment.HybridWetCapacity",
+            "label": "Hybrid Wet Capacity",
+            "type": "float",
+            "default": 7.5,
+            "min": 0.0,
+            "max": 30.0,
+            "step": 0.1
+          },
+          {
+            "key": "Garment.HybridMessCapacity",
+            "label": "Hybrid Mess Capacity",
+            "type": "float",
+            "default": 5.6,
+            "min": 0.0,
+            "max": 22.4,
+            "step": 0.1
+          },
+          {
+            "key": "Garment.StartingSparesLight",
+            "label": "Starting Spares Light",
+            "type": "int",
+            "default": 1,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "Garment.StartingSparesStandard",
+            "label": "Starting Spares Standard",
+            "type": "int",
+            "default": 2,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "Garment.StartingSparesOvernight",
+            "label": "Starting Spares Overnight",
+            "type": "int",
+            "default": 1,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "Garment.StartingSparesEvaMax",
+            "label": "Starting Spares Eva Max",
+            "type": "int",
+            "default": 1,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "Garment.StartingSparesHybrid",
+            "label": "Starting Spares Hybrid",
+            "type": "int",
+            "default": 1,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "Garment.ChangeNeedWet",
+            "label": "Change Need Wet",
+            "type": "float",
+            "default": 0.55,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Garment.ChangeNeedMess",
+            "label": "Change Need Mess",
+            "type": "float",
+            "default": 0.35,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Garment.GarmentAffectsMovement",
+            "label": "Garment Affects Movement",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Garment.EditorIDLight",
+            "label": "Editor ID Light",
+            "type": "string",
+            "default": "SFMAG_MAG_L",
+            "maxLength": 64
+          },
+          {
+            "key": "Garment.EditorIDStandard",
+            "label": "Editor ID Standard",
+            "type": "string",
+            "default": "SFMAG_MAG_M",
+            "maxLength": 64
+          },
+          {
+            "key": "Garment.EditorIDOvernight",
+            "label": "Editor ID Overnight",
+            "type": "string",
+            "default": "SFMAG_MAG_H",
+            "maxLength": 64
+          },
+          {
+            "key": "Garment.EditorIDEvaMax",
+            "label": "Editor ID Eva Max",
+            "type": "string",
+            "default": "SFMAG_MAG_X",
+            "maxLength": 64
+          },
+          {
+            "key": "Garment.EditorIDHybrid",
+            "label": "Editor ID Hybrid",
+            "type": "string",
+            "default": "SFMAG_MAG_C",
+            "maxLength": 64
+          },
+          {
+            "key": "Garment.AddonPrefix",
+            "label": "Addon Prefix",
+            "type": "string",
+            "default": "SFMAG_MAG_ARMA",
+            "maxLength": 64
+          },
+          {
+            "key": "Garment.StainOverlayEditorID",
+            "label": "Stain Overlay Editor ID",
+            "type": "string",
+            "default": "SFMAG_STAIN_OVERLAY",
+            "maxLength": 64,
+            "hint": "Overlay item used only on underwear this mod did not author. Absent records are a no-op until the overlay mesh exists."
+          },
+          {
+            "key": "Garment.StainAddonPrefix",
+            "label": "Stain Addon Prefix",
+            "type": "string",
+            "default": "SFMAG_STAIN_ARMA",
+            "maxLength": 64
+          },
+          {
+            "key": "Garment.UnderwearEditorID",
+            "label": "Underwear Editor ID",
+            "type": "string",
+            "default": "SFMAG_UNDIES",
+            "maxLength": 64
+          },
+          {
+            "key": "Garment.VoidwearPlugin",
+            "label": "Voidwear Plugin",
+            "type": "string",
+            "default": "jrdeveraux_underwear.esm",
+            "maxLength": 64,
+            "hint": "Soft dependency: Voidwear (Nexus 12366) or Novawear Uncut (Nexus 13230). Both ship as jrdeveraux_underwear.esm — load one, then its SFMAG_* patch. Requires Slim Fit / Novaform as the underwear pack documents."
+          },
+          {
+            "key": "Garment.VoidwearListEditorID",
+            "label": "Voidwear List Editor ID",
+            "type": "string",
+            "default": "jrdeveraux_underwear",
+            "maxLength": 64
+          },
+          {
+            "key": "Garment.UnderwearPatchListEditorID",
+            "label": "Underwear Patch List Editor ID",
+            "type": "string",
+            "default": "SFMAG_UnderwearList",
+            "maxLength": 64
+          },
+          {
+            "key": "Garment.UnderwearWetCapacity",
+            "label": "Underwear Wet Capacity",
+            "type": "float",
+            "default": 0.18,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Garment.UnderwearMessCapacity",
+            "label": "Underwear Mess Capacity",
+            "type": "float",
+            "default": 0.12,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Garment.WetDryPerHour",
+            "label": "Wet Dry Per Hour",
+            "type": "float",
+            "default": 0.04,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01,
+            "hint": "Surface wetness dries in the MAG over time. Solid waste stays until you change unless MessDecayPerHour is raised above 0."
+          },
+          {
+            "key": "Garment.MessDecayPerHour",
+            "label": "Mess Decay Per Hour",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          }
+        ]
+      },
+      {
+        "id": "waste",
+        "label": "Waste",
+        "settings": [
+          {
+            "key": "Waste.DeathWasteRelease",
+            "label": "Death Waste Release",
+            "type": "bool",
+            "default": false,
+            "hint": "Extra simulation, all off by default. A MAG holds solids until it is actually full; overflow (and any mess with no MAG) falls through pants onto the ground. Underwear and outer clothes do not contain. Urine soaks in — it is not a puddle."
+          },
+          {
+            "key": "Waste.WorldWasteDeposits",
+            "label": "World Waste Deposits",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "Waste.CleanupHours",
+            "label": "Cleanup Hours",
+            "type": "float",
+            "default": 3.0,
+            "min": 0.0,
+            "max": 12.0,
+            "step": 0.1
+          },
+          {
+            "key": "Waste.MaxDeposits",
+            "label": "Max Deposits",
+            "type": "int",
+            "default": 8,
+            "min": 0,
+            "max": 32,
+            "step": 1
+          },
+          {
+            "key": "Waste.EditorID",
+            "label": "Editor ID",
+            "type": "string",
+            "default": "SFMAG_WASTE_SOLID",
+            "maxLength": 64
+          },
+          {
+            "key": "Waste.LightWick",
+            "label": "Light Wick",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01,
+            "hint": "--- Core behaviour per grade ------------------------------------------------- MAG-X is the aerospace end: thin, dense, fast-wicking, engineered for containment rather than comfort. MAG-C keeps that containment but blends in premium-brief loft, so it holds more and is far kinder to wear, at the c..."
+          },
+          {
+            "key": "Waste.StandardWick",
+            "label": "Standard Wick",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.OvernightWick",
+            "label": "Overnight Wick",
+            "type": "float",
+            "default": 0.95,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.EvaMaxWick",
+            "label": "Eva Max Wick",
+            "type": "float",
+            "default": 1.15,
+            "min": 0.0,
+            "max": 4.6,
+            "step": 0.1
+          },
+          {
+            "key": "Waste.HybridWick",
+            "label": "Hybrid Wick",
+            "type": "float",
+            "default": 0.85,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.LightLeakResist",
+            "label": "Light Leak Resist",
+            "type": "float",
+            "default": 0.85,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.StandardLeakResist",
+            "label": "Standard Leak Resist",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.OvernightLeakResist",
+            "label": "Overnight Leak Resist",
+            "type": "float",
+            "default": 1.15,
+            "min": 0.0,
+            "max": 4.6,
+            "step": 0.1
+          },
+          {
+            "key": "Waste.EvaMaxLeakResist",
+            "label": "Eva Max Leak Resist",
+            "type": "float",
+            "default": 1.45,
+            "min": 0.0,
+            "max": 5.8,
+            "step": 0.1
+          },
+          {
+            "key": "Waste.HybridLeakResist",
+            "label": "Hybrid Leak Resist",
+            "type": "float",
+            "default": 1.45,
+            "min": 0.0,
+            "max": 5.8,
+            "step": 0.1
+          },
+          {
+            "key": "Waste.LightComfort",
+            "label": "Light Comfort",
+            "type": "float",
+            "default": 0.7,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.StandardComfort",
+            "label": "Standard Comfort",
+            "type": "float",
+            "default": 0.65,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.OvernightComfort",
+            "label": "Overnight Comfort",
+            "type": "float",
+            "default": 0.55,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.EvaMaxComfort",
+            "label": "Eva Max Comfort",
+            "type": "float",
+            "default": 0.35,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.HybridComfort",
+            "label": "Hybrid Comfort",
+            "type": "float",
+            "default": 0.9,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.LightDryness",
+            "label": "Light Dryness",
+            "type": "float",
+            "default": 0.55,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.StandardDryness",
+            "label": "Standard Dryness",
+            "type": "float",
+            "default": 0.65,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.OvernightDryness",
+            "label": "Overnight Dryness",
+            "type": "float",
+            "default": 0.75,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.EvaMaxDryness",
+            "label": "Eva Max Dryness",
+            "type": "float",
+            "default": 0.8,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.HybridDryness",
+            "label": "Hybrid Dryness",
+            "type": "float",
+            "default": 0.95,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.LightOdorControl",
+            "label": "Light Odor Control",
+            "type": "float",
+            "default": 0.4,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.StandardOdorControl",
+            "label": "Standard Odor Control",
+            "type": "float",
+            "default": 0.55,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.OvernightOdorControl",
+            "label": "Overnight Odor Control",
+            "type": "float",
+            "default": 0.7,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.EvaMaxOdorControl",
+            "label": "Eva Max Odor Control",
+            "type": "float",
+            "default": 0.85,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.HybridOdorControl",
+            "label": "Hybrid Odor Control",
+            "type": "float",
+            "default": 0.92,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.LightBulk",
+            "label": "Light Bulk",
+            "type": "float",
+            "default": 0.5,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.StandardBulk",
+            "label": "Standard Bulk",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Waste.OvernightBulk",
+            "label": "Overnight Bulk",
+            "type": "float",
+            "default": 1.4,
+            "min": 0.0,
+            "max": 5.6,
+            "step": 0.1
+          },
+          {
+            "key": "Waste.EvaMaxBulk",
+            "label": "Eva Max Bulk",
+            "type": "float",
+            "default": 1.8,
+            "min": 0.0,
+            "max": 7.2,
+            "step": 0.1
+          },
+          {
+            "key": "Waste.HybridBulk",
+            "label": "Hybrid Bulk",
+            "type": "float",
+            "default": 1.6,
+            "min": 0.0,
+            "max": 6.4,
+            "step": 0.1
+          }
+        ]
+      },
+      {
+        "id": "toilets",
+        "label": "Toilets",
+        "settings": [
+          {
+            "key": "Toilets.ToiletRange",
+            "label": "Toilet Range",
+            "type": "int",
+            "default": 220,
+            "min": 0,
+            "max": 880,
+            "step": 1
+          },
+          {
+            "key": "Toilets.BucketsAreToilets",
+            "label": "Buckets Are Toilets",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Toilets.ShipAlwaysHasToilet",
+            "label": "Ship Always Has Toilet",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Toilets.AllowPublicRelief",
+            "label": "Allow Public Relief",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Toilets.UseFurnitureAnims",
+            "label": "Use Furniture Anims",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Toilets.ToiletUseSecondsMin",
+            "label": "Toilet Use Seconds Min",
+            "type": "float",
+            "default": 3.5,
+            "min": 0.0,
+            "max": 14.0,
+            "step": 0.1
+          },
+          {
+            "key": "Toilets.ToiletUseSecondsMax",
+            "label": "Toilet Use Seconds Max",
+            "type": "float",
+            "default": 12.0,
+            "min": 0.0,
+            "max": 48.0,
+            "step": 0.1
+          }
+        ]
+      },
+      {
+        "id": "crime",
+        "label": "Crime",
+        "settings": [
+          {
+            "key": "Crime.PublicAccidentIsCrime",
+            "label": "Public Accident Is Crime",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Crime.InnBedwettingIsCrime",
+            "label": "Inn Bedwetting Is Crime",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Crime.DiaperPunishment",
+            "label": "Diaper Punishment",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Crime.PublicBountyCredits",
+            "label": "Public Bounty Credits",
+            "type": "int",
+            "default": 75,
+            "min": 0,
+            "max": 300,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "npc",
+        "label": "NPC",
+        "settings": [
+          {
+            "key": "NPC.EnableNPCs",
+            "label": "Enable NP Cs",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "NPC.Exploit",
+            "label": "Exploit",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "NPC.TickSeconds",
+            "label": "Tick Seconds",
+            "type": "float",
+            "default": 2.5,
+            "min": 0.0,
+            "max": 10.0,
+            "step": 0.1
+          },
+          {
+            "key": "NPC.FillRate",
+            "label": "Fill Rate",
+            "type": "float",
+            "default": 0.45,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "NPC.MetabolicRate",
+            "label": "Metabolic Rate",
+            "type": "float",
+            "default": 0.25,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "NPC.CombatFillBonus",
+            "label": "Combat Fill Bonus",
+            "type": "float",
+            "default": 1.35,
+            "min": 0.0,
+            "max": 5.4,
+            "step": 0.1
+          },
+          {
+            "key": "NPC.DrinkHours",
+            "label": "Drink Hours",
+            "type": "float",
+            "default": 2.2,
+            "min": 0.0,
+            "max": 8.8,
+            "step": 0.1
+          },
+          {
+            "key": "NPC.FoodHours",
+            "label": "Food Hours",
+            "type": "float",
+            "default": 6.0,
+            "min": 0.0,
+            "max": 24.0,
+            "step": 0.1
+          },
+          {
+            "key": "NPC.Range",
+            "label": "Range",
+            "type": "int",
+            "default": 3200,
+            "min": 0,
+            "max": 12800,
+            "step": 1
+          },
+          {
+            "key": "NPC.MaxTracked",
+            "label": "Max Tracked",
+            "type": "int",
+            "default": 28,
+            "min": 0,
+            "max": 112,
+            "step": 1
+          },
+          {
+            "key": "NPC.PerPulse",
+            "label": "Per Pulse",
+            "type": "int",
+            "default": 8,
+            "min": 0,
+            "max": 32,
+            "step": 1
+          },
+          {
+            "key": "NPC.NeedsRequireToilet",
+            "label": "Needs Require Toilet",
+            "type": "bool",
+            "default": true,
+            "hint": "Zone-locked NPCs with no toilet in ToiletRange do not simulate needs."
+          },
+          {
+            "key": "NPC.CheckToiletMines",
+            "label": "Check Toilet Mines",
+            "type": "bool",
+            "default": true,
+            "hint": "Check the stall for mines/grenades before sitting. Counters toilet bombs."
+          },
+          {
+            "key": "NPC.MineScanRadius",
+            "label": "Mine Scan Radius",
+            "type": "int",
+            "default": 180,
+            "min": 0,
+            "max": 720,
+            "step": 1
+          },
+          {
+            "key": "NPC.FreeCraft",
+            "label": "Free Craft",
+            "type": "bool",
+            "default": true,
+            "hint": "NPCs fabricate a MAG or spare underwear with no bench and no resources."
+          },
+          {
+            "key": "NPC.ChangePulseChance",
+            "label": "Change Pulse Chance",
+            "type": "float",
+            "default": 0.22,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          }
+        ]
+      },
+      {
+        "id": "hud",
+        "label": "HUD",
+        "settings": [
+          {
+            "key": "HUD.ShowMeters",
+            "label": "Show Meters",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "HUD.ShowIcons",
+            "label": "Show Icons",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "HUD.LiveToasts",
+            "label": "Live Toasts",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "HUD.RefreshSeconds",
+            "label": "Refresh Seconds",
+            "type": "float",
+            "default": 0.5,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "HUD.ToastSeconds",
+            "label": "Toast Seconds",
+            "type": "float",
+            "default": 8.0,
+            "min": 0.0,
+            "max": 32.0,
+            "step": 0.1
+          },
+          {
+            "key": "HUD.MeterWarnAt",
+            "label": "Meter Warn At",
+            "type": "float",
+            "default": 0.55,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "HUD.MeterUrgentAt",
+            "label": "Meter Urgent At",
+            "type": "float",
+            "default": 0.78,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          }
+        ]
+      },
+      {
+        "id": "hotkeys",
+        "label": "Hotkeys",
+        "settings": [
+          {
+            "key": "Hotkeys.Status",
+            "label": "Status",
+            "type": "string",
+            "default": "F8",
+            "maxLength": 64
+          },
+          {
+            "key": "Hotkeys.Relieve",
+            "label": "Relieve",
+            "type": "string",
+            "default": "F9",
+            "maxLength": 64
+          },
+          {
+            "key": "Hotkeys.ChangeGarment",
+            "label": "Change Garment",
+            "type": "string",
+            "default": "F7",
+            "maxLength": 64
+          },
+          {
+            "key": "Hotkeys.CycleGrade",
+            "label": "Cycle Grade",
+            "type": "string",
+            "default": "F4",
+            "maxLength": 64
+          },
+          {
+            "key": "Hotkeys.MedicalRecords",
+            "label": "Medical Records",
+            "type": "string",
+            "default": "F6",
+            "maxLength": 64
+          },
+          {
+            "key": "Hotkeys.ExploitNPC",
+            "label": "Exploit NPC",
+            "type": "string",
+            "default": "F3",
+            "maxLength": 64
+          }
+        ]
+      }
+    ]
+  },
+  "views": [
+    {
+      "name": "status",
+      "title": "SFMAG",
+      "description": "Needs, garment load, and accident controls.",
+      "hub": true,
+      "sections": [
+        {
+          "title": "Needs",
+          "rows": [
+            {
+              "kind": "bar",
+              "label": "Bladder",
+              "data": "bladder",
+              "max": 1,
+              "sample": 0.42,
+              "format": {
+                "scale": 100,
+                "decimals": 0,
+                "suffix": "%"
+              }
+            },
+            {
+              "kind": "bar",
+              "label": "Bowel",
+              "data": "bowel",
+              "max": 1,
+              "sample": 0.18,
+              "format": {
+                "scale": 100,
+                "decimals": 0,
+                "suffix": "%"
+              }
+            }
+          ]
+        },
+        {
+          "title": "Garment",
+          "rows": [
+            {
+              "kind": "toggle",
+              "label": "Enable MAG / diapers",
+              "setting": "Garment.EnableGarments"
+            },
+            {
+              "kind": "toggle",
+              "label": "Auto MAG in space",
+              "setting": "Garment.AutoWearVirtualMAGInSpace"
+            },
+            {
+              "kind": "select",
+              "label": "Flavor",
+              "setting": "General.Flavor",
+              "options": [
+                "space",
+                "casual"
+              ],
+              "optionLabels": [
+                "Space",
+                "Casual"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "accent": "#4AA3C7"
+}

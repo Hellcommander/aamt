@@ -1,0 +1,7 @@
+<Project>
+  <!-- Keep QudLab build artifacts local; ignore parent Tools redirects. -->
+  <PropertyGroup>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)artifacts\bin\$(MSBuildProjectName)\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)artifacts\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+  </PropertyGroup>
+</Project>

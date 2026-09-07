@@ -1,0 +1,3257 @@
+{
+  "version": "1.0.0",
+  "metadata": {
+    "description": "Quality placeholders for Space Whale FX effects. Multiple variations per effect for manual selection/editing.",
+    "top_n_per_effect": 4,
+    "usage": "Select the variation that best fits your needs, or use as a starting point for manual editing."
+  },
+  "effects": [
+    {
+      "baseId": "space_whale_orbit_field",
+      "variations": [
+        {
+          "id": "space_whale_orbit_field",
+          "type": "aura",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#66ccff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#88ddff",
+            "bloomColor": "#aaffff",
+            "distortionStrength": 0.11199999999999999,
+            "distortionType": "gravityWell",
+            "noiseType": "perlin",
+            "noiseSpeed": 0.5,
+            "noiseScale": 2.0,
+            "spriteSize": 256,
+            "frames": 24,
+            "layers": [
+              "distortion",
+              "particles",
+              "glow"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.6,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.44,
+              "radius": 1.5
+            },
+            "chromaticAberration": true
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "orbital",
+            "orbitalParticles": {
+              "enabled": true,
+              "count": 41,
+              "speedMin": 0.2,
+              "speedMax": 0.5,
+              "lifeMin": 2.0,
+              "lifeMax": 4.0,
+              "orbitRadius": 1.0,
+              "spiralInward": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleOrbitField;",
+            "transcendence": {
+              "as": "aura",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_orbit_field.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 20,
+            "featureCompleteness": 17,
+            "technicalQuality": 20,
+            "aestheticAppeal": 13,
+            "overallScore": 17,
+            "level": "EXCELLENT",
+            "levelValue": 17,
+            "notes": [
+              "Excellent color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 1
+          }
+        },
+        {
+          "id": "space_whale_orbit_field_v04",
+          "type": "aura",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#66ccff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#88ddff",
+            "bloomColor": "#aaffff",
+            "distortionStrength": 0.096,
+            "distortionType": "gravityWell",
+            "noiseType": "perlin",
+            "noiseSpeed": 0.5,
+            "noiseScale": 2.0,
+            "spriteSize": 256,
+            "frames": 24,
+            "layers": [
+              "distortion",
+              "particles",
+              "glow"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.3,
+              "pulse": true,
+              "expand": false
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.32,
+              "radius": 1.5
+            },
+            "chromaticAberration": true
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "orbital",
+            "orbitalParticles": {
+              "enabled": true,
+              "count": 36,
+              "speedMin": 0.2,
+              "speedMax": 0.5,
+              "lifeMin": 2.0,
+              "lifeMax": 4.0,
+              "orbitRadius": 1.0,
+              "spiralInward": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleOrbitField;",
+            "transcendence": {
+              "as": "aura",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_orbit_field.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 20,
+            "featureCompleteness": 17,
+            "technicalQuality": 20,
+            "aestheticAppeal": 13,
+            "overallScore": 17,
+            "level": "EXCELLENT",
+            "levelValue": 17,
+            "notes": [
+              "Excellent color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 2
+          }
+        },
+        {
+          "id": "space_whale_orbit_field_v03",
+          "type": "aura",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#66ccff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#88ddff",
+            "bloomColor": "#aaffff",
+            "distortionStrength": 0.08,
+            "distortionType": "gravityWell",
+            "noiseType": "perlin",
+            "noiseSpeed": 0.5,
+            "noiseScale": 2.0,
+            "spriteSize": 256,
+            "frames": 24,
+            "layers": [
+              "distortion",
+              "particles",
+              "glow"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.0,
+              "pulse": true,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.2,
+              "radius": 1.5
+            },
+            "chromaticAberration": true
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "orbital",
+            "orbitalParticles": {
+              "enabled": true,
+              "count": 32,
+              "speedMin": 0.2,
+              "speedMax": 0.5,
+              "lifeMin": 2.0,
+              "lifeMax": 4.0,
+              "orbitRadius": 1.0,
+              "spiralInward": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleOrbitField;",
+            "transcendence": {
+              "as": "aura",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_orbit_field.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 20,
+            "featureCompleteness": 17,
+            "technicalQuality": 20,
+            "aestheticAppeal": 13,
+            "overallScore": 17,
+            "level": "EXCELLENT",
+            "levelValue": 17,
+            "notes": [
+              "Excellent color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 3
+          }
+        },
+        {
+          "id": "space_whale_orbit_field_v02",
+          "type": "aura",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#66ccff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#88ddff",
+            "bloomColor": "#aaffff",
+            "distortionStrength": 0.064,
+            "distortionType": "gravityWell",
+            "noiseType": "perlin",
+            "noiseSpeed": 0.5,
+            "noiseScale": 2.0,
+            "spriteSize": 256,
+            "frames": 24,
+            "layers": [
+              "distortion",
+              "particles",
+              "glow"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 1.7,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.08,
+              "radius": 1.5
+            },
+            "chromaticAberration": true
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "orbital",
+            "orbitalParticles": {
+              "enabled": true,
+              "count": 27,
+              "speedMin": 0.2,
+              "speedMax": 0.5,
+              "lifeMin": 2.0,
+              "lifeMax": 4.0,
+              "orbitRadius": 1.0,
+              "spiralInward": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleOrbitField;",
+            "transcendence": {
+              "as": "aura",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_orbit_field.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 17,
+            "featureCompleteness": 17,
+            "technicalQuality": 20,
+            "aestheticAppeal": 13,
+            "overallScore": 16,
+            "level": "VERY_GOOD_PLUS",
+            "levelValue": 16,
+            "notes": [
+              "Excellent color harmony",
+              "Acceptable intensity",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "baseId": "space_whale_bio_core",
+      "variations": [
+        {
+          "id": "space_whale_bio_core",
+          "type": "energy",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#00ff88",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#44ffaa",
+            "bloomColor": "#88ffcc",
+            "distortionStrength": 0.02,
+            "distortionType": "radial",
+            "noiseType": "simplex",
+            "noiseSpeed": 1.0,
+            "noiseScale": 4.0,
+            "spriteSize": 128,
+            "frames": 12,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 3.5,
+              "pulse": true,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 2.0,
+              "radius": 1.3
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "core",
+            "coreParticles": {
+              "enabled": true,
+              "count": 12,
+              "speedMin": 0.1,
+              "speedMax": 0.3,
+              "lifeMin": 1.0,
+              "lifeMax": 2.0,
+              "spiralOutward": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "pulseFrequency": 1.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleBioCore;",
+            "transcendence": {
+              "as": "energy",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_bio_core.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 13,
+            "featureCompleteness": 17,
+            "technicalQuality": 20,
+            "aestheticAppeal": 17,
+            "overallScore": 16,
+            "level": "VERY_GOOD_PLUS",
+            "levelValue": 16,
+            "notes": [
+              "Color harmony could be improved",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "High-energy glow present",
+              "Rich layered composition"
+            ],
+            "rank": 1
+          }
+        },
+        {
+          "id": "space_whale_bio_core_v04",
+          "type": "energy",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#00ff88",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#44ffaa",
+            "bloomColor": "#88ffcc",
+            "distortionStrength": 0.024,
+            "distortionType": "radial",
+            "noiseType": "simplex",
+            "noiseSpeed": 1.0,
+            "noiseScale": 4.0,
+            "spriteSize": 128,
+            "frames": 12,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 4.0249999999999995,
+              "pulse": true,
+              "expand": false
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 2.2,
+              "radius": 1.3
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "core",
+            "coreParticles": {
+              "enabled": true,
+              "count": 13,
+              "speedMin": 0.1,
+              "speedMax": 0.3,
+              "lifeMin": 1.0,
+              "lifeMax": 2.0,
+              "spiralOutward": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "pulseFrequency": 1.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleBioCore;",
+            "transcendence": {
+              "as": "energy",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_bio_core.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 9,
+            "featureCompleteness": 17,
+            "technicalQuality": 20,
+            "aestheticAppeal": 17,
+            "overallScore": 15,
+            "level": "VERY_GOOD",
+            "levelValue": 15,
+            "notes": [
+              "Color harmony could be improved",
+              "Acceptable intensity",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "High-energy glow present",
+              "Rich layered composition"
+            ],
+            "rank": 2
+          }
+        },
+        {
+          "id": "space_whale_bio_core_v05",
+          "type": "energy",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#00ff88",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#44ffaa",
+            "bloomColor": "#88ffcc",
+            "distortionStrength": 0.027999999999999997,
+            "distortionType": "radial",
+            "noiseType": "simplex",
+            "noiseSpeed": 1.0,
+            "noiseScale": 4.0,
+            "spriteSize": 128,
+            "frames": 12,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 4.55,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 2.4,
+              "radius": 1.3
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "core",
+            "coreParticles": {
+              "enabled": true,
+              "count": 15,
+              "speedMin": 0.1,
+              "speedMax": 0.3,
+              "lifeMin": 1.0,
+              "lifeMax": 2.0,
+              "spiralOutward": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "pulseFrequency": 1.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleBioCore;",
+            "transcendence": {
+              "as": "energy",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_bio_core.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 9,
+            "featureCompleteness": 17,
+            "technicalQuality": 20,
+            "aestheticAppeal": 17,
+            "overallScore": 15,
+            "level": "VERY_GOOD",
+            "levelValue": 15,
+            "notes": [
+              "Color harmony could be improved",
+              "Acceptable intensity",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "High-energy glow present",
+              "Rich layered composition"
+            ],
+            "rank": 3
+          }
+        },
+        {
+          "id": "space_whale_bio_core_v02",
+          "type": "energy",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#00ff88",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#44ffaa",
+            "bloomColor": "#88ffcc",
+            "distortionStrength": 0.016,
+            "distortionType": "radial",
+            "noiseType": "simplex",
+            "noiseSpeed": 1.0,
+            "noiseScale": 4.0,
+            "spriteSize": 128,
+            "frames": 12,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.975,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.8,
+              "radius": 1.3
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "core",
+            "coreParticles": {
+              "enabled": true,
+              "count": 10,
+              "speedMin": 0.1,
+              "speedMax": 0.3,
+              "lifeMin": 1.0,
+              "lifeMax": 2.0,
+              "spiralOutward": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "pulseFrequency": 1.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleBioCore;",
+            "transcendence": {
+              "as": "energy",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_bio_core.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 9,
+            "featureCompleteness": 17,
+            "technicalQuality": 20,
+            "aestheticAppeal": 13,
+            "overallScore": 14,
+            "level": "GOOD_PLUS",
+            "levelValue": 14,
+            "notes": [
+              "Color harmony could be improved",
+              "Optimal intensity range",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "baseId": "space_whale_song_pulse",
+      "variations": [
+        {
+          "id": "space_whale_song_pulse",
+          "type": "shockwave",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#ff66ff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#ff99ff",
+            "bloomColor": "#ffccff",
+            "distortionStrength": 0.12,
+            "distortionType": "turbulent",
+            "noiseType": "voronoi",
+            "noiseSpeed": 2.0,
+            "noiseScale": 3.0,
+            "spriteSize": 512,
+            "frames": 16,
+            "layers": [
+              "core",
+              "shockwave",
+              "bloom",
+              "distortion",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 4.0,
+              "pulse": true,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": true,
+              "ringCount": 3,
+              "thickness": 0.04,
+              "expandSpeed": 3.0
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 2.5,
+              "radius": 1.8
+            },
+            "chromaticAberration": true
+          },
+          "particles": {
+            "burstCount": 48,
+            "burstSpeedMin": 1.5,
+            "burstSpeedMax": 4.0,
+            "lifetimeMin": 0.4,
+            "lifetimeMax": 1.2,
+            "sizeMin": 0.04,
+            "sizeMax": 0.12,
+            "blend": "additive",
+            "motionPattern": "radialBurst",
+            "coreParticles": {
+              "enabled": true,
+              "count": 16,
+              "speedMin": 0.3,
+              "speedMax": 0.8,
+              "lifeMin": 0.6,
+              "lifeMax": 1.5
+            },
+            "shockwaveParticles": {
+              "enabled": true,
+              "count": 24,
+              "ringRadius": 0.7,
+              "expandSpeed": 2.5
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.09160434048266154,
+            "shockwaveExpandTime": 0.20359087522129002,
+            "fadeOutTime": 0.4933582531427183,
+            "easeIn": "easeOut",
+            "easeOut": "easeIn"
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleSongPulse;",
+            "transcendence": {
+              "as": "explosion",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_song_pulse.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 17,
+            "featureCompleteness": 20,
+            "technicalQuality": 19,
+            "aestheticAppeal": 20,
+            "overallScore": 18,
+            "level": "EXCELLENT_PLUS",
+            "levelValue": 18,
+            "notes": [
+              "Good color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count acceptable",
+              "Nova Drift style confirmed",
+              "High-energy glow present",
+              "Smooth easing curves configured",
+              "Rich layered composition"
+            ],
+            "rank": 1
+          }
+        },
+        {
+          "id": "space_whale_song_pulse_v02",
+          "type": "shockwave",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#ff66ff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#ff99ff",
+            "bloomColor": "#ffccff",
+            "distortionStrength": 0.096,
+            "distortionType": "turbulent",
+            "noiseType": "voronoi",
+            "noiseSpeed": 2.0,
+            "noiseScale": 3.0,
+            "spriteSize": 512,
+            "frames": 16,
+            "layers": [
+              "core",
+              "shockwave",
+              "bloom",
+              "distortion",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 3.4,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": true,
+              "ringCount": 2,
+              "thickness": 0.04,
+              "expandSpeed": 3.0
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 2.25,
+              "radius": 1.8
+            },
+            "chromaticAberration": true
+          },
+          "particles": {
+            "burstCount": 38,
+            "burstSpeedMin": 1.5,
+            "burstSpeedMax": 4.0,
+            "lifetimeMin": 0.4,
+            "lifetimeMax": 1.2,
+            "sizeMin": 0.04,
+            "sizeMax": 0.12,
+            "blend": "additive",
+            "motionPattern": "radialBurst",
+            "coreParticles": {
+              "enabled": true,
+              "count": 13,
+              "speedMin": 0.3,
+              "speedMax": 0.8,
+              "lifeMin": 0.6,
+              "lifeMax": 1.5
+            },
+            "shockwaveParticles": {
+              "enabled": true,
+              "count": 24,
+              "ringRadius": 0.7,
+              "expandSpeed": 2.5
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.10233741718318193,
+            "shockwaveExpandTime": 0.22162507302555523,
+            "fadeOutTime": 0.5303527882287319,
+            "easeIn": "easeOut",
+            "easeOut": "easeIn"
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleSongPulse;",
+            "transcendence": {
+              "as": "explosion",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_song_pulse.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 17,
+            "featureCompleteness": 20,
+            "technicalQuality": 19,
+            "aestheticAppeal": 20,
+            "overallScore": 18,
+            "level": "EXCELLENT_PLUS",
+            "levelValue": 18,
+            "notes": [
+              "Good color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count acceptable",
+              "Nova Drift style confirmed",
+              "High-energy glow present",
+              "Smooth easing curves configured",
+              "Rich layered composition"
+            ],
+            "rank": 2
+          }
+        },
+        {
+          "id": "space_whale_song_pulse_v01",
+          "type": "shockwave",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#ff66ff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#ff99ff",
+            "bloomColor": "#ffccff",
+            "distortionStrength": 0.072,
+            "distortionType": "turbulent",
+            "noiseType": "voronoi",
+            "noiseSpeed": 2.0,
+            "noiseScale": 3.0,
+            "spriteSize": 512,
+            "frames": 16,
+            "layers": [
+              "core",
+              "shockwave",
+              "bloom",
+              "distortion",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.8,
+              "pulse": true,
+              "expand": false
+            },
+            "shockwave": {
+              "enabled": true,
+              "ringCount": 1,
+              "thickness": 0.04,
+              "expandSpeed": 3.0
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 2.0,
+              "radius": 1.8
+            },
+            "chromaticAberration": true
+          },
+          "particles": {
+            "burstCount": 28,
+            "burstSpeedMin": 1.5,
+            "burstSpeedMax": 4.0,
+            "lifetimeMin": 0.4,
+            "lifetimeMax": 1.2,
+            "sizeMin": 0.04,
+            "sizeMax": 0.12,
+            "blend": "additive",
+            "motionPattern": "radialBurst",
+            "coreParticles": {
+              "enabled": true,
+              "count": 11,
+              "speedMin": 0.3,
+              "speedMax": 0.8,
+              "lifeMin": 0.6,
+              "lifeMax": 1.5
+            },
+            "shockwaveParticles": {
+              "enabled": true,
+              "count": 24,
+              "ringRadius": 0.7,
+              "expandSpeed": 2.5
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.10516336301405149,
+            "shockwaveExpandTime": 0.19261153841492418,
+            "fadeOutTime": 0.4923578708821723,
+            "easeIn": "easeOut",
+            "easeOut": "easeIn"
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleSongPulse;",
+            "transcendence": {
+              "as": "explosion",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_song_pulse.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 17,
+            "featureCompleteness": 20,
+            "technicalQuality": 20,
+            "aestheticAppeal": 17,
+            "overallScore": 18,
+            "level": "EXCELLENT_PLUS",
+            "levelValue": 18,
+            "notes": [
+              "Good color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Smooth easing curves configured",
+              "Rich layered composition"
+            ],
+            "rank": 3
+          }
+        },
+        {
+          "id": "space_whale_song_pulse_v06",
+          "type": "shockwave",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#ff66ff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#ff99ff",
+            "bloomColor": "#ffccff",
+            "distortionStrength": 0.072,
+            "distortionType": "turbulent",
+            "noiseType": "voronoi",
+            "noiseSpeed": 2.0,
+            "noiseScale": 3.0,
+            "spriteSize": 512,
+            "frames": 16,
+            "layers": [
+              "core",
+              "shockwave",
+              "bloom",
+              "distortion",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.8,
+              "pulse": true,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": true,
+              "ringCount": 3,
+              "thickness": 0.04,
+              "expandSpeed": 3.0
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 2.0,
+              "radius": 1.8
+            },
+            "chromaticAberration": true
+          },
+          "particles": {
+            "burstCount": 28,
+            "burstSpeedMin": 1.5,
+            "burstSpeedMax": 4.0,
+            "lifetimeMin": 0.4,
+            "lifetimeMax": 1.2,
+            "sizeMin": 0.04,
+            "sizeMax": 0.12,
+            "blend": "additive",
+            "motionPattern": "radialBurst",
+            "coreParticles": {
+              "enabled": true,
+              "count": 11,
+              "speedMin": 0.3,
+              "speedMax": 0.8,
+              "lifeMin": 0.6,
+              "lifeMax": 1.5
+            },
+            "shockwaveParticles": {
+              "enabled": true,
+              "count": 24,
+              "ringRadius": 0.7,
+              "expandSpeed": 2.5
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.11371899586326602,
+            "shockwaveExpandTime": 0.22283453103914033,
+            "fadeOutTime": 0.5253304711144439,
+            "easeIn": "easeOut",
+            "easeOut": "easeIn"
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleSongPulse;",
+            "transcendence": {
+              "as": "explosion",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_song_pulse.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 17,
+            "featureCompleteness": 20,
+            "technicalQuality": 20,
+            "aestheticAppeal": 17,
+            "overallScore": 18,
+            "level": "EXCELLENT_PLUS",
+            "levelValue": 18,
+            "notes": [
+              "Good color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Smooth easing curves configured",
+              "Rich layered composition"
+            ],
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "baseId": "space_whale_shield_link",
+      "variations": [
+        {
+          "id": "space_whale_shield_link",
+          "type": "tether",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#88ffff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#aaffff",
+            "bloomColor": "#ccffff",
+            "distortionStrength": 0.041999999999999996,
+            "distortionType": "linear",
+            "noiseType": "perlin",
+            "noiseSpeed": 1.5,
+            "noiseScale": 6.0,
+            "spriteSize": 64,
+            "frames": 8,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 3.25,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.7999999999999998,
+              "radius": 1.2
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "linear",
+            "linearParticles": {
+              "enabled": true,
+              "count": 16,
+              "speedMin": 0.5,
+              "speedMax": 1.2,
+              "lifeMin": 0.5,
+              "lifeMax": 1.5,
+              "direction": "towardMinion"
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleShieldLink;",
+            "transcendence": {
+              "as": "tether",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_shield_link.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 20,
+            "featureCompleteness": 13,
+            "technicalQuality": 20,
+            "aestheticAppeal": 17,
+            "overallScore": 17,
+            "level": "EXCELLENT",
+            "levelValue": 17,
+            "notes": [
+              "Excellent color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "High-energy glow present",
+              "Rich layered composition"
+            ],
+            "rank": 1
+          }
+        },
+        {
+          "id": "space_whale_shield_link_v03",
+          "type": "tether",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#88ffff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#aaffff",
+            "bloomColor": "#ccffff",
+            "distortionStrength": 0.03,
+            "distortionType": "linear",
+            "noiseType": "perlin",
+            "noiseSpeed": 1.5,
+            "noiseScale": 6.0,
+            "spriteSize": 64,
+            "frames": 8,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.5,
+              "pulse": true,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.5,
+              "radius": 1.2
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "linear",
+            "linearParticles": {
+              "enabled": true,
+              "count": 16,
+              "speedMin": 0.5,
+              "speedMax": 1.2,
+              "lifeMin": 0.5,
+              "lifeMax": 1.5,
+              "direction": "towardMinion"
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleShieldLink;",
+            "transcendence": {
+              "as": "tether",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_shield_link.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 20,
+            "featureCompleteness": 13,
+            "technicalQuality": 20,
+            "aestheticAppeal": 13,
+            "overallScore": 16,
+            "level": "VERY_GOOD_PLUS",
+            "levelValue": 16,
+            "notes": [
+              "Excellent color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 2
+          }
+        },
+        {
+          "id": "space_whale_shield_link_v04",
+          "type": "tether",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#88ffff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#aaffff",
+            "bloomColor": "#ccffff",
+            "distortionStrength": 0.036,
+            "distortionType": "linear",
+            "noiseType": "perlin",
+            "noiseSpeed": 1.5,
+            "noiseScale": 6.0,
+            "spriteSize": 64,
+            "frames": 8,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.875,
+              "pulse": true,
+              "expand": false
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.6500000000000001,
+              "radius": 1.2
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "linear",
+            "linearParticles": {
+              "enabled": true,
+              "count": 16,
+              "speedMin": 0.5,
+              "speedMax": 1.2,
+              "lifeMin": 0.5,
+              "lifeMax": 1.5,
+              "direction": "towardMinion"
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleShieldLink;",
+            "transcendence": {
+              "as": "tether",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_shield_link.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 20,
+            "featureCompleteness": 13,
+            "technicalQuality": 20,
+            "aestheticAppeal": 13,
+            "overallScore": 16,
+            "level": "VERY_GOOD_PLUS",
+            "levelValue": 16,
+            "notes": [
+              "Excellent color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 3
+          }
+        },
+        {
+          "id": "space_whale_shield_link_v02",
+          "type": "tether",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#88ffff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#aaffff",
+            "bloomColor": "#ccffff",
+            "distortionStrength": 0.024,
+            "distortionType": "linear",
+            "noiseType": "perlin",
+            "noiseSpeed": 1.5,
+            "noiseScale": 6.0,
+            "spriteSize": 64,
+            "frames": 8,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.125,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.35,
+              "radius": 1.2
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "linear",
+            "linearParticles": {
+              "enabled": true,
+              "count": 16,
+              "speedMin": 0.5,
+              "speedMax": 1.2,
+              "lifeMin": 0.5,
+              "lifeMax": 1.5,
+              "direction": "towardMinion"
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleShieldLink;",
+            "transcendence": {
+              "as": "tether",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_shield_link.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 20,
+            "featureCompleteness": 13,
+            "technicalQuality": 20,
+            "aestheticAppeal": 13,
+            "overallScore": 16,
+            "level": "VERY_GOOD_PLUS",
+            "levelValue": 16,
+            "notes": [
+              "Excellent color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "baseId": "space_whale_drone_spawn",
+      "variations": [
+        {
+          "id": "space_whale_drone_spawn",
+          "type": "spawn",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#ffaa00",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#ffcc44",
+            "bloomColor": "#ffdd88",
+            "distortionStrength": 0.06,
+            "distortionType": "radial",
+            "noiseType": "voronoi",
+            "noiseSpeed": 1.8,
+            "noiseScale": 3.5,
+            "spriteSize": 96,
+            "frames": 10,
+            "layers": [
+              "core",
+              "shockwave",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 3.0,
+              "pulse": true,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": true,
+              "ringCount": 3,
+              "thickness": 0.03,
+              "expandSpeed": 2.2
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 2.0,
+              "radius": 1.4
+            }
+          },
+          "particles": {
+            "burstCount": 24,
+            "burstSpeedMin": 0.8,
+            "burstSpeedMax": 2.0,
+            "lifetimeMin": 0.3,
+            "lifetimeMax": 0.8,
+            "sizeMin": 0.03,
+            "sizeMax": 0.08,
+            "blend": "additive",
+            "motionPattern": "radialBurst",
+            "coreParticles": {
+              "enabled": false
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.1297645876333402,
+            "shockwaveExpandTime": 0.16959297359258027,
+            "fadeOutTime": 0.27290483472423493,
+            "easeIn": "easeOut",
+            "easeOut": "easeIn"
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleDroneSpawn;",
+            "transcendence": {
+              "as": "explosion",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_drone_spawn.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 13,
+            "featureCompleteness": 20,
+            "technicalQuality": 20,
+            "aestheticAppeal": 20,
+            "overallScore": 17,
+            "level": "EXCELLENT",
+            "levelValue": 17,
+            "notes": [
+              "Color harmony could be improved",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "High-energy glow present",
+              "Smooth easing curves configured",
+              "Rich layered composition"
+            ],
+            "rank": 1
+          }
+        },
+        {
+          "id": "space_whale_drone_spawn_v02",
+          "type": "spawn",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#ffaa00",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#ffcc44",
+            "bloomColor": "#ffdd88",
+            "distortionStrength": 0.048,
+            "distortionType": "radial",
+            "noiseType": "voronoi",
+            "noiseSpeed": 1.8,
+            "noiseScale": 3.5,
+            "spriteSize": 96,
+            "frames": 10,
+            "layers": [
+              "core",
+              "shockwave",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.55,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": true,
+              "ringCount": 2,
+              "thickness": 0.03,
+              "expandSpeed": 2.2
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.8,
+              "radius": 1.4
+            }
+          },
+          "particles": {
+            "burstCount": 19,
+            "burstSpeedMin": 0.8,
+            "burstSpeedMax": 2.0,
+            "lifetimeMin": 0.3,
+            "lifetimeMax": 0.8,
+            "sizeMin": 0.03,
+            "sizeMax": 0.08,
+            "blend": "additive",
+            "motionPattern": "radialBurst",
+            "coreParticles": {
+              "enabled": false
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.1144606808546937,
+            "shockwaveExpandTime": 0.16867832250345002,
+            "fadeOutTime": 0.32582600240367293,
+            "easeIn": "easeOut",
+            "easeOut": "easeIn"
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleDroneSpawn;",
+            "transcendence": {
+              "as": "explosion",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_drone_spawn.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 13,
+            "featureCompleteness": 20,
+            "technicalQuality": 20,
+            "aestheticAppeal": 17,
+            "overallScore": 17,
+            "level": "EXCELLENT",
+            "levelValue": 17,
+            "notes": [
+              "Color harmony could be improved",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Smooth easing curves configured",
+              "Rich layered composition"
+            ],
+            "rank": 2
+          }
+        },
+        {
+          "id": "space_whale_drone_spawn_v06",
+          "type": "spawn",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#ffaa00",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#ffcc44",
+            "bloomColor": "#ffdd88",
+            "distortionStrength": 0.036,
+            "distortionType": "radial",
+            "noiseType": "voronoi",
+            "noiseSpeed": 1.8,
+            "noiseScale": 3.5,
+            "spriteSize": 96,
+            "frames": 10,
+            "layers": [
+              "core",
+              "shockwave",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.0999999999999996,
+              "pulse": true,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": true,
+              "ringCount": 3,
+              "thickness": 0.03,
+              "expandSpeed": 2.2
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.6,
+              "radius": 1.4
+            }
+          },
+          "particles": {
+            "burstCount": 14,
+            "burstSpeedMin": 0.8,
+            "burstSpeedMax": 2.0,
+            "lifetimeMin": 0.3,
+            "lifetimeMax": 0.8,
+            "sizeMin": 0.03,
+            "sizeMax": 0.08,
+            "blend": "additive",
+            "motionPattern": "radialBurst",
+            "coreParticles": {
+              "enabled": false
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.11967846635557829,
+            "shockwaveExpandTime": 0.15501819516475587,
+            "fadeOutTime": 0.2798801161753093,
+            "easeIn": "easeOut",
+            "easeOut": "easeIn"
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleDroneSpawn;",
+            "transcendence": {
+              "as": "explosion",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_drone_spawn.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 13,
+            "featureCompleteness": 20,
+            "technicalQuality": 20,
+            "aestheticAppeal": 17,
+            "overallScore": 17,
+            "level": "EXCELLENT",
+            "levelValue": 17,
+            "notes": [
+              "Color harmony could be improved",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Smooth easing curves configured",
+              "Rich layered composition"
+            ],
+            "rank": 3
+          }
+        },
+        {
+          "id": "space_whale_drone_spawn_v01",
+          "type": "spawn",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#ffaa00",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#ffcc44",
+            "bloomColor": "#ffdd88",
+            "distortionStrength": 0.036,
+            "distortionType": "radial",
+            "noiseType": "voronoi",
+            "noiseSpeed": 1.8,
+            "noiseScale": 3.5,
+            "spriteSize": 96,
+            "frames": 10,
+            "layers": [
+              "core",
+              "shockwave",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.0999999999999996,
+              "pulse": true,
+              "expand": false
+            },
+            "shockwave": {
+              "enabled": true,
+              "ringCount": 1,
+              "thickness": 0.03,
+              "expandSpeed": 2.2
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.6,
+              "radius": 1.4
+            }
+          },
+          "particles": {
+            "burstCount": 14,
+            "burstSpeedMin": 0.8,
+            "burstSpeedMax": 2.0,
+            "lifetimeMin": 0.3,
+            "lifetimeMax": 0.8,
+            "sizeMin": 0.03,
+            "sizeMax": 0.08,
+            "blend": "additive",
+            "motionPattern": "radialBurst",
+            "coreParticles": {
+              "enabled": false
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.1020953101523674,
+            "shockwaveExpandTime": 0.2061325344666888,
+            "fadeOutTime": 0.2802065221530597,
+            "easeIn": "easeOut",
+            "easeOut": "easeIn"
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleDroneSpawn;",
+            "transcendence": {
+              "as": "explosion",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_drone_spawn.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 13,
+            "featureCompleteness": 20,
+            "technicalQuality": 20,
+            "aestheticAppeal": 17,
+            "overallScore": 17,
+            "level": "EXCELLENT",
+            "levelValue": 17,
+            "notes": [
+              "Color harmony could be improved",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Smooth easing curves configured",
+              "Rich layered composition"
+            ],
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "baseId": "space_whale_swallow",
+      "variations": [
+        {
+          "id": "space_whale_swallow",
+          "type": "consumption",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#ff0066",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#ff4488",
+            "bloomColor": "#ff88aa",
+            "distortionStrength": 0.06,
+            "distortionType": "implosion",
+            "noiseType": "voronoi",
+            "noiseSpeed": 2.5,
+            "noiseScale": 2.5,
+            "spriteSize": 192,
+            "frames": 14,
+            "layers": [
+              "core",
+              "shockwave",
+              "bloom",
+              "distortion",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 3.15,
+              "pulse": true,
+              "expand": false
+            },
+            "shockwave": {
+              "enabled": true,
+              "ringCount": 1,
+              "thickness": 0.05,
+              "expandSpeed": -2.0,
+              "inward": true
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 2.4000000000000004,
+              "radius": 1.6
+            },
+            "chromaticAberration": true
+          },
+          "particles": {
+            "burstCount": 19,
+            "burstSpeedMin": -1.5,
+            "burstSpeedMax": -3.0,
+            "lifetimeMin": 0.4,
+            "lifetimeMax": 1.0,
+            "sizeMin": 0.04,
+            "sizeMax": 0.1,
+            "blend": "additive",
+            "motionPattern": "radialBurst",
+            "inward": true,
+            "coreParticles": {
+              "enabled": true,
+              "count": 8,
+              "speedMin": -0.5,
+              "speedMax": -1.2,
+              "lifeMin": 0.6,
+              "lifeMax": 1.2
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.1709938233142293,
+            "shockwaveExpandTime": 0.24929335933585453,
+            "fadeOutTime": 0.4482116850886386,
+            "easeIn": "easeIn",
+            "easeOut": "easeOut"
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleSwallow;",
+            "transcendence": {
+              "as": "explosion",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_swallow.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 13,
+            "featureCompleteness": 17,
+            "technicalQuality": 20,
+            "aestheticAppeal": 20,
+            "overallScore": 17,
+            "level": "EXCELLENT",
+            "levelValue": 17,
+            "notes": [
+              "Color harmony could be improved",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "High-energy glow present",
+              "Smooth easing curves configured",
+              "Rich layered composition"
+            ],
+            "rank": 1
+          }
+        },
+        {
+          "id": "space_whale_swallow_v06",
+          "type": "consumption",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#ff0066",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#ff4488",
+            "bloomColor": "#ff88aa",
+            "distortionStrength": 0.06,
+            "distortionType": "implosion",
+            "noiseType": "voronoi",
+            "noiseSpeed": 2.5,
+            "noiseScale": 2.5,
+            "spriteSize": 192,
+            "frames": 14,
+            "layers": [
+              "core",
+              "shockwave",
+              "bloom",
+              "distortion",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 3.15,
+              "pulse": true,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": true,
+              "ringCount": 3,
+              "thickness": 0.05,
+              "expandSpeed": -2.0,
+              "inward": true
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 2.4000000000000004,
+              "radius": 1.6
+            },
+            "chromaticAberration": true
+          },
+          "particles": {
+            "burstCount": 19,
+            "burstSpeedMin": -1.5,
+            "burstSpeedMax": -3.0,
+            "lifetimeMin": 0.4,
+            "lifetimeMax": 1.0,
+            "sizeMin": 0.04,
+            "sizeMax": 0.1,
+            "blend": "additive",
+            "motionPattern": "radialBurst",
+            "inward": true,
+            "coreParticles": {
+              "enabled": true,
+              "count": 8,
+              "speedMin": -0.5,
+              "speedMax": -1.2,
+              "lifeMin": 0.6,
+              "lifeMax": 1.2
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.15749810124081132,
+            "shockwaveExpandTime": 0.24877650750975422,
+            "fadeOutTime": 0.3510067307642745,
+            "easeIn": "easeIn",
+            "easeOut": "easeOut"
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleSwallow;",
+            "transcendence": {
+              "as": "explosion",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_swallow.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 13,
+            "featureCompleteness": 17,
+            "technicalQuality": 20,
+            "aestheticAppeal": 20,
+            "overallScore": 17,
+            "level": "EXCELLENT",
+            "levelValue": 17,
+            "notes": [
+              "Color harmony could be improved",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "High-energy glow present",
+              "Smooth easing curves configured",
+              "Rich layered composition"
+            ],
+            "rank": 2
+          }
+        },
+        {
+          "id": "space_whale_swallow_v02",
+          "type": "consumption",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#ff0066",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#ff4488",
+            "bloomColor": "#ff88aa",
+            "distortionStrength": 0.08000000000000002,
+            "distortionType": "implosion",
+            "noiseType": "voronoi",
+            "noiseSpeed": 2.5,
+            "noiseScale": 2.5,
+            "spriteSize": 192,
+            "frames": 14,
+            "layers": [
+              "core",
+              "shockwave",
+              "bloom",
+              "distortion",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 3.8249999999999997,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": true,
+              "ringCount": 2,
+              "thickness": 0.05,
+              "expandSpeed": -2.0,
+              "inward": true
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 2.7,
+              "radius": 1.6
+            },
+            "chromaticAberration": true
+          },
+          "particles": {
+            "burstCount": 25,
+            "burstSpeedMin": -1.5,
+            "burstSpeedMax": -3.0,
+            "lifetimeMin": 0.4,
+            "lifetimeMax": 1.0,
+            "sizeMin": 0.04,
+            "sizeMax": 0.1,
+            "blend": "additive",
+            "motionPattern": "radialBurst",
+            "inward": true,
+            "coreParticles": {
+              "enabled": true,
+              "count": 10,
+              "speedMin": -0.5,
+              "speedMax": -1.2,
+              "lifeMin": 0.6,
+              "lifeMax": 1.2
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.152470163996921,
+            "shockwaveExpandTime": 0.2722903195290711,
+            "fadeOutTime": 0.36642749238901784,
+            "easeIn": "easeIn",
+            "easeOut": "easeOut"
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleSwallow;",
+            "transcendence": {
+              "as": "explosion",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_swallow.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 13,
+            "featureCompleteness": 17,
+            "technicalQuality": 20,
+            "aestheticAppeal": 20,
+            "overallScore": 17,
+            "level": "EXCELLENT",
+            "levelValue": 17,
+            "notes": [
+              "Color harmony could be improved",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "High-energy glow present",
+              "Smooth easing curves configured",
+              "Rich layered composition"
+            ],
+            "rank": 3
+          }
+        },
+        {
+          "id": "space_whale_swallow_v03",
+          "type": "consumption",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#ff0066",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#ff4488",
+            "bloomColor": "#ff88aa",
+            "distortionStrength": 0.1,
+            "distortionType": "implosion",
+            "noiseType": "voronoi",
+            "noiseSpeed": 2.5,
+            "noiseScale": 2.5,
+            "spriteSize": 192,
+            "frames": 14,
+            "layers": [
+              "core",
+              "shockwave",
+              "bloom",
+              "distortion",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 4.5,
+              "pulse": true,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": true,
+              "ringCount": 3,
+              "thickness": 0.05,
+              "expandSpeed": -2.0,
+              "inward": true
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 3.0,
+              "radius": 1.6
+            },
+            "chromaticAberration": true
+          },
+          "particles": {
+            "burstCount": 32,
+            "burstSpeedMin": -1.5,
+            "burstSpeedMax": -3.0,
+            "lifetimeMin": 0.4,
+            "lifetimeMax": 1.0,
+            "sizeMin": 0.04,
+            "sizeMax": 0.1,
+            "blend": "additive",
+            "motionPattern": "radialBurst",
+            "inward": true,
+            "coreParticles": {
+              "enabled": true,
+              "count": 12,
+              "speedMin": -0.5,
+              "speedMax": -1.2,
+              "lifeMin": 0.6,
+              "lifeMax": 1.2
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.13892647600742444,
+            "shockwaveExpandTime": 0.28187585969626594,
+            "fadeOutTime": 0.3934838376981876,
+            "easeIn": "easeIn",
+            "easeOut": "easeOut"
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleSwallow;",
+            "transcendence": {
+              "as": "explosion",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_swallow.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 9,
+            "featureCompleteness": 17,
+            "technicalQuality": 20,
+            "aestheticAppeal": 20,
+            "overallScore": 15,
+            "level": "VERY_GOOD",
+            "levelValue": 15,
+            "notes": [
+              "Color harmony could be improved",
+              "Acceptable intensity",
+              "Good distortion strength",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "High-energy glow present",
+              "Smooth easing curves configured",
+              "Rich layered composition"
+            ],
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "baseId": "space_whale_wave_trail",
+      "variations": [
+        {
+          "id": "space_whale_wave_trail",
+          "type": "trail",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#66ccff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#88ddff",
+            "bloomColor": "#aaffff",
+            "distortionStrength": 0.027999999999999997,
+            "distortionType": "linear",
+            "noiseType": "perlin",
+            "noiseSpeed": 1.0,
+            "noiseScale": 4.0,
+            "spriteSize": 32,
+            "frames": 8,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.3400000000000003,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.2,
+              "radius": 1.1
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "trail",
+            "trailParticles": {
+              "enabled": true,
+              "count": 16,
+              "speedMin": 0.1,
+              "speedMax": 0.3,
+              "lifeMin": 1.0,
+              "lifeMax": 2.0,
+              "followSpine": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleWaveTrail;",
+            "transcendence": {
+              "as": "trail",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_wave_trail.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 20,
+            "featureCompleteness": 13,
+            "technicalQuality": 17,
+            "aestheticAppeal": 13,
+            "overallScore": 16,
+            "level": "VERY_GOOD_PLUS",
+            "levelValue": 16,
+            "notes": [
+              "Excellent color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 1
+          }
+        },
+        {
+          "id": "space_whale_wave_trail_v04",
+          "type": "trail",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#66ccff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#88ddff",
+            "bloomColor": "#aaffff",
+            "distortionStrength": 0.024,
+            "distortionType": "linear",
+            "noiseType": "perlin",
+            "noiseSpeed": 1.0,
+            "noiseScale": 4.0,
+            "spriteSize": 32,
+            "frames": 8,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.07,
+              "pulse": true,
+              "expand": false
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.1,
+              "radius": 1.1
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "trail",
+            "trailParticles": {
+              "enabled": true,
+              "count": 16,
+              "speedMin": 0.1,
+              "speedMax": 0.3,
+              "lifeMin": 1.0,
+              "lifeMax": 2.0,
+              "followSpine": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleWaveTrail;",
+            "transcendence": {
+              "as": "trail",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_wave_trail.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 20,
+            "featureCompleteness": 13,
+            "technicalQuality": 17,
+            "aestheticAppeal": 13,
+            "overallScore": 16,
+            "level": "VERY_GOOD_PLUS",
+            "levelValue": 16,
+            "notes": [
+              "Excellent color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 2
+          }
+        },
+        {
+          "id": "space_whale_wave_trail_v03",
+          "type": "trail",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#66ccff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#88ddff",
+            "bloomColor": "#aaffff",
+            "distortionStrength": 0.02,
+            "distortionType": "linear",
+            "noiseType": "perlin",
+            "noiseSpeed": 1.0,
+            "noiseScale": 4.0,
+            "spriteSize": 32,
+            "frames": 8,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 1.8,
+              "pulse": true,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.0,
+              "radius": 1.1
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "trail",
+            "trailParticles": {
+              "enabled": true,
+              "count": 16,
+              "speedMin": 0.1,
+              "speedMax": 0.3,
+              "lifeMin": 1.0,
+              "lifeMax": 2.0,
+              "followSpine": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleWaveTrail;",
+            "transcendence": {
+              "as": "trail",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_wave_trail.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 17,
+            "featureCompleteness": 13,
+            "technicalQuality": 17,
+            "aestheticAppeal": 13,
+            "overallScore": 15,
+            "level": "VERY_GOOD",
+            "levelValue": 15,
+            "notes": [
+              "Excellent color harmony",
+              "Acceptable intensity",
+              "Good distortion strength",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 3
+          }
+        },
+        {
+          "id": "space_whale_wave_trail_v02",
+          "type": "trail",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#66ccff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#88ddff",
+            "bloomColor": "#aaffff",
+            "distortionStrength": 0.016,
+            "distortionType": "linear",
+            "noiseType": "perlin",
+            "noiseSpeed": 1.0,
+            "noiseScale": 4.0,
+            "spriteSize": 32,
+            "frames": 8,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 1.53,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 0.9,
+              "radius": 1.1
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "trail",
+            "trailParticles": {
+              "enabled": true,
+              "count": 16,
+              "speedMin": 0.1,
+              "speedMax": 0.3,
+              "lifeMin": 1.0,
+              "lifeMax": 2.0,
+              "followSpine": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleWaveTrail;",
+            "transcendence": {
+              "as": "trail",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_wave_trail.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 13,
+            "featureCompleteness": 13,
+            "technicalQuality": 17,
+            "aestheticAppeal": 13,
+            "overallScore": 14,
+            "level": "GOOD_PLUS",
+            "levelValue": 14,
+            "notes": [
+              "Excellent color harmony",
+              "Acceptable intensity",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "baseId": "space_whale_regeneration",
+      "variations": [
+        {
+          "id": "space_whale_regeneration",
+          "type": "healing",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#00ff44",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#44ff88",
+            "bloomColor": "#88ffaa",
+            "distortionStrength": 0.013999999999999999,
+            "distortionType": "radial",
+            "noiseType": "simplex",
+            "noiseSpeed": 0.3,
+            "noiseScale": 5.0,
+            "spriteSize": 64,
+            "frames": 16,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 1.9500000000000002,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.44,
+              "radius": 1.1
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "gentle",
+            "gentleParticles": {
+              "enabled": true,
+              "count": 8,
+              "speedMin": 0.05,
+              "speedMax": 0.15,
+              "lifeMin": 2.0,
+              "lifeMax": 4.0,
+              "driftUpward": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "pulseFrequency": 0.5,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleRegeneration;",
+            "transcendence": {
+              "as": "healing",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_regeneration.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 5,
+            "featureCompleteness": 13,
+            "technicalQuality": 20,
+            "aestheticAppeal": 13,
+            "overallScore": 12,
+            "level": "ACCEPTABLE_PLUS",
+            "levelValue": 12,
+            "notes": [
+              "Color harmony could be improved",
+              "Acceptable intensity",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 1
+          }
+        },
+        {
+          "id": "space_whale_regeneration_v04",
+          "type": "healing",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#00ff44",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#44ff88",
+            "bloomColor": "#88ffaa",
+            "distortionStrength": 0.012,
+            "distortionType": "radial",
+            "noiseType": "simplex",
+            "noiseSpeed": 0.3,
+            "noiseScale": 5.0,
+            "spriteSize": 64,
+            "frames": 16,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 1.7249999999999999,
+              "pulse": true,
+              "expand": false
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.32,
+              "radius": 1.1
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "gentle",
+            "gentleParticles": {
+              "enabled": true,
+              "count": 8,
+              "speedMin": 0.05,
+              "speedMax": 0.15,
+              "lifeMin": 2.0,
+              "lifeMax": 4.0,
+              "driftUpward": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "pulseFrequency": 0.5,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleRegeneration;",
+            "transcendence": {
+              "as": "healing",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_regeneration.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 5,
+            "featureCompleteness": 13,
+            "technicalQuality": 20,
+            "aestheticAppeal": 13,
+            "overallScore": 12,
+            "level": "ACCEPTABLE_PLUS",
+            "levelValue": 12,
+            "notes": [
+              "Color harmony could be improved",
+              "Acceptable intensity",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 2
+          }
+        },
+        {
+          "id": "space_whale_regeneration_v03",
+          "type": "healing",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#00ff44",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#44ff88",
+            "bloomColor": "#88ffaa",
+            "distortionStrength": 0.01,
+            "distortionType": "radial",
+            "noiseType": "simplex",
+            "noiseSpeed": 0.3,
+            "noiseScale": 5.0,
+            "spriteSize": 64,
+            "frames": 16,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 1.5,
+              "pulse": true,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.2,
+              "radius": 1.1
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "gentle",
+            "gentleParticles": {
+              "enabled": true,
+              "count": 8,
+              "speedMin": 0.05,
+              "speedMax": 0.15,
+              "lifeMin": 2.0,
+              "lifeMax": 4.0,
+              "driftUpward": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "pulseFrequency": 0.5,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleRegeneration;",
+            "transcendence": {
+              "as": "healing",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_regeneration.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 5,
+            "featureCompleteness": 13,
+            "technicalQuality": 20,
+            "aestheticAppeal": 13,
+            "overallScore": 12,
+            "level": "ACCEPTABLE_PLUS",
+            "levelValue": 12,
+            "notes": [
+              "Color harmony could be improved",
+              "Acceptable intensity",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 3
+          }
+        },
+        {
+          "id": "space_whale_regeneration_v02",
+          "type": "healing",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#00ff44",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#44ff88",
+            "bloomColor": "#88ffaa",
+            "distortionStrength": 0.008,
+            "distortionType": "radial",
+            "noiseType": "simplex",
+            "noiseSpeed": 0.3,
+            "noiseScale": 5.0,
+            "spriteSize": 64,
+            "frames": 16,
+            "layers": [
+              "core",
+              "bloom",
+              "particles"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 1.275,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.08,
+              "radius": 1.1
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "gentle",
+            "gentleParticles": {
+              "enabled": true,
+              "count": 8,
+              "speedMin": 0.05,
+              "speedMax": 0.15,
+              "lifeMin": 2.0,
+              "lifeMax": 4.0,
+              "driftUpward": true
+            }
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "pulseFrequency": 0.5,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleRegeneration;",
+            "transcendence": {
+              "as": "healing",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_regeneration.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 1,
+            "featureCompleteness": 13,
+            "technicalQuality": 20,
+            "aestheticAppeal": 13,
+            "overallScore": 11,
+            "level": "ACCEPTABLE",
+            "levelValue": 11,
+            "notes": [
+              "Color harmony could be improved",
+              "Intensity 1.275 may be too weak/strong",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Rich layered composition"
+            ],
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "baseId": "space_whale_spine_glow",
+      "variations": [
+        {
+          "id": "space_whale_spine_glow",
+          "type": "spine",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#88ffff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#aaffff",
+            "bloomColor": "#ccffff",
+            "distortionStrength": 0.020999999999999998,
+            "distortionType": "linear",
+            "noiseType": "simplex",
+            "noiseSpeed": 0.8,
+            "noiseScale": 5.0,
+            "spriteSize": 16,
+            "frames": 4,
+            "layers": [
+              "core",
+              "bloom"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.6,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.7999999999999998,
+              "radius": 1.2
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "none"
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleSpineGlow;",
+            "transcendence": {
+              "as": "glow",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_spine_glow.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 20,
+            "featureCompleteness": 13,
+            "technicalQuality": 13,
+            "aestheticAppeal": 11,
+            "overallScore": 14,
+            "level": "GOOD_PLUS",
+            "levelValue": 14,
+            "notes": [
+              "Excellent color harmony",
+              "Optimal intensity range",
+              "Good distortion strength",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Good layer composition"
+            ],
+            "rank": 1
+          }
+        },
+        {
+          "id": "space_whale_spine_glow_v04",
+          "type": "spine",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#88ffff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#aaffff",
+            "bloomColor": "#ccffff",
+            "distortionStrength": 0.018,
+            "distortionType": "linear",
+            "noiseType": "simplex",
+            "noiseSpeed": 0.8,
+            "noiseScale": 5.0,
+            "spriteSize": 16,
+            "frames": 4,
+            "layers": [
+              "core",
+              "bloom"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.3,
+              "pulse": true,
+              "expand": false
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.6500000000000001,
+              "radius": 1.2
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "none"
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleSpineGlow;",
+            "transcendence": {
+              "as": "glow",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_spine_glow.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 17,
+            "featureCompleteness": 13,
+            "technicalQuality": 13,
+            "aestheticAppeal": 11,
+            "overallScore": 13,
+            "level": "GOOD",
+            "levelValue": 13,
+            "notes": [
+              "Excellent color harmony",
+              "Optimal intensity range",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Good layer composition"
+            ],
+            "rank": 2
+          }
+        },
+        {
+          "id": "space_whale_spine_glow_v03",
+          "type": "spine",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#88ffff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#aaffff",
+            "bloomColor": "#ccffff",
+            "distortionStrength": 0.015,
+            "distortionType": "linear",
+            "noiseType": "simplex",
+            "noiseSpeed": 0.8,
+            "noiseScale": 5.0,
+            "spriteSize": 16,
+            "frames": 4,
+            "layers": [
+              "core",
+              "bloom"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 2.0,
+              "pulse": true,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.5,
+              "radius": 1.2
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "none"
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleSpineGlow;",
+            "transcendence": {
+              "as": "glow",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_spine_glow.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 17,
+            "featureCompleteness": 13,
+            "technicalQuality": 13,
+            "aestheticAppeal": 11,
+            "overallScore": 13,
+            "level": "GOOD",
+            "levelValue": 13,
+            "notes": [
+              "Excellent color harmony",
+              "Optimal intensity range",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Good layer composition"
+            ],
+            "rank": 3
+          }
+        },
+        {
+          "id": "space_whale_spine_glow_v02",
+          "type": "spine",
+          "style": "novaDrift",
+          "visual": {
+            "coreColor": "#88ffff",
+            "rimColor": "#ffffff",
+            "shockwaveColor": "#aaffff",
+            "bloomColor": "#ccffff",
+            "distortionStrength": 0.012,
+            "distortionType": "linear",
+            "noiseType": "simplex",
+            "noiseSpeed": 0.8,
+            "noiseScale": 5.0,
+            "spriteSize": 16,
+            "frames": 4,
+            "layers": [
+              "core",
+              "bloom"
+            ],
+            "coreGlow": {
+              "enabled": true,
+              "intensity": 1.7,
+              "pulse": false,
+              "expand": true
+            },
+            "shockwave": {
+              "enabled": false
+            },
+            "bloom": {
+              "enabled": true,
+              "intensity": 1.35,
+              "radius": 1.2
+            }
+          },
+          "particles": {
+            "burstCount": 0,
+            "motionPattern": "none"
+          },
+          "timing": {
+            "coreExpandTime": 0.0,
+            "fadeOutTime": 0.0,
+            "sustain": true
+          },
+          "export": {
+            "unid": "&fxSpaceWhaleSpineGlow;",
+            "transcendence": {
+              "as": "glow",
+              "rotationFrames": 1,
+              "ticksPerFrame": 1
+            },
+            "resourcePaths": {
+              "sprite": "Resources/FX/space_whale_spine_glow.png"
+            }
+          },
+          "quality": {
+            "visualQuality": 13,
+            "featureCompleteness": 13,
+            "technicalQuality": 13,
+            "aestheticAppeal": 11,
+            "overallScore": 12,
+            "level": "ACCEPTABLE_PLUS",
+            "levelValue": 12,
+            "notes": [
+              "Excellent color harmony",
+              "Acceptable intensity",
+              "No particles (may lack visual interest)",
+              "Particle count optimized for performance",
+              "Nova Drift style confirmed",
+              "Good layer composition"
+            ],
+            "rank": 4
+          }
+        }
+      ]
+    }
+  ]
+}

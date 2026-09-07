@@ -1,0 +1,431 @@
+#!/usr/bin/env python3
+"""
+⚠️ DEPRECATED - This script has been superseded by generate_vortex_professional.py
+
+DO NOT USE THIS SCRIPT. Use generate_vortex_professional.py instead.
+
+All features from this script have been merged into the unified generator with improvements:
+- Model router integration
+- Enhanced asset types
+- Additional icons
+- All rendering improvements
+
+This script is kept for reference only.
+"""
+"""
+Enhanced Space-Time Vortex Asset Generator
+Generates additional ability icons and effect sprites using Ollama.
+"""
+
+import os
+import sys
+import json
+import time
+import re
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+import math
+
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    try:
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        if hasattr(sys.stderr, 'reconfigure'):
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, ValueError):
+        pass
+
+# Import Ollama integration
+_ollama_path = os.path.join(os.path.dirname(__file__), "..", "Shared", "ollama_integration.py")
+OLLAMA_INTEGRATION_AVAILABLE = False
+call_ollama = None
+test_ollama_connection = None
+TASK_VISUAL = "visual"
+
+if os.path.exists(_ollama_path):
+    try:
+        shared_dir = os.path.join(os.path.dirname(__file__), "..", "Shared")
+        if shared_dir not in sys.path:
+            sys.path.insert(0, shared_dir)
+        from ollama_integration import call_ollama, test_ollama_connection
+        OLLAMA_INTEGRATION_AVAILABLE = True
+    except ImportError as e:
+        OLLAMA_INTEGRATION_AVAILABLE = False
+        print(f"Warning: Could not import Ollama integration: {e}")
+
+# Import model router if available
+_model_router_path = os.path.join(os.path.dirname(__file__), "..", "Common", "ollama_model_router.py")
+if os.path.exists(_model_router_path):
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Common"))
+        from ollama_model_router import get_visual_model, TASK_VISUAL
+        MODEL_ROUTER_AVAILABLE = True
+    except ImportError:
+        MODEL_ROUTER_AVAILABLE = False
+        TASK_VISUAL = "visual"
+else:
+    MODEL_ROUTER_AVAILABLE = False
+    TASK_VISUAL = "visual"
+
+
+class EnhancedVortexAssetGenerator:
+    """Generates enhanced Space-Time Vortex assets using Ollama."""
+    
+    def __init__(self, mod_path: Path, ollama_url: str = "http://localhost:11434", model: str = None):
+        self.mod_path = Path(mod_path)
+        self.textures_path = self.mod_path / "Textures"
+        self.visuals_path = self.mod_path / "Visuals"
+        self.textures_path.mkdir(exist_ok=True)
+        self.visuals_path.mkdir(exist_ok=True)
+        
+        self.ollama_url = ollama_url
+        if model is None:
+            preferred_visual_model = "wizardlm-uncensored:latest"
+            if OLLAMA_INTEGRATION_AVAILABLE:
+                available_models = self._get_available_models()
+                if preferred_visual_model in available_models:
+                    model = preferred_visual_model
+                elif available_models:
+                    wizardlm_models = [m for m in available_models if 'wizardlm' in m.lower() and 'uncensored' in m.lower()]
+                    if not wizardlm_models:
+                        wizardlm_models = [m for m in available_models if 'wizardlm' in m.lower()]
+                    if wizardlm_models:
+                        model = wizardlm_models[0]
+                    elif MODEL_ROUTER_AVAILABLE:
+                        model = get_visual_model()
+                    else:
+                        model = available_models[0]
+                elif MODEL_ROUTER_AVAILABLE:
+                    model = get_visual_model()
+                else:
+                    model = preferred_visual_model
+            else:
+                model = preferred_visual_model
+        self.model = model
+        
+        # Test Ollama connection - REQUIRED
+        if OLLAMA_INTEGRATION_AVAILABLE:
+            print("Testing Ollama connection...")
+            self.ollama_available = test_ollama_connection()
+            if not self.ollama_available:
+                raise RuntimeError("Ollama is not available. Please start Ollama before running this script.")
+        else:
+            raise RuntimeError("Ollama integration module not found. Cannot generate high-quality assets without Ollama.")
+    
+    def _get_available_models(self) -> List[str]:
+        """Get list of available Ollama models."""
+        try:
+            import requests
+            response = requests.get(f"{self.ollama_url}/api/tags", timeout=3)
+            if response.status_code == 200:
+                data = response.json()
+                return [model["name"] for model in data.get("models", [])]
+        except:
+            pass
+        return []
+    
+    def generate_ability_icon_design(self, ability_name: str, is_aggressive: bool) -> Dict:
+        """Generate design for ability icon."""
+        mode = "aggressive offensive" if is_aggressive else "defensive tactical"
+        color_hint = "red/orange aggressive" if is_aggressive else "blue/cyan defensive"
+        
+        prompt = f"""Design a {mode} ability icon for Space-Time Vortex in Caves of Qud.
+
+Return ONLY valid JSON with these exact fields:
+{{
+  "symbol": {{
+    "shape": "icon representing {mode} spacetime manipulation",
+    "complexity": "medium",
+    "distinctiveElements": ["element1", "element2"]
+  }},
+  "colorScheme": {{
+    "primary": "#hexcolor ({color_hint} colors)",
+    "secondary": "#hexcolor (accent)",
+    "glow": "#hexcolor (highlight)",
+    "outline": "#hexcolor (dark outline)"
+  }}
+}}
+
+Use {color_hint} for {mode} ability. Return JSON ONLY."""
+        
+        try:
+            print(f"  Calling Ollama for {ability_name} icon design...")
+            start_time = time.time()
+            response = call_ollama(
+                prompt=prompt,
+                task_type=TASK_VISUAL,
+                response_length="short",
+                system_prompt="You are a pixel art designer specializing in game UI icons. Always return valid JSON only.",
+                model_name=self.model
+            )
+            elapsed = time.time() - start_time
+            print(f"  Ollama response received in {elapsed:.1f} seconds")
+            
+            if response:
+                # Try to extract and clean JSON
+                json_start = response.find('{')
+                json_end = response.rfind('}') + 1
+                if json_start >= 0 and json_end > json_start:
+                    json_str = response[json_start:json_end]
+                    
+                    # Try to repair common JSON issues
+                    import re
+                    json_str = re.sub(r'(\w+):', r'"\1":', json_str)
+                    json_str = re.sub(r'""(\w+)"":', r'"\1":', json_str)
+                    
+                    try:
+                        design = json.loads(json_str)
+                        if 'symbol' in design and 'colorScheme' in design:
+                            print(f"  [OK] Ollama generated {ability_name} design")
+                            return design
+                        else:
+                            raise ValueError("Ollama response missing required fields")
+                    except json.JSONDecodeError as je:
+                        print(f"  WARNING: JSON parse error: {je}")
+                        raise ValueError(f"Invalid JSON from Ollama: {je}")
+                else:
+                    raise ValueError("Could not extract JSON from Ollama response")
+            else:
+                raise ValueError("Ollama returned empty response")
+        except Exception as e:
+            print(f"  ERROR: Ollama generation failed: {e}")
+            raise
+    
+    def hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
+        """Convert hex color to RGB tuple."""
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    
+    def render_ability_icon(self, design: Dict, ability_name: str, size: Tuple[int, int] = (64, 64)) -> Image.Image:
+        """Render ability icon based on design."""
+        img = Image.new('RGBA', size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        center_x, center_y = size[0] // 2, size[1] // 2
+        
+        if 'colorScheme' in design:
+            cs = design['colorScheme']
+            primary = self.hex_to_rgb(cs.get('primary', '#ff4444'))
+            secondary = self.hex_to_rgb(cs.get('secondary', '#ff8888'))
+            glow = self.hex_to_rgb(cs.get('glow', '#ffcccc'))
+            outline = self.hex_to_rgb(cs.get('outline', '#000000'))
+            
+            # Outer glow
+            for i in range(4, 0, -1):
+                radius = center_x - (i * 3)
+                if radius > 0:
+                    alpha = int(40 * (1 - i / 4))
+                    glow_color = (*glow, alpha)
+                    draw.ellipse([center_x - radius, center_y - radius, center_x + radius, center_y + radius],
+                               fill=glow_color, outline=None)
+            
+            # Main icon shape (diamond for aggressive, circle for defensive)
+            if "aggressive" in ability_name.lower():
+                # Diamond/arrow shape pointing down
+                points = [
+                    (center_x, center_y - 20),
+                    (center_x + 18, center_y),
+                    (center_x, center_y + 20),
+                    (center_x - 18, center_y)
+                ]
+                draw.polygon(points, fill=primary, outline=outline, width=2)
+                # Inner accent
+                inner_points = [
+                    (center_x, center_y - 12),
+                    (center_x + 10, center_y),
+                    (center_x, center_y + 12),
+                    (center_x - 10, center_y)
+                ]
+                draw.polygon(inner_points, fill=secondary, outline=None)
+            else:
+                # Circular shield shape
+                draw.ellipse([center_x - 22, center_y - 22, center_x + 22, center_y + 22],
+                           fill=primary, outline=outline, width=2)
+                # Inner ring
+                draw.ellipse([center_x - 14, center_y - 14, center_x + 14, center_y + 14],
+                           fill=None, outline=secondary, width=2)
+                # Center dot
+                draw.ellipse([center_x - 4, center_y - 4, center_x + 4, center_y + 4],
+                           fill=secondary, outline=None)
+            
+        else:
+            raise ValueError("Design missing colorScheme")
+        
+        return img
+    
+    def generate_particle_sprite(self, particle_type: str, color: str, size: Tuple[int, int] = (16, 16)) -> Image.Image:
+        """Generate a particle effect sprite."""
+        img = Image.new('RGBA', size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        center_x, center_y = size[0] // 2, size[1] // 2
+        
+        # Parse color
+        color_map = {
+            'purple': (128, 0, 128),
+            'cyan': (0, 255, 255),
+            'white': (255, 255, 255),
+            'yellow': (255, 255, 0),
+            'magenta': (255, 0, 255)
+        }
+        rgb = color_map.get(color.lower(), (255, 255, 255))
+        
+        if particle_type == "spark":
+            # Small bright dot with glow
+            draw.ellipse([center_x - 3, center_y - 3, center_x + 3, center_y + 3],
+                        fill=(*rgb, 200), outline=None)
+            draw.ellipse([center_x - 1, center_y - 1, center_x + 1, center_y + 1],
+                        fill=(255, 255, 255), outline=None)
+        elif particle_type == "swirl":
+            # Spiral particle
+            for i in range(8):
+                angle = (i / 8) * 2 * math.pi
+                x = int(center_x + 4 * math.cos(angle))
+                y = int(center_y + 4 * math.sin(angle))
+                alpha = int(255 * (1 - i / 8))
+                draw.ellipse([x - 1, y - 1, x + 1, y + 1], fill=(*rgb, alpha), outline=None)
+        elif particle_type == "dot":
+            # Simple dot
+            draw.ellipse([center_x - 2, center_y - 2, center_x + 2, center_y + 2],
+                        fill=(*rgb, 180), outline=None)
+        
+        return img
+    
+    def generate_distortion_overlay(self, size: Tuple[int, int] = (32, 32)) -> Image.Image:
+        """Generate a distortion overlay texture."""
+        img = Image.new('RGBA', size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        # Create wavy distortion pattern
+        for y in range(size[1]):
+            wave = int(4 * math.sin(y * math.pi / 8))
+            x_start = size[0] // 2 + wave - 1
+            x_end = size[0] // 2 + wave + 1
+            alpha = int(80 * abs(math.sin(y * math.pi / size[1])))
+            draw.line([(x_start, y), (x_end, y)], fill=(128, 0, 255, alpha), width=1)
+        
+        return img
+    
+    def generate_all_enhanced_assets(self) -> Dict[str, int]:
+        """Generate all enhanced assets."""
+        results = {
+            'ability_icons': 0,
+            'particles': 0,
+            'distortions': 0
+        }
+        
+        print("Generating Enhanced Space-Time Vortex Assets...")
+        print()
+        
+        # 1. Ability Icons
+        print("1. Generating ability icons...")
+        
+        # Aggressive ability icon
+        aggressive_design = self.generate_ability_icon_design("Aggressive", True)
+        aggressive_icon = self.render_ability_icon(aggressive_design, "Aggressive", (64, 64))
+        aggressive_path = self.textures_path / "VortexAbility_Aggressive.png"
+        aggressive_icon.save(aggressive_path, 'PNG')
+        print(f"   [OK] Created: {aggressive_path.name}")
+        results['ability_icons'] += 1
+        
+        # Defensive ability icon
+        defensive_design = self.generate_ability_icon_design("Defensive", False)
+        defensive_icon = self.render_ability_icon(defensive_design, "Defensive", (64, 64))
+        defensive_path = self.textures_path / "VortexAbility_Defensive.png"
+        defensive_icon.save(defensive_path, 'PNG')
+        print(f"   [OK] Created: {defensive_path.name}")
+        results['ability_icons'] += 1
+        
+        # 2. Particle Sprites
+        print()
+        print("2. Generating particle effect sprites...")
+        
+        particle_types = [
+            ("spark", "purple"),
+            ("spark", "cyan"),
+            ("swirl", "purple"),
+            ("swirl", "white"),
+            ("dot", "magenta"),
+            ("dot", "yellow")
+        ]
+        
+        for ptype, color in particle_types:
+            particle = self.generate_particle_sprite(ptype, color, (16, 16))
+            particle_path = self.textures_path / f"VortexParticle_{ptype}_{color}.png"
+            particle.save(particle_path, 'PNG')
+            results['particles'] += 1
+        
+        print(f"   [OK] Created {results['particles']} particle sprites")
+        
+        # 3. Distortion Overlays
+        print()
+        print("3. Generating distortion overlay textures...")
+        
+        for i in range(3):
+            distortion = self.generate_distortion_overlay((32, 32))
+            distortion_path = self.textures_path / f"VortexDistortion_{i:02d}.png"
+            distortion.save(distortion_path, 'PNG')
+            results['distortions'] += 1
+        
+        print(f"   [OK] Created {results['distortions']} distortion overlays")
+        
+        return results
+
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Generate enhanced Space-Time Vortex assets using Ollama")
+    parser.add_argument("mod_path", help="Path to mod directory")
+    parser.add_argument("--ollama-url", default="http://localhost:11434", help="Ollama API URL")
+    parser.add_argument("--model", help="Ollama model to use (default: auto-detect)")
+    
+    args = parser.parse_args()
+    
+    mod_path = Path(args.mod_path)
+    if not mod_path.exists():
+        print(f"ERROR: Mod path does not exist: {mod_path}")
+        return 1
+    
+    print("=" * 60)
+    print("Enhanced Vortex Asset Generator (Ollama)")
+    print("=" * 60)
+    print(f"Mod: {mod_path.name}")
+    print(f"Path: {mod_path}")
+    print()
+    
+    try:
+        generator = EnhancedVortexAssetGenerator(mod_path, args.ollama_url, args.model)
+        results = generator.generate_all_enhanced_assets()
+        
+        print()
+        print("=" * 60)
+        print("Summary")
+        print("=" * 60)
+        print(f"Ability icons: {results['ability_icons']}")
+        print(f"Particle sprites: {results['particles']}")
+        print(f"Distortion overlays: {results['distortions']}")
+        total = sum(results.values())
+        print(f"Total: {total} enhanced assets")
+        print()
+        print("Assets saved to:")
+        print(f"  - {generator.textures_path}")
+        print()
+        
+        return 0
+    except Exception as e:
+        print()
+        print("=" * 60)
+        print("ERROR")
+        print("=" * 60)
+        print(f"Failed to generate assets: {e}")
+        import traceback
+        traceback.print_exc()
+        print()
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

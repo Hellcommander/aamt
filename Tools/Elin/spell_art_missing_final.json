@@ -1,0 +1,20 @@
+[
+  {
+    "act": "ActGoldSkin",
+    "pretty": "Gold Skin",
+    "desc": "Coat yourself in liquid gold, gaining defense based on wealth",
+    "prompt": "cinematic fantasy spell visualization, unique magical phenomenon as the subject, dramatic lighting, physically based materials, dark void background, Unreal Engine cinematic, no text, no watermark, not a UI icon, not a character portrait, show the spell's distinctive effect clearly \u2014 this spell only, not a generic blast. Spell title: Gold Skin. Depict the exact magical event of the spell 'Gold Skin': Coat yourself in liquid gold, gaining defense based on wealth. Show that action or phenomenon in"
+  },
+  {
+    "act": "ActDeadlyPoison",
+    "pretty": "Deadly Poison",
+    "desc": "Inflicts a potent poison that deals severe damage over time and can be fatal to weaker enemies. Ported from Elin CustomRaceClassCreator spell design. Starfield Conduit: real-time gun delivery (not Eli",
+    "prompt": "cinematic fantasy spell visualization, unique magical phenomenon as the subject, dramatic lighting, physically based materials, dark void background, Unreal Engine cinematic, no text, no watermark, not a UI icon, not a character portrait, show the spell's distinctive effect clearly \u2014 this spell only, not a generic blast. Spell title: Deadly Poison. Depict the exact magical event of the spell 'Deadly Poison': Inflicts a potent poison that deals severe damage over time and can be fatal to weaker e"
+  },
+  {
+    "act": "ActWeatherChainLightning",
+    "pretty": "Chain Lightning",
+    "desc": "Lightning that arcs between multiple targets. status",
+    "prompt": "cinematic fantasy spell visualization, unique magical phenomenon as the subject, dramatic lighting, physically based materials, dark void background, Unreal Engine cinematic, no text, no watermark, not a UI icon, not a character portrait, show the spell's distinctive effect clearly \u2014 this spell only, not a generic blast. Spell title: Chain Lightning. Depict the exact magical event of the spell 'Chain Lightning': Lightning that arcs between multiple targets. status. Show that action or phenomenon"
+  }
+]

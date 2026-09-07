@@ -1,0 +1,1100 @@
+{
+  "Weapons": [],
+  "SpellIngredients": [
+    {
+      "Name": "Arcane Core (Common)",
+      "Status": "Missing",
+      "Id": "spellstone_core_common",
+      "AssetPath": "/items/other/crystal/crystal1.png"
+    },
+    {
+      "Name": "Refined Core (Rare)",
+      "Status": "Missing",
+      "Id": "spellstone_core_refined",
+      "AssetPath": "/items/other/crystal/crystal2.png"
+    },
+    {
+      "Name": "Arcane Core (Epic)",
+      "Status": "Missing",
+      "Id": "spellstone_core_arcane",
+      "AssetPath": "/items/other/crystal/crystal3.png"
+    },
+    {
+      "Name": "Apex Core (Legendary)",
+      "Status": "Missing",
+      "Id": "spellstone_core_apex",
+      "AssetPath": "/items/other/crystal/crystal4.png"
+    },
+    {
+      "Name": "Fire Spellstone",
+      "Status": "Missing",
+      "Id": "spellstone_fire",
+      "AssetPath": "/items/consumable/essence/essencefire.png"
+    },
+    {
+      "Name": "Frost Spellstone",
+      "Status": "Missing",
+      "Id": "spellstone_ice",
+      "AssetPath": "/items/consumable/essence/essenceice.png"
+    },
+    {
+      "Name": "Storm Spellstone",
+      "Status": "Missing",
+      "Id": "spellstone_lightning",
+      "AssetPath": "/items/consumable/essence/essencelightning.png"
+    },
+    {
+      "Name": "Nature Spellstone",
+      "Status": "Missing",
+      "Id": "spellstone_nature",
+      "AssetPath": "/items/consumable/essence/essencepoison.png"
+    },
+    {
+      "Name": "Arcane Spellstone",
+      "Status": "Missing",
+      "Id": "spellstone_arcane",
+      "AssetPath": "/items/consumable/essence/essenceelectric.png"
+    },
+    {
+      "Name": "Void Spellstone",
+      "Status": "Missing",
+      "Id": "spellstone_void",
+      "AssetPath": "/items/consumable/essence/essenceslash.png"
+    },
+    {
+      "Name": "Cosmic Spellstone",
+      "Status": "Missing",
+      "Id": "spellstone_cosmic",
+      "AssetPath": "/items/consumable/essence/essenceplasma.png"
+    },
+    {
+      "Name": "Temporal Spellstone",
+      "Status": "Missing",
+      "Id": "spellstone_temporal",
+      "AssetPath": "/items/consumable/essence/essencechronon.png"
+    },
+    {
+      "Name": "Fire Ruby",
+      "Status": "Missing",
+      "Id": "fire_ruby",
+      "AssetPath": "/items/materials/fire_ruby.png"
+    },
+    {
+      "Name": "Ice Crystal",
+      "Status": "Missing",
+      "Id": "ice_crystal",
+      "AssetPath": "/items/materials/ice_crystal.png"
+    },
+    {
+      "Name": "Lightning Core",
+      "Status": "Missing",
+      "Id": "lightning_core",
+      "AssetPath": "/items/materials/lightning_core.png"
+    },
+    {
+      "Name": "Earth Core",
+      "Status": "Missing",
+      "Id": "earth_core",
+      "AssetPath": "/items/materials/earth_core.png"
+    },
+    {
+      "Name": "Water Pearl",
+      "Status": "Missing",
+      "Id": "water_pearl",
+      "AssetPath": "/items/materials/water_pearl.png"
+    },
+    {
+      "Name": "Air Wisp",
+      "Status": "Missing",
+      "Id": "air_wisp",
+      "AssetPath": "/items/materials/air_wisp.png"
+    },
+    {
+      "Name": "Shadow Wisp",
+      "Status": "Missing",
+      "Id": "shadow_wisp",
+      "AssetPath": "/items/materials/shadow_wisp.png"
+    },
+    {
+      "Name": "Light Prism",
+      "Status": "Missing",
+      "Id": "light_prism",
+      "AssetPath": "/items/materials/light_prism.png"
+    },
+    {
+      "Name": "Nature Seed",
+      "Status": "Missing",
+      "Id": "nature_seed",
+      "AssetPath": "/items/materials/nature_seed.png"
+    },
+    {
+      "Name": "Cosmic Dust",
+      "Status": "Missing",
+      "Id": "cosmic_dust",
+      "AssetPath": "/items/materials/cosmic_dust.png"
+    },
+    {
+      "Name": "Mana Crystal",
+      "Status": "Missing",
+      "Id": "mana_crystal",
+      "AssetPath": "/items/materials/mana_crystal.png"
+    },
+    {
+      "Name": "Focus Crystal",
+      "Status": "Missing",
+      "Id": "focus_crystal",
+      "AssetPath": "/items/materials/focus_crystal.png"
+    },
+    {
+      "Name": "Resonance Crystal",
+      "Status": "Missing",
+      "Id": "resonance_crystal",
+      "AssetPath": "/items/materials/resonance_crystal.png"
+    },
+    {
+      "Name": "Prismatic Crystal",
+      "Status": "Missing",
+      "Id": "prismatic_crystal",
+      "AssetPath": "/items/materials/prismatic_crystal.png"
+    },
+    {
+      "Name": "Chaos Crystal",
+      "Status": "Missing",
+      "Id": "chaos_crystal",
+      "AssetPath": "/items/materials/chaos_crystal.png"
+    },
+    {
+      "Name": "Stability Catalyst",
+      "Status": "Missing",
+      "Id": "stability_catalyst",
+      "AssetPath": "/items/materials/stability_catalyst.png"
+    },
+    {
+      "Name": "Power Amplifier",
+      "Status": "Missing",
+      "Id": "power_amplifier",
+      "AssetPath": "/items/materials/power_amplifier.png"
+    },
+    {
+      "Name": "Resonance Tuner",
+      "Status": "Missing",
+      "Id": "resonance_tuner",
+      "AssetPath": "/items/materials/resonance_tuner.png"
+    },
+    {
+      "Name": "Mana Conductor",
+      "Status": "Missing",
+      "Id": "mana_conductor",
+      "AssetPath": "/items/materials/mana_conductor.png"
+    },
+    {
+      "Name": "Elemental Focus",
+      "Status": "Missing",
+      "Id": "elemental_focus",
+      "AssetPath": "/items/materials/elemental_focus.png"
+    },
+    {
+      "Name": "Salamander Scale",
+      "Status": "Missing",
+      "Id": "salamander_scale",
+      "AssetPath": "/items/materials/salamander_scale.png"
+    },
+    {
+      "Name": "Frost Essence",
+      "Status": "Missing",
+      "Id": "frost_essence",
+      "AssetPath": "/items/materials/frost_essence.png"
+    },
+    {
+      "Name": "Storm Catalyst",
+      "Status": "Missing",
+      "Id": "storm_catalyst",
+      "AssetPath": "/items/materials/storm_catalyst.png"
+    },
+    {
+      "Name": "Void Fragment",
+      "Status": "Missing",
+      "Id": "void_fragment",
+      "AssetPath": "/items/materials/void_fragment.png"
+    },
+    {
+      "Name": "Solar Essence",
+      "Status": "Missing",
+      "Id": "solar_essence",
+      "AssetPath": "/items/materials/solar_essence.png"
+    },
+    {
+      "Name": "Mountain Stone",
+      "Status": "Missing",
+      "Id": "mountain_stone",
+      "AssetPath": "/items/materials/mountain_stone.png"
+    },
+    {
+      "Name": "Ocean Essence",
+      "Status": "Missing",
+      "Id": "ocean_essence",
+      "AssetPath": "/items/materials/ocean_essence.png"
+    },
+    {
+      "Name": "Life Essence",
+      "Status": "Missing",
+      "Id": "life_essence",
+      "AssetPath": "/items/materials/life_essence.png"
+    },
+    {
+      "Name": "Star Fragment",
+      "Status": "Missing",
+      "Id": "star_fragment",
+      "AssetPath": "/items/materials/star_fragment.png"
+    },
+    {
+      "Name": "Void Crystal",
+      "Status": "Missing",
+      "Id": "void_crystal",
+      "AssetPath": "/items/materials/void_crystal.png"
+    },
+    {
+      "Name": "Phoenix Feather",
+      "Status": "Missing",
+      "Id": "phoenix_feather",
+      "AssetPath": "/items/materials/phoenix_feather.png"
+    },
+    {
+      "Name": "Dimensional Anchor",
+      "Status": "Missing",
+      "Id": "dimensional_anchor",
+      "AssetPath": "/items/materials/dimensional_anchor.png"
+    },
+    {
+      "Name": "Temporal Dust",
+      "Status": "Missing",
+      "Id": "temporal_dust",
+      "AssetPath": "/items/materials/temporal_dust.png"
+    },
+    {
+      "Name": "Living Crystal",
+      "Status": "Missing",
+      "Id": "living_crystal",
+      "AssetPath": "/items/materials/living_crystal.png"
+    },
+    {
+      "Name": "Quantum Particle",
+      "Status": "Missing",
+      "Id": "quantum_particle",
+      "AssetPath": "/items/materials/quantum_particle.png"
+    }
+  ],
+  "Particles": [],
+  "Objects": [],
+  "Buffs": [
+    {
+      "Name": null,
+      "Status": "Missing",
+      "Id": "mightyStrength",
+      "AssetPath": "/buffs/icons/buffs/icons/mighty_strength.png"
+    },
+    {
+      "Name": null,
+      "Status": "Missing",
+      "Id": "frostAura",
+      "AssetPath": "/buffs/icons/buffs/icons/frost_aura.png"
+    },
+    {
+      "Name": null,
+      "Status": "Missing",
+      "Id": "stoneSkin",
+      "AssetPath": "/buffs/icons/buffs/icons/stone_skin.png"
+    },
+    {
+      "Name": null,
+      "Status": "Missing",
+      "Id": "berserkerRage",
+      "AssetPath": "/buffs/icons/buffs/icons/berserker_rage.png"
+    },
+    {
+      "Name": null,
+      "Status": "Missing",
+      "Id": "regeneration",
+      "AssetPath": "/buffs/icons/buffs/icons/regeneration.png"
+    },
+    {
+      "Name": null,
+      "Status": "Missing",
+      "Id": "vampiricTouch",
+      "AssetPath": "/buffs/icons/buffs/icons/vampiric_touch.png"
+    },
+    {
+      "Name": null,
+      "Status": "Missing",
+      "Id": "bossBuff",
+      "AssetPath": "/buffs/icons/buffs/icons/boss_power.png"
+    },
+    {
+      "Name": null,
+      "Status": "Missing",
+      "Id": "petLoyalty",
+      "AssetPath": "/buffs/icons/buffs/icons/pet_loyalty.png"
+    },
+    {
+      "Name": null,
+      "Status": "Missing",
+      "Id": "arcaneShield",
+      "AssetPath": "/buffs/icons/buffs/icons/arcane_shield.png"
+    },
+    {
+      "Name": null,
+      "Status": "Missing",
+      "Id": "invisibility",
+      "AssetPath": "/buffs/icons/buffs/icons/invisibility.png"
+    }
+  ],
+  "Reagents": [],
+  "Interface": [],
+  "Items": [
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk2.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "chemicalgrenadeammo_mk2",
+      "AssetPath": "/items/sprites/chemicalgrenadeammo_mk2.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk2.item",
+      "Status": "Missing",
+      "Source": "animationParts.shell",
+      "ItemId": "chemicalgrenadeammo_mk2",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/shell_mk2.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk2.item",
+      "Status": "Missing",
+      "Source": "animationParts.reagent1",
+      "ItemId": "chemicalgrenadeammo_mk2",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/reagent1_mk2.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk2.item",
+      "Status": "Missing",
+      "Source": "animationParts.reagent2",
+      "ItemId": "chemicalgrenadeammo_mk2",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/reagent2_mk2.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk2.item",
+      "Status": "Missing",
+      "Source": "animationParts.reagent3",
+      "ItemId": "chemicalgrenadeammo_mk2",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/reagent3_mk2.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk2.item",
+      "Status": "Missing",
+      "Source": "animationParts.reinforcement",
+      "ItemId": "chemicalgrenadeammo_mk2",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/reinforcement.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk3.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/sprites/chemicalgrenadeammo_mk3.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk3.item",
+      "Status": "Missing",
+      "Source": "animationParts.shell",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/shell_mk3.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk3.item",
+      "Status": "Missing",
+      "Source": "animationParts.reagent1",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/reagent1_mk3.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk3.item",
+      "Status": "Missing",
+      "Source": "animationParts.reagent2",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/reagent2_mk3.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk3.item",
+      "Status": "Missing",
+      "Source": "animationParts.reagent3",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/reagent3_mk3.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk3.item",
+      "Status": "Missing",
+      "Source": "animationParts.runes",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/runes.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo_mk3.item",
+      "Status": "Missing",
+      "Source": "animationParts.manaGlow",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/mana_glow.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "chemicalgrenadeammo",
+      "AssetPath": "/items/sprites/chemicalgrenadeammo.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo.item",
+      "Status": "Missing",
+      "Source": "animationParts.shell",
+      "ItemId": "chemicalgrenadeammo",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/shell.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo.item",
+      "Status": "Missing",
+      "Source": "animationParts.reagent1",
+      "ItemId": "chemicalgrenadeammo",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/reagent1.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo.item",
+      "Status": "Missing",
+      "Source": "animationParts.reagent2",
+      "ItemId": "chemicalgrenadeammo",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/reagent2.png"
+    },
+    {
+      "File": "\\items\\ammo\\chemicalgrenadeammo\\chemicalgrenadeammo.item",
+      "Status": "Missing",
+      "Source": "animationParts.reagent3",
+      "ItemId": "chemicalgrenadeammo",
+      "AssetPath": "/items/ammo/chemicalgrenadeammo/reagent3.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_acid.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "grenade_acid",
+      "AssetPath": "/items/sprites/grenade_acid.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_acid.item",
+      "Status": "Missing",
+      "Source": "animationParts.shell",
+      "ItemId": "grenade_acid",
+      "AssetPath": "/items/ammo/specializedgrenades/shell_acid.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_acid.item",
+      "Status": "Missing",
+      "Source": "animationParts.fuse",
+      "ItemId": "grenade_acid",
+      "AssetPath": "/items/ammo/specializedgrenades/fuse_acid.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_acid.item",
+      "Status": "Missing",
+      "Source": "animationParts.corrosion",
+      "ItemId": "grenade_acid",
+      "AssetPath": "/items/ammo/specializedgrenades/corrosion_mark.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_fire.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "grenade_fire",
+      "AssetPath": "/items/sprites/grenade_fire.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_fire.item",
+      "Status": "Missing",
+      "Source": "animationParts.shell",
+      "ItemId": "grenade_fire",
+      "AssetPath": "/items/ammo/specializedgrenades/shell_fire.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_fire.item",
+      "Status": "Missing",
+      "Source": "animationParts.fuse",
+      "ItemId": "grenade_fire",
+      "AssetPath": "/items/ammo/specializedgrenades/fuse_fire.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_fire.item",
+      "Status": "Missing",
+      "Source": "animationParts.glow",
+      "ItemId": "grenade_fire",
+      "AssetPath": "/items/ammo/specializedgrenades/fire_glow.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_frost.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "grenade_frost",
+      "AssetPath": "/items/sprites/grenade_frost.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_frost.item",
+      "Status": "Missing",
+      "Source": "animationParts.shell",
+      "ItemId": "grenade_frost",
+      "AssetPath": "/items/ammo/specializedgrenades/shell_frost.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_frost.item",
+      "Status": "Missing",
+      "Source": "animationParts.fuse",
+      "ItemId": "grenade_frost",
+      "AssetPath": "/items/ammo/specializedgrenades/fuse_frost.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_frost.item",
+      "Status": "Missing",
+      "Source": "animationParts.frost",
+      "ItemId": "grenade_frost",
+      "AssetPath": "/items/ammo/specializedgrenades/frost_coating.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_shadow.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "grenade_shadow",
+      "AssetPath": "/items/sprites/grenade_shadow.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_shadow.item",
+      "Status": "Missing",
+      "Source": "animationParts.shell",
+      "ItemId": "grenade_shadow",
+      "AssetPath": "/items/ammo/specializedgrenades/shell_shadow.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_shadow.item",
+      "Status": "Missing",
+      "Source": "animationParts.fuse",
+      "ItemId": "grenade_shadow",
+      "AssetPath": "/items/ammo/specializedgrenades/fuse_shadow.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_shadow.item",
+      "Status": "Missing",
+      "Source": "animationParts.void",
+      "ItemId": "grenade_shadow",
+      "AssetPath": "/items/ammo/specializedgrenades/void_essence.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_storm.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "grenade_storm",
+      "AssetPath": "/items/sprites/grenade_storm.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_storm.item",
+      "Status": "Missing",
+      "Source": "animationParts.shell",
+      "ItemId": "grenade_storm",
+      "AssetPath": "/items/ammo/specializedgrenades/shell_storm.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_storm.item",
+      "Status": "Missing",
+      "Source": "animationParts.fuse",
+      "ItemId": "grenade_storm",
+      "AssetPath": "/items/ammo/specializedgrenades/fuse_storm.png"
+    },
+    {
+      "File": "\\items\\ammo\\specializedgrenades\\grenade_storm.item",
+      "Status": "Missing",
+      "Source": "animationParts.lightning",
+      "ItemId": "grenade_storm",
+      "AssetPath": "/items/ammo/specializedgrenades/lightning_charge.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_catalyst.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "reagent_catalyst",
+      "AssetPath": "/items/sprites/reagent_catalyst.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_catalyst.item",
+      "Status": "Missing",
+      "Source": "animationParts.satchel",
+      "ItemId": "reagent_catalyst",
+      "AssetPath": "/items/consumable/reagents/satchel.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_catalyst.item",
+      "Status": "Missing",
+      "Source": "animationParts.crystals",
+      "ItemId": "reagent_catalyst",
+      "AssetPath": "/items/consumable/reagents/crystals_catalyst.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_catalyst.item",
+      "Status": "Missing",
+      "Source": "animationParts.glow",
+      "ItemId": "reagent_catalyst",
+      "AssetPath": "/items/consumable/reagents/catalyst_glow.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_fireessence.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "reagent_fireessence",
+      "AssetPath": "/items/sprites/reagent_fireessence.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_fireessence.item",
+      "Status": "Missing",
+      "Source": "animationParts.vial",
+      "ItemId": "reagent_fireessence",
+      "AssetPath": "/items/consumable/reagents/vial_fire.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_fireessence.item",
+      "Status": "Missing",
+      "Source": "animationParts.liquid",
+      "ItemId": "reagent_fireessence",
+      "AssetPath": "/items/consumable/reagents/liquid_fire.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_fireessence.item",
+      "Status": "Missing",
+      "Source": "animationParts.embers",
+      "ItemId": "reagent_fireessence",
+      "AssetPath": "/items/consumable/reagents/embers.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_fireessence.item",
+      "Status": "Missing",
+      "Source": "animationParts.glow",
+      "ItemId": "reagent_fireessence",
+      "AssetPath": "/items/consumable/reagents/fire_glow.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_icecrystal.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "reagent_icecrystal",
+      "AssetPath": "/items/sprites/reagent_icecrystal.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_icecrystal.item",
+      "Status": "Missing",
+      "Source": "animationParts.vial",
+      "ItemId": "reagent_icecrystal",
+      "AssetPath": "/items/consumable/reagents/vial_ice.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_icecrystal.item",
+      "Status": "Missing",
+      "Source": "animationParts.liquid",
+      "ItemId": "reagent_icecrystal",
+      "AssetPath": "/items/consumable/reagents/liquid_ice.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_icecrystal.item",
+      "Status": "Missing",
+      "Source": "animationParts.frost",
+      "ItemId": "reagent_icecrystal",
+      "AssetPath": "/items/consumable/reagents/frost.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_icecrystal.item",
+      "Status": "Missing",
+      "Source": "animationParts.crystals",
+      "ItemId": "reagent_icecrystal",
+      "AssetPath": "/items/consumable/reagents/crystals.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_oilpowder.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "reagent_oilpowder",
+      "AssetPath": "/items/sprites/reagent_oilpowder.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_oilpowder.item",
+      "Status": "Missing",
+      "Source": "animationParts.pouch",
+      "ItemId": "reagent_oilpowder",
+      "AssetPath": "/items/consumable/reagents/pouch.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_oilpowder.item",
+      "Status": "Missing",
+      "Source": "animationParts.powder",
+      "ItemId": "reagent_oilpowder",
+      "AssetPath": "/items/consumable/reagents/powder_oil.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_oilpowder.item",
+      "Status": "Missing",
+      "Source": "animationParts.stain",
+      "ItemId": "reagent_oilpowder",
+      "AssetPath": "/items/consumable/reagents/oil_stain.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_poisoncloud.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "reagent_poisoncloud",
+      "AssetPath": "/items/sprites/reagent_poisoncloud.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_poisoncloud.item",
+      "Status": "Missing",
+      "Source": "animationParts.canister",
+      "ItemId": "reagent_poisoncloud",
+      "AssetPath": "/items/consumable/reagents/canister.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_poisoncloud.item",
+      "Status": "Missing",
+      "Source": "animationParts.gas",
+      "ItemId": "reagent_poisoncloud",
+      "AssetPath": "/items/consumable/reagents/gas_poison.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_poisoncloud.item",
+      "Status": "Missing",
+      "Source": "animationParts.warning",
+      "ItemId": "reagent_poisoncloud",
+      "AssetPath": "/items/consumable/reagents/warning_label.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_poisoncloud.item",
+      "Status": "Missing",
+      "Source": "animationParts.seal",
+      "ItemId": "reagent_poisoncloud",
+      "AssetPath": "/items/consumable/reagents/safety_seal.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_vial.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "reagent_vial",
+      "AssetPath": "/items/sprites/reagent_vial.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_vial.item",
+      "Status": "Missing",
+      "Source": "animationParts.vial",
+      "ItemId": "reagent_vial",
+      "AssetPath": "/items/consumable/reagents/vial.png"
+    },
+    {
+      "File": "\\items\\consumable\\reagents\\reagent_vial.item",
+      "Status": "Missing",
+      "Source": "animationParts.liquid",
+      "ItemId": "reagent_vial",
+      "AssetPath": "/items/consumable/reagents/liquid_empty.png"
+    },
+    {
+      "File": "\\items\\magitech\\minion_enhancements\\magitech_berserker_core.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "magitech_berserker_core",
+      "AssetPath": "/items/sprites/magitech_berserker_core.png"
+    },
+    {
+      "File": "\\items\\magitech\\minion_enhancements\\magitech_elemental_shard.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "magitech_elemental_shard",
+      "AssetPath": "/items/sprites/magitech_elemental_shard.png"
+    },
+    {
+      "File": "\\items\\magitech\\minion_enhancements\\magitech_essence_crystal.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "magitech_essence_crystal",
+      "AssetPath": "/items/sprites/magitech_essence_crystal.png"
+    },
+    {
+      "File": "\\items\\magitech\\minion_enhancements\\magitech_evolution_catalyst.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "magitech_evolution_catalyst",
+      "AssetPath": "/items/sprites/magitech_evolution_catalyst.png"
+    },
+    {
+      "File": "\\items\\materials\\cosmic\\mt_dimensionalkey.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "mt_dimensionalkey",
+      "AssetPath": "/items/sprites/mt_dimensionalkey.png"
+    },
+    {
+      "File": "\\items\\materials\\cosmic\\mt_stellarfragment.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "mt_stellarfragment",
+      "AssetPath": "/items/sprites/mt_stellarfragment.png"
+    },
+    {
+      "File": "\\items\\materials\\cosmic\\mt_voidessence.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "mt_voidessence",
+      "AssetPath": "/items/sprites/mt_voidessence.png"
+    },
+    {
+      "File": "\\items\\materials\\spellcrafting\\explosive_core.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "explosive_core",
+      "AssetPath": "/items/sprites/explosive_core.png"
+    },
+    {
+      "File": "\\items\\materials\\spellcrafting\\fire_essence.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "fire_essence",
+      "AssetPath": "/items/sprites/fire_essence.png"
+    },
+    {
+      "File": "\\items\\materials\\spellcrafting\\ice_essence.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "ice_essence",
+      "AssetPath": "/items/sprites/ice_essence.png"
+    },
+    {
+      "File": "\\items\\materials\\spellcrafting\\lightning_essence.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "lightning_essence",
+      "AssetPath": "/items/sprites/lightning_essence.png"
+    },
+    {
+      "File": "\\items\\materials\\spellcrafting\\mana_crystal.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "mana_crystal",
+      "AssetPath": "/items/sprites/mana_crystal.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech2.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "chemicalgrenadelauncher_tech2",
+      "AssetPath": "/items/sprites/chemicalgrenadelauncher_tech2.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech2.item",
+      "Status": "Missing",
+      "Source": "animationParts.butt",
+      "ItemId": "chemicalgrenadelauncher_tech2",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/butt_tech2.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech2.item",
+      "Status": "Missing",
+      "Source": "animationParts.middle",
+      "ItemId": "chemicalgrenadelauncher_tech2",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/middle_tech2.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech2.item",
+      "Status": "Missing",
+      "Source": "animationParts.barrel",
+      "ItemId": "chemicalgrenadelauncher_tech2",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/barrel_tech2.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech2.item",
+      "Status": "Missing",
+      "Source": "animationParts.muzzleFlash",
+      "ItemId": "chemicalgrenadelauncher_tech2",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/muzzleflash_tech2.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech2.item",
+      "Status": "Missing",
+      "Source": "animationParts.filigree",
+      "ItemId": "chemicalgrenadelauncher_tech2",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/filigree.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech3.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/sprites/chemicalgrenadelauncher_tech3.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech3.item",
+      "Status": "Missing",
+      "Source": "animationParts.butt",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/butt_tech3.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech3.item",
+      "Status": "Missing",
+      "Source": "animationParts.middle",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/middle_tech3.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech3.item",
+      "Status": "Missing",
+      "Source": "animationParts.barrel",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/barrel_tech3.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech3.item",
+      "Status": "Missing",
+      "Source": "animationParts.muzzleFlash",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/muzzleflash_tech3.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech3.item",
+      "Status": "Missing",
+      "Source": "animationParts.runes",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/runes.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher_tech3.item",
+      "Status": "Missing",
+      "Source": "animationParts.arcaneGlow",
+      "ItemId": "chemicalgrenadelauncher_tech3",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/arcane_glow.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "chemicalgrenadelauncher",
+      "AssetPath": "/items/sprites/chemicalgrenadelauncher.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher.item",
+      "Status": "Missing",
+      "Source": "animationParts.butt",
+      "ItemId": "chemicalgrenadelauncher",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/butt.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher.item",
+      "Status": "Missing",
+      "Source": "animationParts.middle",
+      "ItemId": "chemicalgrenadelauncher",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/middle.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher.item",
+      "Status": "Missing",
+      "Source": "animationParts.barrel",
+      "ItemId": "chemicalgrenadelauncher",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/barrel.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\chemicalgrenadelauncher.item",
+      "Status": "Missing",
+      "Source": "animationParts.muzzleFlash",
+      "ItemId": "chemicalgrenadelauncher",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/muzzleflash.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\flamelord_grenadegun.item",
+      "Status": "Missing",
+      "Source": "inventoryIcon",
+      "ItemId": "flamelord_grenadegun",
+      "AssetPath": "/items/sprites/flamelord_grenadegun.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\flamelord_grenadegun.item",
+      "Status": "Missing",
+      "Source": "animationParts.butt",
+      "ItemId": "flamelord_grenadegun",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/flamelord_butt.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\flamelord_grenadegun.item",
+      "Status": "Missing",
+      "Source": "animationParts.middle",
+      "ItemId": "flamelord_grenadegun",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/flamelord_middle.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\flamelord_grenadegun.item",
+      "Status": "Missing",
+      "Source": "animationParts.barrel",
+      "ItemId": "flamelord_grenadegun",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/flamelord_barrel.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\flamelord_grenadegun.item",
+      "Status": "Missing",
+      "Source": "animationParts.muzzleFlash",
+      "ItemId": "flamelord_grenadegun",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/flamelord_muzzleflash.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\flamelord_grenadegun.item",
+      "Status": "Missing",
+      "Source": "animationParts.embers",
+      "ItemId": "flamelord_grenadegun",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/embers.png"
+    },
+    {
+      "File": "\\items\\weapons\\alchemicalgrenadelauncher\\flamelord_grenadegun.item",
+      "Status": "Missing",
+      "Source": "animationParts.moltenGlow",
+      "ItemId": "flamelord_grenadegun",
+      "AssetPath": "/items/weapons/alchemicalgrenadelauncher/molten_glow.png"
+    }
+  ],
+  "Animations": [
+    {
+      "Status": "Missing",
+      "AnimationFile": "\\animations\\magitech\\magitech_device.animation",
+      "Part": "device",
+      "AssetPath": "/items/active/weapons/staff/commonwoodstaff.png"
+    },
+    {
+      "Status": "Missing",
+      "AnimationFile": "\\animations\\magitech\\magitech_device.animation",
+      "Part": "deviceFullbright",
+      "AssetPath": "/items/active/weapons/staff/tier1/staff.png"
+    },
+    {
+      "Status": "Missing",
+      "AnimationFile": "\\animations\\magitech\\mt_magitech_device.animation",
+      "Part": "device",
+      "AssetPath": "/items/active/weapons/staff/commonwoodstaff.png"
+    },
+    {
+      "Status": "Missing",
+      "AnimationFile": "\\animations\\magitech\\mt_magitech_device.animation",
+      "Part": "deviceFullbright",
+      "AssetPath": "/items/active/weapons/staff/tier1/staff.png"
+    }
+  ],
+  "Projectiles": [
+    {
+      "File": "\\projectiles\\magitech\\magitech_bolt.projectile",
+      "Status": "Missing",
+      "AssetPath": "/projectiles/magitech/bolt.png"
+    },
+    {
+      "File": "\\projectiles\\magitech\\magitech_burst.projectile",
+      "Status": "Missing",
+      "AssetPath": "/projectiles/magitech/burst.png"
+    }
+  ]
+}

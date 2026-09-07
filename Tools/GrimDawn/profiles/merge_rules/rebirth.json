@@ -1,0 +1,56 @@
+{
+  "id": "rebirth",
+  "match": ["Rebirth"],
+  "mode": "class",
+  "enabled": true,
+  "priority": 92,
+  "class_priority": 94,
+  "items_mode": "merge",
+  "conflict_merge": true,
+  "conflict_merge_prefixes": [
+    "records/creatures/enemies/",
+    "records/skills/playerclass",
+    "records/ui/skills/class",
+    "records/skills/",
+    "records/items/",
+    "records/controllers/",
+    "records/creatures/npcs/"
+  ],
+  "prefer_field_substrings": [
+    "controller",
+    "aibehavior",
+    "actorcontroller",
+    "brain",
+    "skillName",
+    "skill",
+    "buff",
+    "spell",
+    "onDie",
+    "onHit",
+    "onAttack",
+    "onDamage",
+    "tactical",
+    "pursuit",
+    "animation",
+    "anm"
+  ],
+  "keep_base_field_substrings": [
+    "loot",
+    "drop",
+    "tdyn",
+    "merchant",
+    "store",
+    "factions",
+    "conversion",
+    "blueprint",
+    "artifact",
+    "augment"
+  ],
+  "skip_overlay_prefixes": [
+    "records/creatures/pc/",
+    "records/ui/inventor/",
+    "records/ui/character/",
+    "records/game/"
+  ],
+  "notes": "Grim∩Rebirth ≈952. Field-merge overlapping enemies/skills/items/controllers so unique keys from both survive. Prefer Rebirth on AI/skill/anim fields; keep Grim on loot/merchant/faction fields. Still skip PC hubs (hub union), inventor/character UI, gameengine."
+}

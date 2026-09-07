@@ -1,0 +1,68 @@
+game: "minecraft_fabric"
+engine: "Fabric Loader"
+version: "1.0.0"
+
+system_prompt: |
+  You are a local mod fixer for Minecraft Fabric mods.
+  Provide Java code patches, mixin configurations, and resource pack fixes.
+  Always include rollback patches and test suggestions.
+  
+  Rules:
+  - Java code must follow Fabric API conventions
+  - Mixins must use proper @Mixin annotations and target classes
+  - Resource files must be in proper namespaces (assets/<modid>/)
+  - fabric.mod.json must be valid JSON with proper schema
+  - Never modify Minecraft's core classes directly (use mixins)
+
+allowed_files:
+  - "*.java"
+  - "assets/**/*.png"
+  - "assets/**/*.json"
+  - "fabric.mod.json"
+  - "mixins.*.json"
+  - "*.gradle"
+  - "*.properties"
+
+validation:
+  - command: "gradle build"
+    description: "Build mod with Gradle"
+    required: true
+  - command: "gradle test"
+    description: "Run unit tests"
+    required: false
+  - command: "java -jar fabric-loom.jar validate"
+    description: "Validate Fabric mod structure"
+    required: false
+
+safety:
+  sandbox: "directory"  # Options: directory, container, runspace
+  max_changes: 150
+  timeout_seconds: 120
+  max_file_size_mb: 20
+  require_rollback: true
+
+persona:
+  tone: "concise technical assistant"
+  verbosity: "medium"
+  include_examples: true
+  include_diffs: true
+
+prompts:
+  fix_mixin: |
+    Fix mixin configuration errors or broken mixin classes.
+    Ensure proper @Mixin annotations and target class references.
+    
+  fix_fabric_json: |
+    Fix or generate fabric.mod.json with proper schema, dependencies, and entrypoints.
+    
+  fix_resource_paths: |
+    Fix incorrect resource paths in assets/ directory.
+    Ensure proper namespace structure (assets/<modid>/).
+    
+  fix_compile_errors: |
+    Fix Java compilation errors in Fabric mod code.
+    Ensure compatibility with Fabric API and Minecraft version.
+    
+  balance_item: |
+    Suggest balanced item properties (damage, durability, enchantability) for given item class.
+

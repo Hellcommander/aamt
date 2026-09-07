@@ -1,0 +1,14 @@
+---
+description: Keep AAMT licenses isolated — no copyleft in MIT sources, no vendoring third-party or Qud sim
+alwaysApply: true
+---
+
+# Licensing isolation
+
+- Original AAMT code is **MIT** ([LICENSE](LICENSE), [LICENSING.md](LICENSING.md)). Do not copy GPL, AGPL, LGPL, MPL, or CC-BY-SA code into MIT files.
+- **Generated mods/assets** belong to the user. Do not add AAMT license headers to tool output.
+- **Qud Lab simulator** (`QudLab.Simulator` scenario `.cs`, `QudLab.SimHost/Program.cs`, Unity `QudManagedHost` / `QudRestrictedObjectSim` / `QudZoneGetProbe`) is proprietary and gitignored. Do not commit it. Granting repo access is not granting the sim; unpack with `Tools/Qud/QudLab/Fetch-PrivatePack.ps1`.
+- Third-party trees (`XEdit/vendor/TES5Edit`, `FrankyCLI`, `arzedit-master`, `renodx-src`, TranscendenceDev workspace, Pixelorama source, `ReferenceAssets`) stay gitignored. Fetch with `Tools/Fetch-ThirdParty.ps1`. Keep their licenses.
+- Never commit **dumps**: TDB/API/obsolete JSON, FunctionList extracts, decompiled game `.cs`, workshop reports, `exe_strings.json`, game chart XML, `api_rules*.json`, `VanillaDesignTypeMap.json`. Refresh from a local install.
+- Never commit machine-local settings (`TranscendenceTools.ini`, `AssetGenerationSettings.ps1`, `Qud/settings.json`) or generated assets (`Output/`, `Shared/Concepts/`, `*.glb`, per-game staging like `ElinAssets/` / `CDDAMods/` / `TerrariaPortals/`, `workshop_patches/`).
+- Never commit personal token-entry notes (`sd key.txt`, `*key.txt`, `*token*.txt`). Keep `hf_token_switch.py` / `HfTokenSwitch.psm1` — those read the machine store, they are not the notes.

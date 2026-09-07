@@ -1,0 +1,15 @@
+{
+  "id": "nydiamar",
+  "match": ["Nydiamar", "NydiamarDungeons", "Nydiamar-40"],
+  "mode": "portal",
+  "enabled": true,
+  "priority": 30,
+  "class_priority": 30,
+  "quest_remap": true,
+  "quest_prefix": "nydiamar",
+  "skip_world_maps": true,
+  "skip_unnamespaced_quests": true,
+  "items_mode": "isolate",
+  "items_prefix": "nydiamar",
+  "notes": "Priority 30 portal. Prefer nydiamar_campaign.py for full campaign pipeline; Survival kitchen-sink keeps Nydiamar out unless listed."
+}

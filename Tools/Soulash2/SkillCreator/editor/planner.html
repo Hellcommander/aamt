@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Soulash 2 Skill Path Planner</title>
+  <style>
+    :root {
+      --bg: #141618; --panel: #1e2226; --panel2: #262b30; --ink: #e8e4d9;
+      --muted: #9a9588; --accent: #7aa8c4; --off: #c45a5a; --ok: #5a8f7b;
+      --util: #c4a35a; --line: #33383e; --stat: #c9b227;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: "Segoe UI", Candara, sans-serif;
+      background: var(--bg); color: var(--ink);
+      display: grid; grid-template-rows: 52px 1fr;
+    }
+    header {
+      display: flex; align-items: center; gap: 8px; padding: 0 14px;
+      background: #1c2830; border-bottom: 1px solid #2a4050;
+    }
+    header h1 { font-size: 0.92rem; margin: 0 10px 0 0; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; }
+    a.nav, button.nav {
+      background: transparent; color: var(--muted); border: 1px solid transparent;
+      border-radius: 4px; padding: 6px 12px; cursor: pointer; text-decoration: none; font: inherit;
+    }
+    a.nav:hover, button.nav:hover { color: var(--accent); }
+    .status { margin-left: auto; font-size: 0.78rem; color: var(--muted); }
+    button, select, input {
+      background: var(--panel2); color: var(--ink); border: 1px solid #444; border-radius: 4px; padding: 6px 10px; font: inherit;
+    }
+    button { cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: #243038; border-color: var(--accent); color: var(--accent); }
+    .workspace { display: grid; grid-template-columns: 280px 1fr 360px; min-height: 0; }
+    .col { overflow: auto; padding: 12px; }
+    .left { background: var(--panel); border-right: 1px solid var(--line); }
+    .right { background: var(--panel); border-left: 1px solid var(--line); }
+    h2 { font-size: 0.92rem; margin: 0 0 8px; color: var(--accent); }
+    .hint { font-size: 0.74rem; color: var(--muted); line-height: 1.4; margin: 0 0 10px; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+    label { font-size: 0.78rem; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+    .mod { display: flex; gap: 8px; align-items: flex-start; font-size: 0.78rem; padding: 4px 0; border-bottom: 1px solid var(--line); }
+    .mod input { margin-top: 3px; }
+    .mod .meta { color: var(--muted); font-size: 0.7rem; }
+    .budget {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 0 0 12px;
+    }
+    .meter {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px;
+    }
+    .meter strong { display: block; font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+    .meter .n { font-size: 1.15rem; margin: 4px 0; }
+    .meter.ok .n { color: var(--ok); }
+    .meter.bad .n { color: var(--off); }
+    .meter.mid .n { color: var(--util); }
+    .bar { height: 6px; background: #2a3036; border-radius: 3px; overflow: hidden; }
+    .bar > span { display: block; height: 100%; background: var(--ok); }
+    .bar.over > span { background: var(--off); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); }
+    tr.sel { background: #243038; }
+    tr { cursor: pointer; }
+    input[type=range] { width: 120px; }
+    .chip.weapon { border-color: #d8b07a; color: #d8b07a; }
+    .chip.magic { border-color: var(--accent); color: var(--accent); }
+    .chip.use { border-color: var(--ok); color: var(--ok); }
+    .chip.craft { border-color: var(--line); color: var(--muted); }
+    .filters label { flex-direction: row; align-items: center; gap: 4px; }
+    .tree-item { display: grid; grid-template-columns: 44px 88px 1fr; gap: 8px; padding: 5px 6px; border-bottom: 1px solid var(--line); font-size: 0.8rem; }
+    .tree-item.lock { opacity: 0.38; }
+    .kind-ability { color: var(--off); }
+    .kind-amplifier { color: var(--accent); }
+    .kind-passive { color: var(--ok); }
+    .kind-stat { color: var(--stat); }
+    .kind-recipe, .kind-production_action { color: var(--util); }
+    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 0.8rem; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Path Planner</h1>
+    <a class="nav" href="/">Studio</a>
+    <button type="button" id="btnReload">Reload mods</button>
+    <button type="button" id="btnEnabled">Use in-game list</button>
+    <span class="status" id="status">Loading…</span>
+    <input id="planName" placeholder="plan name" style="width:140px" />
+    <button class="primary" type="button" id="btnSave">Save plan</button>
+    <select id="planList"><option value="">Load…</option></select>
+  </header>
+  <div class="workspace">
+    <aside class="col left">
+      <h2>Mods</h2>
+      <p class="hint">Loads core_2, then checked mods in this order (same overlay as the game). Workshop ids resolve from Steam content; local folders from data/mods.</p>
+      <div id="modList"></div>
+      <h2 style="margin-top:16px;">Race</h2>
+      <label>Playable race
+        <select id="race"></select>
+      </label>
+      <p class="hint" id="raceHint"></p>
+      <div class="stats" id="raceStats"></div>
+      <h2 style="margin-top:16px;">Age stage</h2>
+      <p class="hint">Young adult is character creation. Middle-aged and elder each add +30 max potential (60 over a lifetime). Physical stats start dropping at elder; INT/WIL tick up once.</p>
+      <div class="row">
+        <label><input type="radio" name="stage" value="young" /> Young</label>
+        <label><input type="radio" name="stage" value="middle" /> Middle</label>
+        <label><input type="radio" name="stage" value="elder" checked /> Elder</label>
+      </div>
+      <p class="hint" id="ageHint"></p>
+    </aside>
+    <main class="col">
+      <div class="budget" id="budget"></div>
+      <div class="row filters">
+        <span class="hint" style="margin:0">Show</span>
+        <label><input type="radio" name="kind" value="all" checked /> All</label>
+        <label><input type="radio" name="kind" value="combat" /> Combat</label>
+        <label><input type="radio" name="kind" value="weapon" /> Weapon</label>
+        <label><input type="radio" name="kind" value="magic" /> Magic</label>
+        <label><input type="radio" name="kind" value="use" /> Use</label>
+        <label><input type="radio" name="kind" value="craft" /> Craft</label>
+        <label><input type="radio" name="kind" value="starting" /> Starting</label>
+        <label><input type="radio" name="kind" value="planned" /> Planned</label>
+        <input id="filter" placeholder="search skills" style="min-width:180px; margin-left:auto" />
+      </div>
+      <p class="hint" id="startHint">Pick 3 starting skills (they begin at 20). Drag a Plan slider to spend shared potential.</p>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:44px">Start</th>
+            <th>Skill</th>
+            <th style="width:70px">Plan</th>
+            <th style="width:140px"></th>
+            <th style="width:56px">Pool</th>
+            <th style="width:72px">Unlocks</th>
+          </tr>
+        </thead>
+        <tbody id="skillBody"></tbody>
+      </table>
+    </main>
+    <aside class="col right">
+      <h2 id="previewTitle">Skill tree</h2>
+      <p class="hint" id="previewHint">Select a skill to preview milestones and +1 statistic rows at the planned potential. Same level can grant both.</p>
+      <div id="preview"></div>
+    </aside>
+  </div>
+  <script>
+    let overlay = null;
+    let evald = null;
+    let starting = [];
+    let allocations = {};
+    let selected = "";
+    let stage = "elder";
+    let allMods = [];
+    let evalTimer = null;
+    let evalSeq = 0;
+    let draggingAlloc = null;
+
+    const $ = (id) => document.getElementById(id);
+
+    async function api(path, opts) {
+      const r = await fetch(path, opts);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || r.statusText);
+      return data;
+    }
+
+    function skillKind(s) {
+      return s.kind || (s.combat ? "weapon" : "craft");
+    }
+
+    function kindFilter() {
+      const el = document.querySelector("input[name=kind]:checked");
+      return (el && el.value) || "all";
+    }
+
+    function skillVisible(s) {
+      const q = ($("filter").value || "").toLowerCase();
+      const filt = kindFilter();
+      const kind = skillKind(s);
+      if (filt === "combat" && kind !== "weapon" && kind !== "magic") return false;
+      if (["weapon", "magic", "craft", "use"].includes(filt) && kind !== filt) return false;
+      if (filt === "starting" && !starting.includes(s.id)) return false;
+      if (filt === "planned" && plannedFor(s.id) <= 10) return false;
+      if (q && !(s.name + s.id).toLowerCase().includes(q)) return false;
+      return true;
+    }
+
+    function plannedFor(id) {
+      if (allocations[id] != null) return allocations[id];
+      return starting.includes(id) ? 20 : 10;
+    }
+
+    function clampAlloc(id, value) {
+      const skill = ((overlay && overlay.skills) || []).find(s => s.id === id);
+      if (!skill) return null;
+      let planned = Math.max(10, Math.min(Number(skill.max_level) || 50, Number(value) || 10));
+      if (starting.includes(id)) planned = Math.max(planned, 20);
+      return planned;
+    }
+
+    function setAlloc(id, value, { fromSlider = false } = {}) {
+      const planned = clampAlloc(id, value);
+      if (planned == null) return;
+      allocations[id] = planned;
+      const tr = document.querySelector(`#skillBody tr[data-id="${CSS.escape(id)}"]`);
+      if (tr) {
+        tr.children[2].textContent = String(planned);
+        const range = tr.querySelector("input[data-alloc]");
+        if (range && !fromSlider && draggingAlloc !== id) range.value = String(planned);
+        tr.children[4].textContent = String(Math.max(0, planned - 10));
+      }
+      if (selected === id) renderPreview();
+      scheduleRefresh();
+    }
+
+    function scheduleRefresh() {
+      clearTimeout(evalTimer);
+      evalTimer = setTimeout(() => refreshEval({ rebuildSkills: false }), 60);
+    }
+
+    function checkedMods() {
+      return [...document.querySelectorAll("#modList input[type=checkbox]:checked")].map(el => el.value);
+    }
+
+    function raceId() { return $("race").value; }
+
+    function renderMods(mods, missing, checkedIds) {
+      const source = allMods.length ? allMods : (mods || []);
+      const checked = new Set(checkedIds || checkedMods());
+      if (!checked.size) (mods || []).forEach(m => { if (m.enabled) checked.add(m.id); });
+      $("modList").innerHTML = source.map(m => `
+        <label class="mod">
+          <input type="checkbox" value="${esc(m.id)}" ${checked.has(m.id) ? "checked" : ""} />
+          <span><strong>${esc(m.name)}</strong> <code>${esc(m.id)}</code>
+            <div class="meta">${esc(m.origin || "")}${m.has_skills ? " · skills" : ""}${m.has_character ? " · character" : ""}</div>
+          </span>
+        </label>`).join("") + (missing && missing.length ? `<p class="hint">Missing: ${missing.map(esc).join(", ")}</p>` : "");
+      $("modList").querySelectorAll("input").forEach(el => el.addEventListener("change", () => loadOverlay(checkedMods())));
+    }
+
+    function renderRaces(races, keep) {
+      const playable = (races || []).filter(r => r.playable);
+      const rest = (races || []).filter(r => !r.playable);
+      const opts = [...playable, ...rest].map(r =>
+        `<option value="${esc(r.id)}">${esc(r.name)}${r.playable ? "" : " (NPC)"}</option>`
+      ).join("");
+      $("race").innerHTML = opts;
+      if (keep && [...$("race").options].some(o => o.value === keep)) $("race").value = keep;
+      else if (playable[0]) $("race").value = playable[0].id;
+    }
+
+    function meterClass(remaining) {
+      if (remaining < 0) return "bad";
+      if (remaining <= 30) return "mid";
+      return "ok";
+    }
+
+    function renderBudget() {
+      if (!evald) return;
+      const b = evald.budgets;
+      const stages = [
+        ["Young", b.young, "young"],
+        ["Middle +30", b.middle, "middle"],
+        ["Elder +60", b.elder, "elder"],
+      ];
+      $("budget").innerHTML = stages.map(([label, row, key]) => {
+        const rem = row.remaining;
+        const pct = Math.min(100, Math.max(0, (evald.spent / Math.max(row.available, 1)) * 100));
+        return `<div class="meter ${meterClass(rem)} ${stage === key ? "sel" : ""}">
+          <strong>${label}</strong>
+          <div class="n">${rem >= 0 ? rem + " left" : Math.abs(rem) + " over"}</div>
+          <div class="bar ${rem < 0 ? "over" : ""}"><span style="width:${pct}%"></span></div>
+          <div class="hint">${evald.spent} / ${row.available} pool</div>
+        </div>`;
+      }).join("");
+      $("status").textContent = `${evald.race.name} · pool ${evald.pool} · spent ${evald.spent} · gold ~${evald.gold} · ${evald.full_skills_left} more 40-pt skills at this stage`;
+      const age = evald.age;
+      $("ageHint").textContent = age.practical_aging
+        ? `Starts ~${age.start}. Middle-aged at ${age.middle_at} (+${age.middle.bonus}). Elder at ${age.elder_at} (+${age.elder.bonus} more).`
+        : `${evald.race.name} adult/elder ages are ${age.middle_at}/${age.elder_at} — age bonuses will not arrive in a normal lifetime.`;
+      const race = evald.race;
+      $("raceHint").textContent = (race.description || "").replace(/\[color=[^\]]+\]/g, "").replace(/\[\/color\]/g, "").slice(0, 280);
+      const stats = evald.stats_at_stage || {};
+      $("raceStats").innerHTML = Object.entries(stats).map(([k, v]) => `<div>${esc(k)} <strong>${v}</strong></div>`).join("") || "";
+    }
+
+    function patchSkillNumbers() {
+      const skills = (overlay && overlay.skills) || [];
+      const byId = Object.fromEntries(((evald && evald.skills) || []).map(r => [r.id, r]));
+      for (const s of skills) {
+        const tr = document.querySelector(`#skillBody tr[data-id="${CSS.escape(s.id)}"]`);
+        if (!tr) continue;
+        const planned = plannedFor(s.id);
+        const row = byId[s.id];
+        tr.classList.toggle("sel", selected === s.id);
+        tr.children[2].textContent = String(planned);
+        const range = tr.querySelector("input[data-alloc]");
+        if (range && draggingAlloc !== s.id && document.activeElement !== range) {
+          range.value = String(planned);
+          range.max = String(s.max_level);
+        }
+        tr.children[4].textContent = String(row ? row.from_pool : Math.max(0, planned - 10));
+        tr.children[5].textContent = row ? `${row.unlocked}/${(s.tree || []).length}` : "";
+        const startBox = tr.querySelector("input[data-start]");
+        if (startBox) startBox.checked = starting.includes(s.id);
+      }
+      $("startHint").textContent = `Starting skills ${starting.length}/3 (they begin at 20).`;
+    }
+
+    function renderSkills() {
+      const body = $("skillBody");
+      const skills = ((overlay && overlay.skills) || []).filter(skillVisible);
+      body.innerHTML = skills.map(s => {
+        const planned = plannedFor(s.id);
+        const fromPool = Math.max(0, planned - 10);
+        const row = (evald && evald.skills || []).find(x => x.id === s.id);
+        const kind = skillKind(s);
+        return `<tr data-id="${esc(s.id)}" class="${selected === s.id ? "sel" : ""}" title="${esc(s.tooltip || s.description || "")}">
+          <td><input type="checkbox" data-start="${esc(s.id)}" ${starting.includes(s.id) ? "checked" : ""} /></td>
+          <td>${esc(s.name)} <span class="chip ${kind}">${kind}</span><div class="meta" style="color:var(--muted);font-size:0.7rem">${esc(s.source || "")} · max ${s.max_level}</div></td>
+          <td>${planned}</td>
+          <td><input type="range" min="10" max="${s.max_level}" value="${planned}" data-alloc="${esc(s.id)}" /></td>
+          <td>${fromPool}</td>
+          <td>${row ? row.unlocked + "/" + (s.tree || []).length : ""}</td>
+        </tr>`;
+      }).join("");
+      body.querySelectorAll("tr").forEach(tr => tr.onclick = (ev) => {
+        if (ev.target.closest("input")) return;
+        selected = tr.dataset.id;
+        patchSkillNumbers();
+        renderPreview();
+      });
+      body.querySelectorAll("input[data-start]").forEach(el => el.onchange = () => {
+        const id = el.dataset.start;
+        if (el.checked) {
+          if (starting.length >= 3) { el.checked = false; return; }
+          starting.push(id);
+          allocations[id] = Math.max(allocations[id] || 20, 20);
+        } else {
+          starting = starting.filter(x => x !== id);
+        }
+        $("startHint").textContent = `Starting skills ${starting.length}/3 (they begin at 20).`;
+        refreshEval({ rebuildSkills: true });
+      });
+      body.querySelectorAll("input[data-alloc]").forEach(el => {
+        el.onpointerdown = () => { draggingAlloc = el.dataset.alloc; };
+        el.onpointerup = () => { draggingAlloc = null; scheduleRefresh(); };
+        el.onpointercancel = () => { draggingAlloc = null; };
+        el.oninput = () => setAlloc(el.dataset.alloc, el.value, { fromSlider: true });
+      });
+      $("startHint").textContent = `Starting skills ${starting.length}/3 (they begin at 20).`;
+    }
+
+    function renderPreview() {
+      const skill = ((overlay && overlay.skills) || []).find(s => s.id === selected);
+      if (!skill) { $("preview").innerHTML = ""; $("previewTitle").textContent = "Skill tree"; return; }
+      const planned = plannedFor(skill.id);
+      $("previewTitle").textContent = skill.name + "  @ " + planned;
+      $("preview").innerHTML = (skill.tree || []).map(t => {
+        const lv = t.level === "innate" ? "inn" : t.level;
+        const open = t.level === "innate" || (typeof t.level === "number" && t.level <= planned);
+        return `<div class="tree-item ${open ? "" : "lock"}" title="${esc(t.tooltip || t.summary || "")}"><strong>L${lv}</strong><span class="kind-${t.kind || "stat"}">${t.kind || "stat"}</span><span>${esc(t.name || "")} ${t.reward ? "<code>" + esc(t.reward) + "</code>" : ""}</span></div>`;
+      }).join("") || "<p class='hint'>No milestones.</p>";
+    }
+
+    function esc(s) {
+      return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+
+    async function loadOverlay(mods) {
+      $("status").textContent = "Loading overlay…";
+      overlay = await api("/api/planner/overlay", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mods }),
+      });
+      const keepRace = $("race").value;
+      renderMods(overlay.mods, overlay.missing, mods);
+      renderRaces(overlay.races, keepRace);
+      for (const s of overlay.skills || []) {
+        if (allocations[s.id] == null) allocations[s.id] = starting.includes(s.id) ? 20 : 10;
+        allocations[s.id] = Math.min(s.max_level, Math.max(10, allocations[s.id]));
+      }
+      await refreshEval();
+    }
+
+    async function refreshEval({ rebuildSkills = true } = {}) {
+      if (!overlay) return;
+      const seq = ++evalSeq;
+      const payload = {
+        mods: checkedMods(),
+        race_id: raceId(),
+        starting,
+        allocations: { ...allocations },
+        stage,
+      };
+      evald = await api("/api/planner/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (seq !== evalSeq) return;
+      renderBudget();
+      if (rebuildSkills && !draggingAlloc) renderSkills();
+      else patchSkillNumbers();
+      renderPreview();
+    }
+
+    async function refreshPlans() {
+      const data = await api("/api/planner/plans");
+      const cur = $("planList").value;
+      $("planList").innerHTML = `<option value="">Load…</option>` + (data.plans || []).map(p =>
+        `<option value="${esc(p.id)}">${esc(p.name)}</option>`
+      ).join("");
+      if (cur) $("planList").value = cur;
+    }
+
+    $("race").onchange = () => refreshEval();
+    $("filter").oninput = () => renderSkills();
+    document.querySelectorAll("input[name=kind]").forEach(el => el.onchange = () => renderSkills());
+    document.querySelectorAll("input[name=stage]").forEach(el => el.onchange = () => { stage = el.value; refreshEval(); });
+    $("btnReload").onclick = () => loadOverlay(checkedMods());
+    $("btnEnabled").onclick = async () => {
+      const data = await api("/api/planner/mods");
+      await loadOverlay((data.mods || []).filter(m => m.enabled).map(m => m.id));
+    };
+    $("btnSave").onclick = async () => {
+      const name = $("planName").value.trim() || "plan";
+      await api("/api/planner/plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, race_id: raceId(), starting, allocations, stage, mods: checkedMods() }),
+      });
+      await refreshPlans();
+      $("status").textContent = "Saved " + name;
+    };
+    $("planList").onchange = async () => {
+      const id = $("planList").value;
+      if (!id) return;
+      const data = await api("/api/planner/plans?id=" + encodeURIComponent(id));
+      const plan = data.plan || {};
+      starting = plan.starting || [];
+      allocations = plan.allocations || {};
+      stage = plan.stage || "elder";
+      document.querySelectorAll("input[name=stage]").forEach(el => { el.checked = el.value === stage; });
+      $("planName").value = plan.name || id;
+      await loadOverlay(plan.mods || checkedMods());
+      if (plan.race_id) $("race").value = plan.race_id;
+      await refreshEval();
+    };
+
+    (async () => {
+      const data = await api("/api/planner/mods");
+      allMods = data.mods || [];
+      renderMods(allMods, [], allMods.filter(m => m.enabled).map(m => m.id));
+      await loadOverlay((allMods || []).filter(m => m.enabled).map(m => m.id));
+      await refreshPlans();
+    })().catch(err => { $("status").textContent = err.message; });
+  </script>
+</body>
+</html>

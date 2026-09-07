@@ -1,0 +1,10 @@
+{
+  "id": "riftwalk",
+  "match": ["Riftwalk"],
+  "mode": "content",
+  "enabled": false,
+  "priority": 100,
+  "class_priority": 100,
+  "items_mode": "merge",
+  "notes": "Highest default priority when enabled (wins all overlaps; unique lower-mod files still merge). DISABLED — OP. Set enabled=true to restore."
+}

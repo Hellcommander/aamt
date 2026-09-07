@@ -1,0 +1,122 @@
+{
+  "version": "1.0.0",
+  "auras": [
+    {
+      "id": "solar_wind_shield",
+      "type": "shieldAura",
+      "visual": {
+        "baseColor": "#66ccff",
+        "windColor": "#aaffff",
+        "distortionColor": "#88ddff",
+        "radiusMin": 1.2,
+        "radiusMax": 2.4,
+        "alphaNoiseSpeed": 1.8,
+        "alphaNoiseScale": 3.2,
+        "alphaNoiseStrength": 0.6,
+        "distortionStrength": 0.05,
+        "distortionFrequency": 2.6,
+        "distortionType": "heatHaze",
+        "windStreakCount": 12,
+        "windSpeed": 0.6,
+        "windNoise": 1.2,
+        "spriteSize": 64,
+        "frames": 12,
+        "noiseType": "perlin",
+        "falloffCurve": "smooth"
+      },
+      "particles": {
+        "orbitCount": 24,
+        "orbitSpeedMin": 0.4,
+        "orbitSpeedMax": 1.6,
+        "orbitRadiusMin": 0.8,
+        "orbitRadiusMax": 1.8,
+        "gravityStrength": 0.8,
+        "particleSize": 0.04,
+        "particleLifetime": 5.0,
+        "particleAlpha": 0.7,
+        "turbulence": 0.3,
+        "blend": "additive"
+      },
+      "behavior": {
+        "projectileInfluence": true,
+        "projectileOrbitTime": 0.3,
+        "projectileInfluenceRadius": 2.0,
+        "projectileGravityStrength": 0.6,
+        "projectileTangentialBlend": 0.4,
+        "projectileInwardPull": 0.2,
+        "shieldScaleWithHP": true,
+        "radiusScaleCurve": "smooth",
+        "alphaScaleWithHP": true,
+        "speedScaleWithHP": true
+      },
+      "export": {
+        "unid": "&auSolarWindShield;",
+        "transcendenceXml": true,
+        "resourcePaths": {
+          "auraSprite": "Resources/Auras/solar_wind_shield.png",
+          "distortionMap": "Resources/Auras/solar_wind_shield_distort.png",
+          "particleProfile": "Resources/Auras/solar_wind_shield_particles.json"
+        }
+      }
+    },
+    {
+      "id": "plasma_gravity_field",
+      "type": "gravityField",
+      "visual": {
+        "baseColor": "#ff6600",
+        "windColor": "#ffaa00",
+        "distortionColor": "#ff8800",
+        "radiusMin": 1.5,
+        "radiusMax": 3.0,
+        "alphaNoiseSpeed": 2.2,
+        "alphaNoiseScale": 2.8,
+        "alphaNoiseStrength": 0.7,
+        "distortionStrength": 0.08,
+        "distortionFrequency": 3.0,
+        "distortionType": "turbulent",
+        "windStreakCount": 16,
+        "windSpeed": 0.8,
+        "windNoise": 1.5,
+        "spriteSize": 128,
+        "frames": 16,
+        "noiseType": "voronoi",
+        "falloffCurve": "exponential"
+      },
+      "particles": {
+        "orbitCount": 32,
+        "orbitSpeedMin": 0.6,
+        "orbitSpeedMax": 2.0,
+        "orbitRadiusMin": 1.0,
+        "orbitRadiusMax": 2.2,
+        "gravityStrength": 0.9,
+        "particleSize": 0.05,
+        "particleLifetime": 6.0,
+        "particleAlpha": 0.8,
+        "turbulence": 0.4,
+        "blend": "additive"
+      },
+      "behavior": {
+        "projectileInfluence": true,
+        "projectileOrbitTime": 0.5,
+        "projectileInfluenceRadius": 2.5,
+        "projectileGravityStrength": 0.8,
+        "projectileTangentialBlend": 0.5,
+        "projectileInwardPull": 0.3,
+        "shieldScaleWithHP": true,
+        "radiusScaleCurve": "exponential",
+        "alphaScaleWithHP": true,
+        "speedScaleWithHP": true
+      },
+      "export": {
+        "unid": "&auPlasmaGravityField;",
+        "transcendenceXml": true,
+        "resourcePaths": {
+          "auraSprite": "Resources/Auras/plasma_gravity_field.png",
+          "distortionMap": "Resources/Auras/plasma_gravity_field_distort.png",
+          "particleProfile": "Resources/Auras/plasma_gravity_field_particles.json"
+        }
+      }
+    }
+  ]
+}
+

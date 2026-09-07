@@ -1,0 +1,637 @@
+{
+  "_meta": {
+    "description": "Hand-verified, mechanically-safe find/replace rules applied by both the PowerShell CLI (Update-ObsoleteApis.ps1) and the C# ApiMigrator.Core engine used by the GUI. Compiled from data/charts/*.xml|*.json via ApiMigrator.Cli compile-rules. Regex syntax is .NET System.Text.RegularExpressions. Optional ensureUsings / requiresSubstring / enabled:false / postEnsureUsings as documented in data/charts/README.md.",
+    "gameFileVersion": "2.0.212.30",
+    "capturedDate": "2026-09-06",
+    "steamBetaKey": "lang-experimental",
+    "steamBuildId": "24964365",
+    "notes": "Source of truth for edits: data/charts/ (compile-rules). Do not hand-edit this JSON except via compile."
+  },
+  "_addAction": {
+    "note": "AddActionFixer maps obsolete string AddAction overloads to AddAction(new InventoryAction { \u2026 }) when first arg is string/Name: and remaining args map to known InventoryAction fields. Classic (Name,Key,FireOnActor,Display,Command) vs modern (Name,Display,Command,\u2026) detected by 2nd positional char vs string. Skips Override (no InventoryAction field) while still consuming its positional arg. Named\u002Bpositional mixes skip already-filled slots. CS8209 \u0060_ = E.AddAction(...)\u0060 void discards are stripped. InventoryActionsXmlFixer (mod-scoped, runs first): literal Name/Display/Command/Key \u2192 AddXMLAction(\u0022Name\u0022) \u002B InventoryActions.xml overlay; same-file \u0060string cmd = \u0022\u2026\u0022\u0060 Command fields are resolved. Both skip mod-defined AddAction (receiver typed as a non-inventory event, or untyped in a file that never mentions IInventoryActionsEvent / GetInventoryActionsEvent / EventParameterGetInventoryActions)."
+  },
+  "_addReplacerExpr": {
+    "note": "ReplaceBuilder.AddReplacer: dump\u0027s generic obsolete message is now \u0027Decorate a valid method with VariableReplacer\u0027 (delegate/method-group forms). Value forms still \u2192 SetArgument (same arg order: Key/Alias, Value/Argument). Curated autofix: literal\u002Bliteral, literal\u002BexprWithDotOrCall, and literal\u002Bternary(? :) \u2192 SetArgument. Bare identifiers stay advice-only (string local vs Replacer method group)."
+  },
+  "_appendReputationDescription": {
+    "note": "AppendReputationDescriptionFixer (NOT curated regex): StringBuilder local = new()/new StringBuilder(); \u2026 AppendReputationDescription(local) \u2192 using TextBuilder local = TextBuilder.Get();. Early-outs unless AppendReputationDescription is present \u2014 avoids ReDoS that hung Update-ObsoleteApis.ps1 on large mods. Ensures using XRL.World.Text."
+  },
+  "_bodiesAnatomy": {
+    "note": "Bodies.xml anatomy compat: Type=\u0022Flipper\u0022 \u2192 Type=\u0022Fin\u0022 (vanilla BodyPartType; Fish uses Fin for lateral swimming limbs). Laterality=\u0022Middle\u0022 \u2192 \u0022Mid\u0022 (Laterality.GetCode; vanilla uses Mid / Right Mid / Left Mid) \u2014 scoped to Laterality= attrs only."
+  },
+  "_capitalizeInstance": {
+    "note": "CapitalizeFixer: simple recv.Capitalize()/Capitalize(bool) \u2192 Translator.InitUpper(recv). Curated regex still covers Extensions.Capitalize( and ColorUtility.CapitalizeExceptFormatting(. Chained receivers (Grammar.Cardinal(n).Capitalize()) stay advice-only."
+  },
+  "_countMethodGroup": {
+    "note": "Not expressed as regex rules here \u2014 balanced-paren LINQ tails and IEnumerable-typed locals need CountMethodGroupFixer (C#) / Repair-CountMethodGroups (Update-ObsoleteApis.ps1). Auto-fix: .Where(...).Count \u003E N \u2192 .Count(); IEnumerable\u003CT\u003E xs; xs.Count \u003E N \u2192 xs.Count(). Excluded: list.Count, dict.Count, ToList().Count, ICollection/IList/IReadOnlyList Count properties, ambiguous var/foo.Count."
+  },
+  "_drankOverride": {
+    "note": "DrankOverrideFixer is last-resort signature-only: Drank(..., StringBuilder Message, ...) \u2192 TextBuilder on leftover vanilla liquid patches (LiquidBlood, \u2026). Own BaseLiquid.Drank is converted by LiquidDrankToPartFixer (MessageOnDrink / *OnDrink part) and is not bumped. PreferXML.Drank on own BaseLiquid; PreferHarmonyPatch.Drank on vanilla liquid types; BaseLiquidPart.Drank is the part pipeline and is not flagged."
+  },
+  "_finalRenderOverride": {
+    "note": "FinalRenderOverrideFixer: override bool FinalRender(RenderEvent E, bool Alt) \u2192 FinalRender(RenderEvent E) only when Alt is unreferenced in the body. PreferHarmonyPatch.FinalRender advice still reported."
+  },
+  "_gameTextCallSites": {
+    "note": "GameTextCallSiteFixer (Apply): high-confidence \u2014 MessageQueue/Popup $\u0022{go.t()} {isOrAre|hasOrHave} \u2026\u0022 \u2192 =subject.the.name= =subject.verb:\u2026=; $\u0022{go.its} \u2026\u0022; (x =\u003E x.an()) \u2192 =object.a.name=; simple DidX/XDidY(\u0022verb\u0022[, extra][, EndMark \u0022!\u0022] ) / DidXToY / XDidYToZ \u2192 EmitMessage (trailing null/bool/color/\u0022\u0026R\u0022/ParentObject defaults ignored). Receiver chains (ParentObject.Physics.DidX, Messaging.XDidY) are included in the replace span so they are not left as Physics.\u0022=\u2026\u0022. recv.Poss(\u0022word\u0022) \u002B \u0022\u2026\u0022 \u2192 =subject.poss:word=; recv.GetVerb(\u0022are\u0022) \u2192 =object.verb:are=; Grammar.InitLowerIfArticle(expr) \u2192 =text|initLowerIfArticle=; GameObject.a/the/its/It/itself/Is \u2192 =object.*= StartReplace (skips case Keys.A / assignments); The/the \u002B DisplayName/DisplayNameOnly concat collapsed to =object.The.name=; Popup.ShowYesNoCancel(target itself) \u2192 !TargetSelfConfirm(). Ensures using XRL.World.Text and using XRL (StartReplace extension) when the file is not already namespace XRL.*. Concatenated Extra / GameObject.Does stay dump \u002B Ollama suggest / ManualAdvice."
+  },
+  "_genotypesXml": {
+    "note": "GenotypesXmlFixer (Apply): strip unused Load= on genotype (GenotypeFactory.LoadGenotypeNode never parses Load; merge is same-Name redeclare)."
+  },
+  "_getDisplayNameArgs": {
+    "note": "GetDisplayNameArgFixer (Apply): CS1739 GetDisplayName(WithAnnotations: bool) \u2192 Annotations: (live BaseMutation is Direct/Base/Annotations/Variant). Named-arg only \u2014 do not rewrite GetDisplayName(false) (now Direct)."
+  },
+  "_harmonyDynamicPatch": {
+    "note": "HarmonyDynamicPatchFixer \u002B RemovedGameApiFixer (data/removed_game_apis.json). Removed game types (SifrahGame, PsychicCombatSifrah, SocialSifrah, HackingGame, \u2026) are not [Obsolete] \u2014 they are gone, so typeof() is CS0246 and PatchAll can stall. Autofix: [HarmonyPatch(typeof(T), \u0022M\u0022)] \u2192 [HarmonyPatch] \u002B Prepare() =\u003E TargetMethod() != null \u002B TargetMethod() { AccessTools.TypeByName(fqn); AccessTools.Method(t, \u0022M\u0022); }. Options.Sifrah*/AnySifrah if-blocks stripped (vanilla Lovesick/Domination no longer call minigames). Leftover type identifiers report RemovedType.*; never glob *Sifrah* (SpringSifrah is a mod)."
+  },
+  "_liquidCsToXml": {
+    "note": "LiquidCsToXmlFixer (mod-scoped): [IsLiquid] / override IsLiquid / ctor FlameTemperature= / VaporTemperature= / \u2026 literals, GetName/GetSmeared*/GetColor/GetColors (Colors field or LiquidBlood.Colors \u2192 rK), GetValuePerDram, simple StainElements, Blood-like render methods \u2192 Liquids.xml (Name = ctor slug, class, fields, \u003Crender\u003E when extractable else empty \u003Crender /\u003E) and strip those C# sites. MergeNamedChildren then MergeMissingInner (never overwrite existing values; empty \u003Crender /\u003E replaced when incoming has children). Drink behavior is LiquidDrankToPartFixer. PreferXML.LiquidProperties advice remains if a non-literal assignment is left."
+  },
+  "_liquidXmlAdvice": {
+    "note": "LiquidXmlAdviceScanner (report-only, C# files only): FlameTemperature/VaporTemperature/Cleansing/Slippery*/ConsiderDangerous*/\u2026 assignments \u2192 PreferXML.LiquidProperties with Liquids.xml field list. Not run on XML \u2014 object Physics Weight= / population Weight= are not liquid fields. LiquidBlood.Colors/ID \u2192 PreferXML.LiquidBlood; LiquidWarmStatic.ApplyRandomEffectTo/GlitchObject/GlitchZone/ID \u2192 PreferXML.LiquidWarmStatic (BaseGlitchPart / GlitchOn* / LiquidID.WarmStatic); light CS0118 namespace-vs-type when a using imports a namespace ending in Telepathy/etc."
+  },
+  "_liquidXmlRender": {
+    "note": "LiquidXmlFixer (Apply) \u002B LiquidXmlRenderAdviceScanner (report-only). Quiet Age learnings: (1) BaseLiquid C# must be namespace XRL.Liquids for Liquids.xml \u003Cclass\u003E ResolveType; (2) liquids with \u003Cclass\u003E missing \u003Crender\u003E \u2192 insert \u003Crender /\u003E (Part.Class null \u2192 BaseLiquid.Initialize NRE); merge-only overlays without \u003Cclass\u003E inherit vanilla render and are not flagged; (3) default-render colorText/colorTile/colorDetail \u2192 baseColorText/baseColorTile/baseColorDetail (attrs \u002B direct children; never RenderSecondTo* parts); (4) BrighterWithVolume/LightLevel on \u003Crender\u003E/default part \u2192 move onto \u003Cpart Name=\u0022Glows\u0022\u003E when safe, else report PreferXML.LiquidRender.MisplacedGlow."
+  },
+  "_mutationEntryDisplayName": {
+    "note": "NOT a curated regex \u2014 MutationEntry.DisplayName \u2192 Name (stable ID) OR GetDisplayName() (UI). Ambiguous; stays needsManual. ManualAdvice.MutationEntryDisplayNameAdvice enriches remaining hits. Callers often pass XML DisplayName text, not Name."
+  },
+  "_mutationsXml": {
+    "note": "MutationsXmlFixer (Apply): strip unused Load= on mutations/category/mutation (merge is same-Name redeclare); strip unused Code= on mutation; Description= attr\u2192child \u003Cdescription\u003E\u003Cp\u003E\u2026\u003C/p\u003E\u003C/description\u003E; ExludeFromPool\u2192ExcludeFromPool typo. Confirmed vs MutationFactory/MutationEntry/IPartEntry."
+  },
+  "_namingXml": {
+    "note": "NamingXmlFixer (Apply): template Name *Var*\u2192=var= (first letter lower); templatevar Name PascalCase\u2192camelCase; strip unused Load= on templatevar. Confirmed vs XRL.Names.NameStyles XmlDataHelper deprecation messages."
+  },
+  "_objectBlueprintXml": {
+    "note": "ObjectBlueprintXmlFixer (Apply): inventoryobject Name\u2192Blueprint; Wire Material= strip; Projectile RequiresPhaseMatch= strip; Examiner AlternateDisplayName= strip; MutationOnEquip ClassName\u2192Mutation (\u002B Variant strip); mutation Name Compat/Class renames (Compat.xml FreezingHands\u2192FreezingRay/FlamingHands\u2192FlamingRay/\u2026 plus display\u2192Class Sleep Gas Generation\u2192SleepGasGeneration, Nerve Poppy\u2192Analgesia, Double-muscled\u2192HeightenedStrength, \u2026); Compat blueprint Name/Inherits renames (Doru\u2192Tam, JoppaZealot\u2192VillageZeroConvert, \u2026); mutation Value=*delete\u2192removemutation; obsolete part attrs (MeleeWeapon.RenderString/SecondaryStat\u2192Stat, Corpse.BodyDrop/InventoryDrop, Brain.IgnoreCombat, Physics.Occluding, acegiak_Seed.Chance); MeleeWeapon ElementalDamage/Element\u2192ElementalDamage part; role\u2192Role tag (drop if Role tag exists); Comwmerce\u2192Commerce; Name= whitespace trim; 2nd AnimatedMaterialGeneric\u2192AnimatedMaterialGenericAlternate; duplicate named part/tag merge later-wins (CyberneticsHasImplants joins Implants). Does not invent Mutations.xml entries for removed classes (FattyHump/HeightenedSmell) \u2014 ManualAdvice notes ExcludeFromPool overlay. BlueprintTypeNamespaceFixer also splits trailing IPart after helpers into XRL.World.Parts."
+  },
+  "_ollamaLeftovers": {
+    "note": "OllamaLeftoverSuggester: leftover DidX Extra concatenations, GameObject.Does, and other NeedsManual hits after curated autofix. The model MUST emit a C# replacement (skip=true only if already current-API). Hedged skip=true with a safe C# replacement is unskipped; advisory prose (You should / PreferXML essays) is rejected. --apply / GUI Apply writes unique-original-line hits (GUI Apply uses high\u002Bmedium). Default host localhost:11434. Optional cloud: --cloud / GUI checkbox \u2192 https://ollama.com with Authorization Bearer (OLLAMA_API_KEY or --api-key / GUI PasswordBox). Free-tier catalog (CloudModelProfiles, seeded first): gemma4:31b (multimodal 256K), gpt-oss:120b (frontier MoE), gpt-oss:20b (default leftover \u2014 fast code/JSON), nemotron-3-nano:30b / super / ultra (agentic 1M). Direct cloud strips trailing -cloud; local proxy keeps *-cloud after ollama signin / ollama pull. Probe GET /api/tags then MergeCloudCatalog; Chat POST /api/chat with format=json, retry without JSON if the model rejects it, fall back to /api/generate. ResolveModel keeps explicit gpt-oss:20b vs :120b (no bare-name collapse). Never writes [Obsolete] or pragma warning disable."
+  },
+  "_overridePreference": {
+    "note": "OverridePreferenceScanner / Find-OverridePreferenceHits \u002B ManualAdvice. When a mod extends game/vanilla behavior or data via C# override: (1) PreferXML \u2014 MutationEntries DisplayName/Type, Liquids.xml vs IsLiquid, own BaseLiquid.Drank \u2192 OnDrink/MessageOnDrink, InventoryActions, blueprints (DataManager overlay / Load=Merge / same-Name redeclare); (2) PreferHarmonyPatch \u2014 safer Prefix/Postfix for Register/FireEvent/HandleEvent/Render/FinalRender/vanilla-liquid Drank/\u2026 on concrete vanilla types (Stomach, Brain, LiquidBlood, \u2026); (3) C# override only when there is no other option. WantEvent/HandleEvent/Register/FireEvent/Drank on the mod\u2019s own IPart/Effect/BaseMutation/BaseLiquidPart/*Part/*Effect subclasses are the part event pipeline and are not flagged. Do not add [Obsolete] for CS0672. Carve-out: in-place API body fixes inside mod methods are fine. Simple Register bodies may get last-resort signature bump under Apply; complex overrides are never auto-deleted."
+  },
+  "_registerOverride": {
+    "note": "RegisterOverrideFixer is last-resort Apply-time only for simple Register(GameObject) bodies that solely call Object.RegisterPartEvent/UnregisterPartEvent(this, \u2026) and optional base.Register(Object). PreferHarmonyPatch still prefers Harmony Prefix/Postfix when replacing a concrete vanilla type; IPart/Effect/BaseMutation Register is the part pipeline and is not flagged. Complex FireEvent-heavy / multi-object registration stays advice-only. Never adds [Obsolete]; never deletes overrides."
+  },
+  "_reverseTranslateBit": {
+    "note": "ReverseTranslateBitFixer: BitType.ReverseTranslateBit/ReverseCharTranslateBit \u2192 FetchBitByCode. Auto only with clear cues \u2014 string/\u002B= / ==\u0022?\u0022 / BitCost \u2192 BitID.ToString(); ColorString/{{ / DisplayColor \u2192 DisplayColor; ReverseChar always BitID char. Ambiguous sites stay advice (obsolete msg says .ID; live field is BitID)."
+  },
+  "_showOptionList": {
+    "note": "Not a curated regex \u2014 ShowOptionListFixer maps ShowOptionList/Async \u2192 PickOption/Async with named args when positional\u002Bnamed args parse cleanly (Managed signature order). Unmappable calls stay advice-only (ManualAdvice PickOption shape). Never rewrite when unknown named args appear."
+  },
+  "_statShifter": {
+    "note": "NOT a curated regex. GameObject.ApplyStatShift/UnapplyStatShift \u2192 IPart/Effect StatShifter.SetStatShift / RemoveStatShift|RemoveStatShifts. Receiver moves off GameObject; Unapply drops Amount (GUID-tracked). Flagged needsManual in obsolete_api_dump.json; ManualAdvice.StatShifterAdvice enriches remaining hits."
+  },
+  "_statisticCtor": {
+    "note": "StatisticCtorFixer (mod-scoped): CS1729 5-arg new Statistic(name, min, max, value, owner) or (name, displayName, min, max, value) \u2192 new Statistic(StatisticBlueprint.TryGet(...) ? bp : new StatisticBlueprint { \u2026 }) { Owner, BaseValue } plus Statistics.xml overlay. Ensures using XRL.Blueprints. Name must be a string literal."
+  },
+  "_subtypesXml": {
+    "note": "SubtypesXmlFixer (Apply): strip unused Load= on class/category/subtype/skills/reputations/savemodifiers; strip Code= on subtype; class DisplayName\u2192ChargenTitle (strip if ChargenTitle set); strip Class=/Tile= on class only; Foreground=/ForegroundColor=\u2192DetailColor when missing else strip; wrap root orphan \u003Csubtype\u003E under \u003Cclass ID=Callings\u003E or expand preceding empty/self-closing class. Confirmed vs SubtypeFactory XMLNodes (root only accepts class)."
+  },
+  "_textBuilderHalfMigration": {
+    "note": "TextBuilderCsFixer (Apply) \u002B TextBuilderHalfMigrationScanner (leftovers). After Event.NewStringBuilder \u2192 TextBuilder.Get: Event.FinalizeString(tb) \u2192 tb.ToString() (CS1503); tb.AppendSigned(n) \u2192 Append(n, true); tb.AppendSigned(n, \u0022rules\u0022) \u2192 AppendModifier; AddsRep.AppendDescription 7-arg \u2192 (TB, Value, Faction, SignedRules) with Value/Faction swap. Locals still passed to AppendName/Substitute (StringBuilder APIs) are reverted to new StringBuilder(). Scanner still reports AppendArmor/PV/Damage/Attribute and leftover DefaultDisplayOrder."
+  },
+  "_things": {
+    "note": "ThingsFixer: Extensions.Things(num, what[, plural]) / recv.Things(what[, plural]) \u2192 _T(\u0022\u2026\u0022, \u0022=number.things:\u2026=\u0022).SetArgument(\u0022number\u0022, num).ToString() when what (and optional plural) are string literals (GameText.StartReplace same token is fine for non-localized UI). Non-literal nouns stay advice-only. Do not bake markup/color breaks into the noun token \u2014 wrap after. Double/Single \u2192 cast/round to long for SetArgument (replacer is Int32/Int64)."
+  },
+  "_tryGetParser": {
+    "note": "NOT obsolete \u2014 CS0103. Bare TryGetParser(out IValueParser\u003CT\u003E) must be IValueParser.TryGetParser (static on XRL.Serialization.Parsers.IValueParser; using is not enough without type qualifier). PreLang used TryGetAttributeParser; Lang builds use IValueParser.Add \u002B IValueParser.TryGetParser. Seen in Choose Your Body Plan Lang/Startup.cs GetParser\u003CT\u003E()."
+  },
+  "_variableReplacerContext": {
+    "note": "VariableReplacerFixer (Apply) \u002B curated rule: [VariableReplacer|VariableObjectReplacer] DelegateContext Context \u2192 VariableContext Context. [VariableObjectReplacer(\u2026)] \u2192 [VariableReplacer(\u2026, Capitalization = true)]. When the body uses Context.Target / Context.Pronouns, add GameObject Object and rewrite to Object / Object.GetPronounProvider() (vanilla GameObjectReplacers pattern). ConversationDelegate DelegateContext is left alone. Context.Explicit (GenderedNoun) stays manual."
+  },
+  "_worldsXml": {
+    "note": "WorldsXmlAdviceScanner (report-only) \u002B WorldsXmlFixer (safe cell DisableForcedConnections strip). Player.log XmlDataHelper: (1) zone Load create conflicts \u2014 flag \u003Czone without Load= under cell Load=Merge|Replace; never autofix Merge vs Replace (Bethesda Susa landmark overlay example in ManualAdvice.WorldsZoneLoadAdvice); (2) unexpected cell-level \u003Cbuilder\u003E \u2014 report only, never auto-delete (builders/music belong on zones / \u003Cmusic\u003E); (3) DisableForcedConnections on \u003Ccell\u003E \u2014 Fixer removes (zone-only attr). Dual_Wield_*\u2192Multiweapon_*, *Wares\u2192GenericInventoryRestocker, Calendar.get*\u2192Get*, AddReplacer\u2192SetArgument, AddAction Override skip, ColorUtility/HistoricEvent enabled:false remain curated."
+  },
+  "rules": [
+    {
+      "name": "Event.NewStringBuilder -\u003E TextBuilder.Get",
+      "pattern": "Event\\.NewStringBuilder\\(",
+      "replacement": "TextBuilder.Get(",
+      "dumpMember": null,
+      "ensureUsings": [
+        "XRL.World.Text"
+      ],
+      "note": "From prior mod-fix work; Event.NewStringBuilder was removed in favor of the pooled TextBuilder.Get() factory. Always ensure using XRL.World.Text; TextBuilder is not in XRL.World. TextBuilderCsFixer reverts Get() to new StringBuilder() when the local is still passed to AppendName/Substitute, and retargets same-file ref StringBuilder parameters that receive a TextBuilder.Get local."
+    },
+    {
+      "name": "XRL.World.TextBuilder -\u003E TextBuilder (wrong FQN)",
+      "pattern": "XRL\\.World\\.TextBuilder\\b",
+      "replacement": "TextBuilder",
+      "dumpMember": null,
+      "ensureUsings": [
+        "XRL.World.Text"
+      ],
+      "note": "Common mistaken fully-qualified name after NewStringBuilder migration; the type lives in XRL.World.Text, not XRL.World. Does not match the correct XRL.World.Text.TextBuilder form."
+    },
+    {
+      "name": "StringBuilder x = TextBuilder.Get -\u003E TextBuilder x = TextBuilder.Get",
+      "pattern": "(?:System\\.Text\\.)?StringBuilder\\s\u002B(\\w\u002B)\\s*=\\s*TextBuilder\\.Get\\(",
+      "replacement": "TextBuilder ${1} = TextBuilder.Get(",
+      "dumpMember": null,
+      "ensureUsings": [
+        "XRL.World.Text"
+      ],
+      "note": "TextBuilder is not a StringBuilder subclass; leftover typed locals from Event.NewStringBuilder migrations must be retargeted."
+    },
+    {
+      "name": "Grammar.Cardinal -\u003E Translator.Cardinal",
+      "pattern": "Grammar\\.Cardinal\\(",
+      "replacement": "Translator.Cardinal(",
+      "dumpMember": "XRL.Language.Grammar.Cardinal",
+      "ensureUsings": [
+        "XRL.Language"
+      ],
+      "note": "Safe rename \u2014 Translator.Cardinal(int/long) matches Grammar.Cardinal signatures. Prefer embedding count in GameText (\u0060=amount.things:dram=\u0060 / \u0060=liquid.cardinal.drams.of.liquid#amount=\u0060) when the surrounding sentence is already a StartReplace/EmitMessage template."
+    },
+    {
+      "name": "Grammar.CardinalNo -\u003E Translator.CardinalNo",
+      "pattern": "Grammar\\.CardinalNo\\(",
+      "replacement": "Translator.CardinalNo(",
+      "dumpMember": "XRL.Language.Grammar.CardinalNo",
+      "ensureUsings": [
+        "XRL.Language"
+      ],
+      "note": null
+    },
+    {
+      "name": "Grammar.Ordinal -\u003E Translator.Ordinal",
+      "pattern": "Grammar\\.Ordinal\\(",
+      "replacement": "Translator.Ordinal(",
+      "dumpMember": "XRL.Language.Grammar.Ordinal",
+      "ensureUsings": [
+        "XRL.Language"
+      ],
+      "note": null
+    },
+    {
+      "name": "Grammar.InitCap -\u003E Translator.InitUpper",
+      "pattern": "Grammar\\.InitCap\\(",
+      "replacement": "Translator.InitUpper(",
+      "dumpMember": "XRL.Language.Grammar.InitCap",
+      "ensureUsings": [
+        "XRL.Language"
+      ],
+      "note": "Defaults to culture-aware InitUpper; switch to Translator.InitUpperInvariant by hand if invariant casing is required."
+    },
+    {
+      "name": "Grammar.InitLower -\u003E Translator.InitLower",
+      "pattern": "Grammar\\.InitLower\\(",
+      "replacement": "Translator.InitLower(",
+      "dumpMember": "XRL.Language.Grammar.InitLower",
+      "ensureUsings": [
+        "XRL.Language"
+      ],
+      "note": null
+    },
+    {
+      "name": "Grammar.Multiplicative -\u003E Translator.Multiplicative",
+      "pattern": "Grammar\\.Multiplicative\\(",
+      "replacement": "Translator.Multiplicative(",
+      "dumpMember": "XRL.Language.Grammar.Multiplicative",
+      "ensureUsings": [
+        "XRL.Language"
+      ],
+      "note": null
+    },
+    {
+      "name": "Grammar.Stutterize -\u003E Translator.StutterizeString",
+      "pattern": "Grammar\\.Stutterize\\(",
+      "replacement": "Translator.StutterizeString(",
+      "dumpMember": "XRL.Language.Grammar.Stutterize",
+      "ensureUsings": [
+        "XRL.Language"
+      ],
+      "note": null
+    },
+    {
+      "name": "GameObject.FlushWantTurnTickCache -\u003E FlushTransientCache",
+      "pattern": "\\.FlushWantTurnTickCache\\(\\s*\\)",
+      "replacement": ".FlushTransientCache()",
+      "dumpMember": "XRL.World.GameObject.FlushWantTurnTickCache",
+      "note": null
+    },
+    {
+      "name": "pBrain -\u003E Brain",
+      "pattern": "\\.pBrain\\b",
+      "replacement": ".Brain",
+      "dumpMember": null,
+      "note": "Old GameObject backing-field-style property; live API is Brain. Member-access only (\\.pBrain) \u2014 bare identifier locals/params named pBrain are NOT rewritten (2026-08 unsafe-autofix audit)."
+    },
+    {
+      "name": "Brain.pPhysics -\u003E ParentObject.Physics",
+      "pattern": "(?\u003C=[Bb]rain)\\.pPhysics\\b",
+      "replacement": ".ParentObject.Physics",
+      "dumpMember": "XRL.World.Parts.Brain.pPhysics",
+      "note": "Brain.pPhysics is obsolete (\u0027use pPhysics on parent object\u0027); Brain has no Physics field. Must run before the general .pPhysics rule. Matches ParentBrain.pPhysics as well (lookbehind is Brain)."
+    },
+    {
+      "name": "Brain._pPhysics -\u003E ParentObject.Physics",
+      "pattern": "(?\u003C=[Bb]rain)\\._pPhysics\\b",
+      "replacement": ".ParentObject.Physics",
+      "dumpMember": "XRL.World.Parts.Brain.pPhysics",
+      "note": "Same as Brain.pPhysics; underscore alias."
+    },
+    {
+      "name": ".pPhysics -\u003E .Physics",
+      "pattern": "\\.pPhysics\\b",
+      "replacement": ".Physics",
+      "dumpMember": "XRL.World.GameObject.pPhysics",
+      "note": "GameObject field is Physics; member-access only (does not rename locals named pPhysics)."
+    },
+    {
+      "name": "._pPhysics -\u003E .Physics",
+      "pattern": "\\._pPhysics\\b",
+      "replacement": ".Physics",
+      "dumpMember": "XRL.World.GameObject._pPhysics",
+      "note": null
+    },
+    {
+      "name": ".pRender -\u003E .Render",
+      "pattern": "\\.pRender\\b",
+      "replacement": ".Render",
+      "dumpMember": "XRL.World.GameObject.pRender",
+      "note": "GameObject field is Render; member-access only (does not rename locals named pRender)."
+    },
+    {
+      "name": "._pRender -\u003E .Render",
+      "pattern": "\\._pRender\\b",
+      "replacement": ".Render",
+      "dumpMember": "XRL.World.GameObject._pRender",
+      "note": null
+    },
+    {
+      "name": "GameObject.create -\u003E Create",
+      "pattern": "GameObject\\.create\\(",
+      "replacement": "GameObject.Create(",
+      "dumpMember": "XRL.World.GameObject.create",
+      "note": "Qualified GameObject.create only \u2014 avoids ScreenBuffer.create and other non-obsolete create helpers."
+    },
+    {
+      "name": "GameObject.createSample -\u003E CreateSample",
+      "pattern": "GameObject\\.createSample\\(",
+      "replacement": "GameObject.CreateSample(",
+      "dumpMember": "XRL.World.GameObject.createSample",
+      "note": null
+    },
+    {
+      "name": "GameObject.createUnmodified -\u003E CreateUnmodified",
+      "pattern": "GameObject\\.createUnmodified\\(",
+      "replacement": "GameObject.CreateUnmodified(",
+      "dumpMember": "XRL.World.GameObject.createUnmodified",
+      "note": null
+    },
+    {
+      "name": "Calendar.getMonth -\u003E Calendar.GetMonth",
+      "pattern": "Calendar\\.getMonth\\(",
+      "replacement": "Calendar.GetMonth(",
+      "dumpMember": "XRL.World.Calendar.getMonth",
+      "note": "PascalCase rename; GetMonth is the live API."
+    },
+    {
+      "name": "Calendar.getYear -\u003E Calendar.GetYear",
+      "pattern": "Calendar\\.getYear\\(",
+      "replacement": "Calendar.GetYear(",
+      "dumpMember": "XRL.World.Calendar.getYear",
+      "note": "PascalCase rename; GetYear is the live API."
+    },
+    {
+      "name": "Calendar.getTime -\u003E Calendar.GetTime",
+      "pattern": "Calendar\\.getTime\\(",
+      "replacement": "Calendar.GetTime(",
+      "dumpMember": "XRL.World.Calendar.getTime",
+      "note": "PascalCase rename for all overloads (getTime()/getTime(zoneID)/getTime(int) \u2192 GetTime(...))."
+    },
+    {
+      "name": "Calendar.getDay -\u003E Calendar.GetDay",
+      "pattern": "Calendar\\.getDay\\(",
+      "replacement": "Calendar.GetDay(",
+      "dumpMember": "XRL.World.Calendar.getDay",
+      "note": "PascalCase rename; GetDay is the live callable API. Do NOT auto-rewrite GetDay() \u2192 =time.day= (too broad \u2014 computation/UI still need GetDay). Messaging/Popup/journal may hand-migrate to =time.day= (see dump ManualAdvice)."
+    },
+    {
+      "name": "Reputation.get -\u003E Reputation.Get",
+      "pattern": "Reputation\\.get\\(",
+      "replacement": "Reputation.Get(",
+      "dumpMember": "XRL.World.Reputation.get",
+      "note": "PascalCase rename. Dump searchPattern tightened to Reputation.get( (was .get( \u2014 HotkeySpread.get false positive)."
+    },
+    {
+      "name": "Reputation.set -\u003E Reputation.Set",
+      "pattern": "Reputation\\.set\\(",
+      "replacement": "Reputation.Set(",
+      "dumpMember": "XRL.World.Reputation.set",
+      "note": "PascalCase rename."
+    },
+    {
+      "name": "Reputation.modify -\u003E Reputation.Modify",
+      "pattern": "Reputation\\.modify\\(",
+      "replacement": "Reputation.Modify(",
+      "dumpMember": "XRL.World.Reputation.modify",
+      "note": "PascalCase rename."
+    },
+    {
+      "name": "Factions.get -\u003E Factions.Get",
+      "pattern": "Factions\\.get\\(",
+      "replacement": "Factions.Get(",
+      "dumpMember": "XRL.World.Factions.get",
+      "note": "PascalCase rename; dump pattern already Factions.get(."
+    },
+    {
+      "name": "Location2D.get -\u003E Location2D.Get",
+      "pattern": "Location2D\\.get\\(",
+      "replacement": "Location2D.Get(",
+      "dumpMember": "Genkit.Location2D.get",
+      "note": "PascalCase rename."
+    },
+    {
+      "name": "[VariableReplacer] DelegateContext Context -\u003E VariableContext Context",
+      "pattern": "(?\u003Cpre\u003E\\[(?:VariableReplacer|VariableObjectReplacer)\\b[^\\r\\n]*?\\]\\s*\\r?\\n\\s*[^\\r\\n]*?)\\bDelegateContext(?\u003Csp\u003E\\s\u002B)Context\\b",
+      "replacement": "${pre}VariableContext${sp}Context",
+      "dumpMember": null,
+      "note": "Scoped to the method signature immediately below a [VariableReplacer] or [VariableObjectReplacer] attribute; DelegateContext used elsewhere (e.g. ConversationDelegates) is a different, still-current type and is left untouched. VariableReplacerFixer then rewrites VariableObjectReplacer \u2192 VariableReplacer(Capitalization=true) and adds GameObject Object when the body uses Context.Target/Pronouns."
+    },
+    {
+      "name": "ReplaceBuilder.AddReplacer(str,str) -\u003E SetArgument",
+      "pattern": "\\.AddReplacer\\(\\s*(\u0022(?:[^\u0022\\\\]|\\\\.)*\u0022)\\s*,\\s*(\u0022(?:[^\u0022\\\\]|\\\\.)*\u0022)\\s*\\)",
+      "replacement": ".SetArgument(${1}, ${2})",
+      "dumpMember": "XRL.World.Text.ReplaceBuilder.AddReplacer(Key,Value)",
+      "ensureUsings": [
+        "XRL.World.Text"
+      ],
+      "note": "Only rewrites the literal-string/literal-string overload; delegate-based AddReplacer(key, MethodRef) calls are left for manual [VariableReplacer] conversion."
+    },
+    {
+      "name": "ReplaceBuilder.AddReplacer(str,expr) -\u003E SetArgument",
+      "pattern": "\\.AddReplacer\\(\\s*(\u0022(?:[^\u0022\\\\]|\\\\.)*\u0022)\\s*,\\s*((?:[^,()\\r\\n]*\\.[^,()\\r\\n]\u002B|[^,()\\r\\n]\u002B\\([^)]*\\)))\\s*\\)",
+      "replacement": ".SetArgument(${1}, ${2})",
+      "dumpMember": "XRL.World.Text.ReplaceBuilder.AddReplacer(Key,Value)",
+      "ensureUsings": [
+        "XRL.World.Text"
+      ],
+      "note": "Second arg must contain \u0027.\u0027 or \u0027(\u0027 (e.g. Opp.its, x.ToString(), ParentObject.DisplayName) so bare Replacer method-group identifiers are not rewritten. Run after the literal\u002Bliteral rule."
+    },
+    {
+      "name": "ReplaceBuilder.AddReplacer(str,ternary) -\u003E SetArgument",
+      "pattern": "\\.AddReplacer\\(\\s*(\u0022(?:[^\u0022\\\\]|\\\\.)*\u0022)\\s*,\\s*([^,\\r\\n]*\\?[^\\r\\n]*:[^,\\r\\n]*)\\s*\\)",
+      "replacement": ".SetArgument(${1}, ${2})",
+      "dumpMember": "XRL.World.Text.ReplaceBuilder.AddReplacer(Key,Value)",
+      "ensureUsings": [
+        "XRL.World.Text"
+      ],
+      "note": "Ternary value expressions (e.g. Foil ? \u0022 (F)\u0022 : null) are always the string Value overload, never a Replacer method group. Same arg order as SetArgument(Alias, Argument). Run after literal\u002Bliteral and str,expr rules. Does not match commas outside the second arg (keep ternaries simple or hand-fix)."
+    },
+    {
+      "name": "LiquidXxx.ID -\u003E LiquidID.Xxx",
+      "pattern": "\\bLiquid(Acid|Algae|Asphalt|Blood|BrainBrine|Cider|Cloning|Convalessence|Gel|Goo|Honey|Ink|Lava|NeutronFlux|Oil|Ooze|ProteanGunk|Putrescence|Salt|Sap|Slime|Sludge|SunSlag|WarmStatic|Water|Wax|Wine)\\.ID\\b",
+      "replacement": "LiquidID.$1",
+      "dumpMember": "XRL.Liquids.LiquidSalt.ID",
+      "ensureUsings": [
+        "XRL.Liquids"
+      ],
+      "note": "Static LiquidXxx.ID field \u2192 LiquidID.Xxx (WarmStatic/Salt/Blood/Water/\u2026). Method calls ApplyRandomEffectTo/GlitchObject/GlitchZone stay PreferXML.LiquidWarmStatic advice (BaseGlitchPart)."
+    },
+    {
+      "name": "ReplaceBuilder.AddObject(obj,alias,silent) -\u003E SetArgument(alias,obj,silent)",
+      "pattern": "(?\u003C=(?:StartReplace\\(|_T\\(|\\bReplaceBuilder\\b|\\.Start\\(\\s*\u0022|EmitMessage)[^;]{0,400})\\.AddObject\\(\\s*([^,()\\r\\n]\u002B?)\\s*,\\s*(\u0022(?:[^\u0022\\\\]|\\\\.)*\u0022)\\s*,\\s*(true|false)\\s*\\)",
+      "replacement": ".SetArgument(${2}, ${1}, ${3})",
+      "dumpMember": "XRL.World.Text.ReplaceBuilder.AddObject",
+      "ensureUsings": [
+        "XRL.World.Text"
+      ],
+      "note": "3-arg aliased form (Object, Alias, Silent). Argument order swaps: AddObject(Object, Alias) -\u003E SetArgument(Alias, Object). Confidence signal earlier in SAME statement (lookbehind stops at \u0027;\u0027): StartReplace(/_T(/ReplaceBuilder/EmitMessage/GameText .Start(\u0022\u2026 \u2014 NOT bare .Start() (Thread/History/Stopwatch) and NOT empty .Start(). chains (2026-08 unsafe-autofix audit). Must run before the 2-arg rule below. Rare GameText .Start().AddObject(alias) stays manual."
+    },
+    {
+      "name": "ReplaceBuilder.AddObject(obj,alias) -\u003E SetArgument(alias,obj)",
+      "pattern": "(?\u003C=(?:StartReplace\\(|_T\\(|\\bReplaceBuilder\\b|\\.Start\\(\\s*\u0022|EmitMessage)[^;]{0,400})\\.AddObject\\(\\s*([^,()\\r\\n]\u002B?)\\s*,\\s*(\u0022(?:[^\u0022\\\\]|\\\\.)*\u0022)\\s*\\)",
+      "replacement": ".SetArgument(${2}, ${1})",
+      "dumpMember": "XRL.World.Text.ReplaceBuilder.AddObject",
+      "ensureUsings": [
+        "XRL.World.Text"
+      ],
+      "note": "2-arg aliased form (Object, Alias). Same confidence lookbehind as the 3-arg rule (tightened 2026-08: dropped bare \\\\.Start\\\\( \u2014 Thread/History false positives). Unaliased .AddObject(x) stays manual. Cell/Inventory/Zone placement excluded by lookbehind."
+    },
+    {
+      "name": "Extensions.Capitalize -\u003E Translator.InitUpper",
+      "pattern": "Extensions\\.Capitalize\\(",
+      "replacement": "Translator.InitUpper(",
+      "dumpMember": "Extensions.Capitalize",
+      "ensureUsings": [
+        "XRL.Language"
+      ],
+      "note": "Only the static/qualified form. Instance-style s.Capitalize() must become Translator.InitUpper(s) by hand (receiver moves into the arg list)."
+    },
+    {
+      "name": "ColorUtility.CapitalizeExceptFormatting -\u003E Translator.InitUpper",
+      "pattern": "ColorUtility\\.CapitalizeExceptFormatting\\(",
+      "replacement": "Translator.InitUpper(",
+      "dumpMember": "ConsoleLib.Console.ColorUtility.CapitalizeExceptFormatting",
+      "ensureUsings": [
+        "XRL.Language"
+      ],
+      "enabled": false,
+      "note": "DISABLED 2026-08 unsafe-autofix audit: InitUpper is NOT color-code-aware; auto-rewrite can regress formatted strings (CapitalizeExceptFormatting skips \u0026K/{{\u2026}} runs). Prefer hand-migrate to Translator.InitUpper only when no mid-string color codes, or keep CapitalizeExceptFormatting until a true replacement exists. Dump remains needsManual."
+    },
+    {
+      "name": "HistoricEvent.hasEventProperty -\u003E HasEventProperty",
+      "pattern": "\\.hasEventProperty\\(",
+      "replacement": ".HasEventProperty(",
+      "dumpMember": "HistoryKit.HistoricEvent.hasEventProperty",
+      "enabled": false,
+      "note": "DISABLED 2026-08 unsafe-autofix audit: bare .hasEventProperty( over-matches any type; dump already needsManual/autoFixable:false. Re-enable only with a HistoricEvent-receiver-gated pattern after reviewing call sites."
+    },
+    {
+      "name": "HistoricEvent.setEventProperty -\u003E SetEventProperty",
+      "pattern": "\\.setEventProperty\\(",
+      "replacement": ".SetEventProperty(",
+      "dumpMember": "HistoryKit.HistoricEvent.setEventProperty",
+      "enabled": false,
+      "note": "DISABLED 2026-08 unsafe-autofix audit: bare .setEventProperty( over-matches; dump needsManual. Same as hasEventProperty."
+    },
+    {
+      "name": "HistoricEvent.getEventProperty -\u003E GetEventProperty",
+      "pattern": "\\.getEventProperty\\(",
+      "replacement": ".GetEventProperty(",
+      "dumpMember": "HistoryKit.HistoricEvent.getEventProperty",
+      "enabled": false,
+      "note": "DISABLED 2026-08 unsafe-autofix audit: bare .getEventProperty( over-matches; dump needsManual."
+    },
+    {
+      "name": "History.GetNewEntity -\u003E CreateEntity",
+      "pattern": "\\.GetNewEntity\\(",
+      "replacement": ".CreateEntity(",
+      "dumpMember": "HistoryKit.History.GetNewEntity",
+      "enabled": false,
+      "note": "DISABLED 2026-08 unsafe-autofix audit: bare .GetNewEntity( \u2192 .CreateEntity( can hit unrelated types; dump needsManual/autoFixable:false. Re-enable with History-receiver gate after reviewing call sites."
+    },
+    {
+      "name": "StringBuilder local \u002B AppendReputationDescription -\u003E TextBuilder.Get",
+      "pattern": "NEVER_MATCH_AppendReputationDescription_USE_PROGRAMMATIC_FIXER",
+      "replacement": "$0",
+      "dumpMember": "XRL.World.Parts.GivesRep.AppendReputationDescription",
+      "ensureUsings": [
+        "XRL.World.Text"
+      ],
+      "enabled": false,
+      "note": "DISABLED 2026-08: previous multi-line backref regex ReDoS-hung on any empty \u0060new StringBuilder()\u0060/\u0060new()\u0060 (even without AppendReputationDescription). Logic moved to AppendReputationDescriptionFixer (Core \u002B Update-ObsoleteApis Repair-ProgrammaticCsFixes)."
+    },
+    {
+      "name": "Dual_Wield_Fussilade -\u003E Multiweapon_Flurry",
+      "pattern": "\\bDual_Wield_Fussilade\\b",
+      "replacement": "Multiweapon_Flurry",
+      "dumpMember": null,
+      "note": "From Compat.xml skill rename; Dual Wield tree became Multiweapon Fighting. Word-boundary safe for XML/C# skill Name/Class/Prereq tokens."
+    },
+    {
+      "name": "Dual_Wield_Ambidexterity -\u003E Multiweapon_Expertise",
+      "pattern": "\\bDual_Wield_Ambidexterity\\b",
+      "replacement": "Multiweapon_Expertise",
+      "dumpMember": null,
+      "note": "From Compat.xml skill rename (Dual Wield \u2192 Multiweapon Fighting tree)."
+    },
+    {
+      "name": "Dual_Wield_Offhand_Strikes -\u003E Multiweapon_Proficiency",
+      "pattern": "\\bDual_Wield_Offhand_Strikes\\b",
+      "replacement": "Multiweapon_Proficiency",
+      "dumpMember": null,
+      "note": "From Compat.xml skill rename (Dual Wield \u2192 Multiweapon Fighting tree)."
+    },
+    {
+      "name": "Dual_Wield_Two_Weapon_Fighting -\u003E Multiweapon_Mastery",
+      "pattern": "\\bDual_Wield_Two_Weapon_Fighting\\b",
+      "replacement": "Multiweapon_Mastery",
+      "dumpMember": null,
+      "note": "From Compat.xml skill rename (Dual Wield \u2192 Multiweapon Fighting tree)."
+    },
+    {
+      "name": "Dual_Wield -\u003E Multiweapon_Fighting",
+      "pattern": "\\bDual_Wield\\b",
+      "replacement": "Multiweapon_Fighting",
+      "dumpMember": null,
+      "note": "From Compat.xml skill rename. \\b is safe vs Dual_Wield_* children because _ is a word char (no boundary before the suffix)."
+    },
+    {
+      "name": "builders GritGateWares\u002BTier2Wares -\u003E MafeoWares restocker",
+      "pattern": "\u003Cbuilder\\s\u002BName=\u0022(?:XRL\\.World\\.ObjectBuilders\\.)?GritGateWares\u0022\\s*/\u003E\\s*\u003Cbuilder\\s\u002BName=\u0022(?:XRL\\.World\\.ObjectBuilders\\.)?Tier2Wares\u0022\\s*/\u003E",
+      "replacement": "\u003Cpart Name=\u0022GenericInventoryRestocker\u0022 Table=\u0022MafeoWares\u0022 /\u003E",
+      "dumpMember": null,
+      "note": "Vanilla Mafeo replaced the old GritGateWares\u002BTier2Wares builder pair with MafeoWares (includes Tier2Wares). Must run before the Tier2Wares 1:1 rule; consecutive-pair only. GritGateWares alone has no population \u2014 left for manual review."
+    },
+    {
+      "name": "builder *Wares -\u003E GenericInventoryRestocker (1:1 table)",
+      "pattern": "\u003Cbuilder\\s\u002BName=\u0022(?:XRL\\.World\\.ObjectBuilders\\.)?(?\u003Ctable\u003EDataDiskWares|ScrapWares|Tier[1-8]Wares|MafeoWares|YurlWares|GlowpadOasisWares|GeneralMerchantWares)\u0022\\s*/\u003E",
+      "replacement": "\u003Cpart Name=\u0022GenericInventoryRestocker\u0022 Table=\u0022${table}\u0022 /\u003E",
+      "dumpMember": null,
+      "note": "Old merchant ObjectBuilders (*Wares) were removed; stock now comes from GenericInventoryRestocker \u002B PopulationTables of the same name. Only tables that still exist 1:1."
+    },
+    {
+      "name": "Laterality Middle -\u003E Mid",
+      "pattern": "Laterality=\u0022Middle\\b",
+      "replacement": "Laterality=\u0022Mid",
+      "dumpMember": null,
+      "note": "XRL.World.Capabilities.Laterality.GetCode: Middle is invalid; MID=32 token is Mid (vanilla Bodies.xml uses Laterality=\u0022Mid\u0022 / \u0022Right Mid\u0022 / \u0022Left Mid\u0022). Scoped to Laterality=\u0022 so ThrownWeapon/Type Middle Hardpoint is untouched. Compounds Middle Right/Left become Mid Right/Left (same codes as Right Mid/Left Mid). Crown is not a laterality token \u2014 hand-map (often Upper); no autofix."
+    },
+    {
+      "name": "Bodies Type=Flipper -\u003E Fin",
+      "pattern": "\\bType\\s*=\\s*([\u0022\u0027])Flipper\\1",
+      "replacement": "Type=$1Fin$1",
+      "dumpMember": null,
+      "note": "Anatomy/Bodies.xml: Flipper is not a vanilla BodyPartType. Lateral swimming limbs use Fin (same slots as Fish). Covers Type=\u0022Flipper\u0022 on \u003Cpart\u003E and \u003Cbodyparttype\u003E."
+    },
+    {
+      "name": "populations population/group/object/table name= -\u003E Name=",
+      "pattern": "\u003C(?\u003Ctag\u003Epopulation|group|object|table)\\b(?\u003Cpre\u003E[^\u003E]*?)\\b(?!Name\\b)[Nn][Aa][Mm][Ee]\\s*=",
+      "replacement": "\u003C${tag}${pre}Name=",
+      "dumpMember": null,
+      "note": "PopulationManager / XmlDataHelper case-sensitive Name=. Prefer PopulationXmlFixer for full wrong-case \u002B Load value title-case; this curated rule covers the common lowercase name= form for dry-run visibility."
+    },
+    {
+      "name": "populations population/group load= -\u003E Load=",
+      "pattern": "\u003C(?\u003Ctag\u003Epopulation|group)\\b(?\u003Cpre\u003E[^\u003E]*?)\\b(?!Load\\b)[Ll][Oo][Aa][Dd]\\s*=\\s*(?\u003Cq\u003E[\u0022\u0027])(?\u003Cval\u003Emerge|replace|remove)\\k\u003Cq\u003E",
+      "replacement": "\u003C${tag}${pre}Load=${q}${val}${q}",
+      "dumpMember": null,
+      "note": "Case-sensitive Load=; value title-cased by follow-up Load=\u0022merge\u0022\u2192Merge rules / PopulationXmlFixer."
+    },
+    {
+      "name": "populations Load=\u0022merge\u0022 -\u003E Load=\u0022Merge\u0022",
+      "pattern": "\\bLoad\\s*=\\s*\u0022merge\u0022",
+      "replacement": "Load=\u0022Merge\u0022",
+      "dumpMember": null,
+      "note": "PopulationItem Load == \u0022Merge\u0022 is case-sensitive."
+    },
+    {
+      "name": "populations Load=\u0027merge\u0027 -\u003E Load=\u0027Merge\u0027",
+      "pattern": "\\bLoad\\s*=\\s*\u0027merge\u0027",
+      "replacement": "Load=\u0027Merge\u0027",
+      "dumpMember": null,
+      "note": "Single-quote variant of Load merge\u2192Merge."
+    },
+    {
+      "name": "populations Load=\u0022replace\u0022 -\u003E Load=\u0022Replace\u0022",
+      "pattern": "\\bLoad\\s*=\\s*\u0022replace\u0022",
+      "replacement": "Load=\u0022Replace\u0022",
+      "dumpMember": null,
+      "note": "PopulationItem Load == \u0022Replace\u0022 is case-sensitive."
+    },
+    {
+      "name": "populations Load=\u0022remove\u0022 -\u003E Load=\u0022Remove\u0022",
+      "pattern": "\\bLoad\\s*=\\s*\u0022remove\u0022",
+      "replacement": "Load=\u0022Remove\u0022",
+      "dumpMember": null,
+      "note": "PopulationItem Load == \u0022Remove\u0022 is case-sensitive."
+    },
+    {
+      "name": "populations population/group style= -\u003E Style=",
+      "pattern": "\u003C(?\u003Ctag\u003Epopulation|group)\\b(?\u003Cpre\u003E[^\u003E]*?)\\b(?!Style\\b)[Ss][Tt][Yy][Ll][Ee]\\s*=",
+      "replacement": "\u003C${tag}${pre}Style=",
+      "dumpMember": null,
+      "note": "XmlDataHelper case-sensitive Style= on population/group."
+    },
+    {
+      "name": "Faction.getFormattedName \u2192 GetFormattedName",
+      "pattern": "\\.getFormattedName\\(",
+      "replacement": ".GetFormattedName(",
+      "dumpMember": "XRL.World.Faction.getFormattedName",
+      "requiresSubstring": "getFormattedName",
+      "note": "Obsolete camelCase removed; live API is Faction.GetFormattedName (static \u002B instance)."
+    },
+    {
+      "name": "PopupMessage._SingleButton \u2192 SingleButton",
+      "pattern": "PopupMessage\\._(?\u003Cn\u003EYesNoCancel|AcceptCancel|SubmitCancel|Single|Cancel|Copy|YesNo)Button\\b",
+      "replacement": "PopupMessage.${n}Button",
+      "dumpMember": null,
+      "requiresSubstring": "PopupMessage._",
+      "note": "Private backing lists; public wrappers are PopupMessage.SingleButton / YesNoButton / etc. CS0117 on _SingleButton."
+    }
+  ],
+  "postEnsureUsings": [
+    {
+      "name": "TextBuilder needs XRL.World.Text",
+      "ifPattern": "\\bTextBuilder\\b",
+      "usings": [
+        "XRL.World.Text"
+      ]
+    },
+    {
+      "name": "StartReplace needs XRL",
+      "ifPattern": "\\.StartReplace\\s*\\(",
+      "usings": [
+        "XRL"
+      ]
+    },
+    {
+      "name": "Translator needs XRL.Language",
+      "ifPattern": "\\bTranslator\\.(Cardinal|CardinalNo|Ordinal|InitUpper|InitLower|Multiplicative|Stutterize)",
+      "usings": [
+        "XRL.Language"
+      ]
+    },
+    {
+      "name": "Grammar needs XRL.Language",
+      "ifPattern": "\\bGrammar\\.",
+      "usings": [
+        "XRL.Language"
+      ]
+    }
+  ]
+}

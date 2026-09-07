@@ -1,0 +1,238 @@
+name: skyraider
+version: 1.2.0
+
+modules:
+  fuselage:
+    mesh: modules/skyraider_body.fbx
+    attachBone: root
+    offset: [0, 0, 0]
+    scale: [1, 1, 1]
+    rotation: [1, 0, 0, 0]
+    
+  wing_left:
+    mesh: modules/skyraider_wing_L.fbx
+    attachBone: wing_L
+    offset: [-2.5, 0.2, 0]
+    scale: [1, 1, 1]
+    rotation: [1, 0, 0, 0]
+    controlSurface: aileron
+    maxDeflection: 30
+    
+  wing_right:
+    mesh: modules/skyraider_wing_R.fbx
+    attachBone: wing_R
+    offset: [2.5, 0.2, 0]
+    scale: [1, 1, 1]
+    rotation: [1, 0, 0, 0]
+    controlSurface: aileron
+    maxDeflection: 30
+    
+  tailplane:
+    mesh: modules/skyraider_tail.fbx
+    attachBone: tail
+    offset: [0, 0.5, -4]
+    scale: [1, 1, 1]
+    rotation: [1, 0, 0, 0]
+    controlSurface: elevator
+    maxDeflection: 20
+    
+  thruster_main:
+    mesh: modules/skyraider_thruster.fbx
+    attachBone: rear
+    offset: [0, 0, -5]
+    scale: [1, 1, 1]
+    rotation: [1, 0, 0, 0]
+    thrustForce: 12000.0
+    thrustDirection: [0, 0, -1]
+    heatDistortion: 0.3
+    
+  thruster_aux:
+    mesh: modules/skyraider_thruster_aux.fbx
+    attachBone: rear
+    offset: [0, 0.5, -4.5]
+    scale: [0.8, 0.8, 0.8]
+    rotation: [1, 0, 0, 0]
+    thrustForce: 3000.0
+    thrustDirection: [0, 0, -1]
+    heatDistortion: 0.1
+    
+  weapon_left:
+    mesh: modules/skyraider_weapon_L.fbx
+    attachBone: wing_L
+    offset: [-3, 0, 0]
+    scale: [1, 1, 1]
+    rotation: [1, 0, 0, 0]
+    weaponType: plasma_cannon
+    weaponRange: 500.0
+    
+  weapon_right:
+    mesh: modules/skyraider_weapon_R.fbx
+    attachBone: wing_R
+    offset: [3, 0, 0]
+    scale: [1, 1, 1]
+    rotation: [1, 0, 0, 0]
+    weaponType: plasma_cannon
+    weaponRange: 500.0
+    
+  energy_core:
+    mesh: modules/skyraider_core.fbx
+    attachBone: root
+    offset: [0, 0.5, -1]
+    scale: [0.5, 0.5, 0.5]
+    rotation: [1, 0, 0, 0]
+
+cockpit:
+  mesh: modules/skyraider_cockpit.fbx
+  attachBone: root
+  seatPosition: [0, 0.6, -0.2]
+  hudAnchors:
+    - [0.1, 0.4, 0.0]  # speedometer
+    - [0.0, 0.5, 0.1]  # targeting
+    - [-0.1, 0.4, 0.0] # altitude
+    - [0.0, 0.3, 0.1]  # energy
+  canopyMaterial: canopy_mat
+  canopyTransparency: 0.8
+  enableHolographicHUD: true
+
+magitechMaterials:
+  runeGlow:
+    emissiveColor: [0.2, 0.8, 1.0]
+    pulseRate: 0.8
+    patternScale: 0.5
+    glowIntensity: 1.0
+    
+  engineHeat:
+    distortionIntensity: 0.3
+    flickerRate: 10.0
+    heatColor: [1.0, 0.3, 0.1]
+    maxTemperature: 1200.0
+    
+  energyTrail:
+    trailColor: [0.1, 0.6, 1.0]
+    trailLength: 50.0
+    trailWidth: 2.0
+    fadeRate: 0.95
+
+flightParameters:
+  maxSpeed: 350.0
+  maxAltitude: 12000.0
+  maxThrust: 12000.0
+  liftCoefficient: 1.2
+  dragCoefficient: 0.8
+  turnRate: 45.0
+  climbRate: 25.0
+  controlSurface:
+    wing_L:
+      maxDeflection: 30
+    wing_R:
+      maxDeflection: 30
+    tail:
+      maxDeflection: 20
+
+animations:
+  - id: takeoff
+    type: takeoff
+    path: animations/takeoff.fbx
+    speed: 1.0
+    loop: false
+    blendTime: 0.2
+    
+  - id: hover
+    type: hover
+    path: animations/hover.fbx
+    speed: 1.0
+    loop: true
+    blendTime: 0.3
+    
+  - id: forward_flight
+    type: forward_flight
+    path: animations/forward.fbx
+    speed: 1.0
+    loop: true
+    blendTime: 0.2
+    
+  - id: banking
+    type: banking
+    path: animations/banking.fbx
+    speed: 1.0
+    loop: true
+    blendTime: 0.2
+    
+  - id: landing
+    type: landing
+    path: animations/landing.fbx
+    speed: 1.0
+    loop: false
+    blendTime: 0.3
+    
+  - id: cockpit_open
+    type: cockpit_open
+    path: animations/cockpit_open.fbx
+    speed: 1.0
+    loop: false
+    blendTime: 0.5
+    
+  - id: cockpit_close
+    type: cockpit_close
+    path: animations/cockpit_close.fbx
+    speed: 1.0
+    loop: false
+    blendTime: 0.5
+    
+  - id: weapon_deploy
+    type: weapon_deploy
+    path: animations/weapon_deploy.fbx
+    speed: 1.0
+    loop: false
+    blendTime: 0.3
+    
+  - id: weapon_retract
+    type: weapon_retract
+    path: animations/weapon_retract.fbx
+    speed: 1.0
+    loop: false
+    blendTime: 0.3
+
+physics:
+  totalMass: 800.0
+  centerOfMass: [0, 0.2, -1]
+  moduleMass:
+    fuselage: 400.0
+    wing_left: 50.0
+    wing_right: 50.0
+    tailplane: 30.0
+    thruster_main: 80.0
+    thruster_aux: 20.0
+    cockpit: 60.0
+    weapon_left: 40.0
+    weapon_right: 40.0
+    energy_core: 30.0
+
+lods:
+  - quality: ultra
+    meshDecimate: 0.0
+    materialDetail: 1.0
+    maxBoneInfluences: 8
+    enableShadows: true
+    enableReflections: true
+    
+  - quality: high
+    meshDecimate: 0.3
+    materialDetail: 0.7
+    maxBoneInfluences: 6
+    enableShadows: true
+    enableReflections: true
+    
+  - quality: medium
+    meshDecimate: 0.6
+    materialDetail: 0.4
+    maxBoneInfluences: 4
+    enableShadows: true
+    enableReflections: false
+    
+  - quality: low
+    meshDecimate: 0.9
+    materialDetail: 0.2
+    maxBoneInfluences: 2
+    enableShadows: false
+    enableReflections: false 

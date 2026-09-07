@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spell Templates</title>
+  <link rel="stylesheet" href="../../shared/osfui.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app" class="board">
+    <header class="view-head">
+      <h1>Spell Templates</h1>
+      <p>Mod builds ship with the plugin. Personal builds live on this machine. Suggested builds are generated from the live banks (school, triggers, capacity, stability). Tagged files can auto-apply on a zone or suit change (school-on-draw is off by default). Distinct from F8 suggestions, which generate a layout. A fuse pair snapshots Grid A (element) plus Grid B (delivery); Apply aims both banks — hold the fuse modifier to mutate. Export copies a personal JSON to the Export folder. Drop received files in Import, then Import dropped. Shared files cannot grant essence, durability, or energy.</p>
+    </header>
+    <div class="layout">
+      <aside class="list-col">
+        <div class="osf-segmented" id="tabs"></div>
+        <div class="palette-list" id="list"></div>
+        <p class="osf-note osf-note--info" id="empty">No templates in this list yet.</p>
+      </aside>
+      <section class="detail osf-card">
+        <div class="osf-eyebrow">Selected</div>
+        <h2 id="sel-name">Nothing selected</h2>
+        <p class="meta" id="sel-meta"></p>
+        <p class="desc" id="sel-desc"></p>
+        <p class="desc fusion-line hidden" id="sel-fusion"></p>
+        <p class="desc fusion-line hidden" id="sel-autoload"></p>
+        <div class="actions" id="sel-actions"></div>
+        <form class="save-row hidden" id="rename-form">
+          <input type="text" id="rename-name" maxlength="48" placeholder="New name" autocomplete="off">
+          <button type="submit" class="osf-btn osf-btn--ghost">Rename</button>
+        </form>
+        <div class="osf-note hidden" id="warn"></div>
+        <div class="osf-eyebrow">Combat hotkeys</div>
+        <p class="desc" id="hotkey-hint">Select a mod or personal template, then bind it. Suggestions cannot be bound until you Keep them. Stolen only while the Conduit is in hand.</p>
+        <div class="hotkeys" id="hotkeys"></div>
+        <div class="osf-eyebrow">Favorite slots</div>
+        <p class="desc">Keys 1–8 load Grid A (element) plus Grid B (delivery). Triggers ride on those banks. Click a bank for A, its B button for delivery, then a slot to bind. Click a bound slot again to reset.</p>
+        <div class="hotkeys" id="favorites"></div>
+        <div class="osf-eyebrow">Live banks</div>
+        <ol class="banks" id="banks"></ol>
+        <form class="save-row" id="save-form">
+          <input type="text" id="save-name" maxlength="48" placeholder="Name this loadout" autocomplete="off">
+          <input type="text" id="save-desc" maxlength="160" placeholder="Optional description" autocomplete="off">
+          <label class="save-fusion">
+            <input type="checkbox" id="save-fusion">
+            Save as fuse pair (Grid A + Grid B)
+          </label>
+          <button type="submit" class="osf-btn">Save current</button>
+          <button type="button" class="osf-btn osf-btn--ghost" id="reload">Reload lists</button>
+          <button type="button" class="osf-btn osf-btn--ghost" id="import">Import dropped</button>
+          <button type="button" class="osf-btn osf-btn--ghost" id="open-import">Open Import folder</button>
+          <button type="button" class="osf-btn osf-btn--ghost" id="open-export">Open Export folder</button>
+        </form>
+        <p class="desc" id="share-hint">Drop shared JSON into the Import folder, then Import dropped. Export copies the selected personal template to the Export folder.</p>
+      </section>
+    </div>
+  </div>
+  <script src="../../shared/osfui.js"></script>
+  <script src="../padnav.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

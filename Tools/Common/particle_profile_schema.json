@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Particle Profile Schema",
+  "description": "Particle system profiles for shield ambient and impact effects",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "default": "1.0.0"
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/particleProfile"
+      }
+    }
+  },
+  "definitions": {
+    "particleProfile": {
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique particle profile identifier"
+        },
+        "ambient": {
+          "$ref": "#/definitions/particleLayer"
+        },
+        "impact": {
+          "$ref": "#/definitions/particleLayer"
+        }
+      }
+    },
+    "particleLayer": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of particles"
+        },
+        "spawnShape": {
+          "type": "string",
+          "enum": ["disk", "ring", "sphere", "point"],
+          "default": "disk",
+          "description": "Particle spawn shape"
+        },
+        "radiusMin": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.1,
+          "description": "Minimum spawn radius"
+        },
+        "radiusMax": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.9,
+          "description": "Maximum spawn radius"
+        },
+        "velocity": {
+          "type": "object",
+          "properties": {
+            "min": {"type": "number"},
+            "max": {"type": "number"}
+          },
+          "description": "Velocity range"
+        },
+        "speed": {
+          "type": "object",
+          "properties": {
+            "min": {"type": "number"},
+            "max": {"type": "number"}
+          },
+          "description": "Speed range (alternative to velocity)"
+        },
+        "size": {
+          "type": "object",
+          "properties": {
+            "min": {"type": "number"},
+            "max": {"type": "number"}
+          },
+          "description": "Particle size range"
+        },
+        "life": {
+          "type": "object",
+          "properties": {
+            "min": {"type": "number"},
+            "max": {"type": "number"}
+          },
+          "description": "Particle lifetime range (seconds)"
+        },
+        "colorGradient": {
+          "type": "array",
+          "items": {"type": "string"},
+          "description": "Color gradient (hex colors)"
+        },
+        "blend": {
+          "type": "string",
+          "enum": ["additive", "alpha", "screen", "multiply"],
+          "default": "additive",
+          "description": "Blend mode"
+        },
+        "motionPattern": {
+          "type": "string",
+          "enum": ["OrbitInwardSpiral", "RadialBurst", "NoiseDrift", "Linear", "Random"],
+          "default": "Random",
+          "description": "Motion pattern type"
+        },
+        "trail": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable particle trails"
+        },
+        "trailLength": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.5,
+          "description": "Trail length (if trail = true)"
+        },
+        "noiseJitter": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.0,
+          "description": "Noise-based jitter strength"
+        },
+        "distortMap": {
+          "type": "string",
+          "description": "Path to distortion map texture (for impact particles)"
+        },
+        "angularSpeed": {
+          "type": "number",
+          "default": 0.0,
+          "description": "Angular speed for OrbitInwardSpiral"
+        },
+        "radialDecay": {
+          "type": "number",
+          "default": 0.0,
+          "description": "Radial decay rate for OrbitInwardSpiral"
+        },
+        "drag": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.0,
+          "description": "Drag coefficient (0 = none, 1 = max)"
+        }
+      }
+    }
+  }
+}
+

@@ -1,0 +1,327 @@
+# Phoenix QuadMech Definition
+# A four-legged Magitech mech with functional cockpit and energy systems
+
+name: phoenix_quad
+version: "1.0.0"
+author: "MagiTech Engineering"
+description: "A high-performance quadraped mech with advanced Magitech energy systems and functional cockpit"
+
+modules:
+  chassis:
+    mesh: "modules/phoenix_body.fbx"
+    attachBone: "root"
+    offset: [0, 0, 0]
+    scale: [1.0, 1.0, 1.0]
+    rotation: [0, 0, 0]
+    mass: 800.0
+  
+  leg_front_left:
+    mesh: "modules/phoenix_leg_fl.fbx"
+    attachBone: "hip_FL"
+    offset: [-0.8, 0, 1.2]
+    scale: [1.0, 1.0, 1.0]
+    rotation: [0, 0, 0]
+    mass: 150.0
+  
+  leg_front_right:
+    mesh: "modules/phoenix_leg_fr.fbx"
+    attachBone: "hip_FR"
+    offset: [0.8, 0, 1.2]
+    scale: [1.0, 1.0, 1.0]
+    rotation: [0, 0, 0]
+    mass: 150.0
+  
+  leg_back_left:
+    mesh: "modules/phoenix_leg_bl.fbx"
+    attachBone: "hip_BL"
+    offset: [-0.8, 0, -1.2]
+    scale: [1.0, 1.0, 1.0]
+    rotation: [0, 0, 0]
+    mass: 150.0
+  
+  leg_back_right:
+    mesh: "modules/phoenix_leg_br.fbx"
+    attachBone: "hip_BR"
+    offset: [0.8, 0, -1.2]
+    scale: [1.0, 1.0, 1.0]
+    rotation: [0, 0, 0]
+    mass: 150.0
+  
+  head:
+    mesh: "modules/phoenix_head.fbx"
+    attachBone: "neck"
+    offset: [0, 0.5, 0.8]
+    scale: [1.0, 1.0, 1.0]
+    rotation: [0, 0, 0]
+    mass: 100.0
+  
+  cockpit:
+    mesh: "modules/phoenix_cockpit.fbx"
+    attachBone: "torso_mid"
+    offset: [0, 0.8, 0]
+    scale: [1.0, 1.0, 1.0]
+    rotation: [0, 0, 0]
+    mass: 100.0
+  
+  weapon_left:
+    mesh: "modules/phoenix_weapon_l.fbx"
+    attachBone: "shoulder_L"
+    offset: [-1.2, 0.3, 0.5]
+    scale: [1.0, 1.0, 1.0]
+    rotation: [0, 0, 0]
+    mass: 50.0
+  
+  weapon_right:
+    mesh: "modules/phoenix_weapon_r.fbx"
+    attachBone: "shoulder_R"
+    offset: [1.2, 0.3, 0.5]
+    scale: [1.0, 1.0, 1.0]
+    rotation: [0, 0, 0]
+    mass: 50.0
+  
+  energy_core:
+    mesh: "modules/phoenix_core.fbx"
+    attachBone: "spine_mid"
+    offset: [0, 0.2, 0]
+    scale: [1.0, 1.0, 1.0]
+    rotation: [0, 0, 0]
+    mass: 200.0
+
+cockpit:
+  seatPosition: [0, 0.8, 0]
+  canopyTint: [0.2, 0.6, 1.0, 0.3]
+  canopyMaterial: "canopy_mat"
+  transparency: 0.3
+  enableHologram: true
+  hudAnchorPoints:
+    - [0.3, 0.9, 0.2]
+    - [-0.3, 0.9, 0.2]
+    - [0, 0.8, 0.4]
+
+magitechMaterials:
+  energyRunes:
+    emissiveColor: [0.1, 0.6, 1.0]
+    glowIntensity:
+      min: 0.5
+      max: 2.0
+    animationRate: 1.0
+    pulseFrequency: 2.0
+    enableFlicker: true
+    flickerIntensity: 0.3
+  
+  energyCore:
+    coreColor: [0.8, 0.2, 0.1]
+    energyLevel: 1.0
+    pulseRate: 3.0
+    enableArcs: true
+    arcIntensity: 0.7
+    arcCount: 4
+  
+  canopy:
+    tint: [0.2, 0.6, 1.0, 0.3]
+    transparency: 0.3
+    reflectivity: 0.8
+    enableScratches: true
+    scratchDensity: 0.1
+
+animations:
+  - id: "walk"
+    type: "walk"
+    path: "animations/walk.fbx"
+    speed: 1.0
+    loop: true
+    blendTime: 0.2
+    gaitPhase: 0.0
+    strideLength: 1.0
+    legLift: 0.3
+  
+  - id: "trot"
+    type: "trot"
+    path: "animations/trot.fbx"
+    speed: 2.0
+    loop: true
+    blendTime: 0.2
+    gaitPhase: 0.0
+    strideLength: 1.5
+    legLift: 0.4
+  
+  - id: "gallop"
+    type: "gallop"
+    path: "animations/gallop.fbx"
+    speed: 3.5
+    loop: true
+    blendTime: 0.2
+    gaitPhase: 0.0
+    strideLength: 2.0
+    legLift: 0.5
+  
+  - id: "cockpit_open"
+    type: "cockpit_open"
+    path: "animations/open_cockpit.fbx"
+    speed: 1.0
+    loop: false
+    blendTime: 0.3
+  
+  - id: "cockpit_close"
+    type: "cockpit_close"
+    path: "animations/close_cockpit.fbx"
+    speed: 1.0
+    loop: false
+    blendTime: 0.3
+  
+  - id: "pilot_entry"
+    type: "pilot_entry"
+    path: "animations/pilot_entry.fbx"
+    speed: 1.0
+    loop: false
+    blendTime: 0.5
+  
+  - id: "pilot_exit"
+    type: "pilot_exit"
+    path: "animations/pilot_exit.fbx"
+    speed: 1.0
+    loop: false
+    blendTime: 0.5
+  
+  - id: "idle"
+    type: "idle"
+    path: "animations/idle.fbx"
+    speed: 1.0
+    loop: true
+    blendTime: 0.2
+  
+  - id: "attack"
+    type: "attack"
+    path: "animations/attack.fbx"
+    speed: 1.5
+    loop: false
+    blendTime: 0.1
+  
+  - id: "defend"
+    type: "defend"
+    path: "animations/defend.fbx"
+    speed: 1.0
+    loop: false
+    blendTime: 0.2
+
+physics:
+  totalMass: 1500.0
+  moduleMass:
+    chassis: 800.0
+    leg_front_left: 150.0
+    leg_front_right: 150.0
+    leg_back_left: 150.0
+    leg_back_right: 150.0
+    head: 100.0
+    cockpit: 100.0
+    weapon_left: 50.0
+    weapon_right: 50.0
+    energy_core: 200.0
+  
+  jointLimits:
+    hip_FL:
+      swing: [45, 45]
+      twist: [30, 30]
+      damping: 0.1
+      friction: 0.2
+    
+    hip_FR:
+      swing: [45, 45]
+      twist: [30, 30]
+      damping: 0.1
+      friction: 0.2
+    
+    hip_BL:
+      swing: [50, 50]
+      twist: [30, 30]
+      damping: 0.1
+      friction: 0.2
+    
+    hip_BR:
+      swing: [50, 50]
+      twist: [30, 30]
+      damping: 0.1
+      friction: 0.2
+    
+    knee_FL:
+      swing: [0, 120]
+      twist: [0, 0]
+      damping: 0.15
+      friction: 0.25
+    
+    knee_FR:
+      swing: [0, 120]
+      twist: [0, 0]
+      damping: 0.15
+      friction: 0.25
+    
+    knee_BL:
+      swing: [0, 120]
+      twist: [0, 0]
+      damping: 0.15
+      friction: 0.25
+    
+    knee_BR:
+      swing: [0, 120]
+      twist: [0, 0]
+      damping: 0.15
+      friction: 0.25
+    
+    ankle_FL:
+      swing: [-30, 30]
+      twist: [-15, 15]
+      damping: 0.2
+      friction: 0.3
+    
+    ankle_FR:
+      swing: [-30, 30]
+      twist: [-15, 15]
+      damping: 0.2
+      friction: 0.3
+    
+    ankle_BL:
+      swing: [-30, 30]
+      twist: [-15, 15]
+      damping: 0.2
+      friction: 0.3
+    
+    ankle_BR:
+      swing: [-30, 30]
+      twist: [-15, 15]
+      damping: 0.2
+      friction: 0.3
+  
+  enableCCD: true
+  collisionMargin: 0.01
+
+lods:
+  - quality: "high"
+    meshDecimate: 0.0
+    materialDetail: 1.0
+    maxBones: 100
+    enableMorphTargets: true
+  
+  - quality: "medium"
+    meshDecimate: 0.4
+    materialDetail: 0.6
+    maxBones: 60
+    enableMorphTargets: true
+  
+  - quality: "low"
+    meshDecimate: 0.8
+    materialDetail: 0.3
+    maxBones: 30
+    enableMorphTargets: false
+  
+  - quality: "ultra_low"
+    meshDecimate: 0.95
+    materialDetail: 0.1
+    maxBones: 15
+    enableMorphTargets: false
+
+tags:
+  - "quadraped"
+  - "magitech"
+  - "combat"
+  - "scout"
+  - "phoenix" 

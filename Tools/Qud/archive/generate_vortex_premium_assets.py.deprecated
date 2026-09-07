@@ -1,0 +1,445 @@
+#!/usr/bin/env python3
+"""
+⚠️ DEPRECATED - This script has been superseded by generate_vortex_professional.py
+
+DO NOT USE THIS SCRIPT. Use generate_vortex_professional.py instead.
+
+All features from this script have been merged into the unified generator with improvements:
+- Premium quality rendering
+- 16-frame animations
+- All rendering quality improvements
+
+This script is kept for reference only.
+"""
+"""
+PREMIUM Quality Space-Time Vortex Asset Generator
+Creates high-quality animated sprites using advanced rendering techniques.
+16 frames for ultra-smooth animation in Caves of Qud.
+"""
+
+import os
+import sys
+import json
+import time
+import re
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+from PIL import Image, ImageDraw, ImageFilter, ImageFont
+import math
+import numpy as np
+
+# Fix Windows console encoding
+if sys.platform == 'win32':
+    try:
+        if hasattr(sys.stdout, 'reconfigure'):
+            sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+        if hasattr(sys.stderr, 'reconfigure'):
+            sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    except (AttributeError, ValueError):
+        pass
+
+# Import Ollama integration
+_ollama_path = os.path.join(os.path.dirname(__file__), "..", "Shared", "ollama_integration.py")
+OLLAMA_INTEGRATION_AVAILABLE = False
+call_ollama = None
+test_ollama_connection = None
+TASK_VISUAL = "visual"
+
+if os.path.exists(_ollama_path):
+    try:
+        shared_dir = os.path.join(os.path.dirname(__file__), "..", "Shared")
+        if shared_dir not in sys.path:
+            sys.path.insert(0, shared_dir)
+        from ollama_integration import call_ollama, test_ollama_connection
+        OLLAMA_INTEGRATION_AVAILABLE = True
+    except ImportError as e:
+        OLLAMA_INTEGRATION_AVAILABLE = False
+
+# Import model router if available
+_model_router_path = os.path.join(os.path.dirname(__file__), "..", "Common", "ollama_model_router.py")
+if os.path.exists(_model_router_path):
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "Common"))
+        from ollama_model_router import get_visual_model, TASK_VISUAL
+        MODEL_ROUTER_AVAILABLE = True
+    except ImportError:
+        MODEL_ROUTER_AVAILABLE = False
+        TASK_VISUAL = "visual"
+else:
+    MODEL_ROUTER_AVAILABLE = False
+    TASK_VISUAL = "visual"
+
+
+class PremiumVortexGenerator:
+    """Generates PREMIUM quality animated vortex assets."""
+    
+    def __init__(self, mod_path: Path, ollama_url: str = "http://localhost:11434", model: str = None):
+        self.mod_path = Path(mod_path)
+        self.textures_path = self.mod_path / "Textures"
+        self.visuals_path = self.mod_path / "Visuals"
+        self.textures_path.mkdir(exist_ok=True)
+        self.visuals_path.mkdir(exist_ok=True)
+        
+        self.ollama_url = ollama_url
+        if model is None:
+            preferred_visual_model = "wizardlm-uncensored:latest"
+            if OLLAMA_INTEGRATION_AVAILABLE:
+                available_models = self._get_available_models()
+                if preferred_visual_model in available_models:
+                    model = preferred_visual_model
+                elif available_models:
+                    wizardlm_models = [m for m in available_models if 'wizardlm' in m.lower()]
+                    model = wizardlm_models[0] if wizardlm_models else available_models[0]
+                else:
+                    model = preferred_visual_model
+            else:
+                model = preferred_visual_model
+        self.model = model
+        
+        # Test Ollama connection
+        if OLLAMA_INTEGRATION_AVAILABLE:
+            print("Testing Ollama connection...")
+            self.ollama_available = test_ollama_connection()
+            if not self.ollama_available:
+                raise RuntimeError("Ollama is not available. Please start Ollama.")
+        else:
+            raise RuntimeError("Ollama integration module not found.")
+    
+    def _get_available_models(self) -> List[str]:
+        try:
+            import requests
+            response = requests.get(f"{self.ollama_url}/api/tags", timeout=3)
+            if response.status_code == 200:
+                return [m["name"] for m in response.json().get("models", [])]
+        except:
+            pass
+        return []
+    
+    def hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
+        hex_color = hex_color.lstrip('#')
+        return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    
+    def render_premium_black_hole(self, frame: int, frame_count: int = 16, size: Tuple[int, int] = (64, 64)) -> Image.Image:
+        """Render PREMIUM black hole with ultra-smooth 16-frame animation."""
+        img = Image.new('RGBA', size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        cx, cy = size[0] // 2, size[1] // 2
+        rotation = (frame / frame_count) * (2 * math.pi)
+        pulse = 0.9 + (0.1 * math.sin(frame * 2 * math.pi / frame_count))
+        
+        # Color scheme - vibrant purple/magenta
+        colors = {
+            'outer_glow': (100, 0, 150),
+            'mid_glow': (150, 0, 200),
+            'spiral_outer': (200, 0, 255),
+            'spiral_inner': (255, 0, 255),
+            'core': (150, 0, 200),
+            'void': (20, 0, 40)
+        }
+        
+        # DRAMATIC layered glow
+        for i in range(8, 0, -1):
+            radius = int((cx - i * 2) * pulse)
+            if radius > 0:
+                alpha = int(70 * (1 - i / 8))
+                draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
+                           fill=(*colors['outer_glow'], alpha), outline=None)
+        
+        # THICK rotating spiral arms (3 arms for drama)
+        for arm in range(3):
+            arm_offset = (2 * math.pi * arm / 3) + rotation
+            
+            # Draw THICK spiral
+            for i in range(120):  # Many points for smooth spiral
+                t = i / 120
+                angle = arm_offset + (t * 8 * math.pi)  # 4 full turns
+                radius = t * (cx - 8)
+                x = int(cx + radius * math.cos(angle))
+                y = int(cy + radius * math.sin(angle))
+                
+                if 0 <= x < size[0] and 0 <= y < size[1]:
+                    # Color gradient along spiral
+                    color = tuple(
+                        int(colors['spiral_outer'][j] * (1 - t) + colors['spiral_inner'][j] * t)
+                        for j in range(3)
+                    )
+                    
+                    # Thickness increases toward center
+                    thickness = int(4 * (1 - t * 0.5))
+                    
+                    # Main spiral point
+                    draw.ellipse([x - thickness, y - thickness, x + thickness, y + thickness],
+                               fill=color, outline=None)
+                    
+                    # Glow around spiral
+                    if t < 0.6:
+                        glow_size = thickness + 2
+                        alpha = int(120 * (1 - t))
+                        draw.ellipse([x - glow_size, y - glow_size, x + glow_size, y + glow_size],
+                                   fill=(*colors['mid_glow'], alpha), outline=None)
+        
+        # Pulsing event horizon rings
+        for i in range(6, 0, -1):
+            ring_pulse = 1.0 + (0.08 * math.sin(frame * 2 * math.pi / frame_count + i * math.pi / 6))
+            radius = int((cx - i * 3) * ring_pulse)
+            if radius > 0:
+                alpha = int(240 * (1 - i / 6))
+                draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
+                           fill=None, outline=(*colors['core'], alpha), width=2)
+        
+        # Bright void center with glow
+        center_size = 6
+        draw.ellipse([cx - center_size - 2, cy - center_size - 2, cx + center_size + 2, cy + center_size + 2],
+                    fill=(*colors['spiral_inner'], 80), outline=None)
+        draw.ellipse([cx - center_size, cy - center_size, cx + center_size, cy + center_size],
+                    fill=colors['void'], outline=colors['spiral_inner'], width=2)
+        
+        # Apply slight blur for smoothness
+        img = img.filter(ImageFilter.SMOOTH)
+        
+        return img
+    
+    def render_premium_white_hole(self, frame: int, frame_count: int = 16, size: Tuple[int, int] = (64, 64)) -> Image.Image:
+        """Render PREMIUM white hole with ultra-smooth 16-frame animation."""
+        img = Image.new('RGBA', size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        cx, cy = size[0] // 2, size[1] // 2
+        rotation = (frame / frame_count) * (2 * math.pi)
+        pulse = 0.9 + (0.1 * math.sin(frame * 2 * math.pi / frame_count))
+        
+        # Color scheme - bright white/cyan/blue
+        colors = {
+            'outer_glow': (200, 255, 255),
+            'mid_glow': (150, 255, 255),
+            'ray_outer': (0, 255, 255),
+            'ray_inner': (255, 255, 255),
+            'core': (100, 255, 255),
+            'center': (255, 255, 255)
+        }
+        
+        # DRAMATIC layered glow
+        for i in range(8, 0, -1):
+            radius = int((cx - i * 2) * pulse)
+            if radius > 0:
+                alpha = int(90 * (1 - i / 8))
+                draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
+                           fill=(*colors['outer_glow'], alpha), outline=None)
+        
+        # THICK rotating rays (16 rays for full coverage)
+        for ray in range(16):
+            angle = (2 * math.pi * ray / 16) + rotation
+            
+            # Draw THICK ray
+            for dist in range(0, cx - 6, 2):
+                t = dist / (cx - 6)
+                x = int(cx + dist * math.cos(angle))
+                y = int(cy + dist * math.sin(angle))
+                
+                if 0 <= x < size[0] and 0 <= y < size[1]:
+                    # Color gradient - white to cyan
+                    color = tuple(
+                        int(colors['ray_inner'][j] * (1 - t) + colors['ray_outer'][j] * t)
+                        for j in range(3)
+                    )
+                    
+                    # Thickness decreases with distance
+                    thickness = int(5 * (1 - t * 0.7))
+                    alpha = int(255 * (1 - t * 0.6))
+                    
+                    # Main ray point
+                    draw.ellipse([x - thickness, y - thickness, x + thickness, y + thickness],
+                               fill=(*color, alpha), outline=None)
+                    
+                    # Glow around ray
+                    if t < 0.5:
+                        glow_size = thickness + 2
+                        glow_alpha = int(100 * (1 - t * 2))
+                        draw.ellipse([x - glow_size, y - glow_size, x + glow_size, y + glow_size],
+                                   fill=(*colors['mid_glow'], glow_alpha), outline=None)
+        
+        # Expanding burst rings
+        for i in range(6, 0, -1):
+            ring_pulse = 1.0 + (0.12 * math.sin(frame * 2 * math.pi / frame_count + i * math.pi / 6))
+            radius = int((cx - i * 3) * ring_pulse)
+            if radius > 0:
+                alpha = int(220 * (1 - i / 6))
+                draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
+                           fill=None, outline=(*colors['core'], alpha), width=3)
+        
+        # Brilliant white center
+        center_size = int(8 + 2 * math.sin(frame * 2 * math.pi / frame_count))
+        draw.ellipse([cx - center_size - 3, cy - center_size - 3, cx + center_size + 3, cy + center_size + 3],
+                    fill=(*colors['core'], 120), outline=None)
+        draw.ellipse([cx - center_size, cy - center_size, cx + center_size, cy + center_size],
+                    fill=colors['center'], outline=colors['ray_outer'], width=2)
+        
+        # Apply slight blur for smoothness
+        img = img.filter(ImageFilter.SMOOTH)
+        
+        return img
+    
+    def generate_premium_icon(self, size: Tuple[int, int] = (96, 96)) -> Image.Image:
+        """Generate premium quality mutation icon."""
+        img = Image.new('RGBA', size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        cx, cy = size[0] // 2, size[1] // 2
+        
+        # Dramatic glow
+        for i in range(10, 0, -1):
+            radius = cx - i * 2
+            alpha = int(50 * (1 - i / 10))
+            draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
+                       fill=(0, 200, 255, alpha), outline=None)
+        
+        # Spiral singularity
+        for arm in range(2):
+            for i in range(100):
+                t = i / 100
+                angle = (2 * math.pi * arm / 2) + (t * 6 * math.pi)
+                radius = t * (cx - 10)
+                x = int(cx + radius * math.cos(angle))
+                y = int(cy + radius * math.sin(angle))
+                
+                if 0 <= x < size[0] and 0 <= y < size[1]:
+                    r = int(100 * (1 - t) + 200 * t)
+                    g = int(150 * (1 - t) + 100 * t)
+                    b = 255
+                    thickness = int(5 * (1 - t * 0.6))
+                    draw.ellipse([x - thickness, y - thickness, x + thickness, y + thickness],
+                               fill=(r, g, b), outline=None)
+        
+        # Event horizon
+        for i in range(4, 0, -1):
+            radius = cx - i * 6
+            alpha = int(200 * (1 - i / 4))
+            draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
+                       fill=None, outline=(150, 100, 255, alpha), width=3)
+        
+        # Center
+        draw.ellipse([cx - 8, cy - 8, cx + 8, cy + 8],
+                    fill=(20, 0, 50), outline=(200, 100, 255), width=2)
+        
+        img = img.filter(ImageFilter.SMOOTH)
+        return img
+    
+    def generate_all_premium_assets(self) -> Dict[str, int]:
+        """Generate all premium quality assets with 16-frame animation."""
+        results = {'icon': 0, 'black_hole_frames': 0, 'white_hole_frames': 0, 'warning': 0}
+        
+        print("=" * 60)
+        print("PREMIUM Quality Vortex Asset Generator")
+        print("=" * 60)
+        print("Creating ULTRA-SMOOTH 16-frame animations...")
+        print()
+        
+        # Premium icon
+        print("1. Generating premium mutation icon (96x96)...")
+        icon = self.generate_premium_icon((96, 96))
+        icon.save(self.textures_path / "Space-Time Vortex_icon.png", 'PNG')
+        icon.save(self.visuals_path / "Space-Time Vortex_icon.png", 'PNG')
+        results['icon'] = 1
+        print("   [OK] Premium icon created")
+        
+        # Black hole - 16 FRAMES
+        print()
+        print("2. Generating black hole (64x64, 16 frames for smooth animation)...")
+        for i in range(16):
+            frame = self.render_premium_black_hole(i, 16, (64, 64))
+            frame.save(self.textures_path / f"BlackHole_frame{i:02d}.png", 'PNG')
+            results['black_hole_frames'] += 1
+            if i % 4 == 0:
+                print(f"   Progress: {i+1}/16 frames...")
+        
+        # Main visual
+        main = self.render_premium_black_hole(8, 16, (64, 64))
+        main.save(self.textures_path / "BlackHole_visual.png", 'PNG')
+        main.save(self.visuals_path / "BlackHole_visual.png", 'PNG')
+        print("   [OK] 16 black hole frames + main visual")
+        
+        # White hole - 16 FRAMES
+        print()
+        print("3. Generating white hole (64x64, 16 frames for smooth animation)...")
+        for i in range(16):
+            frame = self.render_premium_white_hole(i, 16, (64, 64))
+            frame.save(self.textures_path / f"WhiteHole_frame{i:02d}.png", 'PNG')
+            results['white_hole_frames'] += 1
+            if i % 4 == 0:
+                print(f"   Progress: {i+1}/16 frames...")
+        
+        # Main visual
+        main = self.render_premium_white_hole(8, 16, (64, 64))
+        main.save(self.textures_path / "WhiteHole_visual.png", 'PNG')
+        main.save(self.visuals_path / "WhiteHole_visual.png", 'PNG')
+        print("   [OK] 16 white hole frames + main visual")
+        
+        # Warning marker
+        print()
+        print("4. Generating warning marker...")
+        warning = Image.new('RGBA', (64, 64), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(warning)
+        cx, cy = 32, 32
+        
+        # Pulsing rings
+        for i in range(3, 0, -1):
+            radius = 32 - i * 8
+            alpha = int(180 * (1 - i / 3))
+            draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius],
+                       fill=(255, 200, 0, alpha), outline=(255, 150, 0), width=2)
+        
+        # Center
+        draw.ellipse([cx - 6, cy - 6, cx + 6, cy + 6],
+                    fill=(255, 100, 0), outline=(255, 200, 0), width=2)
+        
+        warning.save(self.textures_path / "VortexWarning_marker.png", 'PNG')
+        warning.save(self.visuals_path / "VortexWarning_marker.png", 'PNG')
+        results['warning'] = 1
+        print("   [OK] Warning marker created")
+        
+        return results
+
+
+def main():
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Generate PREMIUM quality animated vortex assets")
+    parser.add_argument("mod_path", help="Path to mod directory")
+    parser.add_argument("--ollama-url", default="http://localhost:11434", help="Ollama API URL")
+    parser.add_argument("--model", help="Ollama model to use")
+    
+    args = parser.parse_args()
+    
+    mod_path = Path(args.mod_path)
+    if not mod_path.exists():
+        print(f"ERROR: Mod path does not exist: {mod_path}")
+        return 1
+    
+    try:
+        generator = PremiumVortexGenerator(mod_path, args.ollama_url, args.model)
+        results = generator.generate_all_premium_assets()
+        
+        print()
+        print("=" * 60)
+        print("PREMIUM ASSETS COMPLETE!")
+        print("=" * 60)
+        print(f"Icon: {results['icon']}")
+        print(f"Black hole: 16 animated frames + 1 main visual")
+        print(f"White hole: 16 animated frames + 1 main visual")
+        print(f"Warning marker: {results['warning']}")
+        print()
+        print("Total: 35 premium quality assets")
+        print("Animation: ULTRA-SMOOTH 16-frame sequences")
+        print()
+        
+        return 0
+    except Exception as e:
+        print(f"\nERROR: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

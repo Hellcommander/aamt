@@ -1,0 +1,122 @@
+{
+  "version": "1.0.0",
+  "description": "Space Whale Level-Based Size Scaling System",
+  "leveling": {
+    "system": "evolvedShip",
+    "description": "Uses same leveling system as evolved ships - player level from objGetLevel",
+    "baseLevel": 1,
+    "maxLevel": 50,
+    "levelSource": "objGetLevel",
+    "tierMapping": {
+      "tier1": { "minLevel": 1, "maxLevel": 10 },
+      "tier2": { "minLevel": 11, "maxLevel": 20 },
+      "tier3": { "minLevel": 21, "maxLevel": 30 },
+      "tier4": { "minLevel": 31, "maxLevel": 40 },
+      "tier5": { "minLevel": 41, "maxLevel": 50 }
+    },
+    "sizeScaling": {
+      "baseSize": {
+        "length": 4.0,
+        "width": 1.75,
+        "height": 1.0,
+        "description": "Tier 1 starting size - balanced for early game"
+      },
+      "maxSize": {
+        "length": 8.0,
+        "width": 3.5,
+        "height": 2.0,
+        "description": "Maximum size at level 50 - capital ship scale"
+      },
+      "scalingFormula": "linear",
+      "scalingPerLevel": {
+        "length": 0.082,
+        "width": 0.036,
+        "height": 0.020,
+        "description": "Growth per level (from base to max over 50 levels: (max - base) / 49)"
+      },
+      "alternativeFormula": "exponential",
+      "exponentialBase": 1.028,
+      "description": "Exponential growth option: size = baseSize * (exponentialBase ^ (level - 1))"
+    },
+    "statScaling": {
+      "hullHP": {
+        "base": 500,
+        "max": 2000,
+        "perLevel": 30.61,
+        "formula": "linear",
+        "description": "Growth per level: (2000 - 500) / 49 = 30.61"
+      },
+      "armor": {
+        "base": 50,
+        "max": 150,
+        "perLevel": 2.04,
+        "formula": "linear",
+        "description": "Growth per level: (150 - 50) / 49 = 2.04"
+      },
+      "mass": {
+        "base": 2000,
+        "max": 5000,
+        "perLevel": 61.22,
+        "formula": "linear",
+        "scalesWithSize": true,
+        "description": "Growth per level: (5000 - 2000) / 49 = 61.22"
+      },
+      "bioCoreMaxEnergy": {
+        "base": 400,
+        "max": 1000,
+        "perLevel": 12.24,
+        "formula": "linear",
+        "description": "Growth per level: (1000 - 400) / 49 = 12.24"
+      },
+      "orbitFieldRadius": {
+        "base": 1.5,
+        "max": 2.5,
+        "perLevel": 0.020,
+        "formula": "linear",
+        "scalesWithSize": true,
+        "description": "Growth per level: (2.5 - 1.5) / 49 = 0.020"
+      },
+      "droneBayMaxDrones": {
+        "base": 6,
+        "max": 12,
+        "perLevel": 0.122,
+        "formula": "linear",
+        "rounding": "floor",
+        "description": "Growth per level: (12 - 6) / 49 = 0.122"
+      }
+    },
+    "visualScaling": {
+      "moduleScaling": true,
+      "proportionalGrowth": true,
+      "description": "All modules scale proportionally with ship size"
+    }
+  },
+  "levelProgression": {
+    "experienceCurve": "quadratic",
+    "baseXP": 100,
+    "xpMultiplier": 1.15,
+    "description": "XP required increases by 15% per level"
+  },
+  "implementation": {
+    "transcendenceXML": {
+      "levelSource": "(objGetLevel gSource)",
+      "description": "Uses same leveling system as evolved ships - gets player level directly from objGetLevel",
+      "sizeCalculation": "swCalculateSizeFromLevel",
+      "statCalculation": "swCalculateStatsFromLevel",
+      "example": "(setq level (objGetLevel gSource)) ; Get player level (1-50)"
+    },
+    "formulas": {
+      "linearSize": {
+        "length": "baseLength + (level - 1) * lengthPerLevel",
+        "width": "baseWidth + (level - 1) * widthPerLevel",
+        "height": "baseHeight + (level - 1) * heightPerLevel"
+      },
+      "exponentialSize": {
+        "length": "baseLength * (1.028 ^ (level - 1))",
+        "width": "baseWidth * (1.028 ^ (level - 1))",
+        "height": "baseHeight * (1.028 ^ (level - 1))"
+      }
+    }
+  }
+}
+

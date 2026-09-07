@@ -1,0 +1,16 @@
+---
+description: Use the Shared AAMT SD3.5 pipeline for game images; never Cursor image gen for tiles.
+alwaysApply: true
+---
+
+# Shared image pipeline
+
+Pixels for this repo come from **Tools/Shared** Stable Diffusion 3.5, not Cursor's image generator.
+
+Before generating or fixing icons, sprites, or tilesheets:
+
+1. Read `D:\games\Ai assisted toolkit\Tools\Shared\AGENTS.md` and `AI_ASSET_RESOURCES.md`.
+2. Probe with `python ai_resources.py` / `--ensure image` from that Shared folder.
+3. Soulash 2 skill atlases: `SkillCreator\s2_skill_cli.py generate-icons --id <id> --overwrite` (128px cells, index 0 bottom-left). Prefer txt2img; `--names` is comma-separated display names.
+
+If `python ai_resources.py --stage image` reports `foreign`, port 1338 is not AAMT — replace it via `--ensure image`, do not generate against it.

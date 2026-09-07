@@ -1,0 +1,341 @@
+{
+  "modId": "arendeth.ship-weapon-powers",
+  "title": "Ship Weapon Powers",
+  "description": "Starborn ship arsenal.",
+  "version": 1,
+  "source": {
+    "ini": "SFSE/Plugins/ShipWeaponPowers.ini"
+  },
+  "settings": {
+    "groups": [
+      {
+        "id": "general",
+        "label": "General",
+        "settings": [
+          {
+            "key": "General.EnableWeaponStarbornCasting",
+            "label": "Enable Weapon Starborn Casting",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "General.ReplaceNormalFire",
+            "label": "Replace Normal Fire",
+            "type": "bool",
+            "default": false,
+            "hint": "1 = pure power weapon (no normal projectile when cast succeeds)"
+          },
+          {
+            "key": "General.RequireArcaneConduit",
+            "label": "Require Arcane Conduit",
+            "type": "bool",
+            "default": true,
+            "hint": "Refuse to enable casting unless ArcaneConduit.esm is in the load order."
+          },
+          {
+            "key": "General.DrainEssence",
+            "label": "Drain Essence",
+            "type": "bool",
+            "default": true,
+            "hint": "Spend Arc_AV_Essence on the pilot in addition to Star Power."
+          },
+          {
+            "key": "General.DefaultEssenceCost",
+            "label": "Default Essence Cost",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 10,
+            "step": 1,
+            "hint": "Used when a mapping omits essenceCost and the Conduit catalog has no cost."
+          }
+        ]
+      },
+      {
+        "id": "hooks",
+        "label": "Hooks",
+        "settings": [
+          {
+            "key": "Hooks.ShipWeaponFireSignature",
+            "label": "Ship Weapon Fire Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "Hooks.UseWeaponFiredEventFallback",
+            "label": "Use Weapon Fired Event Fallback",
+            "type": "bool",
+            "default": true,
+            "hint": "Interim hook: listen for WeaponFiredEvent until the ship-fire AOB detour is wired."
+          },
+          {
+            "key": "Hooks.FireHookProbe",
+            "label": "Fire Hook Probe",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 10,
+            "step": 1,
+            "hint": "Diagnostic only: hooks the ship-weapon fire request and logs each call to Documents\\My Games\\Starfield\\SFSE\\Logs\\MadScience.log. Casts nothing and changes no behaviour, and installs even when EnableWeaponStarbornCasting=0. Purpose: confirm the player's trigger reaches this function. Reverse engin..."
+          },
+          {
+            "key": "Hooks.FireHookID",
+            "label": "Fire Hook ID",
+            "type": "int",
+            "default": 105260,
+            "min": 0,
+            "max": 421040,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "requirements",
+        "label": "Requirements",
+        "settings": [
+          {
+            "key": "Requirements.RequireStarbornPilot",
+            "label": "Require Starborn Pilot",
+            "type": "bool",
+            "default": true,
+            "hint": "Pilot must have Starborn keyword/trait"
+          },
+          {
+            "key": "Requirements.StarbornKeywordEditorID",
+            "label": "Starborn Keyword Editor ID",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "Requirements.RequireSeatAbility",
+            "label": "Require Seat Ability",
+            "type": "bool",
+            "default": true,
+            "hint": "Pilot must be seated in a cockpit module that grants this ability. Granted/removed by the Papyrus companion (plugins/ShipWeaponPowers/Papyrus). This Editor ID MUST match the ability's Editor ID and the script property."
+          },
+          {
+            "key": "Requirements.SeatAbilityEditorID",
+            "label": "Seat Ability Editor ID",
+            "type": "string",
+            "default": "ABL_StarbornWeaponInterface",
+            "maxLength": 64
+          },
+          {
+            "key": "Requirements.SeatActiveKeywordEditorID",
+            "label": "Seat Active Keyword Editor ID",
+            "type": "string",
+            "default": "KW_ShipWeaponPilotActive",
+            "maxLength": 64,
+            "hint": "Keyword added/removed by the pilot-seat Papyrus companion (preferred native check)."
+          },
+          {
+            "key": "Requirements.MinStarPowerPercent",
+            "label": "Min Star Power Percent",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 10,
+            "step": 1,
+            "hint": "Minimum meter % before any shot is allowed"
+          },
+          {
+            "key": "Requirements.DefaultStarPowerCost",
+            "label": "Default Star Power Cost",
+            "type": "int",
+            "default": 25,
+            "min": 0,
+            "max": 100,
+            "step": 1,
+            "hint": "Default drain per shot if a weapon mapping omits starPowerCost (percent of max meter)"
+          }
+        ]
+      },
+      {
+        "id": "scaling",
+        "label": "Scaling",
+        "settings": [
+          {
+            "key": "Scaling.BaseDamage",
+            "label": "Base Damage",
+            "type": "int",
+            "default": 100,
+            "min": 0,
+            "max": 400,
+            "step": 1
+          },
+          {
+            "key": "Scaling.BaseRadius",
+            "label": "Base Radius",
+            "type": "int",
+            "default": 50,
+            "min": 0,
+            "max": 200,
+            "step": 1
+          },
+          {
+            "key": "Scaling.BaseDuration",
+            "label": "Base Duration",
+            "type": "int",
+            "default": 5,
+            "min": 0,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "Scaling.PilotLevelDamageScale",
+            "label": "Pilot Level Damage Scale",
+            "type": "float",
+            "default": 2.0,
+            "min": 0.0,
+            "max": 8.0,
+            "step": 0.1
+          },
+          {
+            "key": "Scaling.GunnerSkillDamageScale",
+            "label": "Gunner Skill Damage Scale",
+            "type": "float",
+            "default": 1.5,
+            "min": 0.0,
+            "max": 6.0,
+            "step": 0.1
+          },
+          {
+            "key": "Scaling.PilotStarbornRankRadiusScale",
+            "label": "Pilot Starborn Rank Radius Scale",
+            "type": "float",
+            "default": 3.0,
+            "min": 0.0,
+            "max": 12.0,
+            "step": 0.1
+          },
+          {
+            "key": "Scaling.GunnerPerkDurationScale",
+            "label": "Gunner Perk Duration Scale",
+            "type": "float",
+            "default": 1.2,
+            "min": 0.0,
+            "max": 4.8,
+            "step": 0.1
+          }
+        ]
+      },
+      {
+        "id": "chance",
+        "label": "Chance",
+        "settings": [
+          {
+            "key": "Chance.BaseChancePercent",
+            "label": "Base Chance Percent",
+            "type": "int",
+            "default": 100,
+            "min": 0,
+            "max": 400,
+            "step": 1
+          },
+          {
+            "key": "Chance.DefaultCooldownSeconds",
+            "label": "Default Cooldown Seconds",
+            "type": "int",
+            "default": 5,
+            "min": 0,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "Chance.LowHullBonusChance",
+            "label": "Low Hull Bonus Chance",
+            "type": "int",
+            "default": 20,
+            "min": 0,
+            "max": 80,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "stats",
+        "label": "Stats",
+        "settings": [
+          {
+            "key": "Stats.GunnerSkillEditorID",
+            "label": "Gunner Skill Editor ID",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "Stats.GunnerBonusPerkID",
+            "label": "Gunner Bonus Perk ID",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "perkintegration",
+        "label": "PerkIntegration",
+        "settings": [
+          {
+            "key": "PerkIntegration.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": true,
+            "hint": "Keyword-driven detection for newest Starborn perk mod powers (no hardcoded mod names)"
+          },
+          {
+            "key": "PerkIntegration.ExcludeSummonPowers",
+            "label": "Exclude Summon Powers",
+            "type": "int",
+            "default": 1,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "PerkIntegration.StarbornKeywordFilter",
+            "label": "Starborn Keyword Filter",
+            "type": "string",
+            "default": "Starborn",
+            "maxLength": 64
+          }
+        ]
+      }
+    ]
+  },
+  "views": [
+    {
+      "name": "arsenal",
+      "title": "Ship Weapon Powers",
+      "description": "Starborn ship arsenal casts.",
+      "hub": true,
+      "sections": [
+        {
+          "title": "Casting",
+          "rows": [
+            {
+              "kind": "toggle",
+              "label": "Weapon Starborn casting",
+              "setting": "General.EnableWeaponStarbornCasting"
+            },
+            {
+              "kind": "toggle",
+              "label": "Replace normal fire",
+              "setting": "General.ReplaceNormalFire"
+            },
+            {
+              "kind": "toggle",
+              "label": "Drain essence",
+              "setting": "General.DrainEssence"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "accent": "#D4A017"
+}

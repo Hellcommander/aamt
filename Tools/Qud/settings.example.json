@@ -1,0 +1,8 @@
+{
+  "unityPath": "",
+  "unityEditorPath": "",
+  "projectPath": "",
+  "unityVersion": "",
+  "gameRoot": "",
+  "notes": "Copy to settings.json and set gameRoot to your Caves of Qud install, or leave blank and use QUDLAB_QUD_PATH / autodetection. unityVersion is resolved from the live game binary when blank."
+}

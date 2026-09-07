@@ -1,0 +1,26 @@
+artifacts/
+**/bin/
+**/obj/
+.vs/
+*.user
+*.dll
+*.pdb
+Workspace/Qud.Install.props
+Workspace/assembly-refs.json
+omnisharp.json
+.vscode/settings.json
+
+# Restricted simulator / SimHost / Unity LoadFrom host — download-only (LICENSE-PROPRIETARY.md).
+# PublicStubs/ remain tracked so the MIT tree compiles without the pack.
+src/QudLab.Simulator/*.cs
+src/QudLab.SimHost/Program.cs
+UnityProject/Assets/QudLab/Scripts/QudManagedHost.cs
+UnityProject/Assets/QudLab/Scripts/QudManagedHost.cs.meta
+UnityProject/Assets/QudLab/Scripts/QudRestrictedObjectSim.cs
+UnityProject/Assets/QudLab/Scripts/QudRestrictedObjectSim.cs.meta
+UnityProject/Assets/QudLab/Scripts/QudZoneGetProbe.cs
+UnityProject/Assets/QudLab/Scripts/QudZoneGetProbe.cs.meta
+UnityProject/Library/
+UnityProject/Temp/
+UnityProject/Logs/
+UnityProject/UserSettings/

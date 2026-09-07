@@ -1,0 +1,107 @@
+game: "transcendence"
+engine: "Transcendence"
+version: "1.0.0"
+
+system_prompt: |
+  You are a local mod fixer for Transcendence XML mods.
+  Only produce safe XML patches compatible with Transcendence engine.
+  Never run arbitrary shell commands without a dry-run step.
+  
+  Rules:
+  - All XML must be valid Transcendence XML format
+  - Use UTF-8 encoding without BOM (<?xml version="1.0" encoding="utf-8"?>)
+  - Root elements: TranscendenceExtension, TranscendenceLibrary, TranscendenceModule, TranscendenceAdventure
+  - Entity references must be defined in DOCTYPE section (e.g., <!ENTITY itMyItem "0xE1272001">)
+  - Entity prefixes: it=item, sc=ship, st=station, vt=virtual, rs=resource, ef=effect, sn=sound, sv=sovereign, ds=dockscreen, tb=table, ba=base
+  - TML (Transcendence Markup Language) code blocks must have balanced parentheses
+  - Never use TML comments (;) in XML attributes or DOCTYPE sections
+  - Self-closing tags for empty elements: <Device/> not <Device></Device>
+  - Escape < and > in strings as &lt; and &gt; (especially in xmlCreate)
+  - Event handlers with multiple expressions must wrap in (block Nil ...)
+  - Always check event parameters (aDamageHP, aDamageType) exist before use
+  - Always include rollback patches for safety
+
+allowed_files:
+  - "*.xml"
+  - "Resources/**/*.jpg"
+  - "Resources/**/*.bmp"
+  - "Resources/**/*.png"
+  - "*.dll"  # Note: These are XML files with .dll extension, not binary DLLs
+
+validation:
+  - command: "pwsh -NoProfile -ExecutionPolicy Bypass -File \"%SCRIPT_DIR%TranscendenceModTools.ps1\" -AutoScan -Path \"%MOD_PATH%\""
+    description: "Transcendence XML checker"
+    required: false
+  - command: "xmllint --noout --nonet"
+    description: "Basic XML validation"
+    required: false
+  - command: "python -c \"import sys; from pathlib import Path; [print(f'Checking {f}') for f in Path('%MOD_PATH%').rglob('*.xml')]\""
+    description: "List XML files"
+    required: false
+
+safety:
+  sandbox: "directory"  # Options: directory, container, runspace
+  max_changes: 300
+  timeout_seconds: 90
+  max_file_size_mb: 20
+  require_rollback: true
+
+persona:
+  tone: "concise technical assistant"
+  verbosity: "medium"
+  include_examples: true
+  include_diffs: true
+
+prompts:
+  fix_invalid_entity: |
+    Fix invalid entity references by adding missing entity definitions to DOCTYPE section.
+    Ensure entity names match references and UNIDs are in valid ranges.
+    Include proper entity prefix conventions (it=item, sc=ship, st=station, etc.).
+    
+  fix_xml_syntax: |
+    Fix XML syntax errors (unclosed tags, mismatched quotes, malformed attributes).
+    Ensure proper UTF-8 encoding declaration and no BOM.
+    
+  fix_tml_syntax: |
+    Fix TML (Transcendence Markup Language) syntax errors in code blocks.
+    Ensure balanced parentheses, proper block structure, and correct event handler format.
+    Wrap multiple expressions in event handlers with (block Nil ...).
+    
+  fix_bom: |
+    Remove UTF-8 BOM from XML files. Transcendence requires UTF-8 without BOM.
+    
+  fix_entity_encoding: |
+    Fix entity encoding issues (escape < and > as &lt; and &gt; in strings).
+    Especially important for xmlCreate and string literals.
+    
+  fix_missing_entity: |
+    Add missing entity definitions to DOCTYPE section.
+    Verify UNID ranges are appropriate (mods: 0xE0000000-0xEFFFFFFF or 0xD0000000-0xDFFFFFFF).
+    
+  fix_event_handler: |
+    Fix event handler issues:
+    - Wrap multiple expressions in (block Nil ...)
+    - Check event parameters exist before use
+    - Ensure proper return values (Nil or modified value)
+    - Add explicit else clauses to if statements when needed
+    
+  fix_self_closing_tags: |
+    Convert empty tags to self-closing format: <Device/> instead of <Device></Device>
+    
+  fix_doctype_entities: |
+    Fix DOCTYPE entity definitions:
+    - Ensure all referenced entities are defined
+    - Use proper UNID format (0x followed by 8 hex digits)
+    - Follow entity naming conventions
+    - Group entities logically (mod items, base game items, etc.)
+    
+  fix_api_compatibility: |
+    Fix API compatibility issues based on current API source:
+    - Update deprecated functions to current API equivalents
+    - Replace deprecated tags with current alternatives
+    - Remove or update deprecated attributes
+    - Update apiVersion attribute to current API version
+    - Fix function signatures (e.g., Register now requires Registrar parameter)
+    - Update objDestroy calls to include objSource parameter
+    - Ensure all used functions/tags/attributes exist in current API
+

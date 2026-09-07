@@ -1,0 +1,12 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+---
+!u!129 &1
+PlayerSettings:
+  productName: QudLab
+  companyName: QudLab
+  bundleVersion: 0.1.0
+  defaultScreenWidth: 1280
+  defaultScreenHeight: 720
+  activeColorSpace: 0
+  androidRenderOutsideSafeArea: 1

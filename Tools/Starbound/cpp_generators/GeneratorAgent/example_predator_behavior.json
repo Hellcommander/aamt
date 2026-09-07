@@ -1,0 +1,63 @@
+{
+  "speed": 1.5,
+  "detectionRange": 15.0,
+  "attackRange": 1.5,
+  "aggression": 0.8,
+  "packSize": 1,
+  "burrowDepth": 2.0,
+  "climbAbility": true,
+  
+  "patrolRadius": 20.0,
+  "idleTime": 1.5,
+  "chaseSpeed": 2.0,
+  "retreatHealth": 0.2,
+  "canSwim": false,
+  "canFly": false,
+  "nocturnal": true,
+  "territorial": true,
+  "territorySize": 30.0,
+  
+  "attackDamage": 15.0,
+  "attackCooldown": 0.8,
+  "canRangedAttack": false,
+  "rangedAttackRange": 0.0,
+  "canUseAbilities": true,
+  "abilities": [
+    "venom_bite",
+    "armor_penetration",
+    "stealth_hunt"
+  ],
+  
+  "packHunting": false,
+  "packCohesion": 0.0,
+  "hierarchical": false,
+  "dominanceRank": 0,
+  
+  "burrower": true,
+  "climber": true,
+  "swimmer": false,
+  "flyer": false,
+  "preferredTemperature": 15.0,
+  "temperatureTolerance": 8.0,
+  
+  "behaviorName": "predator_hunter",
+  "description": "A highly aggressive predator that hunts in dark environments. This creature is territorial, nocturnal, and uses stealth tactics to ambush prey.",
+  
+  "tags": [
+    "predator",
+    "aggressive",
+    "nocturnal",
+    "territorial",
+    "stealth",
+    "hunter"
+  ],
+  
+  "metadata": {
+    "author": "Magi-Tech Behavior System",
+    "version": "1.0.0",
+    "license": "MIT",
+    "difficulty": "hard",
+    "threat_level": "high",
+    "specialization": "ambush_hunter"
+  }
+} 

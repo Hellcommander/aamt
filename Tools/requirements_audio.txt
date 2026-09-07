@@ -1,0 +1,36 @@
+# Audio Generation Requirements
+# Core dependencies for procedural audio generation across all toolsets
+
+# Required for all audio generators
+numpy>=1.20.0
+soundfile>=0.10.0
+
+# Optional but recommended for advanced features
+scipy>=1.7.0
+
+# Optional for audio quality assessment
+librosa>=0.9.0
+requests>=2.25.0
+
+# Optional for ML-based quality assessment (large downloads)
+# Uncomment if you want to use advanced quality assessment features
+# torch>=2.0.0
+# torchaudio>=2.0.0
+# transformers>=4.20.0
+# openai-whisper>=20230314
+
+# Optional for the shared asset-aware audio pipeline (audio_pipeline.py)
+# sentence-transformers>=2.2.0   # tag embeddings (all-MiniLM-L6-v2)
+# transformers>=4.20.0           # CLAP laion/clap-htsat-unfused
+# librosa>=0.9.0                 # mp3 inside zips + resample
+# faiss-cpu                      # optional; numpy cosine is the default
+
+# Stable Audio Open (text-to-audio) — prefer Setup-StableAudio.ps1
+# Install into a CUDA Python (miniconda), not CPU-only Python 3.14
+# diffusers>=0.30.0
+# transformers>=4.40.0
+# accelerate
+# safetensors
+# soundfile
+# scipy
+# sentencepiece

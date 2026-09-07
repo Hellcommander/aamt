@@ -1,0 +1,562 @@
+[
+  {
+    "id": "T_ABSORB_OOZE",
+    "short_name": "ABSORB_OOZE",
+    "name": "ABSORB_OOZE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_absorb_ooze.png"
+  },
+  {
+    "id": "T_ARCANA_SIPHON",
+    "short_name": "ARCANA_SIPHON",
+    "name": "ARCANA_SIPHON",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_arcana_siphon.png"
+  },
+  {
+    "id": "T_ARCANE_OOZE_HORROR",
+    "short_name": "ARCANE_OOZE_HORROR",
+    "name": "ARCANE_OOZE_HORROR",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_arcane_ooze_horror.png"
+  },
+  {
+    "id": "T_ARCANE_STEAM_AFFINITY",
+    "short_name": "ARCANE_STEAM_AFFINITY",
+    "name": "ARCANE_STEAM_AFFINITY",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_arcane_steam_affinity.png"
+  },
+  {
+    "id": "T_BACKBOILER",
+    "short_name": "BACKBOILER",
+    "name": "BACKBOILER",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_optional_trees.lua",
+    "icon": "t_backboiler.png"
+  },
+  {
+    "id": "T_BLOOD_TO_VIM",
+    "short_name": "BLOOD_TO_VIM",
+    "name": "BLOOD_TO_VIM",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_blood_to_vim.png"
+  },
+  {
+    "id": "T_BOILER_DETONATION",
+    "short_name": "BOILER_DETONATION",
+    "name": "BOILER_DETONATION",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_boiler_detonation.png"
+  },
+  {
+    "id": "T_BOILER_DISTILL",
+    "short_name": "BOILER_DISTILL",
+    "name": "BOILER_DISTILL",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_boiler_distill.png"
+  },
+  {
+    "id": "T_CALIBRATED_LENS",
+    "short_name": "CALIBRATED_LENS",
+    "name": "CALIBRATED_LENS",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_unlockable_trees.lua",
+    "icon": "t_calibrated_lens.png"
+  },
+  {
+    "id": "T_CATASTROPHIC_VENT",
+    "short_name": "CATASTROPHIC_VENT",
+    "name": "CATASTROPHIC_VENT",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_unlockable_trees.lua",
+    "icon": "t_catastrophic_vent.png"
+  },
+  {
+    "id": "T_CLUSTER_VENTS",
+    "short_name": "CLUSTER_VENTS",
+    "name": "CLUSTER_VENTS",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_cluster_vents.png"
+  },
+  {
+    "id": "T_CORRUPTED_ARCANE_FUSION",
+    "short_name": "CORRUPTED_ARCANE_FUSION",
+    "name": "CORRUPTED_ARCANE_FUSION",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_corrupted_arcane_fusion.png"
+  },
+  {
+    "id": "T_CORRUPTED_NATURE_STORM",
+    "short_name": "CORRUPTED_NATURE_STORM",
+    "name": "CORRUPTED_NATURE_STORM",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_corrupted_nature_storm.png"
+  },
+  {
+    "id": "T_CORRUPTED_SMOG_MANIPULATION",
+    "short_name": "CORRUPTED_SMOG_MANIPULATION",
+    "name": "CORRUPTED_SMOG_MANIPULATION",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_corrupted_smog_manipulation.png"
+  },
+  {
+    "id": "T_CORRUPTED_STEAM_CLOUD",
+    "short_name": "CORRUPTED_STEAM_CLOUD",
+    "name": "CORRUPTED_STEAM_CLOUD",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_corrupted_steam_cloud.png"
+  },
+  {
+    "id": "T_CROSSFEED",
+    "short_name": "CROSSFEED",
+    "name": "CROSSFEED",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_optional_trees.lua",
+    "icon": "t_crossfeed.png"
+  },
+  {
+    "id": "T_DUAL_RESOURCE_MASTERY",
+    "short_name": "DUAL_RESOURCE_MASTERY",
+    "name": "DUAL_RESOURCE_MASTERY",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_dual_resource_mastery.png"
+  },
+  {
+    "id": "T_EXECUTION_CLOUD",
+    "short_name": "EXECUTION_CLOUD",
+    "name": "EXECUTION_CLOUD",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_optional_trees.lua",
+    "icon": "t_execution_cloud.png"
+  },
+  {
+    "id": "T_EXTRACT_REFINED_GEMS",
+    "short_name": "EXTRACT_REFINED_GEMS",
+    "name": "EXTRACT_REFINED_GEMS",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_extract_refined_gems.png"
+  },
+  {
+    "id": "T_FIRST_VENT",
+    "short_name": "FIRST_VENT",
+    "name": "FIRST_VENT",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_optional_trees.lua",
+    "icon": "t_first_vent.png"
+  },
+  {
+    "id": "T_FLUSH_LINE",
+    "short_name": "FLUSH_LINE",
+    "name": "FLUSH_LINE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_unlockable_trees.lua",
+    "icon": "t_flush_line.png"
+  },
+  {
+    "id": "T_FOCAL_BURN",
+    "short_name": "FOCAL_BURN",
+    "name": "FOCAL_BURN",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_unlockable_trees.lua",
+    "icon": "t_focal_burn.png"
+  },
+  {
+    "id": "T_FURNACE_BREATH",
+    "short_name": "FURNACE_BREATH",
+    "name": "FURNACE_BREATH",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_optional_trees.lua",
+    "icon": "t_furnace_breath.png"
+  },
+  {
+    "id": "T_GAUGE_SORCERY",
+    "short_name": "GAUGE_SORCERY",
+    "name": "GAUGE_SORCERY",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_unlockable_trees.lua",
+    "icon": "t_gauge_sorcery.png"
+  },
+  {
+    "id": "T_JET_STREAM",
+    "short_name": "JET_STREAM",
+    "name": "JET_STREAM",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_jet_stream.png"
+  },
+  {
+    "id": "T_MANA_VIM_CONVERTER",
+    "short_name": "MANA_VIM_CONVERTER",
+    "name": "MANA_VIM_CONVERTER",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_mana_vim_converter.png"
+  },
+  {
+    "id": "T_MANA_VIM_EXCHANGE",
+    "short_name": "MANA_VIM_EXCHANGE",
+    "name": "MANA_VIM_EXCHANGE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_mana_vim_exchange.png"
+  },
+  {
+    "id": "T_MANA_VIM_SIPHON",
+    "short_name": "MANA_VIM_SIPHON",
+    "name": "MANA_VIM_SIPHON",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_mana_vim_siphon.png"
+  },
+  {
+    "id": "T_MANIFOLD_EXIT",
+    "short_name": "MANIFOLD_EXIT",
+    "name": "MANIFOLD_EXIT",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_unlockable_trees.lua",
+    "icon": "t_manifold_exit.png"
+  },
+  {
+    "id": "T_MELTING_PRESSURE",
+    "short_name": "MELTING_PRESSURE",
+    "name": "MELTING_PRESSURE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_optional_trees.lua",
+    "icon": "t_melting_pressure.png"
+  },
+  {
+    "id": "T_NEEDLE_STEAM",
+    "short_name": "NEEDLE_STEAM",
+    "name": "NEEDLE_STEAM",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_optional_trees.lua",
+    "icon": "t_needle_steam.png"
+  },
+  {
+    "id": "T_ORB_OF_STEAM",
+    "short_name": "ORB_OF_STEAM",
+    "name": "ORB_OF_STEAM",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_orb_of_steam.png"
+  },
+  {
+    "id": "T_OVERCLOCKED_SOUL",
+    "short_name": "OVERCLOCKED_SOUL",
+    "name": "OVERCLOCKED_SOUL",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_optional_trees.lua",
+    "icon": "t_overclocked_soul.png"
+  },
+  {
+    "id": "T_OVERPRESSURE",
+    "short_name": "OVERPRESSURE",
+    "name": "OVERPRESSURE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_optional_trees.lua",
+    "icon": "t_overpressure.png"
+  },
+  {
+    "id": "T_PIPE_ATTUNEMENT",
+    "short_name": "PIPE_ATTUNEMENT",
+    "name": "PIPE_ATTUNEMENT",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_unlockable_trees.lua",
+    "icon": "t_pipe_attunement.png"
+  },
+  {
+    "id": "T_PRESSURE_LANCE",
+    "short_name": "PRESSURE_LANCE",
+    "name": "PRESSURE_LANCE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_unlockable_trees.lua",
+    "icon": "t_pressure_lance.png"
+  },
+  {
+    "id": "T_PRESSURIZED_SORCERY",
+    "short_name": "PRESSURIZED_SORCERY",
+    "name": "PRESSURIZED_SORCERY",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_pressurized_sorcery.png"
+  },
+  {
+    "id": "T_PRISM_OVERLOAD",
+    "short_name": "PRISM_OVERLOAD",
+    "name": "PRISM_OVERLOAD",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_unlockable_trees.lua",
+    "icon": "t_prism_overload.png"
+  },
+  {
+    "id": "T_REFINE_NATURAL_GEM",
+    "short_name": "REFINE_NATURAL_GEM",
+    "name": "REFINE_NATURAL_GEM",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_refine_natural_gem.png"
+  },
+  {
+    "id": "T_REFRACT_BOLT",
+    "short_name": "REFRACT_BOLT",
+    "name": "REFRACT_BOLT",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_unlockable_trees.lua",
+    "icon": "t_refract_bolt.png"
+  },
+  {
+    "id": "T_RELIEF_VALVE",
+    "short_name": "RELIEF_VALVE",
+    "name": "RELIEF_VALVE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_unlockable_trees.lua",
+    "icon": "t_relief_valve.png"
+  },
+  {
+    "id": "T_RESOURCE_HARMONY",
+    "short_name": "RESOURCE_HARMONY",
+    "name": "RESOURCE_HARMONY",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_resource_harmony.png"
+  },
+  {
+    "id": "T_RETOOL_STAFF",
+    "short_name": "RETOOL_STAFF",
+    "name": "RETOOL_STAFF",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_retool_staff.png"
+  },
+  {
+    "id": "T_RUST_HEX",
+    "short_name": "RUST_HEX",
+    "name": "RUST_HEX",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_optional_trees.lua",
+    "icon": "t_rust_hex.png"
+  },
+  {
+    "id": "T_SMOG_CONDENSER",
+    "short_name": "SMOG_CONDENSER",
+    "name": "SMOG_CONDENSER",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_smog_condenser.png"
+  },
+  {
+    "id": "T_SMOG_DEVIL_APOTHEOSIS",
+    "short_name": "SMOG_DEVIL_APOTHEOSIS",
+    "name": "SMOG_DEVIL_APOTHEOSIS",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\prodigies\\smog_devil.lua",
+    "icon": "t_smog_devil_apotheosis.png"
+  },
+  {
+    "id": "T_SMOG_DEVIL_CLOAK_OF_SHADOWS_AND_STEAM",
+    "short_name": "SMOG_DEVIL_CLOAK_OF_SHADOWS_AND_STEAM",
+    "name": "SMOG_DEVIL_CLOAK_OF_SHADOWS_AND_STEAM",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_smog_devil_cloak_of_shadows_and_steam.png"
+  },
+  {
+    "id": "T_SMOG_DEVIL_DANCE_OF_SHADOWS_AND_STEAM",
+    "short_name": "SMOG_DEVIL_DANCE_OF_SHADOWS_AND_STEAM",
+    "name": "SMOG_DEVIL_DANCE_OF_SHADOWS_AND_STEAM",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_smog_devil_dance_of_shadows_and_steam.png"
+  },
+  {
+    "id": "T_SMOG_DEVIL_MASTERY",
+    "short_name": "SMOG_DEVIL_MASTERY",
+    "name": "SMOG_DEVIL_MASTERY",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\prodigies\\smog_devil.lua",
+    "icon": "t_smog_devil_mastery.png"
+  },
+  {
+    "id": "T_SMOG_DEVIL_SHADOWSTRIKE",
+    "short_name": "SMOG_DEVIL_SHADOWSTRIKE",
+    "name": "SMOG_DEVIL_SHADOWSTRIKE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_smog_devil_shadowstrike.png"
+  },
+  {
+    "id": "T_SMOG_DEVIL_STEALTH",
+    "short_name": "SMOG_DEVIL_STEALTH",
+    "name": "SMOG_DEVIL_STEALTH",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_smog_devil_stealth.png"
+  },
+  {
+    "id": "T_SMOG_GOGGLES",
+    "short_name": "SMOG_GOGGLES",
+    "name": "SMOG_GOGGLES",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_smog_goggles.png"
+  },
+  {
+    "id": "T_SMOG_LIVING_STEAM_CLOUD",
+    "short_name": "SMOG_LIVING_STEAM_CLOUD",
+    "name": "SMOG_LIVING_STEAM_CLOUD",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\prodigies\\smog_devil.lua",
+    "icon": "t_smog_living_steam_cloud.png"
+  },
+  {
+    "id": "T_SMOG_PERPETUAL_MOTION",
+    "short_name": "SMOG_PERPETUAL_MOTION",
+    "name": "SMOG_PERPETUAL_MOTION",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\prodigies\\smog_devil.lua",
+    "icon": "t_smog_perpetual_motion.png"
+  },
+  {
+    "id": "T_SMOG_RESOURCE_VORTEX",
+    "short_name": "SMOG_RESOURCE_VORTEX",
+    "name": "SMOG_RESOURCE_VORTEX",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\prodigies\\smog_devil.lua",
+    "icon": "t_smog_resource_vortex.png"
+  },
+  {
+    "id": "T_SMOG_STEAM_VENT_TRAP",
+    "short_name": "SMOG_STEAM_VENT_TRAP",
+    "name": "SMOG_STEAM_VENT_TRAP",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_smog_steam_vent_trap.png"
+  },
+  {
+    "id": "T_SMOG_TRINITY_OF_POWER",
+    "short_name": "SMOG_TRINITY_OF_POWER",
+    "name": "SMOG_TRINITY_OF_POWER",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\prodigies\\smog_devil.lua",
+    "icon": "t_smog_trinity_of_power.png"
+  },
+  {
+    "id": "T_STEAMSTAFF_MASTERY",
+    "short_name": "STEAMSTAFF_MASTERY",
+    "name": "STEAMSTAFF_MASTERY",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steamstaff_mastery.png"
+  },
+  {
+    "id": "T_STEAM_ARCANE_BOLT",
+    "short_name": "STEAM_ARCANE_BOLT",
+    "name": "STEAM_ARCANE_BOLT",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_arcane_bolt.png"
+  },
+  {
+    "id": "T_STEAM_ARCANE_STORM",
+    "short_name": "STEAM_ARCANE_STORM",
+    "name": "STEAM_ARCANE_STORM",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_arcane_storm.png"
+  },
+  {
+    "id": "T_STEAM_CHANNEL",
+    "short_name": "STEAM_CHANNEL",
+    "name": "STEAM_CHANNEL",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_channel.png"
+  },
+  {
+    "id": "T_STEAM_CLOUD_LEECH",
+    "short_name": "STEAM_CLOUD_LEECH",
+    "name": "STEAM_CLOUD_LEECH",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_steam_cloud_leech.png"
+  },
+  {
+    "id": "T_STEAM_DEMONIC_PACT",
+    "short_name": "STEAM_DEMONIC_PACT",
+    "name": "STEAM_DEMONIC_PACT",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_demonic_pact.png"
+  },
+  {
+    "id": "T_STEAM_DEMONIC_SERVANT",
+    "short_name": "STEAM_DEMONIC_SERVANT",
+    "name": "STEAM_DEMONIC_SERVANT",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_demonic_servant.png"
+  },
+  {
+    "id": "T_STEAM_HELLFIRE",
+    "short_name": "STEAM_HELLFIRE",
+    "name": "STEAM_HELLFIRE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_hellfire.png"
+  },
+  {
+    "id": "T_STEAM_MANA_CONVERTER",
+    "short_name": "STEAM_MANA_CONVERTER",
+    "name": "STEAM_MANA_CONVERTER",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_mana_converter.png"
+  },
+  {
+    "id": "T_STEAM_MANA_SYMPHONY",
+    "short_name": "STEAM_MANA_SYMPHONY",
+    "name": "STEAM_MANA_SYMPHONY",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_mana_symphony.png"
+  },
+  {
+    "id": "T_STEAM_OVERLOAD",
+    "short_name": "STEAM_OVERLOAD",
+    "name": "STEAM_OVERLOAD",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_overload.png"
+  },
+  {
+    "id": "T_STEAM_PIPE_JUMP",
+    "short_name": "STEAM_PIPE_JUMP",
+    "name": "STEAM_PIPE_JUMP",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_unlockable_trees.lua",
+    "icon": "t_steam_pipe_jump.png"
+  },
+  {
+    "id": "T_STEAM_RUSH",
+    "short_name": "STEAM_RUSH",
+    "name": "STEAM_RUSH",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_steam_rush.png"
+  },
+  {
+    "id": "T_STEAM_SOUL_BURN",
+    "short_name": "STEAM_SOUL_BURN",
+    "name": "STEAM_SOUL_BURN",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_soul_burn.png"
+  },
+  {
+    "id": "T_STEAM_SOUL_HARVEST",
+    "short_name": "STEAM_SOUL_HARVEST",
+    "name": "STEAM_SOUL_HARVEST",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_soul_harvest.png"
+  },
+  {
+    "id": "T_STEAM_STAFF_BLAST",
+    "short_name": "STEAM_STAFF_BLAST",
+    "name": "STEAM_STAFF_BLAST",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_staff_blast.png"
+  },
+  {
+    "id": "T_STEAM_STAFF_CHANNEL",
+    "short_name": "STEAM_STAFF_CHANNEL",
+    "name": "STEAM_STAFF_CHANNEL",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_staff_channel.png"
+  },
+  {
+    "id": "T_STEAM_STAFF_CHARGE",
+    "short_name": "STEAM_STAFF_CHARGE",
+    "name": "STEAM_STAFF_CHARGE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_staff_charge.png"
+  },
+  {
+    "id": "T_STEAM_STAFF_OVERDRIVE",
+    "short_name": "STEAM_STAFF_OVERDRIVE",
+    "name": "STEAM_STAFF_OVERDRIVE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_staff_overdrive.png"
+  },
+  {
+    "id": "T_STEAM_STAFF_SWEEP",
+    "short_name": "STEAM_STAFF_SWEEP",
+    "name": "STEAM_STAFF_SWEEP",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil.lua",
+    "icon": "t_steam_staff_sweep.png"
+  },
+  {
+    "id": "T_TRINITY_DISCHARGE",
+    "short_name": "TRINITY_DISCHARGE",
+    "name": "TRINITY_DISCHARGE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_optional_trees.lua",
+    "icon": "t_trinity_discharge.png"
+  },
+  {
+    "id": "T_TRIUNE_CAPACITANCE",
+    "short_name": "TRIUNE_CAPACITANCE",
+    "name": "TRIUNE_CAPACITANCE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_optional_trees.lua",
+    "icon": "t_triune_capacitance.png"
+  },
+  {
+    "id": "T_VENT_ESCAPE",
+    "short_name": "VENT_ESCAPE",
+    "name": "VENT_ESCAPE",
+    "file": "F:\\SteamLibrary\\steamapps\\common\\TalesMajEyal\\game\\addons\\tome-smog-devil-class\\data\\talents\\talents\\smog_devil_trees.lua",
+    "icon": "t_vent_escape.png"
+  }
+]

@@ -1,0 +1,301 @@
+{
+  "version": "1.0.0",
+  "projectiles": [
+    {
+      "id": "plasma_bolt",
+      "type": "Laser",
+      "quality": "High",
+      "visual": {
+        "spriteSize": [32, 32],
+        "rotations": 1,
+        "frames": 1,
+        "palette": {
+          "primary": "#FF6B00",
+          "secondary": "#FFD700",
+          "glow": "#FF4500",
+          "trail": "#FF8C00"
+        },
+        "material": {
+          "type": "Plasma",
+          "glowIntensity": 3.0,
+          "emissionStrength": 2.5,
+          "roughness": 0.2,
+          "metallic": 0.0
+        },
+        "normalMap": false,
+        "distortionMap": false,
+        "animationHints": {
+          "pulse": true,
+          "rotate": false,
+          "trailLength": 0,
+          "particleCount": 0
+        }
+      },
+      "physics": {
+        "speed": 120,
+        "acceleration": 0,
+        "lifetime": 5.0,
+        "drag": 0.0
+      },
+      "damage": {
+        "baseDamage": 15,
+        "damageType": "plasma",
+        "areaRadius": 0,
+        "statusEffects": []
+      },
+      "fx": {
+        "trail": {
+          "enabled": true,
+          "length": 15,
+          "fade": 0.7,
+          "color": "#FF8C00"
+        },
+        "lightEmission": {
+          "enabled": true,
+          "intensity": 1.5,
+          "radius": 8,
+          "color": "#FF6B00"
+        },
+        "sound": {
+          "fire": "sfxLaserFire",
+          "impact": "sfxPlasmaImpact"
+        }
+      },
+      "export": {
+        "xmlTemplate": "Projectile",
+        "unid": "&plPlasmaBolt;",
+        "resourcePaths": {
+          "image": "Resources/Projectiles/plasma_bolt.png"
+        }
+      }
+    },
+    {
+      "id": "homing_missile",
+      "type": "Missile",
+      "quality": "High",
+      "visual": {
+        "spriteSize": [48, 48],
+        "rotations": 8,
+        "frames": 4,
+        "palette": {
+          "primary": "#C0C0C0",
+          "secondary": "#FF0000",
+          "glow": "#FF4444",
+          "trail": "#FF6600"
+        },
+        "material": {
+          "type": "Kinetic",
+          "glowIntensity": 1.5,
+          "emissionStrength": 0.8,
+          "roughness": 0.6,
+          "metallic": 0.7
+        },
+        "normalMap": true,
+        "distortionMap": false,
+        "animationHints": {
+          "pulse": false,
+          "rotate": true,
+          "trailLength": 30,
+          "particleCount": 20
+        }
+      },
+      "physics": {
+        "speed": 80,
+        "acceleration": 20,
+        "maxSpeed": 150,
+        "homingStrength": 0.8,
+        "turnRate": 90,
+        "lifetime": 8.0,
+        "drag": 0.1
+      },
+      "damage": {
+        "baseDamage": 50,
+        "damageType": "kinetic",
+        "areaRadius": 20,
+        "areaDamage": 30,
+        "statusEffects": [
+          {
+            "type": "emp",
+            "duration": 2.0,
+            "chance": 0.5
+          }
+        ]
+      },
+      "fx": {
+        "trail": {
+          "enabled": true,
+          "length": 40,
+          "fade": 0.5,
+          "color": "#FF6600"
+        },
+        "impactParticles": {
+          "enabled": true,
+          "count": 30,
+          "lifetime": 2.0,
+          "color": "#FF4444"
+        },
+        "sound": {
+          "fire": "sfxMissileLaunch",
+          "impact": "sfxExplosion"
+        }
+      },
+      "export": {
+        "xmlTemplate": "Missile",
+        "unid": "&msHomingMissile;",
+        "resourcePaths": {
+          "image": "Resources/Projectiles/homing_missile.png"
+        }
+      }
+    },
+    {
+      "id": "railgun_slug",
+      "type": "Ballistic",
+      "quality": "High",
+      "visual": {
+        "spriteSize": [16, 16],
+        "rotations": 8,
+        "frames": 1,
+        "palette": {
+          "primary": "#888888",
+          "secondary": "#CCCCCC",
+          "glow": "#FFFFFF",
+          "trail": "#FFD700"
+        },
+        "material": {
+          "type": "Kinetic",
+          "glowIntensity": 0.5,
+          "emissionStrength": 0.3,
+          "roughness": 0.4,
+          "metallic": 0.9
+        },
+        "normalMap": true,
+        "distortionMap": false,
+        "animationHints": {
+          "pulse": false,
+          "rotate": true,
+          "trailLength": 10,
+          "particleCount": 0
+        }
+      },
+      "physics": {
+        "speed": 200,
+        "acceleration": 0,
+        "lifetime": 3.0,
+        "gravity": 0,
+        "drag": 0.0,
+        "ricochet": {
+          "enabled": true,
+          "maxBounces": 2,
+          "damageRetention": 0.7
+        },
+        "penetration": {
+          "enabled": true,
+          "maxTargets": 3,
+          "damageFalloff": 0.2
+        }
+      },
+      "damage": {
+        "baseDamage": 100,
+        "damageType": "kinetic",
+        "areaRadius": 0,
+        "statusEffects": []
+      },
+      "fx": {
+        "trail": {
+          "enabled": true,
+          "length": 8,
+          "fade": 0.9,
+          "color": "#FFD700"
+        },
+        "sound": {
+          "fire": "sfxRailgunFire",
+          "impact": "sfxMetalImpact"
+        }
+      },
+      "export": {
+        "xmlTemplate": "Projectile",
+        "unid": "&plRailgunSlug;",
+        "resourcePaths": {
+          "image": "Resources/Projectiles/railgun_slug.png"
+        }
+      }
+    },
+    {
+      "id": "phase_projectile",
+      "type": "Exotic",
+      "quality": "Ultra",
+      "visual": {
+        "spriteSize": [64, 64],
+        "rotations": 16,
+        "frames": 8,
+        "palette": {
+          "primary": "#9B59B6",
+          "secondary": "#E74C3C",
+          "glow": "#8E44AD",
+          "trail": "#9B59B6"
+        },
+        "material": {
+          "type": "Exotic",
+          "glowIntensity": 4.0,
+          "emissionStrength": 3.0,
+          "roughness": 0.1,
+          "metallic": 0.0
+        },
+        "normalMap": true,
+        "distortionMap": true,
+        "animationHints": {
+          "pulse": true,
+          "rotate": true,
+          "trailLength": 50,
+          "particleCount": 15
+        }
+      },
+      "physics": {
+        "speed": 100,
+        "acceleration": 0,
+        "lifetime": 6.0,
+        "drag": 0.0
+      },
+      "damage": {
+        "baseDamage": 40,
+        "damageType": "ion",
+        "areaRadius": 15,
+        "areaDamage": 25,
+        "statusEffects": [
+          {
+            "type": "deviceDisrupt",
+            "duration": 3.0,
+            "chance": 0.8
+          }
+        ]
+      },
+      "fx": {
+        "trail": {
+          "enabled": true,
+          "length": 60,
+          "fade": 0.4,
+          "color": "#9B59B6"
+        },
+        "lightEmission": {
+          "enabled": true,
+          "intensity": 2.0,
+          "radius": 12,
+          "color": "#8E44AD"
+        },
+        "sound": {
+          "fire": "sfxPhaseFire",
+          "impact": "sfxPhaseImpact"
+        }
+      },
+      "export": {
+        "xmlTemplate": "Exotic",
+        "unid": "&plPhaseProjectile;",
+        "resourcePaths": {
+          "image": "Resources/Projectiles/phase_projectile.png"
+        }
+      }
+    }
+  ]
+}
+
+

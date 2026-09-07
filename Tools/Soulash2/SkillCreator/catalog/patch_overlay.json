@@ -1,0 +1,142 @@
+{
+  "note": "Patch-note schemas the official docs omit. Merged after mine. confidence patch is dropdown-valid.",
+  "effects": [
+    {
+      "kind": "passive",
+      "id": "heal_on_damage_type",
+      "description": "Converts incoming damage of this type into healing. value is the damage type string; secondary_value is the heal ratio (0.5 = heal for 50% of damage dealt). Vanilla Feed On Electricity uses electricity + 0.2.",
+      "docs_value": "string (damage type)",
+      "docs_secondary": "float (heal ratio, e.g. 0.5)"
+    },
+    {
+      "kind": "passive",
+      "id": "bonus_knockback_damage_percent",
+      "description": "Increases damage dealt on knockback collisions. Vanilla Knock It Down uses 0.2.",
+      "docs_value": "float"
+    },
+    {
+      "kind": "ability",
+      "id": "stamina_regen",
+      "confidence": "patch",
+      "description": "Increases stamina regeneration. Valid on abilities and stackers (patch). Not seen in vanilla ability JSON; do not confuse with the entity stamina.stamina_regen field.",
+      "docs_value": "float"
+    },
+    {
+      "kind": "stacker",
+      "id": "stamina_regen",
+      "confidence": "patch",
+      "description": "Per-stack stamina regeneration bonus.",
+      "docs_value": "float"
+    },
+    {
+      "kind": "stacker",
+      "id": "bonus_damage",
+      "confidence": "patch",
+      "description": "Per-stack bonus damage. Patch: Bonus Damage now works in stackers.",
+      "docs_value": "int or float"
+    },
+    {
+      "kind": "stacker",
+      "id": "bonus_damage_percent",
+      "confidence": "patch",
+      "description": "Per-stack bonus damage percent. Patch: Bonus Damage Percent now works in stackers.",
+      "docs_value": "float"
+    },
+    {
+      "kind": "stacker",
+      "id": "damage_bonus",
+      "confidence": "patch",
+      "description": "Per-stack bonus damage (ability key name damage_bonus). Patch: works in stackers.",
+      "docs_value": "int or float"
+    },
+    {
+      "kind": "stacker",
+      "id": "damage_bonus_percent",
+      "confidence": "patch",
+      "description": "Per-stack bonus damage percent (ability key name damage_bonus_percent).",
+      "docs_value": "float"
+    },
+    {
+      "kind": "passive",
+      "id": "on_kill_create_item",
+      "confidence": "patch",
+      "description": "Creates an item for the player when any being is killed. value is item id; secondary_value is chance (vanilla Taste for Souls uses 1.0 on the persona variant).",
+      "docs_value": "string (item id)",
+      "docs_secondary": "float (chance)"
+    },
+    {
+      "kind": "passive",
+      "id": "on_kill_persona_create_item",
+      "description": "Creates an item when a persona (settlement NPC) is killed. Vanilla Taste for Souls: value core_2_Soul_Piece, secondary_value 1.0.",
+      "docs_value": "string (item id)",
+      "docs_secondary": "float (chance)"
+    },
+    {
+      "kind": "passive",
+      "id": "bonus_attack",
+      "description": "Chance for an extra attack when attacking (not abilities). Docs: 0.1 = 10%.",
+      "docs_value": "float"
+    },
+    {
+      "kind": "passive",
+      "id": "damage_reduce",
+      "confidence": "patch",
+      "description": "Flat incoming damage reduction. Warlock Dark One's Own Luck / Greater Ward. value is an int (2, 3, 4). Not in vanilla passives.json under this name, but the engine honors it on passives.",
+      "docs_value": "int"
+    },
+    {
+      "kind": "passive",
+      "id": "darkvision",
+      "description": "Ignore infravision daylight penalty to sight (same as Dread Mask). Docs example value 1. This is not infravision/sight as a passive.",
+      "docs_value": "int"
+    },
+    {
+      "kind": "passive",
+      "id": "stamina_percent_on_kill",
+      "description": "Restore this fraction of max stamina on kill. Docs: 0.1 = 10%.",
+      "docs_value": "float"
+    },
+    {
+      "kind": "passive",
+      "id": "ability_extend_duration",
+      "description": "Extends duration of a buff/ability. value is ability id; secondary_value is duration modifier (1.0 = +100%). Vanilla Sprint Boost.",
+      "docs_value": "string (ability id)",
+      "docs_secondary": "float (duration modifier)"
+    },
+    {
+      "kind": "passive",
+      "id": "craft_persona",
+      "description": "City-worker companion craft. Third parameter is the number of resources (patch). Still a settlement trick — do not ship as a combat skill filler.",
+      "docs_third": "int (resource count)"
+    },
+    {
+      "kind": "passive",
+      "id": "better_deals",
+      "confidence": "patch",
+      "description": "Better sale prices for a specific item type. value is likely the bonus; secondary_value is item_type index from messages.json.",
+      "docs_value": "float",
+      "docs_secondary": "int (item type)"
+    },
+    {
+      "kind": "passive_field",
+      "id": "apply_mode",
+      "confidence": "patch",
+      "description": "Replaces only_party. party_only = bonuses only on companions. solo_only = only with no companions. Omit for everyone.",
+      "docs_value": "party_only | solo_only"
+    },
+    {
+      "kind": "skill_field",
+      "id": "level_start",
+      "confidence": "patch",
+      "description": "Optional skills.json starting level for this skill.",
+      "docs_value": "int"
+    },
+    {
+      "kind": "milestone_field",
+      "id": "innate",
+      "confidence": "patch",
+      "description": "Innate milestones are skipped when checking skill level-up requirements. Grant on entities via skills.milestones (Entity Editor → Skills → Milestones).",
+      "docs_value": "bool"
+    }
+  ]
+}

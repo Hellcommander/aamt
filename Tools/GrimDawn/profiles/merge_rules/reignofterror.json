@@ -1,0 +1,15 @@
+{
+  "id": "reignofterror",
+  "match": ["ReignOfTerror", "Reign of Terror", "reignofterror"],
+  "mode": "portal",
+  "enabled": true,
+  "priority": 80,
+  "class_priority": 55,
+  "quest_remap": true,
+  "quest_prefix": "reignofterror",
+  "skip_world_maps": true,
+  "skip_unnamespaced_quests": true,
+  "items_mode": "isolate",
+  "items_prefix": "reignofterror",
+  "notes": "Priority 80 portal; class_priority 55 so RoT does not stomp Grim/Rebirth masteries (~189 mastery overlaps vs Grim, ~269 vs Rebirth). Items isolated (302 item overlaps vs Rebirth). Quest-namespace + Editor portal stitch later."
+}

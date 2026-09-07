@@ -1,0 +1,878 @@
+{
+  "game": "Elemental Reforged",
+  "modDefaultPath": "D:\\User_Directories\\Documents\\My Games\\ElementalReforged\\Mods\\LH_Legacy_Expansion",
+  "gamePath": "E:\\SteamLibrary\\steamapps\\common\\Elemental Reforged",
+  "referenceHkbPath": "E:\\SteamLibrary\\steamapps\\common\\FE Legendary Heroes\\Gfx\\HKB",
+  "havokPath": "D:\\games\\Modding\\Havok\\Havok_7_1_32\\HavokContentTools",
+  "softimagePath": "F:\\tools\\mod_tools\\Softimage\\Softimage_Mod_Tool_7.5",
+  "blenderPath": "D:\\tools\\Blender Foundation\\Blender 5.0\\blender.exe",
+  "prefix": "LHL_",
+  "negativePrompt": "blurry, low quality, watermark, text, logo, photograph, modern clothing, plastic, 3d render artifact, duplicate",
+  "modPackage": {
+    "folderName": "LH_Legacy_Expansion",
+    "title": "LH Legacy Expansion",
+    "author": "Local",
+    "description": "Exotic races, designer options, mounts, and monster clothes/armor/weapon packs for Elemental Reforged. Prefix LHL_. Compatible with DEAD/Q&L undead mods.",
+    "bannerFile": "LH_Legacy_Banner.png",
+    "bannerWidth": 512,
+    "bannerHeight": 439,
+    "genWidth": 768,
+    "genHeight": 640,
+    "bannerSteps": 40,
+    "bannerGuidance": 7.5,
+    "bannerPrompt": ""
+  },
+  "slots": {
+    "Clothes": {
+      "types": [
+        "Torso"
+      ],
+      "subtype": "Clothes",
+      "defense": 1,
+      "shopValue": 40,
+      "cost": 1
+    },
+    "Armor": {
+      "types": [
+        "Torso",
+        "Surcoat"
+      ],
+      "subtype": "Clothes",
+      "defense": 3,
+      "shopValue": 90,
+      "cost": 1
+    },
+    "Weapon": {
+      "types": [
+        "Weapon"
+      ],
+      "subtype": null,
+      "defense": 0,
+      "shopValue": 70,
+      "cost": 1
+    }
+  },
+  "races": {
+    "Demon": {
+      "display": "Demon",
+      "theme": "infernal demonic plate with horns motifs, crimson and black metal, glowing cracks",
+      "palette": [
+        "#4a1010",
+        "#8b1a1a",
+        "#c45a10",
+        "#1a0808"
+      ],
+      "bodyTier": "humanoid",
+      "unitModelTypes": [
+        "WraithMale",
+        "DarklingMale"
+      ],
+      "unitModelTypePrimary": "WraithMale",
+      "clothes": {
+        "itemName": "Infernal Hide",
+        "model": "gfx/hkb/Monsters/M_Demon_Mesh_01.hkb",
+        "texture": "M_Demon_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 1
+      },
+      "armor": {
+        "itemName": "Infernal Carapace",
+        "model": "gfx/hkb/Monsters/M_Demon_Mesh_01.hkb",
+        "texture": "M_Demon_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 4,
+        "resist": {
+          "UnitStat_ResistFire": 15
+        }
+      },
+      "weapon": {
+        "itemName": "Infernal Cleaver",
+        "model": "gfx/hkb/Weapons/M_GiantGolem_Weapon_Axe_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "OneHanded",
+        "weaponUpgradeType": "Axe",
+        "attack": 11,
+        "iconStyle": "axe"
+      },
+      "iconSource": "M_AssassinDemon_01_Card.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Units\\K_Male_Skeleton_01.hkb",
+        "animationPack": "DemonAnimationPack",
+        "cutSceneDataPack": "LHL_DemonUnitCutscenePack",
+        "soundPack": "SoundPack_Demon1",
+        "clothPoseIndex": 6,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Units\\K_Male_Skeleton_01.hkb"
+    },
+    "Darkling": {
+      "display": "Darkling",
+      "theme": "shadow tribal leather armor, umbral cloth, bone charms, dark purple accents",
+      "palette": [
+        "#2a2035",
+        "#5a4060",
+        "#9080a0",
+        "#101018"
+      ],
+      "bodyTier": "humanoid",
+      "unitModelTypes": [
+        "DarklingMale",
+        "WraithMale"
+      ],
+      "unitModelTypePrimary": "DarklingMale",
+      "baseModelPath": "gfx/hkb/Monsters/M_Darkling_Mesh_01.hkb",
+      "clothes": {
+        "itemName": "Umbral Wraps",
+        "model": "gfx/hkb/Monsters/M_Darkling_Mesh_01.hkb",
+        "texture": "M_Darkling_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 1
+      },
+      "armor": {
+        "itemName": "Umbral Harness",
+        "model": "gfx/hkb/Monsters/M_Darkling_Armored_Mesh_01.hkb",
+        "texture": "M_Darkling_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 3,
+        "resist": {
+          "UnitStat_Dodge": 5
+        }
+      },
+      "iconSource": "M_Darkling_Card.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Units\\K_Male_Skeleton_01.hkb",
+        "animationPack": "DarklingAnimationPack",
+        "cutSceneDataPack": "LHL_DarklingUnitCutscenePack",
+        "soundPack": "SoundPack_Darkling1",
+        "clothPoseIndex": 6,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Units\\K_Male_Skeleton_01.hkb",
+      "weapon": {
+        "itemName": "Umbral Blade",
+        "model": "gfx/hkb/Weapons/W_Dagger_Shadow_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "OneHanded",
+        "weaponUpgradeType": "Blade",
+        "attack": 8,
+        "iconStyle": "dagger"
+      }
+    },
+    "FireElemental": {
+      "display": "Elemental",
+      "theme": "molten magma plating, ember veins, volcanic rock armor icon",
+      "palette": [
+        "#5a1800",
+        "#c04000",
+        "#ffaa20",
+        "#2a0800"
+      ],
+      "bodyTier": "elemental",
+      "unitModelTypes": [
+        "WraithMale",
+        "DarklingMale"
+      ],
+      "unitModelTypePrimary": "WraithMale",
+      "clothes": {
+        "itemName": "Ember Shroud",
+        "model": "gfx/hkb/Monsters/M_Fire_Elemental_Mesh_01.hkb",
+        "texture": "M_Fire_Elemental_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 1
+      },
+      "armor": {
+        "itemName": "Ember Mantle",
+        "model": "gfx/hkb/Monsters/M_Fire_Elemental_Mesh_01.hkb",
+        "texture": "M_Fire_Elemental_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 2,
+        "resist": {
+          "UnitStat_ResistFire": 25
+        }
+      },
+      "iconSource": "M_AssassinDemon_01_Card.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Monsters\\M_SuperDemon_Skeleton_01.hkb",
+        "animationPack": "FireEleAnimationPack",
+        "cutSceneDataPack": "LHL_FireElementalUnitCutscenePack",
+        "soundPack": "SoundPack_FireElemental",
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Monsters\\M_SuperDemon_Skeleton_01.hkb",
+      "raceSection": "Elemental",
+      "weapon": {
+        "itemName": "Ember Brand",
+        "model": "gfx/hkb/Weapons/W_Axe_Burning_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "OneHanded",
+        "weaponUpgradeType": "Axe",
+        "attack": 9,
+        "iconStyle": "axe"
+      }
+    },
+    "EarthElemental": {
+      "display": "Elemental",
+      "theme": "stone slab armor, crystal seams, granite plates",
+      "palette": [
+        "#4a4535",
+        "#7a7055",
+        "#c0b080",
+        "#2a2818"
+      ],
+      "bodyTier": "elemental",
+      "unitModelTypes": [
+        "WraithMale",
+        "JuggernautMale"
+      ],
+      "unitModelTypePrimary": "WraithMale",
+      "clothes": {
+        "itemName": "Stone Skin",
+        "model": "gfx/hkb/Monsters/M_EarthElemental_Mesh_01.hkb",
+        "texture": "M_EarthElemental_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 2
+      },
+      "armor": {
+        "itemName": "Stone Plate",
+        "model": "gfx/hkb/Monsters/M_SuperDemon_Rock_Mesh_01.hkb",
+        "texture": "M_SuperDemon_Rock_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 5,
+        "resist": {
+          "UnitStat_Defense_Pierce": 2
+        }
+      },
+      "iconSource": "M_Golem_Card_01.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Monsters\\M_EarthElemental_Skeleton_01.hkb",
+        "animationPack": "EarthElementalAnimationPack",
+        "cutSceneDataPack": "LHL_EarthElementalUnitCutscenePack",
+        "soundPack": "SoundPack_RockGolem1",
+        "clothPoseIndex": 6,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Monsters\\M_EarthElemental_Skeleton_01.hkb",
+      "raceSection": "Elemental",
+      "weapon": {
+        "itemName": "Stone Maul",
+        "model": "gfx/hkb/Weapons/M_GiantGolem_Weapon_Mace_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "Blunt",
+        "weaponUpgradeType": "Blunt",
+        "attack": 10,
+        "iconStyle": "mace"
+      }
+    },
+    "AirElemental": {
+      "display": "Elemental",
+      "theme": "wind-swept cloud silk armor, silver lightning trim, translucent layers",
+      "palette": [
+        "#708090",
+        "#a8c0d8",
+        "#e8f0ff",
+        "#304050"
+      ],
+      "bodyTier": "elemental",
+      "unitModelTypes": [
+        "WraithFemale",
+        "WraithMale"
+      ],
+      "unitModelTypePrimary": "WraithFemale",
+      "clothes": {
+        "itemName": "Zephyr Veil",
+        "model": "gfx/hkb/Monsters/M_AirElemental_Mesh_01.hkb",
+        "texture": "M_AirElemental_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 1
+      },
+      "armor": {
+        "itemName": "Zephyr Vestments",
+        "model": "gfx/hkb/Monsters/M_AirElemental_Mesh_01.hkb",
+        "texture": "M_SuperDemon_StormLord_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 2,
+        "resist": {
+          "UnitStat_CombatSpeed": 2
+        }
+      },
+      "iconSource": "M_AirElemental_Card.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Monsters\\M_SuperDemon_Skeleton_01.hkb",
+        "animationPack": "AirElementalAnimationPack",
+        "cutSceneDataPack": "LHL_AirElementalUnitCutscenePack",
+        "soundPack": "SoundPack_AirElemental",
+        "clothPoseIndex": 0,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Monsters\\M_SuperDemon_Skeleton_01.hkb",
+      "raceSection": "Elemental",
+      "weapon": {
+        "itemName": "Zephyr Spear",
+        "model": "gfx/hkb/Weapons/K_Spear_BoarSpear_Basic_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "OneHanded",
+        "weaponUpgradeType": "Spear",
+        "attack": 8,
+        "iconStyle": "spear"
+      }
+    },
+    "IceElemental": {
+      "display": "Elemental",
+      "theme": "frost crystal armor, glacial ice plates, pale blue glow",
+      "palette": [
+        "#305060",
+        "#70a0c0",
+        "#d0e8ff",
+        "#182830"
+      ],
+      "bodyTier": "elemental",
+      "unitModelTypes": [
+        "WraithMale",
+        "DarklingMale"
+      ],
+      "unitModelTypePrimary": "WraithMale",
+      "clothes": {
+        "itemName": "Rime Shroud",
+        "model": "gfx/hkb/Monsters/M_Demon_Elemental_Mesh_01.hkb",
+        "texture": "M_Demon_Elemental_Texture_03.dds",
+        "textureChannel": "Texture_All",
+        "defense": 1
+      },
+      "armor": {
+        "itemName": "Rime Cuirass",
+        "model": "gfx/hkb/Monsters/M_SuperDemon_Yeti_Mesh_01.hkb",
+        "texture": "M_SuperDemon_Yeti_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 3,
+        "resist": {
+          "UnitStat_ResistCold": 25
+        }
+      },
+      "iconSource": "M_Warg_IceWarg_Card.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Units\\K_Male_Skeleton_01.hkb",
+        "animationPack": "IceElementalAnimationPack",
+        "cutSceneDataPack": "LHL_IceElementalUnitCutscenePack",
+        "soundPack": "SoundPack_IceElemental",
+        "clothPoseIndex": 6,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Units\\K_Male_Skeleton_01.hkb",
+      "raceSection": "Elemental",
+      "weapon": {
+        "itemName": "Rime Staff",
+        "model": "gfx/hkb/Weapons/F_Staff_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "Staff",
+        "weaponUpgradeType": "Staff",
+        "attack": 7,
+        "iconStyle": "staff"
+      }
+    },
+    "Ogre": {
+      "display": "Ogre",
+      "theme": "crude giant bone and hide armor, spiked clubs motifs, brutal tribal",
+      "palette": [
+        "#5a4030",
+        "#8a6040",
+        "#c09050",
+        "#2a1810"
+      ],
+      "bodyTier": "giant",
+      "unitModelTypes": [
+        "JuggernautMale"
+      ],
+      "unitModelTypePrimary": "JuggernautMale",
+      "clothes": {
+        "itemName": "Bonehide Wraps",
+        "model": "gfx/hkb/Monsters/M_Giant_Ogre_Mesh_01.hkb",
+        "texture": "M_Giant_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 2
+      },
+      "armor": {
+        "itemName": "Bonehide Harness",
+        "model": "gfx/hkb/Monsters/M_Giant_Ogre_Mesh_01.hkb",
+        "texture": "M_Giant_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 5,
+        "resist": {
+          "UnitStat_HitPoints": 2
+        }
+      },
+      "weapon": {
+        "itemName": "Bone Maul",
+        "model": "gfx/hkb/weapons/M_GiantGolem_Weapon_Mace_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "Blunt",
+        "weaponUpgradeType": "Blunt",
+        "attack": 10,
+        "iconStyle": "club"
+      },
+      "iconSource": "M_Giant_Troll_Card_01.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Monsters\\M_Giant_Skeleton_01.hkb",
+        "animationPack": "OgreAnimationPack",
+        "cutSceneDataPack": "LHL_OgreUnitCutscenePack",
+        "soundPack": "SoundPack_Giant1",
+        "clothPoseIndex": 10,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Monsters\\M_Giant_Skeleton_01.hkb"
+    },
+    "Troll": {
+      "display": "Troll",
+      "theme": "mossy regenerating hide armor, root bindings, swamp iron",
+      "palette": [
+        "#355030",
+        "#608050",
+        "#a0c070",
+        "#1a2818"
+      ],
+      "bodyTier": "giant",
+      "unitModelTypes": [
+        "JuggernautMale"
+      ],
+      "unitModelTypePrimary": "JuggernautMale",
+      "clothes": {
+        "itemName": "Mossbound Hide",
+        "model": "gfx/hkb/Monsters/M_Giant_Mesh_01.hkb",
+        "texture": "M_Giant_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 2
+      },
+      "armor": {
+        "itemName": "Mossbound Plate",
+        "model": "gfx/hkb/Monsters/M_Giant_Warrior_Mesh_01.hkb",
+        "texture": "M_Giant_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 4,
+        "resist": {
+          "UnitStat_ResistPoison": 20
+        }
+      },
+      "weapon": {
+        "itemName": "Troll Club",
+        "model": "gfx/hkb/weapons/M_Troll_Club_01.hkb",
+        "texture": null,
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "Blunt",
+        "weaponUpgradeType": "Blunt",
+        "attack": 9,
+        "iconStyle": "club"
+      },
+      "iconSource": "M_Giant_Troll_Card_01.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Monsters\\M_Giant_Skeleton_01.hkb",
+        "animationPack": "GiantAnimationPack",
+        "cutSceneDataPack": "LHL_TrollUnitCutscenePack",
+        "soundPack": "SoundPack_Giant1",
+        "clothPoseIndex": 10,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Monsters\\M_Giant_Skeleton_01.hkb"
+    },
+    "Golem": {
+      "display": "Golem",
+      "theme": "forged construct plating, rivets, rune-etched metal slabs",
+      "palette": [
+        "#505058",
+        "#808890",
+        "#c0c8d0",
+        "#282830"
+      ],
+      "bodyTier": "construct",
+      "unitModelTypes": [
+        "WraithMale",
+        "JuggernautMale"
+      ],
+      "unitModelTypePrimary": "WraithMale",
+      "clothes": {
+        "itemName": "Scrap Shell",
+        "model": "gfx/hkb/Monsters/M_ScrapGolem_Mesh_01.hkb",
+        "texture": "M_ScrapGolem_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 2
+      },
+      "armor": {
+        "itemName": "Runic Plating",
+        "model": "gfx/hkb/Monsters/M_Golem_Mesh_02.hkb",
+        "texture": "M_Golem_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 6,
+        "resist": {
+          "UnitStat_ResistPoison": 50
+        }
+      },
+      "weapon": {
+        "itemName": "Runic Greatblade",
+        "model": "gfx/hkb/Weapons/M_GiantGolem_Weapon_Sword_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "OneHanded",
+        "weaponUpgradeType": "Blade",
+        "attack": 12,
+        "iconStyle": "blade"
+      },
+      "iconSource": "M_Golem_Card_01.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Units\\K_Male_Skeleton_01.hkb",
+        "animationPack": "GolemAnimationPack",
+        "cutSceneDataPack": "LHL_GolemUnitCutscenePack",
+        "soundPack": "SoundPack_Golem1",
+        "clothPoseIndex": 6,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Units\\K_Male_Skeleton_01.hkb"
+    },
+    "Drake": {
+      "display": "Drake",
+      "theme": "drake scale armor icon, layered reptile plates, fang clasps",
+      "palette": [
+        "#4a3820",
+        "#806040",
+        "#c0a060",
+        "#201808"
+      ],
+      "bodyTier": "beast",
+      "unitModelTypes": [
+        "WraithMale"
+      ],
+      "unitModelTypePrimary": "WraithMale",
+      "clothes": {
+        "itemName": "Drake Hide",
+        "model": "Gfx\\HKB\\Monsters\\M_Drake_Mesh_01.hkb",
+        "texture": "M_Drake_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 2
+      },
+      "armor": {
+        "itemName": "Drake Scale Mail",
+        "model": "Gfx\\HKB\\Monsters\\M_Drake_Slag_Mesh_01.hkb",
+        "texture": "M_Drake_Slag_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 4,
+        "resist": {
+          "UnitStat_Defense_Pierce": 1
+        }
+      },
+      "iconSource": "M_Drake_Drake_Card_01.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Monsters\\M_Drake_Skeleton_01.hkb",
+        "animationPack": "GiantBeastAnimationPack",
+        "cutSceneDataPack": "LHL_DrakeUnitCutscenePack",
+        "soundPack": "SoundPack_Dragon1",
+        "clothPoseIndex": 0,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Monsters\\M_Drake_Skeleton_01.hkb",
+      "weapon": {
+        "itemName": "Drake Talon",
+        "model": "gfx/hkb/Weapons/W_Axe_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "OneHanded",
+        "weaponUpgradeType": "Axe",
+        "attack": 10,
+        "iconStyle": "axe"
+      }
+    },
+    "Brood": {
+      "display": "Brood",
+      "theme": "chitin carapace armor, spider silk bindings, venom green accents",
+      "palette": [
+        "#3a3020",
+        "#605040",
+        "#80a040",
+        "#181410"
+      ],
+      "bodyTier": "beast",
+      "unitModelTypes": [
+        "DarklingMale",
+        "WraithMale"
+      ],
+      "unitModelTypePrimary": "DarklingMale",
+      "baseModelPath": "gfx/hkb/Monsters/K_SpiderMan_Mesh.hkb",
+      "baseSkeletonPath": "Gfx\\HKB\\Monsters\\M_Spider_Skeleton_01.hkb",
+      "clothes": {
+        "itemName": "Silk Wraps",
+        "model": "gfx/hkb/Monsters/M_Spider_Mesh_01.hkb",
+        "texture": "M_Spider_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 1
+      },
+      "armor": {
+        "itemName": "Chitin Carapace",
+        "model": "gfx/hkb/Monsters/M_Spider_Poison_Mesh_01.hkb",
+        "texture": "M_Spider_Texture_02.dds",
+        "textureChannel": "Texture_All",
+        "defense": 3,
+        "resist": {
+          "UnitStat_Attack_Poison": 2
+        }
+      },
+      "iconSource": "M_AlbinoRockSpider_Giant_Card_01.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Monsters\\M_Spider_Skeleton_01.hkb",
+        "animationPack": "SpiderAnimationPack",
+        "cutSceneDataPack": "LHL_BroodUnitCutscenePack",
+        "soundPack": "SoundPack_LargeSpider",
+        "clothPoseIndex": 0,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "weapon": {
+        "itemName": "Venom Blade",
+        "description": "Brood-forged dagger for the design screen. Pedipalp blades and Accuracy live on Forearms gloves, not this hand socket.",
+        "model": "gfx/hkb/Weapons/W_Dagger_Venomous_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "OneHanded",
+        "weaponUpgradeType": "Blade",
+        "attack": 9,
+        "iconStyle": "dagger"
+      }
+    },
+    "Dragon": {
+      "display": "Dragon",
+      "theme": "dragonscale royal armor, gold trim, crimson scales, majestic",
+      "palette": [
+        "#501818",
+        "#a03020",
+        "#d0a040",
+        "#200808"
+      ],
+      "bodyTier": "beast",
+      "unitModelTypes": [
+        "WraithMale"
+      ],
+      "unitModelTypePrimary": "WraithMale",
+      "clothes": {
+        "itemName": "Ashwake Hide",
+        "model": "Gfx\\HKB\\Monsters\\M_Drake_Mesh_01.hkb",
+        "texture": "M_Drake_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 2
+      },
+      "armor": {
+        "itemName": "Ashwake Scaleplate",
+        "model": "Gfx\\HKB\\Monsters\\M_Drake_Slag_Mesh_01.hkb",
+        "texture": "M_Drake_Slag_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 6,
+        "resist": {
+          "UnitStat_ResistFire": 30
+        }
+      },
+      "iconSource": "M_Drake_Slag_Card_01.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Dragons\\D_Dragon_Skeleton_01.hkb",
+        "animationPack": "DragonAnimationPack",
+        "cutSceneDataPack": "LHL_DragonUnitCutscenePack",
+        "soundPack": "SoundPack_Dragon1",
+        "clothPoseIndex": 0,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Dragons\\D_Dragon_Skeleton_01.hkb",
+      "weapon": {
+        "itemName": "Ashwake Cleaver",
+        "model": "gfx/hkb/Weapons/M_GiantGolem_Weapon_Sword_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "OneHanded",
+        "weaponUpgradeType": "Blade",
+        "attack": 12,
+        "iconStyle": "sword"
+      }
+    },
+    "Skath": {
+      "display": "Skath",
+      "theme": "amphibious wetland hide armor, reed bindings, silt-stained leather",
+      "palette": [
+        "#304028",
+        "#507040",
+        "#90a060",
+        "#182018"
+      ],
+      "bodyTier": "beast",
+      "unitModelTypes": [
+        "WraithMale"
+      ],
+      "unitModelTypePrimary": "WraithMale",
+      "clothes": {
+        "itemName": "Mire Skin",
+        "model": "gfx/hkb/Monsters/M_Warg_Skath_Mesh_01.hkb",
+        "texture": "M_Warg_Skath_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 1
+      },
+      "armor": {
+        "itemName": "Mire Hide",
+        "model": "gfx/hkb/Monsters/M_Warg_Rock_Mesh_01.hkb",
+        "texture": "M_Warg_Rock_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 3,
+        "resist": {
+          "UnitStat_Moves": 1
+        }
+      },
+      "weapon": {
+        "itemName": "Mire Longbow",
+        "model": "gfx/hkb/Weapons/DLC03_Longbow_Skath_01.hkb",
+        "texture": null,
+        "textureChannel": "Texture_All",
+        "attachment": "hand_left_Lcf",
+        "weaponType": "Bow",
+        "weaponUpgradeType": "Bow",
+        "attack": 8,
+        "iconStyle": "bow"
+      },
+      "iconSource": "M_Warg_IceWarg_Card.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Monsters\\M_Warg_Skeleton_01.hkb",
+        "animationPack": "SkathAnimationPack",
+        "cutSceneDataPack": "LHL_SkathUnitCutscenePack",
+        "soundPack": "SoundPack_Slag1",
+        "clothPoseIndex": 0,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Monsters\\M_Warg_Skeleton_01.hkb"
+    },
+    "Warg": {
+      "display": "Warg",
+      "theme": "wolf-pelt war harness, fang trophies, dark fur trim",
+      "palette": [
+        "#303028",
+        "#585040",
+        "#908070",
+        "#181410"
+      ],
+      "bodyTier": "beast",
+      "unitModelTypes": [
+        "WraithMale"
+      ],
+      "unitModelTypePrimary": "WraithMale",
+      "clothes": {
+        "itemName": "Pack Pelt",
+        "model": "gfx/hkb/Monsters/M_Warg_Mesh_01.hkb",
+        "texture": "M_Warg_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 1
+      },
+      "armor": {
+        "itemName": "Pack Harness",
+        "model": "gfx/hkb/Monsters/M_Warg_SandBrute_Mesh_01.hkb",
+        "texture": "M_Warg_SandBrute_Texture_01.dds",
+        "textureChannel": "Texture_All",
+        "defense": 3,
+        "resist": {
+          "UnitStat_Accuracy": 5
+        }
+      },
+      "iconSource": "M_Warg_PlainsWarg_Card.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Monsters\\M_Warg_Skeleton_01.hkb",
+        "animationPack": "WargAnimationPack",
+        "cutSceneDataPack": "LHL_WargUnitCutscenePack",
+        "soundPack": "SoundPack_Warg1",
+        "clothPoseIndex": 0,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "baseSkeletonPath": "Gfx\\HKB\\Monsters\\M_Warg_Skeleton_01.hkb",
+      "weapon": {
+        "itemName": "Pack Fang",
+        "model": "gfx/hkb/Weapons/W_Dagger_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "OneHanded",
+        "weaponUpgradeType": "Blade",
+        "attack": 8,
+        "iconStyle": "dagger"
+      }
+    },
+    "Shrill": {
+      "display": "Shrill",
+      "theme": "crackling chitin armor with lightning veins, swarm motifs",
+      "palette": [
+        "#403050",
+        "#706090",
+        "#c0a0ff",
+        "#181028"
+      ],
+      "bodyTier": "beast",
+      "unitModelTypes": [
+        "DarklingMale",
+        "WraithMale"
+      ],
+      "unitModelTypePrimary": "DarklingMale",
+      "baseModelPath": "gfx/hkb/Monsters/K_SpiderMan_Mesh.hkb",
+      "baseSkeletonPath": "Gfx\\HKB\\Monsters\\M_Spider_Skeleton_01.hkb",
+      "clothes": {
+        "itemName": "Chorus Silk",
+        "model": "gfx/hkb/Monsters/K_SpiderMan_Mesh.hkb",
+        "texture": "M_Spider_Texture_02.dds",
+        "textureChannel": "Texture_All",
+        "defense": 1
+      },
+      "armor": {
+        "itemName": "Chorus Shell",
+        "model": "gfx/hkb/Monsters/M_Spider_Demon_Mesh_01.hkb",
+        "texture": "M_Spider_Texture_02.dds",
+        "textureChannel": "Texture_All",
+        "defense": 2,
+        "resist": {
+          "UnitStat_Attack_Lightning": 3
+        }
+      },
+      "iconSource": "M_Spider_Corps_Card_01.png",
+      "presentation": {
+        "skeletonPath": "Gfx\\HKB\\Monsters\\M_Spider_Skeleton_01.hkb",
+        "animationPack": "ShrillAnimationPack",
+        "cutSceneDataPack": "LHL_ShrillUnitCutscenePack",
+        "soundPack": "SoundPack_Spiderling",
+        "clothPoseIndex": 0,
+        "eyeTexture": "gfx/eyes/male_brown_eye.png"
+      },
+      "weapon": {
+        "itemName": "Chorus Stinger",
+        "model": "gfx/hkb/Weapons/W_Dagger_Toxic_01.hkb",
+        "texture": "K_Weapons_Basic_Texture_01",
+        "textureChannel": "Texture_All",
+        "attachment": "hand_right_Lcf",
+        "weaponType": "OneHanded",
+        "weaponUpgradeType": "Blade",
+        "attack": 8,
+        "iconStyle": "dagger"
+      }
+    }
+  },
+  "assetPolicy": "originals",
+  "textureVariants": true,
+  "altItems": true,
+  "meshPolicy": "configured",
+  "havokExport": {
+    "format": "Packfile",
+    "extension": ".hkb",
+    "avoid": "Tagfile/.hkt",
+    "recommendedVersion": "7.1.0.x"
+  }
+}

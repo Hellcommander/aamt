@@ -1,0 +1,194 @@
+# Reference Assets (Third-Party Files - Isolated)
+# These are reference files that tools can benefit from but don't require
+# They are isolated to keep third-party content separate from tool code
+ReferenceAssets/
+
+# Old location (for migration - will be moved to ReferenceAssets)
+Transcendence/TranscendenceArt/
+
+# Output directories (generated assets)
+Output/
+GeneratedAssets/
+ExportedAssets/
+TestOutput/
+TestAssets_QualityCheck/
+QualityTestAssets_Final/
+TestCometAssets/
+TestCrossGame/
+TestBaked/
+TestMulti/
+Elin/ElinAssets/
+Elin/spell_art_catalog.json
+Elin/spell_art_queue.json
+Elin/spell_art_chunks/
+CDDA/CDDAMods/
+Terraria/TerrariaPortals/
+
+# Logs
+Logs/
+*.log
+
+# Backups
+Backups/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Build artifacts
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+
+# SDK downloads
+SDK/
+
+# Registry generated assets (can be regenerated)
+RegistryGeneratedAssets/
+
+# AI Generated Assets (can be regenerated)
+AI_Generated_Assets/
+
+# Particle effects test outputs
+ParticleEffects/TestParticles/
+
+# Reference archives (can be regenerated)
+reference_archive_*/
+
+# --- Secrets / personal token-entry notes (never commit) ---
+# Cheat-sheets like "sd key.txt" (hf auth login --token ...) stay local.
+# Switcher code (hf_token_switch.py) is tracked.
+secrets/
+**/secrets/
+*token*.txt
+*token*.env
+*key.txt
+**/sd key.txt
+.env
+.env.*
+!.env.example
+HfTokenProfiles.local.ps1
+HfTokenProfiles.local.json
+*.local.ps1
+*.local.json
+**/hf-home/token
+**/stored_tokens
+**/aamt_stable_audio_env.ps1
+!hf_token_switch.py
+!Shared/hf_token_switch.py
+
+# --- Dumps / game extracts (regenerate locally; never publish) ---
+**/*.dump.txt
+**/*.dump.json
+**/obsolete_api_dump.json
+**/obsolete_api_dump_*.json
+**/*decompiled*.cs
+**/FunctionList_API*.txt
+**/exe_strings.json
+**/vanilla_unid_report_*.csv
+**/armorclass_report_*.csv
+**/entity_analysis_*.txt
+**/process_log_*.txt
+Qud/*.cs
+Qud/ref/
+Qud/data/backups/
+Qud/reports/
+Transcendence/_tdb_dump*/
+Transcendence/_tz100_*/
+Transcendence/_ext_fix_backups/
+TranscendenceTools.ini
+Transcendence/ApiSwitcher.config.json
+apply_these.txt
+manual_review.txt
+AssetGenerationSettings.ps1
+Starbound/AssetGenerationSettings.ps1
+Qud/settings.json
+Transcendence/SpaceWhaleAssetGenerator_Settings.json
+Soulash2/overnight_branding_report.json
+*.lnk
+*.backup
+
+# More game extracts / workshop analysis
+Qud/data/charts/
+Qud/data/by-version/**/charts/
+Soulash2/SkillCreator/catalog/effects.json
+Soulash2/SkillCreator/catalog/enums.json
+Transcendence/api_rules*.json
+Transcendence/VanillaDesignTypeMap.json
+Qud/All_Mods_API_Analysis.md
+
+# Generated meshes / concept art pipeline
+Shared/Concepts/
+**/*.glb
+
+# Runtime registries (schema + example JSON in Common/ stay tracked)
+Transcendence/*_registry.json
+Transcendence/test_registry.json
+Transcendence/ui_data_binding_model.json
+
+# Build / workspace scratch
+Transcendence/_v3_backups/
+Transcendence/_api59_*
+Transcendence/_segships_*
+ParticleEffects/
+Soulash2/_icon_refs/
+Soulash2/_test_sd_import.ps1
+Soulash2/SkillCreator/workshop_patches/
+New Text Document.txt
+Qud/Draft for Qud Lab IDE.txt
+
+# --- Third-party clones (Fetch-ThirdParty.ps1) ---
+XEdit/vendor/TES5Edit/
+XEdit/bin/
+!XEdit/vendor/fork.json
+FrankyCLI/
+GrimDawn/renodx-src/
+GrimDawn/arzedit/arzedit-master/
+GrimDawn/bin/
+GrimDawn/work/
+GrimDawn/_smoke_extract/
+Transcendence/_x64_workspace/
+Transcendence/Output/
+Transcendence/References/
+Elin/Exports/
+TerrariaMods/
+Downloads/
+
+# --- Qud Lab private simulator (access-gated; PublicStubs stay tracked) ---
+Qud/QudLab/src/QudLab.Simulator/*.cs
+Qud/QudLab/src/QudLab.SimHost/Program.cs
+Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudManagedHost.cs
+Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudManagedHost.cs.meta
+Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudRestrictedObjectSim.cs
+Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudRestrictedObjectSim.cs.meta
+Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudZoneGetProbe.cs
+Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudZoneGetProbe.cs.meta
+Qud/QudLab/UnityProject/Library/
+Qud/QudLab/UnityProject/Temp/
+Qud/QudLab/UnityProject/Logs/
+Qud/QudLab/UnityProject/UserSettings/
+

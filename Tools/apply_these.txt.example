@@ -1,0 +1,24 @@
+# Example suggestions file for Apply-AIFixes.ps1
+# This file contains suggestions that will be automatically applied
+
+# Format 1: Simple list (applies to all files)
+- Convert raw pointers to smart pointers where appropriate
+- Use std::string_view instead of const char* parameters
+- Add const correctness to function parameters
+
+# Format 2: File-specific suggestions
+file: D:\path\to\source\MyFile.cpp
+suggestion: Replace CC.Link() with CCodeChain::LinkCode()
+suggestion: Remove &CC parameter from Print() calls
+
+file: D:\path\to\source\AnotherFile.cpp
+suggestion: Use ICCItemPtr instead of ICCItem*
+suggestion: Update TopLevel() to use RunOptions
+
+# Format 3: Bullet points (auto-detected)
+• Migrate std::experimental::optional to std::optional
+• Replace auto_ptr with unique_ptr
+• Use range-based for loops where possible
+
+# The tool will automatically detect the format and apply suggestions accordingly
+

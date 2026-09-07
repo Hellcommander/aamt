@@ -1,0 +1,299 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Transcendence Projectile Registry Schema",
+  "description": "Data-driven projectile system registry schema for visual, physics, damage, effects, and export configuration",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Registry schema version",
+      "default": "1.0.0"
+    },
+    "projectiles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/projectile"
+      }
+    }
+  },
+  "definitions": {
+    "projectile": {
+      "type": "object",
+      "required": ["id", "type", "visual", "physics", "damage", "export"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique projectile identifier (e.g., 'plasma_bolt', 'homing_missile')"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["Missile", "Laser", "Ballistic", "Exotic"],
+          "description": "Projectile type category"
+        },
+        "quality": {
+          "type": "string",
+          "enum": ["Standard", "High", "Ultra"],
+          "default": "High",
+          "description": "Asset quality tier"
+        },
+        "visual": {
+          "$ref": "#/definitions/visual"
+        },
+        "physics": {
+          "$ref": "#/definitions/physics"
+        },
+        "damage": {
+          "$ref": "#/definitions/damage"
+        },
+        "fx": {
+          "$ref": "#/definitions/fx"
+        },
+        "export": {
+          "$ref": "#/definitions/export"
+        }
+      }
+    },
+    "visual": {
+      "type": "object",
+      "required": ["spriteSize"],
+      "properties": {
+        "spriteSize": {
+          "type": "array",
+          "items": {"type": "integer"},
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "[width, height] in pixels"
+        },
+        "rotations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120,
+          "default": 1,
+          "description": "Number of rotation frames (1 for non-rotating, 8/16/40/120 for rotating)"
+        },
+        "frames": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Number of animation frames"
+        },
+        "palette": {
+          "type": "object",
+          "properties": {
+            "primary": {"type": "string", "description": "Primary color (hex or name)"},
+            "secondary": {"type": "string", "description": "Secondary color"},
+            "glow": {"type": "string", "description": "Glow/emission color"},
+            "trail": {"type": "string", "description": "Trail color"}
+          }
+        },
+        "material": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["Energy", "Plasma", "Kinetic", "Crystal", "Organic", "Exotic"],
+              "description": "Material type for procedural generation"
+            },
+            "glowIntensity": {"type": "number", "minimum": 0, "maximum": 10, "default": 2.0},
+            "emissionStrength": {"type": "number", "minimum": 0, "maximum": 10, "default": 1.0},
+            "roughness": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.3},
+            "metallic": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.0}
+          }
+        },
+        "normalMap": {
+          "type": "boolean",
+          "default": false,
+          "description": "Generate normal map for depth/shading"
+        },
+        "distortionMap": {
+          "type": "boolean",
+          "default": false,
+          "description": "Generate distortion map for exotic effects"
+        },
+        "animationHints": {
+          "type": "object",
+          "properties": {
+            "pulse": {"type": "boolean", "default": false},
+            "rotate": {"type": "boolean", "default": false},
+            "trailLength": {"type": "number", "minimum": 0, "default": 0},
+            "particleCount": {"type": "integer", "minimum": 0, "default": 0}
+          }
+        }
+      }
+    },
+    "physics": {
+      "type": "object",
+      "properties": {
+        "speed": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Base speed (pixels/second or game units)"
+        },
+        "acceleration": {
+          "type": "number",
+          "default": 0,
+          "description": "Acceleration rate (for missiles)"
+        },
+        "maxSpeed": {
+          "type": "number",
+          "description": "Maximum speed cap"
+        },
+        "homingStrength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0,
+          "description": "Homing/tracking strength (0=none, 1=perfect)"
+        },
+        "turnRate": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Angular turn rate (degrees/second)"
+        },
+        "gravity": {
+          "type": "number",
+          "default": 0,
+          "description": "Gravity effect (for ballistics)"
+        },
+        "drag": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0,
+          "description": "Drag coefficient (0=none, 1=max)"
+        },
+        "lifetime": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Projectile lifetime in seconds"
+        },
+        "ricochet": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "maxBounces": {"type": "integer", "minimum": 0, "default": 1},
+            "damageRetention": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.8}
+          }
+        },
+        "penetration": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "maxTargets": {"type": "integer", "minimum": 1, "default": 1},
+            "damageFalloff": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.1}
+          }
+        }
+      }
+    },
+    "damage": {
+      "type": "object",
+      "required": ["baseDamage"],
+      "properties": {
+        "baseDamage": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Base damage value"
+        },
+        "damageType": {
+          "type": "string",
+          "enum": ["kinetic", "laser", "particle", "ion", "plasma", "thermo", "positron", "antimatter", "darkAcid", "darkSteel", "darkLightning", "darkFire", "darkCold"],
+          "default": "laser",
+          "description": "Transcendence damage type"
+        },
+        "areaRadius": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Area of effect radius (0 = single target)"
+        },
+        "areaDamage": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0,
+          "description": "Area damage (if different from base)"
+        },
+        "statusEffects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["blind", "disintegrate", "emp", "radiation", "paralyze", "shieldDisrupt", "armorDisrupt", "deviceDisrupt", "weaponDisrupt", "shatter"],
+                "description": "Status effect type"
+              },
+              "duration": {"type": "number", "minimum": 0, "default": 0},
+              "chance": {"type": "number", "minimum": 0, "maximum": 1, "default": 1.0}
+            }
+          }
+        }
+      }
+    },
+    "fx": {
+      "type": "object",
+      "properties": {
+        "trail": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "length": {"type": "number", "minimum": 0, "default": 20},
+            "fade": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.5},
+            "color": {"type": "string"}
+          }
+        },
+        "impactParticles": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "count": {"type": "integer", "minimum": 0, "default": 10},
+            "lifetime": {"type": "number", "minimum": 0, "default": 1.0},
+            "color": {"type": "string"}
+          }
+        },
+        "lightEmission": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "intensity": {"type": "number", "minimum": 0, "default": 1.0},
+            "radius": {"type": "number", "minimum": 0, "default": 10},
+            "color": {"type": "string"}
+          }
+        },
+        "sound": {
+          "type": "object",
+          "properties": {
+            "fire": {"type": "string", "description": "Sound ID for firing"},
+            "impact": {"type": "string", "description": "Sound ID for impact"},
+            "flyby": {"type": "string", "description": "Sound ID for flyby"}
+          }
+        }
+      }
+    },
+    "export": {
+      "type": "object",
+      "required": ["unid", "xmlTemplate"],
+      "properties": {
+        "xmlTemplate": {
+          "type": "string",
+          "enum": ["Projectile", "Missile", "Beam", "Exotic"],
+          "description": "Transcendence XML template type"
+        },
+        "unid": {
+          "type": "string",
+          "pattern": "^&[a-zA-Z0-9_]+;$",
+          "description": "Transcendence UNID (e.g., '&plPlasmaBolt;')"
+        },
+        "resourcePaths": {
+          "type": "object",
+          "properties": {
+            "image": {"type": "string", "description": "Path to sprite image"},
+            "sound": {"type": "string", "description": "Path to sound file"},
+            "effect": {"type": "string", "description": "Path to effect file"}
+          }
+        }
+      }
+    }
+  }
+}
+

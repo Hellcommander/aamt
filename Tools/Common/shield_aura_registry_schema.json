@@ -1,0 +1,317 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Shield Aura Registry Schema",
+  "description": "Solar wind-like shield aura with alpha noise, orbital particles, and projectile influence - Nova Drift inspired with gravitational behavior",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "default": "1.0.0"
+    },
+    "auras": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/shieldAura"
+      }
+    }
+  },
+  "definitions": {
+    "shieldAura": {
+      "type": "object",
+      "required": ["id", "type", "visual", "particles", "behavior"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique aura identifier (e.g., 'solar_wind_shield')"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["shieldAura", "gravityField", "distortionAura"],
+          "default": "shieldAura",
+          "description": "Aura type"
+        },
+        "visual": {
+          "$ref": "#/definitions/auraVisual"
+        },
+        "particles": {
+          "$ref": "#/definitions/auraParticles"
+        },
+        "behavior": {
+          "$ref": "#/definitions/auraBehavior"
+        },
+        "export": {
+          "$ref": "#/definitions/auraExport"
+        }
+      }
+    },
+    "auraVisual": {
+      "type": "object",
+      "required": ["baseColor"],
+      "properties": {
+        "baseColor": {
+          "type": "string",
+          "description": "Base aura color (hex format, e.g., '#66ccff')"
+        },
+        "windColor": {
+          "type": "string",
+          "description": "Solar wind stream color (hex format)"
+        },
+        "distortionColor": {
+          "type": "string",
+          "description": "Distortion field color (hex format)"
+        },
+        "radiusMin": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1.2,
+          "description": "Minimum aura radius (at 0% shield)"
+        },
+        "radiusMax": {
+          "type": "number",
+          "minimum": 0,
+          "default": 2.4,
+          "description": "Maximum aura radius (at 100% shield)"
+        },
+        "alphaNoiseSpeed": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1.8,
+          "description": "Alpha noise animation speed"
+        },
+        "alphaNoiseScale": {
+          "type": "number",
+          "minimum": 0,
+          "default": 3.2,
+          "description": "Alpha noise scale/zoom"
+        },
+        "alphaNoiseStrength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.6,
+          "description": "Alpha fluctuation strength (0.0 = none, 1.0 = max)"
+        },
+        "distortionStrength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.05,
+          "description": "Distortion field strength"
+        },
+        "distortionFrequency": {
+          "type": "number",
+          "minimum": 0,
+          "default": 2.6,
+          "description": "Distortion wave frequency"
+        },
+        "distortionType": {
+          "type": "string",
+          "enum": ["radial", "heatHaze", "turbulent", "wave"],
+          "default": "heatHaze",
+          "description": "Distortion field type"
+        },
+        "windStreakCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 12,
+          "description": "Number of solar wind streaks"
+        },
+        "windSpeed": {
+          "type": "number",
+          "default": 0.6,
+          "description": "Solar wind stream speed"
+        },
+        "windNoise": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1.2,
+          "description": "Wind noise/turbulence strength"
+        },
+        "spriteSize": {
+          "type": "integer",
+          "minimum": 32,
+          "default": 64,
+          "description": "Aura sprite size in pixels (square)"
+        },
+        "frames": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 12,
+          "description": "Number of animation frames"
+        },
+        "noiseType": {
+          "type": "string",
+          "enum": ["perlin", "voronoi", "simplex", "cellular"],
+          "default": "perlin",
+          "description": "Noise type for alpha fluctuations"
+        },
+        "falloffCurve": {
+          "type": "string",
+          "enum": ["linear", "exponential", "smooth", "step"],
+          "default": "smooth",
+          "description": "Radial falloff curve type"
+        }
+      }
+    },
+    "auraParticles": {
+      "type": "object",
+      "properties": {
+        "orbitCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 24,
+          "description": "Number of orbital particles"
+        },
+        "orbitSpeedMin": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.4,
+          "description": "Minimum orbital speed (at 0% shield)"
+        },
+        "orbitSpeedMax": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1.6,
+          "description": "Maximum orbital speed (at 100% shield)"
+        },
+        "orbitRadiusMin": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.8,
+          "description": "Minimum orbit radius"
+        },
+        "orbitRadiusMax": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1.8,
+          "description": "Maximum orbit radius"
+        },
+        "gravityStrength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.8,
+          "description": "Gravitational pull strength (0.0 = none, 1.0 = max)"
+        },
+        "particleSize": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.04,
+          "description": "Orbital particle size"
+        },
+        "particleLifetime": {
+          "type": "number",
+          "minimum": 0,
+          "default": 5.0,
+          "description": "Particle lifetime (seconds, 0 = infinite)"
+        },
+        "particleAlpha": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.7,
+          "description": "Particle alpha/transparency"
+        },
+        "turbulence": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.3,
+          "description": "Orbital turbulence/jitter strength"
+        },
+        "blend": {
+          "type": "string",
+          "enum": ["additive", "alpha", "screen"],
+          "default": "additive",
+          "description": "Particle blend mode"
+        }
+      }
+    },
+    "auraBehavior": {
+      "type": "object",
+      "properties": {
+        "projectileInfluence": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable projectile orbit behavior"
+        },
+        "projectileOrbitTime": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.3,
+          "description": "Time projectiles stay in orbit (seconds, 0 = infinite)"
+        },
+        "projectileInfluenceRadius": {
+          "type": "number",
+          "minimum": 0,
+          "default": 2.0,
+          "description": "Radius of projectile influence"
+        },
+        "projectileGravityStrength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.6,
+          "description": "Gravitational pull on projectiles"
+        },
+        "projectileTangentialBlend": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.4,
+          "description": "How much to blend projectile velocity toward tangential (0.0 = none, 1.0 = full)"
+        },
+        "projectileInwardPull": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.2,
+          "description": "Inward gravitational pull on projectiles"
+        },
+        "shieldScaleWithHP": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scale aura properties with shield HP"
+        },
+        "radiusScaleCurve": {
+          "type": "string",
+          "enum": ["linear", "exponential", "logarithmic", "smooth"],
+          "default": "smooth",
+          "description": "Curve for radius scaling with shield HP"
+        },
+        "alphaScaleWithHP": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scale alpha intensity with shield HP"
+        },
+        "speedScaleWithHP": {
+          "type": "boolean",
+          "default": true,
+          "description": "Scale orbital speed with shield HP"
+        }
+      }
+    },
+    "auraExport": {
+      "type": "object",
+      "required": ["unid"],
+      "properties": {
+        "unid": {
+          "type": "string",
+          "pattern": "^&[a-zA-Z0-9_]+;$",
+          "description": "Transcendence UNID (e.g., '&auSolarWindShield;')"
+        },
+        "transcendenceXml": {
+          "type": "boolean",
+          "default": true
+        },
+        "resourcePaths": {
+          "type": "object",
+          "properties": {
+            "auraSprite": {"type": "string", "description": "Path to aura spritesheet"},
+            "distortionMap": {"type": "string", "description": "Path to distortion map"},
+            "particleProfile": {"type": "string", "description": "Path to particle profile JSON"}
+          }
+        }
+      }
+    }
+  }
+}
+

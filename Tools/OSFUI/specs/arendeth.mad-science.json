@@ -1,0 +1,604 @@
+{
+  "modId": "arendeth.mad-science",
+  "title": "Mad Science",
+  "description": "Shared engine extras for the magic collection.",
+  "version": 1,
+  "source": {
+    "ini": "SFSE/Plugins/MadScience.ini"
+  },
+  "settings": {
+    "groups": [
+      {
+        "id": "general",
+        "label": "General",
+        "settings": [
+          {
+            "key": "General.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": false,
+            "hint": "Master switch for the AOB patch engine only (FileHandleLimit, PapyrusLimits, BA2, ...). false = do not write Starfield.exe. Leave this off if Engine Fixes is installed."
+          },
+          {
+            "key": "General.RespectEngineFixes",
+            "label": "Respect Engine Fixes",
+            "type": "bool",
+            "default": true,
+            "hint": "If Starfield Engine Fixes is loaded, skip AOB features that overlap with it."
+          }
+        ]
+      },
+      {
+        "id": "threading",
+        "label": "Threading",
+        "settings": [
+          {
+            "key": "Threading.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Threading.WorkerThreadCount",
+            "label": "Worker Thread Count",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 10,
+            "step": 1,
+            "hint": "0 = hardware_concurrency - 1 (leaves one core for the game). Cap is 8."
+          },
+          {
+            "key": "Threading.MaxQueuedJobs",
+            "label": "Max Queued Jobs",
+            "type": "int",
+            "default": 4096,
+            "min": 0,
+            "max": 16384,
+            "step": 1
+          },
+          {
+            "key": "Threading.MaxResultsPerTick",
+            "label": "Max Results Per Tick",
+            "type": "int",
+            "default": 32,
+            "min": 0,
+            "max": 128,
+            "step": 1,
+            "hint": "Apply at most this many finished jobs per frame so a burst cannot hitch."
+          }
+        ]
+      },
+      {
+        "id": "filechanges",
+        "label": "FileChanges",
+        "settings": [
+          {
+            "key": "FileChanges.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "FileChanges.MaxStdio",
+            "label": "Max Stdio",
+            "type": "int",
+            "default": 2048,
+            "min": 0,
+            "max": 8192,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "recorddiagnostics",
+        "label": "RecordDiagnostics",
+        "settings": [
+          {
+            "key": "RecordDiagnostics.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "RecordDiagnostics.WarnHandlePercent",
+            "label": "Warn Handle Percent",
+            "type": "int",
+            "default": 90,
+            "min": 0,
+            "max": 360,
+            "step": 1,
+            "hint": "Warn when nativeHandle count or REFR+ACHR count reaches this % of 2,097,152."
+          },
+          {
+            "key": "RecordDiagnostics.WarnCreatedLocalId",
+            "label": "Warn Created Local Id",
+            "type": "string",
+            "default": "0x400000",
+            "maxLength": 64,
+            "hint": "Warn when the highest runtime-created local FormID reaches this (0x400000 is the community \"saves start dying\" zone; format max is 0xFFFFFE)."
+          }
+        ]
+      },
+      {
+        "id": "filechangenotify",
+        "label": "FileChangeNotify",
+        "settings": [
+          {
+            "key": "FileChangeNotify.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "FileChangeNotify.BufferBytes",
+            "label": "Buffer Bytes",
+            "type": "int",
+            "default": 262144,
+            "min": 0,
+            "max": 1048576,
+            "step": 1
+          },
+          {
+            "key": "FileChangeNotify.Signature",
+            "label": "Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "Blank = built-in 1.16.x signature. Override only if a game update moves it."
+          }
+        ]
+      },
+      {
+        "id": "filehandlelimit",
+        "label": "FileHandleLimit",
+        "settings": [
+          {
+            "key": "FileHandleLimit.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "FileHandleLimit.PatchCount",
+            "label": "Patch Count",
+            "type": "int",
+            "default": 1,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "FileHandleLimit.Signature",
+            "label": "Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "FileHandleLimit.ValueSize",
+            "label": "Value Size",
+            "type": "int",
+            "default": 4,
+            "min": 0,
+            "max": 16,
+            "step": 1
+          },
+          {
+            "key": "FileHandleLimit.NewValue",
+            "label": "New Value",
+            "type": "int",
+            "default": 2048,
+            "min": 0,
+            "max": 8192,
+            "step": 1
+          },
+          {
+            "key": "FileHandleLimit.ExpectedOriginal",
+            "label": "Expected Original",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          }
+        ]
+      },
+      {
+        "id": "papyruslimits",
+        "label": "PapyrusLimits",
+        "settings": [
+          {
+            "key": "PapyrusLimits.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "PapyrusLimits.PatchCount",
+            "label": "Patch Count",
+            "type": "int",
+            "default": 1,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "PapyrusLimits.Signature",
+            "label": "Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "PapyrusLimits.ValueSize",
+            "label": "Value Size",
+            "type": "int",
+            "default": 4,
+            "min": 0,
+            "max": 16,
+            "step": 1
+          },
+          {
+            "key": "PapyrusLimits.NewValue",
+            "label": "New Value",
+            "type": "int",
+            "default": 1048576,
+            "min": 0,
+            "max": 4194304,
+            "step": 1
+          },
+          {
+            "key": "PapyrusLimits.ExpectedOriginal",
+            "label": "Expected Original",
+            "type": "int",
+            "default": 128,
+            "min": 0,
+            "max": 512,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "ba2archivelimit",
+        "label": "BA2ArchiveLimit",
+        "settings": [
+          {
+            "key": "BA2ArchiveLimit.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "BA2ArchiveLimit.PatchCount",
+            "label": "Patch Count",
+            "type": "int",
+            "default": 2,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "BA2ArchiveLimit.Signature",
+            "label": "Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "BA2ArchiveLimit.ValueSize",
+            "label": "Value Size",
+            "type": "int",
+            "default": 4,
+            "min": 0,
+            "max": 16,
+            "step": 1
+          },
+          {
+            "key": "BA2ArchiveLimit.NewValue",
+            "label": "New Value",
+            "type": "int",
+            "default": 512,
+            "min": 0,
+            "max": 2048,
+            "step": 1
+          },
+          {
+            "key": "BA2ArchiveLimit.ExpectedOriginal",
+            "label": "Expected Original",
+            "type": "int",
+            "default": 255,
+            "min": 0,
+            "max": 1020,
+            "step": 1
+          },
+          {
+            "key": "BA2ArchiveLimit.Signature2",
+            "label": "Signature2",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "BA2ArchiveLimit.ValueSize2",
+            "label": "Value Size2",
+            "type": "int",
+            "default": 4,
+            "min": 0,
+            "max": 16,
+            "step": 1
+          },
+          {
+            "key": "BA2ArchiveLimit.NewValue2",
+            "label": "New Value2",
+            "type": "int",
+            "default": 512,
+            "min": 0,
+            "max": 2048,
+            "step": 1
+          },
+          {
+            "key": "BA2ArchiveLimit.ExpectedOriginal2",
+            "label": "Expected Original2",
+            "type": "int",
+            "default": 255,
+            "min": 0,
+            "max": 1020,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "refrhandlelimit",
+        "label": "RefrHandleLimit",
+        "settings": [
+          {
+            "key": "RefrHandleLimit.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "RefrHandleLimit.PatchCount",
+            "label": "Patch Count",
+            "type": "int",
+            "default": 1,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "RefrHandleLimit.Signature",
+            "label": "Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "RefrHandleLimit.ValueSize",
+            "label": "Value Size",
+            "type": "int",
+            "default": 4,
+            "min": 0,
+            "max": 16,
+            "step": 1
+          },
+          {
+            "key": "RefrHandleLimit.NewValue",
+            "label": "New Value",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "RefrHandleLimit.ExpectedOriginal",
+            "label": "Expected Original",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          }
+        ]
+      },
+      {
+        "id": "loosefilestreaming",
+        "label": "LooseFileStreaming",
+        "settings": [
+          {
+            "key": "LooseFileStreaming.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "LooseFileStreaming.PatchCount",
+            "label": "Patch Count",
+            "type": "int",
+            "default": 1,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "LooseFileStreaming.Signature",
+            "label": "Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "LooseFileStreaming.ValueSize",
+            "label": "Value Size",
+            "type": "int",
+            "default": 4,
+            "min": 0,
+            "max": 16,
+            "step": 1
+          },
+          {
+            "key": "LooseFileStreaming.NewValue",
+            "label": "New Value",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "LooseFileStreaming.ExpectedOriginal",
+            "label": "Expected Original",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          }
+        ]
+      },
+      {
+        "id": "streaminggraph",
+        "label": "StreamingGraph",
+        "settings": [
+          {
+            "key": "StreamingGraph.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "StreamingGraph.PatchCount",
+            "label": "Patch Count",
+            "type": "int",
+            "default": 1,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "StreamingGraph.Signature",
+            "label": "Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "StreamingGraph.ValueSize",
+            "label": "Value Size",
+            "type": "int",
+            "default": 4,
+            "min": 0,
+            "max": 16,
+            "step": 1
+          },
+          {
+            "key": "StreamingGraph.NewValue",
+            "label": "New Value",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "StreamingGraph.ExpectedOriginal",
+            "label": "Expected Original",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          }
+        ]
+      },
+      {
+        "id": "streamingrecordtable",
+        "label": "StreamingRecordTable",
+        "settings": [
+          {
+            "key": "StreamingRecordTable.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "StreamingRecordTable.PatchCount",
+            "label": "Patch Count",
+            "type": "int",
+            "default": 1,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "StreamingRecordTable.Signature",
+            "label": "Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "StreamingRecordTable.ValueSize",
+            "label": "Value Size",
+            "type": "int",
+            "default": 4,
+            "min": 0,
+            "max": 16,
+            "step": 1
+          },
+          {
+            "key": "StreamingRecordTable.NewValue",
+            "label": "New Value",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "StreamingRecordTable.ExpectedOriginal",
+            "label": "Expected Original",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          }
+        ]
+      }
+    ]
+  },
+  "views": [
+    {
+      "name": "extras",
+      "title": "Mad Science",
+      "description": "Threading, diagnostics, and Data folder watcher.",
+      "hub": true,
+      "sections": [
+        {
+          "title": "Threading",
+          "rows": [
+            {
+              "kind": "toggle",
+              "label": "Worker threads",
+              "setting": "Threading.Enabled"
+            },
+            {
+              "kind": "slider",
+              "label": "Worker count",
+              "hint": "0 leaves one core for the game.",
+              "setting": "Threading.WorkerThreadCount",
+              "min": 0,
+              "max": 8,
+              "step": 1
+            }
+          ]
+        },
+        {
+          "title": "Diagnostics",
+          "rows": [
+            {
+              "kind": "toggle",
+              "label": "Record diagnostics",
+              "setting": "RecordDiagnostics.Enabled"
+            },
+            {
+              "kind": "toggle",
+              "label": "Data folder watcher",
+              "setting": "FileChangeNotify.Enabled"
+            },
+            {
+              "kind": "text",
+              "text": "AOB engine patches stay off unless you turn General.Enabled on. Leave that off if Engine Fixes is installed."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "accent": "#E07A3D"
+}

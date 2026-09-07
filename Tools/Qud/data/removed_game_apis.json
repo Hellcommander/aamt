@@ -1,0 +1,39 @@
+{
+  "_meta": {
+    "description": "Game types and members that were removed (not [Obsolete] — they no longer exist). Harmony [HarmonyPatch(typeof(T))] against these becomes Prepare + TargetMethod (AccessTools.TypeByName) so PatchAll skips when the type is missing. Options.Sifrah* if-blocks are stripped because the minigame types do not compile.",
+    "gameFileVersion": "2.0.212.29",
+    "notes": "Sifrah / hacking / haggling / examine minigames were deleted from Caves of Qud. Keep this list curated; do not glob *Sifrah* (mods like SpringSifrah are not game types)."
+  },
+  "types": [
+    { "name": "SifrahGame", "fullNames": [ "XRL.World.SifrahGame" ], "kind": "minigame" },
+    { "name": "ISifrahGame", "fullNames": [ "XRL.World.ISifrahGame" ], "kind": "minigame" },
+    { "name": "SocialSifrah", "fullNames": [ "XRL.World.SocialSifrah" ], "kind": "minigame" },
+    { "name": "PsychicCombatSifrah", "fullNames": [ "XRL.World.PsychicCombatSifrah" ], "kind": "minigame" },
+    { "name": "CombatSifrah", "fullNames": [ "XRL.World.CombatSifrah" ], "kind": "minigame" },
+    { "name": "ExamineSifrah", "fullNames": [ "XRL.World.ExamineSifrah" ], "kind": "minigame" },
+    { "name": "TinkeringSifrah", "fullNames": [ "XRL.World.TinkeringSifrah" ], "kind": "minigame" },
+    { "name": "RepairSifrah", "fullNames": [ "XRL.World.RepairSifrah" ], "kind": "minigame" },
+    { "name": "DisarmingSifrah", "fullNames": [ "XRL.World.DisarmingSifrah" ], "kind": "minigame" },
+    { "name": "CyberneticsSifrah", "fullNames": [ "XRL.World.CyberneticsSifrah" ], "kind": "minigame" },
+    { "name": "HackingSifrah", "fullNames": [ "XRL.World.HackingSifrah" ], "kind": "minigame" },
+    { "name": "RitualSifrah", "fullNames": [ "XRL.World.RitualSifrah" ], "kind": "minigame" },
+    { "name": "CureSifrah", "fullNames": [ "XRL.World.CureSifrah" ], "kind": "minigame" },
+    { "name": "BeaconSifrah", "fullNames": [ "XRL.World.BeaconSifrah" ], "kind": "minigame" },
+    { "name": "WaterRitualSifrah", "fullNames": [ "XRL.World.WaterRitualSifrah" ], "kind": "minigame" },
+    { "name": "ConversationSifrah", "fullNames": [ "XRL.World.ConversationSifrah" ], "kind": "minigame" },
+    { "name": "RegenerationSifrah", "fullNames": [ "XRL.World.RegenerationSifrah" ], "kind": "minigame" },
+    { "name": "RegenearSifrah", "fullNames": [ "XRL.World.RegenearSifrah" ], "kind": "minigame" },
+    { "name": "SifrahToken", "fullNames": [ "XRL.World.SifrahToken" ], "kind": "minigame" },
+    { "name": "SifrahSlot", "fullNames": [ "XRL.World.SifrahSlot" ], "kind": "minigame" },
+    { "name": "HackingGame", "fullNames": [ "XRL.World.HackingGame", "XRL.UI.HackingGame" ], "kind": "minigame" },
+    { "name": "MachineHackingGame", "fullNames": [ "XRL.World.MachineHackingGame" ], "kind": "minigame" },
+    { "name": "FleshHackingGame", "fullNames": [ "XRL.World.FleshHackingGame" ], "kind": "minigame" },
+    { "name": "ArtifactGame", "fullNames": [ "XRL.World.ArtifactGame" ], "kind": "minigame" },
+    { "name": "ExamineGame", "fullNames": [ "XRL.World.ExamineGame" ], "kind": "minigame" },
+    { "name": "ExamineArtifactGame", "fullNames": [ "XRL.World.ExamineArtifactGame" ], "kind": "minigame" },
+    { "name": "IdentifyGame", "fullNames": [ "XRL.World.IdentifyGame" ], "kind": "minigame" },
+    { "name": "HagglingGame", "fullNames": [ "XRL.World.HagglingGame" ], "kind": "minigame" },
+    { "name": "HaggleGame", "fullNames": [ "XRL.World.HaggleGame" ], "kind": "minigame" },
+    { "name": "BargainGame", "fullNames": [ "XRL.World.BargainGame" ], "kind": "minigame" }
+  ]
+}

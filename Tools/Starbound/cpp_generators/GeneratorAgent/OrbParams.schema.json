@@ -1,0 +1,78 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Magi-Tech Orb Parameters",
+    "description": "Defines the parameters for procedurally generating a Magi-Tech Orb.",
+    "type": "object",
+    "properties": {
+        "id": {
+            "description": "Unique identifier for the orb.",
+            "type": "string"
+        },
+        "orbType": {
+            "description": "Magical subtype of the orb, influencing shaders and effects.",
+            "type": "string",
+            "enum": ["gravitational", "teleportation", "pyro", "cryo", "voltaic"]
+        },
+        "radius": {
+            "description": "Base sphere radius of the orb.",
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 10.0
+        },
+        "coreColor": {
+            "description": "Inner glow color as an RGB array [0-1].",
+            "type": "array",
+            "items": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            "minItems": 3,
+            "maxItems": 3
+        },
+        "shellColor": {
+            "description": "Outer refractive shell color as an RGB array [0-1].",
+            "type": "array",
+            "items": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            "minItems": 3,
+            "maxItems": 3
+        },
+        "runePattern": {
+            "description": "Name of the procedural pattern for runes.",
+            "type": "string"
+        },
+        "runeDensity": {
+            "description": "Number of runes to distribute on the orb's surface.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 256
+        },
+        "auraIntensity": {
+            "description": "Strength of the outer glow effect.",
+            "type": "number",
+            "minimum": 0.0
+        },
+        "trailEffect": {
+            "description": "Name of the trailing particle effect.",
+            "type": "string"
+        },
+        "gravitationalPull": {
+            "description": "Force radius for physics-based effects.",
+            "type": "number",
+            "minimum": 0.0
+        },
+        "spellAffinity": {
+            "description": "Gameplay tag for spell interactions.",
+            "type": "string"
+        },
+        "detailLevel": {
+            "description": "Level of detail for mesh and textures (0=low, 1=medium, 2=high).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+        }
+    },
+    "required": [
+        "id",
+        "orbType",
+        "radius",
+        "coreColor",
+        "shellColor"
+    ]
+}

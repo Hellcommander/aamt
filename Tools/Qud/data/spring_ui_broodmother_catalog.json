@@ -1,0 +1,320 @@
+{
+  "mod": "Broodmother",
+  "theme_tags": ["spring", "biomutation", "coq-terminal"],
+  "colors": {
+    "primary": "#302820",
+    "secondary": "#3A402A",
+    "accent": "#A83094",
+    "text": "#DCD2BE",
+    "biometal": "#78A8B0"
+  },
+  "art_root_rel": "Assets/Arendeth_UI/Art/Broodmother",
+  "elements": [
+    {
+      "id": "qud_spring_shared_window_frame",
+      "screen_id": "Shared",
+      "type": "frame",
+      "states": ["default"],
+      "visual_spec": "thin CoQ terminal window frame, umber/olive panel chrome, subtle chitin edge wear, sparse magenta vein corners only",
+      "layout": { "width": 640, "height": 480, "anchor": "center", "margins": [8, 8, 8, 8], "alignment": "stretch" },
+      "reference_art": ["Textures/ui_panel.png", "Textures/texture_chitin.png"],
+      "prefab_target": "Arendeth_Shared_WindowFrame",
+      "fallback_api": "Popup.PickOption"
+    },
+    {
+      "id": "qud_spring_shared_menu_row",
+      "screen_id": "Shared",
+      "type": "menu_row",
+      "states": ["default", "hover", "pressed", "disabled"],
+      "visual_spec": "horizontal list row strip, dark olive fill, thin border, left icon slot, primary/secondary label areas, hotkey hint zone; hover = subtle biometal edge, disabled = desaturated",
+      "layout": { "width": 560, "height": 40, "anchor": "top_stretch", "margins": [4, 2, 4, 2], "alignment": "left" },
+      "reference_art": ["Textures/ui_menu_row.png", "Textures/texture_biometal.png"],
+      "prefab_target": "Arendeth_Shared_MenuRow",
+      "fallback_api": "Popup.PickOption"
+    },
+    {
+      "id": "qud_spring_shared_button_confirm",
+      "screen_id": "Shared",
+      "type": "button",
+      "states": ["default", "hover", "pressed", "disabled"],
+      "visual_spec": "chitin plate confirm button, readable silhouette, sparse magenta underline accent on hover/pressed",
+      "layout": { "width": 120, "height": 36, "anchor": "bottom_right", "margins": [8, 8, 8, 8], "alignment": "center" },
+      "reference_art": ["Icons/ui_button.png"],
+      "prefab_target": "Arendeth_Shared_ButtonBar",
+      "fallback_api": "Popup.PickOption"
+    },
+    {
+      "id": "qud_spring_shared_button_cancel",
+      "screen_id": "Shared",
+      "type": "button",
+      "states": ["default", "hover", "pressed", "disabled"],
+      "visual_spec": "muted cancel/escape button, umber plate, no magenta fill, subtle highlight on hover only",
+      "layout": { "width": 120, "height": 36, "anchor": "bottom_right", "margins": [8, 8, 136, 8], "alignment": "center" },
+      "reference_art": ["Icons/ui_button.png", "Textures/texture_chitin.png"],
+      "prefab_target": "Arendeth_Shared_ButtonBar",
+      "fallback_api": "Popup.PickOption"
+    },
+    {
+      "id": "qud_spring_shared_button_bar",
+      "screen_id": "Shared",
+      "type": "panel",
+      "states": ["default"],
+      "visual_spec": "bottom button bar tray holding Confirm/Cancel, thin top rule, umber fill matching window frame",
+      "layout": { "width": 640, "height": 52, "anchor": "bottom_stretch", "margins": [0, 0, 0, 0], "alignment": "stretch" },
+      "reference_art": ["Textures/ui_panel.png"],
+      "prefab_target": "Arendeth_Shared_ButtonBar",
+      "fallback_api": "Popup.PickOption"
+    },
+    {
+      "id": "qud_spring_shared_status_strip",
+      "screen_id": "Shared",
+      "type": "status_strip",
+      "states": ["default"],
+      "visual_spec": "one-line status underline bar under title, olive/umber, optional sparse magenta underline accent",
+      "layout": { "width": 600, "height": 24, "anchor": "top_stretch", "margins": [16, 48, 16, 0], "alignment": "left" },
+      "reference_art": ["Textures/ui_status_strip.png"],
+      "prefab_target": "Arendeth_Shared_WindowFrame",
+      "fallback_api": "Popup.Show"
+    },
+    {
+      "id": "qud_spring_shared_confirm_modal",
+      "screen_id": "Shared",
+      "type": "panel",
+      "states": ["default"],
+      "visual_spec": "compact Yes/No confirm modal frame over dimmer, same CoQ chrome as main window, no dashboard clutter",
+      "layout": { "width": 420, "height": 200, "anchor": "center", "margins": [16, 16, 16, 16], "alignment": "center" },
+      "reference_art": ["Textures/ui_panel.png", "Icons/ui_button.png"],
+      "prefab_target": "Arendeth_Shared_ConfirmModal",
+      "fallback_api": "Popup.ShowYesNo"
+    },
+    {
+      "id": "qud_spring_shared_scroll_viewport",
+      "screen_id": "Shared",
+      "type": "scroll_viewport",
+      "states": ["default"],
+      "visual_spec": "vertical scroll content area inside frame, dark inset well, thin scrollbar compatible with CoQ lists",
+      "layout": { "width": 600, "height": 320, "anchor": "stretch", "margins": [16, 80, 16, 60], "alignment": "stretch" },
+      "reference_art": ["Textures/ui_panel.png"],
+      "prefab_target": "Arendeth_Shared_WindowFrame",
+      "fallback_api": "Popup.PickOption"
+    },
+    {
+      "id": "qud_spring_shared_tier_pip",
+      "screen_id": "Shared",
+      "type": "tier_pip",
+      "states": ["default", "disabled"],
+      "visual_spec": "small magenta gland gem on biometal socket, sparse accent only",
+      "layout": { "width": 16, "height": 16, "anchor": "left", "margins": [2, 2, 2, 2], "alignment": "center" },
+      "reference_art": ["Icons/ui_tier_pip.png"],
+      "prefab_target": "Arendeth_Shared_MenuRow",
+      "fallback_api": "Popup.PickOption"
+    },
+    {
+      "id": "qud_spring_bm_icon_biomod_chip",
+      "screen_id": "BM_BiomodBrowser",
+      "type": "icon",
+      "states": ["default"],
+      "visual_spec": "biomod gland chip icon, membrane and biometal, readable at 64px",
+      "layout": { "width": 64, "height": 64, "anchor": "left", "margins": [4, 4, 4, 4], "alignment": "center" },
+      "reference_art": ["Icons/ui_biomod_chip.png"],
+      "prefab_target": "Arendeth_Broodmother_BiomodBrowser",
+      "fallback_api": "Popup.PickOption"
+    },
+    {
+      "id": "qud_spring_bm_icon_birth_badge",
+      "screen_id": "BM_BirthSelect",
+      "type": "icon",
+      "states": ["default"],
+      "visual_spec": "birth-select broodling badge, arthropod silhouette, biomutation mood",
+      "layout": { "width": 64, "height": 64, "anchor": "left", "margins": [4, 4, 4, 4], "alignment": "center" },
+      "reference_art": ["Icons/ui_birth_badge.png"],
+      "prefab_target": "Arendeth_Broodmother_BirthSelect",
+      "fallback_api": "Popup.PickOption"
+    },
+    {
+      "id": "qud_spring_bm_icon_evolution_node",
+      "screen_id": "BM_Evolution",
+      "type": "icon",
+      "states": ["default"],
+      "visual_spec": "evolution neural lattice node, biometal filaments, magenta spark accent",
+      "layout": { "width": 64, "height": 64, "anchor": "left", "margins": [4, 4, 4, 4], "alignment": "center" },
+      "reference_art": ["Icons/ui_evolution_node.png"],
+      "prefab_target": "Arendeth_Broodmother_Evolution",
+      "fallback_api": "Popup.PickOption"
+    },
+    {
+      "id": "qud_spring_bm_icon_swarm_frame",
+      "screen_id": "BM_SwarmOverview",
+      "type": "icon",
+      "states": ["default"],
+      "visual_spec": "swarm overview portrait frame, membrane border, empty center for broodling tile",
+      "layout": { "width": 128, "height": 128, "anchor": "left", "margins": [4, 4, 4, 4], "alignment": "center" },
+      "reference_art": ["Icons/ui_swarm_frame.png"],
+      "prefab_target": "Arendeth_Broodmother_SwarmOverview",
+      "fallback_api": "Popup.PickOption"
+    },
+    {
+      "id": "qud_spring_bm_panel_surface",
+      "screen_id": "Shared",
+      "type": "panel",
+      "states": ["default"],
+      "visual_spec": "tileable umber/olive panel surface for Broodmother Spring chrome",
+      "layout": { "width": 256, "height": 256, "anchor": "stretch", "margins": [0, 0, 0, 0], "alignment": "stretch" },
+      "reference_art": ["Textures/ui_panel.png", "Textures/texture_membrane.png"],
+      "prefab_target": "Arendeth_Shared_WindowFrame",
+      "fallback_api": "Popup.PickOption"
+    }
+  ],
+  "screens": [
+    {
+      "screen_id": "Shared",
+      "prefab_target": "Arendeth_Shared_WindowFrame",
+      "purpose": "Shared Spring kit: frame, menu row, button bar, confirm modal, status strip",
+      "fallback_api": "Popup.PickOption",
+      "hierarchy": ["Backplate", "Frame", "Title", "StatusStrip", "ScrollView/Content", "ButtonBar"],
+      "element_ids": [
+        "qud_spring_shared_window_frame",
+        "qud_spring_shared_menu_row",
+        "qud_spring_shared_button_bar",
+        "qud_spring_shared_button_confirm",
+        "qud_spring_shared_button_cancel",
+        "qud_spring_shared_status_strip",
+        "qud_spring_shared_confirm_modal",
+        "qud_spring_shared_scroll_viewport",
+        "qud_spring_shared_tier_pip",
+        "qud_spring_bm_panel_surface"
+      ]
+    },
+    {
+      "screen_id": "BM_BirthSelect",
+      "prefab_target": "Arendeth_Broodmother_BirthSelect",
+      "purpose": "Pick broodling type / tier / cost",
+      "fallback_api": "Popup.PickOption",
+      "hierarchy": ["Frame", "Title", "StatusStrip", "ScrollView/MenuRow", "ButtonBar"],
+      "element_ids": [
+        "qud_spring_shared_window_frame",
+        "qud_spring_shared_status_strip",
+        "qud_spring_shared_menu_row",
+        "qud_spring_shared_scroll_viewport",
+        "qud_spring_shared_button_bar",
+        "qud_spring_bm_icon_birth_badge",
+        "qud_spring_shared_tier_pip"
+      ]
+    },
+    {
+      "screen_id": "BM_GestationStatus",
+      "prefab_target": "Arendeth_Broodmother_GestationStatus",
+      "purpose": "Gestation progress, penalties, cancel policy (read-only + OK)",
+      "fallback_api": "Popup.Show",
+      "hierarchy": ["Frame", "Title", "StatusStrip", "ScrollView", "ButtonBar"],
+      "element_ids": [
+        "qud_spring_shared_window_frame",
+        "qud_spring_shared_status_strip",
+        "qud_spring_shared_scroll_viewport",
+        "qud_spring_shared_button_confirm"
+      ]
+    },
+    {
+      "screen_id": "BM_BiomodBrowser",
+      "prefab_target": "Arendeth_Broodmother_BiomodBrowser",
+      "purpose": "Browse/install/reset biomods by tier",
+      "fallback_api": "Popup.PickOption",
+      "hierarchy": ["Frame", "Title", "StatusStrip", "ScrollView/MenuRow", "ButtonBar"],
+      "element_ids": [
+        "qud_spring_shared_window_frame",
+        "qud_spring_shared_status_strip",
+        "qud_spring_shared_menu_row",
+        "qud_spring_shared_scroll_viewport",
+        "qud_spring_shared_button_bar",
+        "qud_spring_bm_icon_biomod_chip",
+        "qud_spring_shared_tier_pip"
+      ]
+    },
+    {
+      "screen_id": "BM_Evolution",
+      "prefab_target": "Arendeth_Broodmother_Evolution",
+      "purpose": "Buy evolutions / spend MP / advance",
+      "fallback_api": "Popup.PickOption",
+      "hierarchy": ["Frame", "Title", "StatusStrip", "ScrollView/MenuRow", "ButtonBar"],
+      "element_ids": [
+        "qud_spring_shared_window_frame",
+        "qud_spring_shared_status_strip",
+        "qud_spring_shared_menu_row",
+        "qud_spring_shared_scroll_viewport",
+        "qud_spring_shared_button_bar",
+        "qud_spring_bm_icon_evolution_node",
+        "qud_spring_shared_confirm_modal"
+      ]
+    },
+    {
+      "screen_id": "BM_CommandHub",
+      "prefab_target": "Arendeth_Broodmother_CommandHub",
+      "purpose": "Instincts, culling, combat, utility commands",
+      "fallback_api": "Popup.PickOption",
+      "hierarchy": ["Frame", "Title", "StatusStrip", "ScrollView/MenuRow", "ButtonBar"],
+      "element_ids": [
+        "qud_spring_shared_window_frame",
+        "qud_spring_shared_status_strip",
+        "qud_spring_shared_menu_row",
+        "qud_spring_shared_scroll_viewport",
+        "qud_spring_shared_button_bar"
+      ]
+    },
+    {
+      "screen_id": "BM_SwarmOverview",
+      "prefab_target": "Arendeth_Broodmother_SwarmOverview",
+      "purpose": "List broodlings: hunger, eating, level, elite",
+      "fallback_api": "Popup.PickOption",
+      "hierarchy": ["Frame", "Title", "StatusStrip", "ScrollView/MenuRow", "ButtonBar"],
+      "element_ids": [
+        "qud_spring_shared_window_frame",
+        "qud_spring_shared_status_strip",
+        "qud_spring_shared_menu_row",
+        "qud_spring_shared_scroll_viewport",
+        "qud_spring_shared_button_bar",
+        "qud_spring_bm_icon_swarm_frame"
+      ]
+    },
+    {
+      "screen_id": "BM_MealPrepare",
+      "prefab_target": "Arendeth_Broodmother_MealPrepare",
+      "purpose": "Quick meal / recipe / ingredient",
+      "fallback_api": "Popup.PickOption",
+      "hierarchy": ["Frame", "Title", "StatusStrip", "ScrollView/MenuRow", "ButtonBar"],
+      "element_ids": [
+        "qud_spring_shared_window_frame",
+        "qud_spring_shared_status_strip",
+        "qud_spring_shared_menu_row",
+        "qud_spring_shared_scroll_viewport",
+        "qud_spring_shared_button_bar"
+      ]
+    },
+    {
+      "screen_id": "BM_MealFeed",
+      "prefab_target": "Arendeth_Broodmother_MealFeed",
+      "purpose": "Portions left + feed preview",
+      "fallback_api": "Popup.Show",
+      "hierarchy": ["Frame", "Title", "StatusStrip", "ScrollView", "ButtonBar"],
+      "element_ids": [
+        "qud_spring_shared_window_frame",
+        "qud_spring_shared_status_strip",
+        "qud_spring_shared_scroll_viewport",
+        "qud_spring_shared_button_confirm"
+      ]
+    },
+    {
+      "screen_id": "BM_NestManage",
+      "prefab_target": "Arendeth_Broodmother_NestManage",
+      "purpose": "Nest / seed management",
+      "fallback_api": "Popup.PickOption",
+      "hierarchy": ["Frame", "Title", "StatusStrip", "ScrollView/MenuRow", "ButtonBar"],
+      "element_ids": [
+        "qud_spring_shared_window_frame",
+        "qud_spring_shared_status_strip",
+        "qud_spring_shared_menu_row",
+        "qud_spring_shared_scroll_viewport",
+        "qud_spring_shared_button_bar"
+      ]
+    }
+  ]
+}

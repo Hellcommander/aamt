@@ -1,0 +1,20 @@
+{
+  "id": "templates",
+  "title": "Spell Templates",
+  "description": "Mod and personal loadouts. Preview the eight banks, then apply, save, rename, or delete.",
+  "entry": "index.html",
+  "mod": "arendeth.arcane-conduit",
+  "hub": true,
+  "kind": "menu",
+  "width": 1600,
+  "height": 900,
+  "transparent": true,
+  "capturesInput": true,
+  "pausesGame": false,
+  "permissions": {
+    "nativeBridge": true,
+    "filesystem": false,
+    "network": false
+  },
+  "accent": "#7B5CFF"
+}

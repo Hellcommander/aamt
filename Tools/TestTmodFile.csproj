@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <OutputPath>$(MSBuildThisFileDirectory)TerrariaMods\bin\$(Configuration)\$(TargetFramework)\</OutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Exclude other source files -->
+    <Compile Remove="*.cs" />
+    <Compile Include="TestTmodFile.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Reference compiled tModLoader.dll for TmodFile -->
+    <Reference Include="tModLoader">
+      <HintPath>E:\SteamLibrary\steamapps\common\tModLoader\tModLoader.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Ionic.Zlib" Version="1.9.1.5" />
+  </ItemGroup>
+
+</Project>

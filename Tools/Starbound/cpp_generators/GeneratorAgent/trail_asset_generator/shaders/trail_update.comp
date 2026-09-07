@@ -1,0 +1,51 @@
+#version 450 core
+
+layout (local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+struct TrailSegment {
+    vec3 position;
+    vec3 velocity;
+    float lifetime;
+    // Add other per-segment attributes here
+};
+
+layout(std430, binding = 0) buffer TrailData {
+    TrailSegment segments[];
+};
+
+uniform float dt;
+uniform float time;
+uniform float noiseScale;
+uniform float turbulenceStrength;
+uniform float speed;
+
+
+// 3D Curl Noise function (placeholder - needs a proper implementation)
+// This is a simplified version. A real implementation would be more complex.
+vec3 curlNoise(vec3 p) {
+    // Placeholder for curl noise logic
+    // A proper implementation would involve taking the curl of a noise field (e.g., Perlin noise)
+    // For now, let's just return a swirling pattern.
+    float x = sin(p.y * 0.1 + time);
+    float y = cos(p.x * 0.1 + time);
+    float z = sin(p.z * 0.1 + time);
+    return vec3(x, y, z);
+}
+
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+
+    // TODO: Need to check against maxSegments
+    // if (index >= maxSegments) {
+    //     return;
+    // }
+
+    TrailSegment segment = segments[index];
+
+    vec3 noise = curlNoise(segment.position * noiseScale + time * speed);
+    segment.velocity += noise * turbulenceStrength * dt;
+    segment.position += segment.velocity * dt;
+
+    segments[index] = segment;
+}

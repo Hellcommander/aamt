@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spell Grid</title>
+  <link rel="stylesheet" href="../../shared/osfui.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app" class="board">
+    <header class="view-head">
+      <h1>Spell Grid</h1>
+      <p>One spell sits on the north edge. Mods and triggers snap to the triangle vertices; only a path that reaches that spell counts.</p>
+    </header>
+    <div class="layout">
+      <div class="stage" id="stage">
+        <svg id="mesh" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+        <div class="docks" id="docks"></div>
+      </div>
+      <aside class="palette">
+        <div class="osf-segmented" id="tabs"></div>
+        <div class="palette-list" id="palette"></div>
+        <p class="osf-note osf-note--info" id="hint">Pick a spell, then drop mods or triggers on the glowing sockets.</p>
+        <div class="readout osf-card">
+          <div class="osf-eyebrow">Loadout</div>
+          <div id="summary">Empty</div>
+        </div>
+        <button type="button" class="osf-btn osf-btn--ghost" id="clear">Clear board</button>
+      </aside>
+    </div>
+  </div>
+  <script src="../../shared/osfui.js"></script>
+  <script src="../padnav.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

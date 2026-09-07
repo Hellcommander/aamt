@@ -1,0 +1,144 @@
+{
+  "theme": "biomutation",
+  "note": "Keep prompts short (CLIP 77-token limit). Detail lives in T5; avoid trailing fluff that gets truncated.",
+  "icon": {
+    "prompt": "Caves of Qud biomutation icon, pulsating magenta brood-sack on chitin backplate, veined membrane, biometal straps, ichor, dark void, centered",
+    "negative_prompt": "blurry, watermark, text, cute cartoon, anime, simple shapes, neon HUD"
+  },
+  "sack": {
+    "prompt": "Caves of Qud biomutation broodling sack equipment, translucent magenta membrane, broodlings inside, chitin plates, biometal straps, side view, dark background",
+    "negative_prompt": "blurry, watermark, text, cute backpack, anime, simple shapes"
+  },
+  "broodling_ground": {
+    "prompt": "Caves of Qud biomutation arthropod broodling, ant-scorpion hybrid, magenta violet chitin, cyan joints, amber eyes, centered dark background",
+    "negative_prompt": "blurry, cute mascot, anime, watermark, text, simple shapes"
+  },
+  "broodling_flying": {
+    "prompt": "Caves of Qud biomutation winged broodling, dragonfly-wasp hybrid, cyan magenta iridescent wing membranes, slender arthropod, dark background",
+    "negative_prompt": "blurry, cute fairy, anime, watermark, text, simple shapes"
+  },
+  "broodling_crystal": {
+    "prompt": "Caves of Qud biomutation crystalline arthropod broodling, cyan white prismatic facets, purple core, shard chitin, dark background",
+    "negative_prompt": "blurry, anime, watermark, text, simple gem only"
+  },
+  "broodling_phantom": {
+    "prompt": "Caves of Qud biomutation phantom broodling, translucent spectral blue violet arthropod, ghostly membrane trails, dark background",
+    "negative_prompt": "blurry, sheet ghost, anime, watermark, text"
+  },
+  "broodling_bombardier": {
+    "prompt": "Caves of Qud biomutation bombardier broodling, swollen explosive abdomen beetle, purple carapace, amber warning marks, dark background",
+    "negative_prompt": "blurry, cartoon bomb, anime, watermark, text"
+  },
+  "broodling_symbiote": {
+    "prompt": "Caves of Qud biomutation symbiote broodling, green healing tendril glands, magenta veins, symbiotic arthropod, dark background",
+    "negative_prompt": "blurry, cute plant, anime, watermark, text"
+  },
+  "broodling_tunneler": {
+    "prompt": "Caves of Qud biomutation tunneler broodling, burrowing mandibles, ochre dirt-stained chitin, digging claws, dark background",
+    "negative_prompt": "blurry, vehicle, anime, watermark, text"
+  },
+  "broodling_mimic": {
+    "prompt": "Caves of Qud biomutation mimic broodling, chameleonic shifting magenta patterns on arthropod chitin, dark background",
+    "negative_prompt": "blurry, chest mimic only, anime, watermark, text"
+  },
+  "broodling_shard": {
+    "prompt": "Caves of Qud biomutation shard broodling, fragile cyan crystal spikes on tiny arthropod, dark background",
+    "negative_prompt": "blurry, broken glass only, anime, watermark, text"
+  },
+  "broodling_swarmling": {
+    "prompt": "Caves of Qud biomutation swarmling mite, tiny multi-legged magenta chitin broodling, dark background",
+    "negative_prompt": "blurry, cute bug, anime, watermark, text"
+  },
+  "broodling_voidling": {
+    "prompt": "Caves of Qud biomutation voidling, black dimensional core arthropod, violet rift membranes, dark background",
+    "negative_prompt": "blurry, spaceship, anime, watermark, text, neon HUD"
+  },
+  "broodling_fluxling": {
+    "prompt": "Caves of Qud biomutation fluxling, chaotic gold electric arcs on shifting arthropod carapace, dark background",
+    "negative_prompt": "blurry, anime, watermark, text, simple lightning"
+  },
+  "broodling_leechling": {
+    "prompt": "Caves of Qud biomutation leechling, distended red membrane body, needle proboscis, dark background",
+    "negative_prompt": "blurry, cute worm, anime, watermark, text"
+  },
+  "broodling_mindling": {
+    "prompt": "Caves of Qud biomutation mindling, enlarged cyan psychic cranium sac on thin arthropod, dark background",
+    "negative_prompt": "blurry, meme brain, anime, watermark, text"
+  },
+  "broodling_glowling": {
+    "prompt": "Caves of Qud biomutation glowling, small bioluminescent arthropod, soft gold glow organs, dark background",
+    "negative_prompt": "blurry, cute firefly cartoon, anime, watermark, text"
+  },
+  "broodling_rustling": {
+    "prompt": "Caves of Qud biomutation rustling, corrosive orange rust-stained arthropod, acid drips, dark background",
+    "negative_prompt": "blurry, scrap pile only, anime, watermark, text"
+  },
+  "broodling_necroling": {
+    "prompt": "Caves of Qud biomutation necroling, fungal grey-green spore arthropod, decayed chitin, dark background",
+    "negative_prompt": "blurry, cute zombie, anime, watermark, text"
+  },
+  "broodling_thornling": {
+    "prompt": "Caves of Qud biomutation thornling, spiny green chitin shield arthropod, magenta vein underglow, dark background",
+    "negative_prompt": "blurry, cactus only, anime, watermark, text"
+  },
+  "broodling_mandibore": {
+    "prompt": "Caves of Qud 16x24 tile concept, thin ant broodling side view, black chitin, lime accents, antennae, living drill mandibles, arched stinger tail, crisp silhouette, dark bg",
+    "negative_prompt": "blurry, slime blob, soft grey wash, crab pincers, thick body, cute cartoon, anime, watermark, text"
+  },
+  "preview": {
+    "prompt": "Caves of Qud biomutation workshop preview, broodling sack and arthropod broodlings, magenta membrane chitin, umber void, centered composition",
+    "negative_prompt": "blurry, watermark, text, UI chrome, neon HUD, cute cartoon, anime"
+  },
+  "texture_carapace": {
+    "prompt": "Caves of Qud biomutation chitin carapace armor tile, layered magenta violet plates, biometal rivets, side view, dark background",
+    "negative_prompt": "blurry, watermark, text, medieval plate only, anime"
+  },
+  "texture_membrane": {
+    "prompt": "Caves of Qud biomutation seamless membrane texture, veined magenta translucent flesh, subtle ichor sheen, tileable organic",
+    "negative_prompt": "blurry, watermark, text, neon grid, cartoon skin"
+  },
+  "texture_biometal": {
+    "prompt": "Caves of Qud biomutation biometal surface texture, cool teal gunmetal filaments, organic circuitry veins, tileable",
+    "negative_prompt": "blurry, watermark, text, chrome car, neon cyberpunk HUD"
+  },
+  "texture_chitin": {
+    "prompt": "Caves of Qud biomutation arthropod chitin texture, umber olive plates, sparse magenta suture lines, tileable",
+    "negative_prompt": "blurry, watermark, text, plastic, anime"
+  },
+  "ui_biomod_chip": {
+    "prompt": "Caves of Qud biomutation UI icon, living biometal hex gland chip, magenta veins, inventory icon, transparent dark, centered",
+    "negative_prompt": "blurry, text, watermark, cute cartoon, anime, purple neon HUD, simple shapes"
+  },
+  "ui_birth_badge": {
+    "prompt": "Caves of Qud biomutation UI badge, arthropod broodling silhouette, chitin membrane, magenta hive accent, transparent, centered",
+    "negative_prompt": "blurry, text, watermark, cute mascot, anime, neon HUD"
+  },
+  "ui_evolution_node": {
+    "prompt": "Caves of Qud biomutation UI node, neural lattice on dark chitin, cyan synaptic glow, biomutation icon, transparent, centered",
+    "negative_prompt": "blurry, text, watermark, circuit board only, anime, neon HUD"
+  },
+  "ui_swarm_frame": {
+    "prompt": "Caves of Qud biomutation UI portrait frame, thin umber frame, magenta corner pip, biometal edge, empty center, transparent",
+    "negative_prompt": "blurry, text, watermark, ornate gold baroque, neon HUD, anime"
+  },
+  "ui_panel": {
+    "prompt": "Caves of Qud biomutation UI panel surface, umber olive terminal chrome, sparse magenta underglow, matte biometal rim, flat UI texture",
+    "negative_prompt": "blurry, text, watermark, purple neon dashboard, glossy glass UI, anime"
+  },
+  "ui_button": {
+    "prompt": "Caves of Qud biomutation UI button, umber chitin plate, biometal edge, faint magenta vein, flat game UI, centered",
+    "negative_prompt": "blurry, text, watermark, glossy web button, neon HUD, anime"
+  },
+  "ui_menu_row": {
+    "prompt": "Caves of Qud biomutation UI list row, dark umber strip, thin biometal divider, magenta select pip, flat terminal UI",
+    "negative_prompt": "blurry, text, watermark, card UI, neon glow, anime"
+  },
+  "ui_status_strip": {
+    "prompt": "Caves of Qud biomutation UI status strip, thin olive bar, magenta underline accent, biometal ticks, flat HUD fragment",
+    "negative_prompt": "blurry, text, watermark, health bar fantasy RPG, neon HUD, anime"
+  },
+  "ui_tier_pip": {
+    "prompt": "Caves of Qud biomutation UI tier pip, small magenta gland gem on biometal socket, icon, transparent, centered",
+    "negative_prompt": "blurry, text, watermark, jewel RPG loot, neon, anime"
+  }
+}

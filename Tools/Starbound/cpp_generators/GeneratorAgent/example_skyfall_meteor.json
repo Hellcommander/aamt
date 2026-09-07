@@ -1,0 +1,104 @@
+{
+  "id": "skyfall_meteor",
+  "cometType": "meteor",
+  "cometShape": "irregular",
+  "trailType": "dust",
+  "fragmentationType": "explosive",
+  "noiseType": "perlin",
+  "blendMode": "additive",
+  
+  "coreRadius": 0.5,
+  "irregularity": 0.8,
+  "speed": 30.0,
+  "gravityInfluence": 1.0,
+  "mass": 1.2,
+  "drag": 0.15,
+  "lift": 0.05,
+  
+  "heatColor": [1.0, 0.5, 0.1],
+  "burnColor": [1.0, 0.8, 0.3],
+  "coreColor": [0.8, 0.6, 0.4],
+  "glowColor": [1.0, 0.4, 0.0],
+  "dustColor": [0.5, 0.5, 0.5, 0.6],
+  "sparkColor": [1.0, 0.4, 0.1, 1.0],
+  
+  "glowIntensity": 2.0,
+  "emissivePower": 1.5,
+  "coreOpacity": 1.0,
+  "trailOpacity": 0.8,
+  "enableCoreGlow": true,
+  "enableTrailGlow": true,
+  
+  "trailLength": 2.0,
+  "trailWidth": 0.15,
+  "trailNoiseScale": 1.5,
+  "trailNoiseSpeed": 3.0,
+  "trailFadeSpeed": 1.2,
+  "enableTrailFade": true,
+  "enableTrailDistortion": true,
+  "trailDistortionStrength": 0.2,
+  
+  "dustParticleCount": 100,
+  "dustLifetime": 1.5,
+  "dustSize": 0.05,
+  "dustSpeed": 1.0,
+  "enableDustFade": true,
+  "dustFadeSpeed": 1.5,
+  
+  "sparkParticleCount": 30,
+  "sparkLifetime": 0.6,
+  "sparkSize": 0.03,
+  "sparkSpeed": 1.5,
+  "enableSparkFade": true,
+  "sparkFadeSpeed": 1.0,
+  
+  "fragmentationCount": 8,
+  "fragmentSizeFactor": 0.3,
+  "fragmentSpread": 1.5,
+  "fragmentVelocity": 2.5,
+  "enableFragmentPhysics": true,
+  "fragmentLifetime": 2.0,
+  
+  "shaderType": "meteor",
+  "shaderIntensity": 1.2,
+  "enableDistortion": true,
+  "distortionStrength": 0.15,
+  "enableBlur": false,
+  "blurStrength": 0.1,
+  "enableHeatDistortion": true,
+  "heatDistortionStrength": 0.1,
+  
+  "enablePhysics": true,
+  "enableCollision": true,
+  "collisionRadius": 0.5,
+  "enableGravity": true,
+  "enableAirResistance": true,
+  "airResistanceFactor": 0.1,
+  
+  "enableCaching": true,
+  "enableHotReload": true,
+  "enableParallelProcessing": true,
+  "lodLevel": 0,
+  
+  "description": "A powerful skyfall meteor that creates intense impact effects with explosive fragmentation. The projectile has high damage potential and creates impressive visual effects with dust trails and spark particles.",
+  
+  "tags": [
+    "meteor",
+    "skyfall",
+    "projectile",
+    "high_damage",
+    "explosive",
+    "visual_effects"
+  ],
+  
+  "metadata": {
+    "author": "Magi-Tech Comet Projectile System",
+    "version": "1.0.0",
+    "license": "MIT",
+    "damage": "very_high",
+    "range": "long",
+    "difficulty": "expert",
+    "category": "celestial_magic",
+    "tier": "legendary"
+  }
+} 

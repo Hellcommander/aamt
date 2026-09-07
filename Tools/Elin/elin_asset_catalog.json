@@ -1,0 +1,551 @@
+{
+  "modPath": "E:\\SteamLibrary\\steamapps\\common\\Elin\\Package\\Mod\\CustomRaceClassCreator",
+  "outputRoot": "D:\\games\\Ai assisted toolkit\\Tools\\Elin\\Output",
+  "cursorAssetsDir": "C:\\Users\\Arend\\.cursor\\projects\\e-SteamLibrary-steamapps-common-Elin-Package-Mod-CustomRaceClassCreator\\assets",
+  "starfield": {
+    "root": "F:\\SteamLibrary\\steamapps\\common\\Starfield",
+    "arcaneConduit": "F:\\SteamLibrary\\steamapps\\common\\Starfield\\ArcaneConduit",
+    "spellCatalog": "F:\\SteamLibrary\\steamapps\\common\\Starfield\\ArcaneConduit\\spells\\catalog.json",
+    "assets": "F:\\SteamLibrary\\steamapps\\common\\Starfield\\ArcaneConduit\\Assets\\Transcendence",
+    "concepts": "F:\\SteamLibrary\\steamapps\\common\\Starfield\\ArcaneConduit\\Assets\\Transcendence\\Concepts",
+    "sharedMeshes": "D:\\games\\Ai assisted toolkit\\Tools\\Shared\\Concepts\\meshes",
+    "sharedConcepts": "D:\\games\\Ai assisted toolkit\\Tools\\Shared\\Concepts"
+  },
+  "style": {
+    "concept": "cinematic 3D concept art, three-quarter view, single complete object centered, studio lighting, physically based materials, dark void background, Unreal Engine cinematic sculpt, no text, no watermark, not a 2D sprite, not top-down",
+    "icon": "fantasy RPG game icon, Elona/Elin inspired, clear silhouette, centered subject, soft rim light, solid dark background, no text, no watermark, readable at small size",
+    "ui": "Elin/Elona fantasy UI chrome, warm wood and brass, parchment accents, soft bevel, classic JRPG inventory aesthetic, clean edges, no text unless specified",
+    "portrait": "Elona/Elin unique NPC portrait, soft watercolor anime illustration, head-and-shoulders bust, clean white/transparent background, soft lineart, gentle painted shading, no text, no watermark, no frame, no UI; output UN_crcc_{system}.png at 240x320 RGBA",
+    "spell_icon": "fantasy RPG game spell icon, Elona/Elin inspired, single unique magical effect centered, clear silhouette, soft rim light, solid dark background, no text, no watermark, readable at small size, not a generic orb, not a stock fireball \u2014 each spell must look distinct",
+    "spell_concept": "cinematic fantasy spell visualization, unique magical phenomenon as the subject, dramatic lighting, physically based materials, dark void background, Unreal Engine cinematic, no text, no watermark \u2014 complex art that clearly depicts THIS spell only, never a shared school emblem"
+  },
+  "heroes": [
+    {
+      "id": "DragonMagic",
+      "kind": "magic",
+      "elinSystem": "dragon",
+      "prop": "bronze dragon-scale pauldron relic with ember glow and golden horns",
+      "colors": [
+        "#c45c26",
+        "#8b2500",
+        "#ffd700"
+      ],
+      "sfSchool": "Pyrolysis"
+    },
+    {
+      "id": "DreamMagic",
+      "kind": "magic",
+      "elinSystem": "dream",
+      "prop": "floating dreamcatcher orb woven from silver thread with soft indigo mist",
+      "colors": [
+        "#4b3f8f",
+        "#a78bfa",
+        "#e0e7ff"
+      ],
+      "sfSchool": "Phasics"
+    },
+    {
+      "id": "ElementMagic",
+      "kind": "magic",
+      "elinSystem": "element",
+      "prop": "four-element crystal core combining fire ice stone and wind facets",
+      "colors": [
+        "#ef4444",
+        "#38bdf8",
+        "#a3a3a3",
+        "#86efac"
+      ],
+      "sfSchool": "Voltaics"
+    },
+    {
+      "id": "WispMagic",
+      "kind": "magic",
+      "elinSystem": "wisp",
+      "prop": "ornate lantern trapping a glowing cyan wisp spirit",
+      "colors": [
+        "#22d3ee",
+        "#0e7490",
+        "#f0fdfa"
+      ],
+      "sfSchool": "Photonics"
+    },
+    {
+      "id": "DruidicMagic",
+      "kind": "magic",
+      "elinSystem": "druidic",
+      "prop": "living wooden totem wrapped in vines with blooming moss",
+      "colors": [
+        "#166534",
+        "#86efac",
+        "#854d0e"
+      ],
+      "sfSchool": "Vitalics"
+    },
+    {
+      "id": "Crossmagic",
+      "kind": "magic",
+      "elinSystem": "crossmagic",
+      "prop": "interlocking rune prism of fused magical schools",
+      "colors": [
+        "#7c3aed",
+        "#f59e0b",
+        "#06b6d4"
+      ],
+      "sfSchool": "Bindings"
+    },
+    {
+      "id": "RiverMagic",
+      "kind": "magic",
+      "elinSystem": "river",
+      "prop": "carved river-stone vessel with eternally flowing water",
+      "colors": [
+        "#0ea5e9",
+        "#0369a1",
+        "#bae6fd"
+      ],
+      "sfSchool": "Osmotics"
+    },
+    {
+      "id": "Pollution",
+      "kind": "magic",
+      "elinSystem": "pollution",
+      "prop": "cracked toxic sludge urn leaking green-black fumes",
+      "colors": [
+        "#65a30d",
+        "#3f6212",
+        "#171717"
+      ],
+      "sfSchool": "Entropy"
+    },
+    {
+      "id": "ArcaneSaturation",
+      "kind": "magic",
+      "elinSystem": "arcanesaturation",
+      "prop": "overflowing mana flask with violet energy spilling upward",
+      "colors": [
+        "#a855f7",
+        "#6b21a8",
+        "#f5d0fe"
+      ],
+      "sfSchool": "Phasics"
+    },
+    {
+      "id": "BardicMagic",
+      "kind": "magic",
+      "elinSystem": "bardic",
+      "prop": "ornate fantasy lute with glowing sound-crystal inlays",
+      "colors": [
+        "#b45309",
+        "#fbbf24",
+        "#fde68a"
+      ],
+      "sfSchool": "Photonics"
+    },
+    {
+      "id": "SpiritMagic",
+      "kind": "magic",
+      "elinSystem": "spirit",
+      "prop": "ancestral spirit mask with pale ethereal ribbons",
+      "colors": [
+        "#e5e7eb",
+        "#94a3b8",
+        "#c4b5fd"
+      ],
+      "sfSchool": "Celestial"
+    },
+    {
+      "id": "Geomancy",
+      "kind": "magic",
+      "elinSystem": "geomancy",
+      "prop": "carved earth obelisk of layered stone and amber crystal",
+      "colors": [
+        "#78716c",
+        "#d97706",
+        "#44403c"
+      ],
+      "sfSchool": "Gravitics"
+    },
+    {
+      "id": "Necromancy",
+      "kind": "magic",
+      "elinSystem": "necromancy",
+      "prop": "bone phylactery skull bound with iron and green soulfire",
+      "colors": [
+        "#e7e5e4",
+        "#365314",
+        "#171717"
+      ],
+      "sfSchool": "Entropy"
+    },
+    {
+      "id": "BloodMagic",
+      "kind": "magic",
+      "elinSystem": "blood",
+      "prop": "ornate blood chalice with crimson liquid and ruby veins",
+      "colors": [
+        "#991b1b",
+        "#7f1d1d",
+        "#fca5a5"
+      ],
+      "sfSchool": "Abyssal"
+    },
+    {
+      "id": "Golemancy",
+      "kind": "magic",
+      "elinSystem": "golemancy",
+      "prop": "clay golem head core etched with glowing runes",
+      "colors": [
+        "#a8a29e",
+        "#f59e0b",
+        "#57534e"
+      ],
+      "sfSchool": "Synthetics"
+    },
+    {
+      "id": "SpectreMagic",
+      "kind": "magic",
+      "elinSystem": "spectre",
+      "prop": "ghostly veil lantern emitting pale blue cold light",
+      "colors": [
+        "#93c5fd",
+        "#1e3a8a",
+        "#e0f2fe"
+      ],
+      "sfSchool": "Phasics"
+    },
+    {
+      "id": "Technomancy",
+      "kind": "magic",
+      "elinSystem": "technomancy",
+      "prop": "brass-and-crystal steampunk gadget with arcane circuits",
+      "colors": [
+        "#b45309",
+        "#67e8f9",
+        "#292524"
+      ],
+      "sfSchool": "Synthetics"
+    },
+    {
+      "id": "TerrainMagic",
+      "kind": "magic",
+      "elinSystem": "terrain",
+      "prop": "miniature mountain shrine with cliff faces and tiny trees",
+      "colors": [
+        "#57534e",
+        "#16a34a",
+        "#a8a29e"
+      ],
+      "sfSchool": "Gravitics"
+    },
+    {
+      "id": "WeatherMagic",
+      "kind": "magic",
+      "elinSystem": "weather",
+      "prop": "glass storm bottle containing swirling clouds and lightning",
+      "colors": [
+        "#64748b",
+        "#facc15",
+        "#0f172a"
+      ],
+      "sfSchool": "Atmospherics"
+    },
+    {
+      "id": "RuneMagic",
+      "kind": "magic",
+      "elinSystem": "rune",
+      "prop": "standing carved rune tablet glowing with ancient sigils",
+      "colors": [
+        "#44403c",
+        "#fbbf24",
+        "#1c1917"
+      ],
+      "sfSchool": "Bindings"
+    },
+    {
+      "id": "EtherwindMagic",
+      "kind": "magic",
+      "elinSystem": "etherwind",
+      "prop": "wind-swept ether crystal with translucent flowing trails",
+      "colors": [
+        "#a5f3fc",
+        "#67e8f9",
+        "#164e63"
+      ],
+      "sfSchool": "Atmospherics"
+    },
+    {
+      "id": "Geoscience",
+      "kind": "magic",
+      "elinSystem": "geoscience",
+      "prop": "geological core sample crystal on a survey pedestal",
+      "colors": [
+        "#78716c",
+        "#22d3ee",
+        "#fcd34d"
+      ],
+      "sfSchool": "Gravitics"
+    },
+    {
+      "id": "DynamicSpells",
+      "kind": "magic",
+      "elinSystem": "dynamic",
+      "prop": "morphing spell orb shifting between multiple magical forms",
+      "colors": [
+        "#c084fc",
+        "#38bdf8",
+        "#f472b6"
+      ],
+      "sfSchool": "Phasics"
+    },
+    {
+      "id": "SlotMagic",
+      "kind": "magic",
+      "elinSystem": "slot",
+      "prop": "mystical slot-reel artifact with enchanted symbols",
+      "colors": [
+        "#f59e0b",
+        "#7c3aed",
+        "#111827"
+      ],
+      "sfSchool": "Bindings"
+    },
+    {
+      "id": "PactMagic",
+      "kind": "feature",
+      "elinSystem": "pact",
+      "prop": "sealed demonic contract scroll with wax seal and chains",
+      "colors": [
+        "#7f1d1d",
+        "#fbbf24",
+        "#1c1917"
+      ],
+      "sfSchool": "Bindings"
+    },
+    {
+      "id": "RitualMagic",
+      "kind": "feature",
+      "elinSystem": "ritual",
+      "prop": "ritual candle circle altar with floating chalk runes",
+      "colors": [
+        "#fef3c7",
+        "#6b21a8",
+        "#292524"
+      ],
+      "sfSchool": "Bindings"
+    },
+    {
+      "id": "SlotMachine",
+      "kind": "feature",
+      "elinSystem": "slotmachine",
+      "prop": "ornate fantasy slot machine with gem reels and gold trim",
+      "colors": [
+        "#b45309",
+        "#fbbf24",
+        "#831843"
+      ],
+      "sfSchool": "Synthetics"
+    },
+    {
+      "id": "AIAssistant",
+      "kind": "feature",
+      "elinSystem": "ai",
+      "prop": "crystal thinking orb laced with delicate circuit veins",
+      "colors": [
+        "#38bdf8",
+        "#e0f2fe",
+        "#0f172a"
+      ],
+      "sfSchool": "Synthetics"
+    },
+    {
+      "id": "PCCMutation",
+      "kind": "feature",
+      "elinSystem": "mutation",
+      "prop": "mutation vial with swirling biomorphic essence",
+      "colors": [
+        "#22c55e",
+        "#a855f7",
+        "#052e16"
+      ],
+      "sfSchool": "Vitalics"
+    },
+    {
+      "id": "QuestPlus",
+      "kind": "feature",
+      "elinSystem": "quest",
+      "prop": "quest scroll with wax seal and adventurer compass",
+      "colors": [
+        "#fef3c7",
+        "#b45309",
+        "#1e3a8a"
+      ],
+      "sfSchool": "Bindings"
+    },
+    {
+      "id": "SpriteAlter",
+      "kind": "feature",
+      "elinSystem": "sprite",
+      "prop": "painter palette relic with magic brush and pigment gems",
+      "colors": [
+        "#f472b6",
+        "#38bdf8",
+        "#fbbf24"
+      ],
+      "sfSchool": "Photonics"
+    },
+    {
+      "id": "CombatPlus",
+      "kind": "feature",
+      "elinSystem": "combat",
+      "prop": "crossed fantasy weapons relic on a battle crest",
+      "colors": [
+        "#9ca3af",
+        "#dc2626",
+        "#111827"
+      ],
+      "sfSchool": "Kinetics"
+    },
+    {
+      "id": "AnimatedServant",
+      "kind": "feature",
+      "elinSystem": "animatedservant",
+      "prop": "living clay-and-brass servant heart-core with amber soul-gem and master-bond chains",
+      "colors": [
+        "#a8a29e",
+        "#f59e0b",
+        "#57534e"
+      ],
+      "sfSchool": "Synthetics"
+    },
+    {
+      "id": "VisionSystem",
+      "kind": "feature",
+      "elinSystem": "vision",
+      "prop": "ornate brass scrying monocle with floating cyan iris lens",
+      "colors": [
+        "#67e8f9",
+        "#b45309",
+        "#0f172a"
+      ],
+      "sfSchool": "Photonics"
+    },
+    {
+      "id": "NoiseSystem",
+      "kind": "feature",
+      "elinSystem": "noise",
+      "prop": "twin brass tuning-fork crystal resonator with sound-ring ridges",
+      "colors": [
+        "#b45309",
+        "#22d3ee",
+        "#292524"
+      ],
+      "sfSchool": "Atmospherics"
+    },
+    {
+      "id": "ManaMagic",
+      "kind": "magic",
+      "elinSystem": "mana",
+      "prop": "faceted sapphire mana crystal vessel with calm contained liquid mana",
+      "colors": [
+        "#38bdf8",
+        "#a855f7",
+        "#e0f2fe"
+      ],
+      "sfSchool": "Phasics"
+    },
+    {
+      "id": "SpellFusion",
+      "kind": "magic",
+      "elinSystem": "spellfusion",
+      "prop": "fire-orange and frost-blue crystals fused mid-merge with brass clamps",
+      "colors": [
+        "#ef4444",
+        "#38bdf8",
+        "#f59e0b"
+      ],
+      "sfSchool": "Bindings"
+    }
+  ],
+  "ui": [
+    {
+      "id": "ui_panel_frame",
+      "filename": "elin_ui_panel_frame.png",
+      "desc": "rectangular fantasy RPG UI panel frame, warm dark wood border with brass corners, empty translucent center, 9-slice friendly"
+    },
+    {
+      "id": "ui_window_chrome",
+      "filename": "elin_ui_window_chrome.png",
+      "desc": "fantasy RPG window title bar and outer chrome, wood and gold, empty content area, no letters"
+    },
+    {
+      "id": "ui_button_normal",
+      "filename": "elin_ui_button_normal.png",
+      "desc": "fantasy RPG UI button, wood and brass bevel, idle state, no text"
+    },
+    {
+      "id": "ui_button_hover",
+      "filename": "elin_ui_button_hover.png",
+      "desc": "fantasy RPG UI button, wood and brass bevel, glowing hover highlight, no text"
+    },
+    {
+      "id": "ui_button_pressed",
+      "filename": "elin_ui_button_pressed.png",
+      "desc": "fantasy RPG UI button, wood and brass bevel, pressed inset look, no text"
+    },
+    {
+      "id": "ui_tab",
+      "filename": "elin_ui_tab.png",
+      "desc": "fantasy RPG tab button, parchment and brass, no text"
+    },
+    {
+      "id": "ui_resource_bar_frame",
+      "filename": "elin_ui_resource_bar_frame.png",
+      "desc": "horizontal fantasy resource bar frame for HP/mana, ornate metal ends, empty fill area"
+    },
+    {
+      "id": "ui_resource_fill_mana",
+      "filename": "elin_ui_resource_fill_mana.png",
+      "desc": "seamless horizontal mana bar fill texture, glowing violet-blue magical liquid"
+    },
+    {
+      "id": "ui_resource_fill_stamina",
+      "filename": "elin_ui_resource_fill_stamina.png",
+      "desc": "seamless horizontal stamina bar fill texture, warm amber energy"
+    },
+    {
+      "id": "ui_resource_fill_blood",
+      "filename": "elin_ui_resource_fill_blood.png",
+      "desc": "seamless horizontal blood/wyrmforce bar fill, deep crimson with subtle glow"
+    },
+    {
+      "id": "ui_slot_frame",
+      "filename": "elin_ui_slot_frame.png",
+      "desc": "square inventory/spell slot frame, dark metal with brass trim, empty center"
+    },
+    {
+      "id": "ui_icon_badge",
+      "filename": "elin_ui_icon_badge.png",
+      "desc": "circular fantasy icon badge frame, ornate brass ring, empty dark center"
+    },
+    {
+      "id": "ui_scrollbar",
+      "filename": "elin_ui_scrollbar.png",
+      "desc": "fantasy RPG scrollbar track and ornate handle, vertical, wood and brass"
+    },
+    {
+      "id": "ui_toggle",
+      "filename": "elin_ui_toggle.png",
+      "desc": "fantasy RPG toggle switch, ornate metal, on state glowing gem"
+    },
+    {
+      "id": "ui_tooltip_bg",
+      "filename": "elin_ui_tooltip_bg.png",
+      "desc": "fantasy RPG tooltip background panel, dark parchment with thin gold border, empty"
+    },
+    {
+      "id": "ui_divider",
+      "filename": "elin_ui_divider.png",
+      "desc": "horizontal ornate fantasy UI divider line with small gem centerpiece"
+    }
+  ]
+}

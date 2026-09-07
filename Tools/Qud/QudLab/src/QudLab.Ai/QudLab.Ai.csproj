@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\QudLab.Core\QudLab.Core.csproj" />
+    <ProjectReference Include="..\QudLab.Assistant\QudLab.Assistant.csproj" />
+    <ProjectReference Include="..\QudLab.Indexer\QudLab.Indexer.csproj" />
+    <ProjectReference Include="..\QudLab.RoslynCompile\QudLab.RoslynCompile.csproj" />
+    <ProjectReference Include="..\QudLab.Simulator\QudLab.Simulator.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

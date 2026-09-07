@@ -1,0 +1,309 @@
+{
+  "version": "1.0.0",
+  "ships": [
+    {
+      "id": "leviathan_alpha",
+      "type": "spaceWhale",
+      "visual": {
+        "silhouette": {
+          "baseSize": {
+            "length": 4.0,
+            "width": 1.75,
+            "height": 1.0,
+            "description": "Tier 1 starting size (level 1)"
+          },
+          "maxSize": {
+            "length": 8.0,
+            "width": 3.5,
+            "height": 2.0,
+            "description": "Maximum size (level 50)"
+          },
+          "currentSize": {
+            "length": 8.0,
+            "width": 3.5,
+            "height": 2.0,
+            "description": "Current size (for reference, calculated from level)"
+          },
+          "profile": "streamlined",
+          "scalesWithLevel": true,
+          "scalingFormula": "linear"
+        },
+        "materials": {
+          "skinType": "bioluminescent",
+          "baseColor": "#1a2a3a",
+          "veinColor": "#66ccff",
+          "carapaceColor": "#4a5a6a",
+          "emissiveIntensity": 3.5,
+          "subsurfaceScattering": true,
+          "veinFlowSpeed": 1.2
+        },
+        "animations": {
+          "breathingEnabled": true,
+          "breathingSpeed": 0.8,
+          "breathingAmplitude": 0.05,
+          "tailSweepEnabled": true,
+          "gillVentCount": 6,
+          "gillPulseSpeed": 1.5,
+          "dorsalCrestGlow": true
+        },
+        "modules": [
+          {
+            "name": "head",
+            "type": "head",
+            "position": {"x": 0, "y": 0, "z": 3.5}
+          },
+          {
+            "name": "mid_section",
+            "type": "mid",
+            "position": {"x": 0, "y": 0, "z": 0}
+          },
+          {
+            "name": "belly_bay",
+            "type": "belly",
+            "position": {"x": 0, "y": -0.8, "z": -1.5}
+          },
+          {
+            "name": "tail",
+            "type": "tail",
+            "position": {"x": 0, "y": 0, "z": -3.5}
+          },
+          {
+            "name": "dorsal_crest",
+            "type": "dorsalCrest",
+            "position": {"x": 0, "y": 1.2, "z": 0}
+          }
+        ]
+      },
+      "systems": {
+        "bioCore": {
+          "maxEnergy": 1000,
+          "rechargeRate": 25,
+          "drainRate": 15,
+          "outputScaling": true
+        },
+        "orbitField": {
+          "radius": 2.5,
+          "pullStrength": 0.8,
+          "collisionDamageMultiplier": 1.5,
+          "scalesWithBioCore": true,
+          "visualStyle": "solarWind"
+        },
+        "droneBay": {
+          "maxDrones": 12,
+          "spawnRate": 0.5,
+          "deadZoneCapacity": 6,
+          "droneTypes": ["interceptor", "repair", "harasser", "heavy"]
+        },
+        "shield": {
+          "maxStrength": 500,
+          "rechargeRate": 8,
+          "sharedPool": true,
+          "minionLinkEnabled": true
+        },
+        "abilities": {
+          "solarWindToggle": true,
+          "songPulse": {
+            "chargeTime": 2.0,
+            "shockwaveRadius": 3.0,
+            "pushForce": 1.2,
+            "turbulenceDuration": 3.0
+          },
+          "feedingSurge": {
+            "bioCoreCost": 300,
+            "droneSpawnBonus": 2.0,
+            "fieldRadiusBonus": 1.5,
+            "duration": 10.0
+          }
+        }
+      },
+      "stats": {
+        "baseStats": {
+          "hullHP": 500,
+          "armor": 50,
+          "baseSpeed": 0.3,
+          "acceleration": 0.1,
+          "turnRate": 0.15,
+          "mass": 2000,
+          "regenerationRate": 2.0,
+          "description": "Tier 1 starting stats (level 1)"
+        },
+        "maxStats": {
+          "hullHP": 2000,
+          "armor": 150,
+          "baseSpeed": 0.3,
+          "acceleration": 0.1,
+          "turnRate": 0.15,
+          "mass": 5000,
+          "regenerationRate": 2.0,
+          "description": "Maximum stats (level 50)"
+        },
+        "currentStats": {
+          "hullHP": 2000,
+          "armor": 150,
+          "baseSpeed": 0.3,
+          "acceleration": 0.1,
+          "turnRate": 0.15,
+          "mass": 5000,
+          "regenerationRate": 2.0,
+          "description": "Current stats (for reference, calculated from level 50)"
+        },
+        "scalesWithLevel": true
+      },
+      "leveling": {
+        "system": "evolvedShip",
+        "levelSource": "objGetLevel",
+        "description": "Uses same leveling system as evolved ships - scales with player level from objGetLevel (1-50)",
+        "startLevel": 1,
+        "maxLevel": 50,
+        "currentLevel": 50,
+        "tier": 5,
+        "sizeScaling": {
+          "enabled": true,
+          "baseSize": { "length": 4.0, "width": 1.75, "height": 1.0 },
+          "maxSize": { "length": 8.0, "width": 3.5, "height": 2.0 },
+          "formula": "linear",
+          "description": "Ship starts small at level 1 (tier 1 balanced) and grows to capital ship scale at level 50 (tier 5)"
+        }
+      },
+      "export": {
+        "unid": "&shLeviathanAlpha;",
+        "transcendenceXml": true,
+        "facings": 120,
+        "columns": 10,
+        "rows": 12,
+        "resourcePaths": {
+          "shipImage": "Resources/Ships/leviathan_alpha_120facings.png",
+          "shipMask": "Resources/Ships/leviathan_alpha_120facingsMask.bmp",
+          "shipLarge": "Resources/Ships/leviathan_alpha_large.png",
+          "orbitFieldFX": "Resources/FX/leviathan_orbit_field.png",
+          "breathingAnimation": "Resources/Animations/leviathan_breathing.png",
+          "droneBayImage": "Resources/Ships/leviathan_drone_bay.png"
+        }
+      }
+    },
+    {
+      "id": "serpent_void",
+      "type": "spaceWhale",
+      "visual": {
+        "silhouette": {
+          "length": 10.0,
+          "width": 2.5,
+          "height": 1.8,
+          "profile": "serpentine"
+        },
+        "materials": {
+          "skinType": "hybrid",
+          "baseColor": "#2a1a3a",
+          "veinColor": "#ff66ff",
+          "carapaceColor": "#5a4a6a",
+          "emissiveIntensity": 4.0,
+          "subsurfaceScattering": true,
+          "veinFlowSpeed": 1.8
+        },
+        "animations": {
+          "breathingEnabled": true,
+          "breathingSpeed": 1.2,
+          "breathingAmplitude": 0.08,
+          "tailSweepEnabled": true,
+          "gillVentCount": 8,
+          "gillPulseSpeed": 2.0,
+          "dorsalCrestGlow": true
+        },
+        "modules": [
+          {
+            "name": "head",
+            "type": "head",
+            "position": {"x": 0, "y": 0, "z": 4.5}
+          },
+          {
+            "name": "mid_section_1",
+            "type": "mid",
+            "position": {"x": 0, "y": 0, "z": 1.5}
+          },
+          {
+            "name": "mid_section_2",
+            "type": "mid",
+            "position": {"x": 0, "y": 0, "z": -1.5}
+          },
+          {
+            "name": "belly_bay",
+            "type": "belly",
+            "position": {"x": 0, "y": -0.6, "z": 0}
+          },
+          {
+            "name": "tail",
+            "type": "tail",
+            "position": {"x": 0, "y": 0, "z": -4.5}
+          }
+        ]
+      },
+      "systems": {
+        "bioCore": {
+          "maxEnergy": 1200,
+          "rechargeRate": 30,
+          "drainRate": 18,
+          "outputScaling": true
+        },
+        "orbitField": {
+          "radius": 3.0,
+          "pullStrength": 1.0,
+          "collisionDamageMultiplier": 2.0,
+          "scalesWithBioCore": true,
+          "visualStyle": "gravityWell"
+        },
+        "droneBay": {
+          "maxDrones": 16,
+          "spawnRate": 0.6,
+          "deadZoneCapacity": 8,
+          "droneTypes": ["interceptor", "harasser", "heavy"]
+        },
+        "shield": {
+          "maxStrength": 600,
+          "rechargeRate": 10,
+          "sharedPool": true,
+          "minionLinkEnabled": true
+        },
+        "abilities": {
+          "solarWindToggle": true,
+          "songPulse": {
+            "chargeTime": 1.5,
+            "shockwaveRadius": 3.5,
+            "pushForce": 1.5,
+            "turbulenceDuration": 4.0
+          },
+          "feedingSurge": {
+            "bioCoreCost": 400,
+            "droneSpawnBonus": 2.5,
+            "fieldRadiusBonus": 2.0,
+            "duration": 12.0
+          }
+        }
+      },
+      "stats": {
+        "hullHP": 1800,
+        "armor": 120,
+        "baseSpeed": 0.35,
+        "acceleration": 0.12,
+        "turnRate": 0.18,
+        "mass": 4500,
+        "regenerationRate": 2.5
+      },
+      "export": {
+        "unid": "&shSerpentVoid;",
+        "transcendenceXml": true,
+        "facings": 120,
+        "columns": 10,
+        "rows": 12,
+        "resourcePaths": {
+          "shipImage": "Resources/Ships/serpent_void_120facings.png",
+          "shipMask": "Resources/Ships/serpent_void_120facingsMask.bmp",
+          "shipLarge": "Resources/Ships/serpent_void_large.png",
+          "orbitFieldFX": "Resources/FX/serpent_orbit_field.png",
+          "breathingAnimation": "Resources/Animations/serpent_breathing.png",
+          "droneBayImage": "Resources/Ships/serpent_drone_bay.png"
+        }
+      }
+    }
+  ]
+}
+

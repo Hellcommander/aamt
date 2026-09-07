@@ -1,0 +1,320 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Nova Drift Style FX Registry Schema",
+  "description": "Data-driven special effects system with Nova Drift aesthetic: high-energy bursts, additive glows, procedural distortion, particle-driven motion, layered FX",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "default": "1.0.0"
+    },
+    "effects": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/fxProfile"
+      }
+    }
+  },
+  "definitions": {
+    "fxProfile": {
+      "type": "object",
+      "required": ["id", "type", "style", "visual", "export"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique FX identifier (e.g., 'nova_burst_01')"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["fx", "explosion", "impact", "muzzle", "trail"],
+          "default": "fx",
+          "description": "FX type category"
+        },
+        "style": {
+          "type": "string",
+          "enum": ["novaDrift", "classic", "realistic", "stylized"],
+          "default": "novaDrift",
+          "description": "Visual style (Nova Drift = high-energy, additive, procedural)"
+        },
+        "visual": {
+          "$ref": "#/definitions/fxVisual"
+        },
+        "particles": {
+          "$ref": "#/definitions/fxParticles"
+        },
+        "timing": {
+          "$ref": "#/definitions/fxTiming"
+        },
+        "export": {
+          "$ref": "#/definitions/fxExport"
+        }
+      }
+    },
+    "fxVisual": {
+      "type": "object",
+      "required": ["coreColor"],
+      "properties": {
+        "coreColor": {
+          "type": "string",
+          "description": "Core glow color (hex format, e.g., '#ff66ff')"
+        },
+        "rimColor": {
+          "type": "string",
+          "description": "Rim/edge color (hex format)"
+        },
+        "shockwaveColor": {
+          "type": "string",
+          "description": "Shockwave ring color (hex format)"
+        },
+        "bloomColor": {
+          "type": "string",
+          "description": "Bloom/halo color (hex format)"
+        },
+        "distortionStrength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0.04,
+          "description": "Distortion field strength (0.0 = none, 1.0 = max)"
+        },
+        "distortionType": {
+          "type": "string",
+          "enum": ["radial", "heatHaze", "wave", "turbulent"],
+          "default": "heatHaze",
+          "description": "Distortion field type"
+        },
+        "noiseType": {
+          "type": "string",
+          "enum": ["perlin", "voronoi", "simplex", "cellular"],
+          "default": "perlin",
+          "description": "Procedural noise type for texture"
+        },
+        "noiseSpeed": {
+          "type": "number",
+          "default": 1.2,
+          "description": "Noise animation speed"
+        },
+        "noiseScale": {
+          "type": "number",
+          "minimum": 0,
+          "default": 4.0,
+          "description": "Noise scale/zoom"
+        },
+        "spriteSize": {
+          "type": "integer",
+          "minimum": 16,
+          "default": 64,
+          "description": "Sprite size in pixels (square)"
+        },
+        "frames": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 12,
+          "description": "Number of animation frames"
+        },
+        "layers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["core", "shockwave", "bloom", "distortion", "particles", "debris"]
+          },
+          "default": ["core", "shockwave", "bloom", "particles"],
+          "description": "Layers to include in the effect"
+        },
+        "coreGlow": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": true},
+            "intensity": {"type": "number", "minimum": 0, "default": 3.0},
+            "pulse": {"type": "boolean", "default": true},
+            "expand": {"type": "boolean", "default": true}
+          }
+        },
+        "shockwave": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": true},
+            "ringCount": {"type": "integer", "minimum": 1, "default": 1},
+            "thickness": {"type": "number", "minimum": 0, "default": 0.02},
+            "expandSpeed": {"type": "number", "default": 2.0}
+          }
+        },
+        "bloom": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": true},
+            "intensity": {"type": "number", "minimum": 0, "default": 1.5},
+            "radius": {"type": "number", "minimum": 0, "default": 1.2}
+          }
+        },
+        "chromaticAberration": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable chromatic aberration in distortion"
+        }
+      }
+    },
+    "fxParticles": {
+      "type": "object",
+      "properties": {
+        "burstCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 24,
+          "description": "Number of burst particles"
+        },
+        "burstSpeedMin": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.8,
+          "description": "Minimum burst particle speed"
+        },
+        "burstSpeedMax": {
+          "type": "number",
+          "minimum": 0,
+          "default": 2.4,
+          "description": "Maximum burst particle speed"
+        },
+        "lifetimeMin": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.2,
+          "description": "Minimum particle lifetime (seconds)"
+        },
+        "lifetimeMax": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.6,
+          "description": "Maximum particle lifetime (seconds)"
+        },
+        "sizeMin": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.02,
+          "description": "Minimum particle size"
+        },
+        "sizeMax": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.08,
+          "description": "Maximum particle size"
+        },
+        "blend": {
+          "type": "string",
+          "enum": ["additive", "alpha", "screen", "multiply"],
+          "default": "additive",
+          "description": "Particle blend mode"
+        },
+        "motionPattern": {
+          "type": "string",
+          "enum": ["radialBurst", "spiral", "chaotic", "orbital"],
+          "default": "radialBurst",
+          "description": "Particle motion pattern"
+        },
+        "coreParticles": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": true},
+            "count": {"type": "integer", "minimum": 0, "default": 8},
+            "speedMin": {"type": "number", "default": 0.1},
+            "speedMax": {"type": "number", "default": 0.3},
+            "lifeMin": {"type": "number", "default": 0.4},
+            "lifeMax": {"type": "number", "default": 0.8}
+          }
+        },
+        "shockwaveParticles": {
+          "type": "object",
+          "properties": {
+            "enabled": {"type": "boolean", "default": false},
+            "count": {"type": "integer", "minimum": 0, "default": 12},
+            "ringRadius": {"type": "number", "default": 0.5},
+            "expandSpeed": {"type": "number", "default": 1.5}
+          }
+        }
+      }
+    },
+    "fxTiming": {
+      "type": "object",
+      "properties": {
+        "coreExpandTime": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.12,
+          "description": "Time for core to expand (seconds)"
+        },
+        "shockwaveExpandTime": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.18,
+          "description": "Time for shockwave to expand (seconds)"
+        },
+        "fadeOutTime": {
+          "type": "number",
+          "minimum": 0,
+          "default": 0.3,
+          "description": "Time for effect to fade out (seconds)"
+        },
+        "totalDuration": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total effect duration (auto-calculated if not specified)"
+        },
+        "easeIn": {
+          "type": "string",
+          "enum": ["linear", "easeIn", "easeOut", "easeInOut", "bounce", "elastic"],
+          "default": "easeOut",
+          "description": "Easing curve for expansion"
+        },
+        "easeOut": {
+          "type": "string",
+          "enum": ["linear", "easeIn", "easeOut", "easeInOut", "bounce", "elastic"],
+          "default": "easeIn",
+          "description": "Easing curve for fade out"
+        }
+      }
+    },
+    "fxExport": {
+      "type": "object",
+      "required": ["unid"],
+      "properties": {
+        "unid": {
+          "type": "string",
+          "pattern": "^&[a-zA-Z0-9_]+;$",
+          "description": "Transcendence UNID (e.g., '&fxNovaBurst01;')"
+        },
+        "transcendence": {
+          "type": "object",
+          "properties": {
+            "as": {
+              "type": "string",
+              "enum": ["explosion", "impact", "muzzle", "trail", "effect"],
+              "default": "explosion",
+              "description": "Transcendence effect type"
+            },
+            "rotationFrames": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "Number of rotation frames (1 = no rotation)"
+            },
+            "ticksPerFrame": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "description": "Game ticks per animation frame"
+            }
+          }
+        },
+        "resourcePaths": {
+          "type": "object",
+          "properties": {
+            "sprite": {"type": "string", "description": "Path to FX spritesheet"},
+            "distortionMap": {"type": "string", "description": "Path to distortion map"},
+            "particleProfile": {"type": "string", "description": "Path to particle profile JSON"}
+          }
+        }
+      }
+    }
+  }
+}
+

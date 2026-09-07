@@ -1,0 +1,189 @@
+# AAMT — ignore generated, secrets, third-party clones, and access-gated Qud Lab sim.
+# Policy: LICENSING.md and THIRD_PARTY.md
+
+# --- Secrets / personal token-entry notes (never commit) ---
+secrets/
+**/secrets/
+.env
+.env.*
+!.env.example
+*token*.txt
+*token*.env
+*key.txt
+**/sd key.txt
+HfTokenProfiles.local.ps1
+HfTokenProfiles.local.json
+*.local.ps1
+*.local.json
+**/hf-home/token
+**/stored_tokens
+**/aamt_stable_audio_env.ps1
+# Switcher source is tool code, not a token note
+!**/hf_token_switch.py
+
+# --- Dumps / game extracts (regenerate locally; never publish) ---
+**/*.dump.txt
+**/*.dump.json
+**/obsolete_api_dump.json
+**/obsolete_api_dump_*.json
+**/*decompiled*.cs
+**/FunctionList_API*.txt
+**/exe_strings.json
+**/vanilla_unid_report_*.csv
+**/armorclass_report_*.csv
+**/entity_analysis_*.txt
+**/process_log_*.txt
+Tools/Qud/*.cs
+Tools/Qud/ref/
+Tools/Qud/data/backups/
+Tools/Qud/reports/
+Tools/Transcendence/_tdb_dump*/
+Tools/Transcendence/_tz100_*/
+Tools/Transcendence/_ext_fix_backups/
+
+# Machine-local path dumps (keep *.example)
+Tools/TranscendenceTools.ini
+Tools/Transcendence/ApiSwitcher.config.json
+Tools/apply_these.txt
+Tools/manual_review.txt
+Tools/AssetGenerationSettings.ps1
+Tools/Starbound/AssetGenerationSettings.ps1
+Tools/Qud/settings.json
+Tools/Transcendence/SpaceWhaleAssetGenerator_Settings.json
+Tools/Soulash2/overnight_branding_report.json
+*.lnk
+*.backup
+
+# More game extracts / workshop analysis
+Tools/Qud/data/charts/
+Tools/Qud/data/by-version/**/charts/
+Tools/Soulash2/SkillCreator/catalog/effects.json
+Tools/Soulash2/SkillCreator/catalog/enums.json
+Tools/Transcendence/api_rules*.json
+Tools/Transcendence/VanillaDesignTypeMap.json
+Tools/Qud/All_Mods_API_Analysis.md
+
+# Generated meshes / concept art pipeline
+Tools/Shared/Concepts/
+**/*.glb
+
+# Runtime registries (schema + example JSON in Common/ stay tracked)
+Tools/Transcendence/*_registry.json
+Tools/Transcendence/test_registry.json
+Tools/Transcendence/ui_data_binding_model.json
+
+# Build / workspace scratch
+Tools/Transcendence/_v3_backups/
+Tools/Transcendence/_api59_*
+Tools/Transcendence/_segships_*
+Tools/ParticleEffects/
+Tools/Soulash2/_icon_refs/
+Tools/Soulash2/_test_sd_import.ps1
+Tools/Soulash2/SkillCreator/workshop_patches/
+Tools/New Text Document.txt
+Tools/Qud/Draft for Qud Lab IDE.txt
+
+# --- Generated / scratch ---
+Tools/Output/
+Tools/GeneratedAssets/
+Tools/ExportedAssets/
+Tools/TestOutput/
+Tools/TestAssets_QualityCheck/
+Tools/QualityTestAssets_Final/
+Tools/TestCometAssets/
+Tools/TestCrossGame/
+Tools/TestBaked/
+Tools/TestMulti/
+Tools/Elin/ElinAssets/
+Tools/Elin/spell_art_catalog.json
+Tools/Elin/spell_art_queue.json
+Tools/Elin/spell_art_chunks/
+Tools/CDDA/CDDAMods/
+Tools/Terraria/TerrariaPortals/
+Tools/AI_Generated_Assets/
+Tools/RegistryGeneratedAssets/
+Tools/Logs/
+Tools/Backups/
+Tools/Downloads/
+Tools/bin/
+Tools/obj/
+Tools/SDK/
+Tools/reference_archive_*/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Build ---
+**/[Bb]in/
+**/[Oo]bj/
+**/artifacts/
+.vs/
+*.user
+*.suo
+*.pdb
+*.dll
+*.exe
+*.nupkg
+node_modules/
+
+# Keep tracked helper scripts that are .bat/.ps1 (not matched above)
+
+# --- Third-party clones (Fetch-ThirdParty.ps1 / Sync-TES5Edit.ps1) ---
+Tools/ReferenceAssets/
+Tools/Transcendence/TranscendenceArt/
+
+Tools/XEdit/vendor/TES5Edit/
+Tools/XEdit/bin/
+!Tools/XEdit/vendor/fork.json
+
+Tools/FrankyCLI/
+
+Tools/GrimDawn/renodx-src/
+Tools/GrimDawn/arzedit/arzedit-master/
+Tools/GrimDawn/bin/
+Tools/GrimDawn/work/
+Tools/GrimDawn/_smoke_extract/
+
+Tools/Transcendence/_x64_workspace/
+Tools/Transcendence/Output/
+Tools/Transcendence/AI_Generated_Assets/
+Tools/Transcendence/Logs/
+Tools/Transcendence/References/
+
+# --- Other people's mods (not AAMT) ---
+Tools/Elin/Exports/
+Tools/TerrariaMods/
+
+# --- Qud Lab private simulator (access-gated; PublicStubs stay tracked) ---
+Tools/Qud/QudLab/src/QudLab.Simulator/*.cs
+Tools/Qud/QudLab/src/QudLab.SimHost/Program.cs
+Tools/Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudManagedHost.cs
+Tools/Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudManagedHost.cs.meta
+Tools/Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudRestrictedObjectSim.cs
+Tools/Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudRestrictedObjectSim.cs.meta
+Tools/Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudZoneGetProbe.cs
+Tools/Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudZoneGetProbe.cs.meta
+Tools/Qud/QudLab/Workspace/Qud.Install.props
+Tools/Qud/QudLab/Workspace/assembly-refs.json
+Tools/Qud/QudLab/UnityProject/Library/
+Tools/Qud/QudLab/UnityProject/Temp/
+Tools/Qud/QudLab/UnityProject/Logs/
+Tools/Qud/QudLab/UnityProject/UserSettings/
+
+# Nested git metadata from clones
+**/.git/
+
+# IDE
+.idea/
+*.sublime-project
+*.sublime-workspace

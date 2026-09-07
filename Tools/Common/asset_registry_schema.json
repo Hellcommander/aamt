@@ -1,0 +1,354 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Unified Asset Registry",
+  "description": "Registry for spells/items that auto-generate icons, FX, spritesheets, and game-specific exports.",
+  "type": "object",
+
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "version": { "type": "string" },
+        "modName": { "type": "string" },
+        "author": { "type": "string" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      }
+    },
+
+    "entries": {
+      "type": "array",
+      "description": "List of all spells/items in the mod.",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "name", "visual", "export"],
+        "properties": {
+
+          "id": {
+            "type": "string",
+            "description": "Canonical ID used across all pipelines.",
+            "pattern": "^[a-z0-9_]+$"
+          },
+
+          "name": {
+            "type": "string",
+            "description": "Human-readable name."
+          },
+
+          "type": {
+            "type": "string",
+            "enum": ["spell", "item", "projectile", "effect", "buff", "debuff"],
+            "description": "Classification of the asset."
+          },
+
+          "school": {
+            "type": "string",
+            "description": "Spell school or item category (Nature, Arachnomancy, Fire, etc.)."
+          },
+
+          "description": {
+            "type": "string",
+            "description": "Lore or gameplay description."
+          },
+
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Optional tags for filtering, batching, or style rules."
+          },
+
+          "visual": {
+            "type": "object",
+            "required": ["icon"],
+            "properties": {
+
+              "icon": {
+                "type": "object",
+                "required": ["shape", "palette", "size"],
+                "properties": {
+                  "shape": { 
+                    "type": "string",
+                    "description": "Shape description (spiral, burst, leaf, star, etc.)"
+                  },
+                  "palette": {
+                    "type": "array",
+                    "items": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})$" },
+                    "minItems": 1,
+                    "maxItems": 4
+                  },
+                  "style": {
+                    "type": "string",
+                    "enum": ["painterly", "pixel", "flat", "procedural"],
+                    "default": "painterly"
+                  },
+                  "size": { 
+                    "type": "integer", 
+                    "enum": [16, 24, 32, 48, 64],
+                    "default": 32
+                  },
+                  "contrast": { 
+                    "type": "string", 
+                    "enum": ["low", "medium", "high"],
+                    "default": "high"
+                  },
+                  "lighting": { 
+                    "type": "string",
+                    "description": "Lighting description (soft rim light, etc.)"
+                  },
+                  "glow": {
+                    "type": "boolean",
+                    "default": false
+                  }
+                }
+              },
+
+              "fx": {
+                "type": "object",
+                "properties": {
+                  "frames": { 
+                    "type": "integer", 
+                    "minimum": 1, 
+                    "maximum": 16,
+                    "default": 4
+                  },
+                  "motion": { 
+                    "type": "string",
+                    "description": "Animation motion type (expanding, rotating, pulse, etc.)"
+                  },
+                  "glow": { 
+                    "type": "boolean",
+                    "default": true
+                  },
+                  "size": { 
+                    "type": "integer", 
+                    "enum": [32, 48, 64, 96, 128],
+                    "default": 32
+                  },
+                  "palette": {
+                    "type": "array",
+                    "items": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})$" }
+                  }
+                }
+              },
+
+              "projectile": {
+                "type": "object",
+                "properties": {
+                  "shape": { 
+                    "type": "string",
+                    "description": "Projectile shape (shard, orb, bolt, etc.)"
+                  },
+                  "frames": { 
+                    "type": "integer", 
+                    "minimum": 1, 
+                    "maximum": 8,
+                    "default": 2
+                  },
+                  "size": { 
+                    "type": "integer", 
+                    "enum": [16, 24, 32, 48],
+                    "default": 32
+                  },
+                  "palette": {
+                    "type": "array",
+                    "items": { "type": "string", "pattern": "^#([A-Fa-f0-9]{6})$" }
+                  }
+                }
+              },
+
+              "buff": {
+                "type": "object",
+                "properties": {
+                  "size": {
+                    "type": "integer",
+                    "enum": [16, 24],
+                    "default": 16
+                  },
+                  "simplified": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              }
+            }
+          },
+
+          "generation": {
+            "type": "object",
+            "description": "Instructions for AI/Blender to generate procedural materials.",
+            "properties": {
+              "quality": {
+                "type": "string",
+                "enum": ["draft", "standard", "high", "ultra"],
+                "default": "standard",
+                "description": "Texture quality level: draft (fast, minimal), standard (default), high (detailed), ultra (maximum detail)"
+              },
+              "materialModel": { 
+                "type": "string",
+                "description": "Blender material type or Ollama model"
+              },
+              "proceduralHints": { 
+                "type": "string",
+                "description": "Hints for procedural generation"
+              },
+              "animationHints": { 
+                "type": "string",
+                "description": "Hints for animation generation"
+              },
+              "complexity": {
+                "type": "string",
+                "enum": ["simple", "medium", "complex"],
+                "default": "medium"
+              },
+              "useAI": {
+                "type": "boolean",
+                "default": false
+              },
+              "sketchSource": {
+                "type": "string",
+                "description": "Path to 2D sketch image file (PNG, JPG, etc.)"
+              },
+              "useSketchAs": {
+                "type": "string",
+                "enum": ["silhouette", "displacement", "mask", "reference", "heightmap"],
+                "default": "silhouette",
+                "description": "How to use the sketch: silhouette (extrude outline), displacement (height map), mask (alpha mask), reference (visual guide), heightmap (3D depth)"
+              },
+              "extrudeDepth": {
+                "type": "number",
+                "default": 0.1,
+                "description": "Extrusion depth for silhouette-based meshes (Blender units)"
+              },
+              "bevelAmount": {
+                "type": "number",
+                "default": 0.01,
+                "description": "Bevel amount for edges (Blender units)"
+              },
+              "mappingStrategy": {
+                "type": "string",
+                "enum": ["hierarchical", "distance", "region", "thickness"],
+                "default": "hierarchical",
+                "description": "Color mapping strategy for line drawings: hierarchical (outer→inner), distance (center→edge), region (by closed regions), thickness (by line width)"
+              },
+              "displacementStrength": {
+                "type": "number",
+                "default": 0.1,
+                "description": "Displacement strength for displacement/heightmap methods (Blender units)"
+              }
+            }
+          },
+
+          "textures": {
+            "type": "object",
+            "description": "Required texture maps for this asset.",
+            "properties": {
+              "baseColor": {
+                "type": "boolean",
+                "default": true,
+                "description": "Bake base color/diffuse texture"
+              },
+              "normal": {
+                "type": "boolean",
+                "default": false,
+                "description": "Bake normal map"
+              },
+              "roughness": {
+                "type": "boolean",
+                "default": false,
+                "description": "Bake roughness map"
+              },
+              "emission": {
+                "type": "boolean",
+                "default": false,
+                "description": "Bake emission map (for FX/glow effects)"
+              },
+              "metallic": {
+                "type": "boolean",
+                "default": false,
+                "description": "Bake metallic map"
+              }
+            },
+            "default": {
+              "baseColor": true,
+              "normal": false,
+              "roughness": false,
+              "emission": false,
+              "metallic": false
+            }
+          },
+
+          "export": {
+            "type": "object",
+            "required": ["elin", "terraria", "starbound"],
+            "properties": {
+              "elin": { 
+                "type": "boolean",
+                "description": "Export for Elin game"
+              },
+              "terraria": { 
+                "type": "boolean",
+                "description": "Export for Terraria/tModLoader"
+              },
+              "starbound": { 
+                "type": "boolean",
+                "description": "Export for Starbound"
+              },
+              "transcendence": {
+                "type": "boolean",
+                "default": false,
+                "description": "Export for Transcendence"
+              },
+              "qud": {
+                "type": "object",
+                "description": "Export for Caves of Qud",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable Qud tile export"
+                  },
+                  "tileSize": {
+                    "type": "integer",
+                    "enum": [24, 32, 48],
+                    "default": 32,
+                    "description": "Qud tile size: 24 (classic), 32 (default), 48 (high-res)"
+                  },
+                  "animated": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Generate animation frames"
+                  },
+                  "frameCount": {
+                    "type": "integer",
+                    "default": 4,
+                    "minimum": 1,
+                    "maximum": 16,
+                    "description": "Number of animation frames"
+                  },
+                  "useHorizontalStrip": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Use horizontal strip instead of individual frames"
+                  },
+                  "metadataFormat": {
+                    "type": "string",
+                    "enum": ["xml", "json"],
+                    "default": "xml",
+                    "description": "Mod metadata format"
+                  }
+                }
+              },
+              "custom": {
+                "type": "array",
+                "description": "Future-proofing: arbitrary export targets.",
+                "items": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  "required": ["entries"]
+}
+

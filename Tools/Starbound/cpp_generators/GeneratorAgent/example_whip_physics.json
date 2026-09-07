@@ -1,0 +1,42 @@
+{
+  "massPerSegment": 0.1,
+  "damping": 0.2,
+  "restitution": 0.1,
+  "collisionRadius": 0.025,
+  "solverIterations": 8,
+  "gravityInfluence": 1.0,
+  
+  "friction": 0.5,
+  "rollingFriction": 0.1,
+  "spinningFriction": 0.1,
+  "enableGravity": true,
+  "enableCollisionDetection": true,
+  "maxLinearVelocity": 100.0,
+  "maxAngularVelocity": 10.0,
+  
+  "jointDamping": 0.2,
+  "jointFriction": 0.1,
+  "enableJointLimits": true,
+  "jointLimitSoftness": 0.5,
+  "jointLimitBias": 0.3,
+  "jointLimitRelaxation": 1.0,
+  
+  "physicsName": "whip_physics",
+  "description": "Physics parameters for flexible whip weapons with realistic joint constraints and collision detection.",
+  
+  "tags": [
+    "whip",
+    "flexible",
+    "joints",
+    "collision",
+    "realistic"
+  ],
+  
+  "metadata": {
+    "author": "Magi-Tech Physics System",
+    "version": "1.0.0",
+    "license": "MIT",
+    "complexity": "medium",
+    "performance": "optimized"
+  }
+} 

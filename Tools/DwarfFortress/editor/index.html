@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AAMT DF Creature Studio</title>
+  <style>
+    :root {
+      --bg: #141618;
+      --panel: #1e2226;
+      --panel2: #262b30;
+      --ink: #e8e4d9;
+      --muted: #9a9588;
+      --accent: #c4a35a;
+      --edge: #5a8f7b;
+      --danger: #c45a5a;
+      --ok: #6a9a6a;
+      --line: #33383e;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: "Segoe UI", Candara, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      display: grid;
+      grid-template-rows: 52px 1fr 132px;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 14px;
+      background: linear-gradient(180deg, #2c2418, #1a1c1e);
+      border-bottom: 1px solid #4a3c24;
+    }
+    header h1 {
+      font-size: 0.95rem;
+      margin: 0 12px 0 0;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .nav-tab {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 0.82rem;
+    }
+    .nav-tab.active {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: #2a2418;
+    }
+    .status { margin-left: auto; font-size: 0.78rem; color: var(--muted); }
+    button, select, input, textarea {
+      background: var(--panel2);
+      color: var(--ink);
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 6px 10px;
+      font: inherit;
+    }
+    button { cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: #3a3220; border-color: var(--accent); color: var(--accent); }
+    button.danger { border-color: var(--danger); color: #e8b0b0; }
+    .workspace {
+      display: grid;
+      grid-template-columns: 230px 1fr;
+      min-height: 0;
+    }
+    .sidebar {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      overflow: auto;
+      padding: 10px;
+    }
+    .sidebar h2, .panel h2, .view h2 {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin: 12px 0 6px;
+    }
+    .sidebar h2:first-child { margin-top: 0; }
+    .project {
+      display: block;
+      width: 100%;
+      text-align: left;
+      margin: 3px 0;
+      font-size: 0.8rem;
+    }
+    .project.active { border-color: var(--accent); color: var(--accent); }
+    .view { display: none; min-height: 0; overflow: auto; }
+    .view.active { display: grid; }
+    #view-studio { padding: 16px; grid-template-columns: 1fr 320px; gap: 16px; }
+    #view-body { grid-template-columns: 220px 1fr 300px; }
+    #view-graphics { padding: 16px; grid-template-columns: 1fr 280px; gap: 16px; }
+    #view-pipeline { padding: 16px; grid-template-columns: 280px 1fr; gap: 16px; }
+    .form-grid label { display: block; font-size: 0.75rem; color: var(--muted); margin-top: 8px; }
+    .form-grid input, .form-grid select, .form-grid textarea { width: 100%; margin-top: 2px; }
+    .checks label { display: flex; gap: 8px; align-items: center; margin-top: 6px; color: var(--ink); }
+    .panel {
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      overflow: auto;
+      padding: 10px;
+    }
+    .panel:last-child { border-right: none; border-left: 1px solid var(--line); }
+    #graphWrap {
+      min-height: 0;
+      background:
+        radial-gradient(circle at 20% 10%, #2c3338 0%, transparent 40%),
+        #16181a;
+    }
+    svg#graph { width: 100%; height: 100%; display: block; }
+    .node circle { stroke: #111; stroke-width: 1.5; cursor: grab; }
+    .node text { fill: var(--ink); font-size: 10px; pointer-events: none; }
+    .edge { stroke: var(--edge); stroke-width: 1.5; fill: none; opacity: 0.85; }
+    #rawPreview, #pipeLog, #issues {
+      font-family: Consolas, monospace;
+      font-size: 0.72rem;
+      white-space: pre-wrap;
+      background: #121416;
+      padding: 8px;
+      border-radius: 4px;
+      border: 1px solid #333;
+    }
+    #rawPreview { max-height: 240px; overflow: auto; }
+    .issue-error { color: var(--danger); }
+    .issue-warning { color: var(--accent); }
+    .issue-info { color: var(--ok); }
+    .tabs { display: flex; gap: 6px; margin: 8px 0; }
+    .tabs button {
+      background: #1a1c1e; color: var(--muted); border: 1px solid #444;
+      font-size: 0.75rem; padding: 4px 8px;
+    }
+    .tabs button.active { color: var(--accent); border-color: var(--accent); }
+    .cost-bar { margin: 6px 0; }
+    .cost-bar .label { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--muted); }
+    .cost-bar .track { height: 8px; background: #121416; border-radius: 4px; overflow: hidden; border: 1px solid #333; }
+    .cost-bar .fill { height: 100%; background: linear-gradient(90deg, #5a8f7b, #c4a35a); }
+    #costPanel, #propsPanel, #rawPanel { display: none; }
+    #propsPanel.active, #costPanel.active, #rawPanel.active { display: block; }
+    .pixel {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      background:
+        repeating-conic-gradient(#2a2e32 0% 25%, #1a1c1e 0% 50%) 0 0 / 12px 12px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+    }
+    #imgSheet { width: 672px; height: 480px; max-width: 100%; }
+    #imgPreview, #imgPortrait { width: 192px; height: 192px; }
+    .gfx-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    .gfx-card { text-align: center; }
+    .gfx-card span { display: block; font-size: 0.72rem; color: var(--muted); margin-bottom: 6px; }
+    .swatches { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+    .swatch {
+      width: 22px; height: 22px; border: 2px solid #444; border-radius: 3px; cursor: pointer; padding: 0;
+    }
+    .swatch.active { border-color: #fff; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+    #pipeLog { height: 100%; min-height: 280px; overflow: auto; }
+    footer.log {
+      background: #101214;
+      border-top: 1px solid var(--line);
+      padding: 6px 10px;
+      overflow: auto;
+      font-family: Consolas, monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+    .meta { font-size: 0.75rem; color: var(--muted); line-height: 1.45; }
+    #fragments label { display: flex; gap: 6px; align-items: center; font-size: 0.8rem; padding: 2px 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Creature Studio</h1>
+    <button class="nav-tab active" data-view="studio">Studio</button>
+    <button class="nav-tab" data-view="body">Body</button>
+    <button class="nav-tab" data-view="graphics">Graphics</button>
+    <button class="nav-tab" data-view="pipeline">Pipeline</button>
+    <span class="status" id="status">Ready</span>
+  </header>
+
+  <div class="workspace">
+    <aside class="sidebar">
+      <h2>Projects</h2>
+      <div id="projectList"></div>
+      <h2>New creature</h2>
+      <div class="form-grid">
+        <label>ID <input id="n_id" placeholder="ASHFOLK" /></label>
+        <label>Name <input id="n_name" placeholder="ash folk" /></label>
+        <label>Preset
+          <select id="n_preset"></select>
+        </label>
+        <label>Culture
+          <select id="n_culture"></select>
+        </label>
+        <label>Phonology
+          <select id="n_phon"></select>
+        </label>
+        <div class="actions">
+          <button class="primary" id="btnNew">Create</button>
+        </div>
+      </div>
+      <p class="meta" id="sysMeta"></p>
+    </aside>
+
+    <div id="view-studio" class="view active">
+      <div class="form-grid">
+        <h2>Identity</h2>
+        <label>ID <input id="p_id" /></label>
+        <label>Name singular <input id="p_name" /></label>
+        <label>Description <textarea id="p_desc" rows="4"></textarea></label>
+        <label>Art prompt <textarea id="p_prompt" rows="3"></textarea></label>
+        <label>Body type
+          <select id="p_preset"></select>
+        </label>
+        <label>Graphics profile
+          <select id="p_gfx">
+            <option value="humanoid">humanoid (ANIMAL_PEOPLE layers)</option>
+            <option value="simple">simple (single tile)</option>
+          </select>
+        </label>
+        <div class="checks">
+          <label><input type="checkbox" id="p_int" /> Intelligent</label>
+          <label><input type="checkbox" id="p_equip" /> Equips</label>
+          <label><input type="checkbox" id="p_doors" /> Can open doors</label>
+          <label><input type="checkbox" id="p_site" /> Site controllable</label>
+        </div>
+        <div class="actions">
+          <button id="btnApplyPreset">Apply body type</button>
+          <button id="btnSave">Save spec</button>
+          <button id="btnLoadPrompt">Load path...</button>
+          <button id="btnUndo">Undo</button>
+        </div>
+      </div>
+      <div>
+        <h2>Validation</h2>
+        <div id="issues"><div class="issue-info">Load or create a creature, then Validate.</div></div>
+        <h2>DF color index</h2>
+        <div class="swatches" id="colorSwatches"></div>
+        <h2>Live preview</h2>
+        <div class="gfx-row">
+          <div class="gfx-card">
+            <span>Assembled</span>
+            <img id="imgStudioPreview" class="pixel" alt="preview" />
+          </div>
+          <div class="gfx-card">
+            <span>Portrait</span>
+            <img id="imgStudioPortrait" class="pixel" alt="portrait" />
+          </div>
+        </div>
+        <p class="meta">Color and identity update this preview. Use Graphics to bake the full 7x5 part sheet.</p>
+      </div>
+    </div>
+
+    <div id="view-body" class="view">
+      <aside class="panel" id="fragPanel">
+        <h2>Body Fragments</h2>
+        <input id="fragFilter" placeholder="Filter..." style="width:100%;margin-bottom:8px;" />
+        <div id="fragments"></div>
+      </aside>
+      <div id="graphWrap">
+        <svg id="graph"></svg>
+      </div>
+      <aside class="panel">
+        <div class="tabs">
+          <button type="button" class="active" data-tab="propsPanel">Flags</button>
+          <button type="button" data-tab="costPanel">Cost</button>
+          <button type="button" data-tab="rawPanel">RAW</button>
+        </div>
+        <div id="propsPanel" class="active">
+          <h2>Selected part</h2>
+          <div id="selInfo" class="meta">Click a node</div>
+          <div class="actions">
+            <button id="btnValidate">Validate</button>
+            <button id="btnFix">Validate + Fix</button>
+            <button id="btnRaw">Refresh RAW</button>
+          </div>
+        </div>
+        <div id="costPanel">
+          <h2>Cost / Balance</h2>
+          <div id="costRole">(run Validate)</div>
+          <div id="costBars"></div>
+          <h2>Warnings</h2>
+          <div id="costWarnings"></div>
+          <h2>Top part costs</h2>
+          <div id="costParts" style="font-size:0.75rem;"></div>
+          <h2>Evolution hints</h2>
+          <div id="costEvo" style="font-size:0.75rem;color:var(--muted);"></div>
+        </div>
+        <div id="rawPanel">
+          <h2>RAW Preview</h2>
+          <div id="rawPreview">(click Refresh RAW)</div>
+        </div>
+      </aside>
+    </div>
+
+    <div id="view-graphics" class="view">
+      <div>
+        <h2>Part sheet (32x32 x 7 x 5)</h2>
+        <img id="imgSheet" class="pixel" alt="body sheet" />
+        <div class="gfx-row" style="margin-top:16px;">
+          <div class="gfx-card">
+            <span>Assembled preview</span>
+            <img id="imgPreview" class="pixel" alt="preview" />
+          </div>
+          <div class="gfx-card">
+            <span>Portrait 96x96</span>
+            <img id="imgPortrait" class="pixel" alt="portrait" />
+          </div>
+        </div>
+      </div>
+      <div>
+        <h2>Generate art</h2>
+        <p class="meta">Procedural DF-style layers for ANIMAL_PEOPLE (head, body, hands, feet, tail). Optional Stable Diffusion if a server is running.</p>
+        <label class="checks"><input type="checkbox" id="g_nosd" checked /> Pillow only (no SD)</label>
+        <label class="checks"><input type="checkbox" id="g_workers" checked /> Workers (4)</label>
+        <div class="actions">
+          <button class="primary" id="btnArt">Generate tiles</button>
+        </div>
+        <p class="meta" id="artMeta"></p>
+      </div>
+    </div>
+
+    <div id="view-pipeline" class="view">
+      <div>
+        <h2>Build</h2>
+        <div class="actions" style="flex-direction:column;align-items:stretch;">
+          <button id="btnPValidate">Validate</button>
+          <button id="btnPAnalyze">Analyze cost</button>
+          <button class="primary" id="btnPGenerate">Generate raws</button>
+          <button id="btnPAdv">Adventure kit</button>
+          <button id="btnPArt">Generate art</button>
+          <button id="btnPInstall">Install to DF mods/</button>
+          <button id="btnPPack">Pack ZIP</button>
+        </div>
+        <label class="checks"><input type="checkbox" id="pipeFix" checked /> Auto-fix layout</label>
+        <label class="checks"><input type="checkbox" id="pipeAdv" /> Include adventure kit on generate</label>
+      </div>
+      <div>
+        <h2>Log</h2>
+        <div id="pipeLog"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="log" id="footLog">Creature Studio — AAMT Dwarf Fortress</footer>
+
+  <script>
+    const DF_COLORS = [
+      ["#2a241f", "0 black"],
+      ["#3e5c94", "1 blue"],
+      ["#4e763f", "2 green"],
+      ["#388084", "3 cyan"],
+      ["#943e30", "4 red"],
+      ["#804076", "5 magenta"],
+      ["#9c7634", "6 brown"],
+      ["#a89e8e", "7 gray"],
+    ];
+
+    const state = {
+      spec: null,
+      path: null,
+      catalogBodies: [],
+      graph: null,
+      undo: [],
+      selected: null,
+      cost: null,
+      presets: [],
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const setStatus = (t) => { $("status").textContent = t; $("footLog").textContent = t; };
+
+    function logPipe(msg) {
+      const el = $("pipeLog");
+      el.textContent += msg + "\n";
+      el.scrollTop = el.scrollHeight;
+    }
+
+    function pushUndo() {
+      if (!state.spec) return;
+      state.undo.push(JSON.stringify(state.spec));
+      if (state.undo.length > 40) state.undo.shift();
+    }
+
+    function collectPropsIntoSpec() {
+      if (!state.spec) return;
+      state.spec.id = $("p_id").value.trim().toUpperCase() || state.spec.id;
+      state.spec.name_singular = $("p_name").value.trim() || state.spec.name_singular;
+      state.spec.description = $("p_desc").value;
+      state.spec.art_prompt = $("p_prompt").value;
+      state.spec.graphics_profile = $("p_gfx").value;
+      state.spec.intelligent = $("p_int").checked;
+      state.spec.equips = $("p_equip").checked;
+      state.spec.can_open_doors = $("p_doors").checked;
+      state.spec.site_controllable = $("p_site").checked;
+    }
+
+    function fillProps() {
+      const s = state.spec;
+      if (!s) return;
+      $("p_id").value = s.id || "";
+      $("p_name").value = s.name_singular || "";
+      $("p_desc").value = s.description || "";
+      $("p_prompt").value = s.art_prompt || "";
+      if ($("p_preset")) $("p_preset").value = s.preset || "humanoid_civ";
+      $("p_gfx").value = s.graphics_profile || "humanoid";
+      $("p_int").checked = !!s.intelligent;
+      $("p_equip").checked = !!s.equips;
+      $("p_doors").checked = !!s.can_open_doors;
+      $("p_site").checked = !!s.site_controllable;
+      renderSwatches();
+    }
+
+    async function api(path, opts) {
+      const res = await fetch(path, opts);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      return data;
+    }
+
+    function fillSelect(id, items, valueKey, labelFn) {
+      const el = $(id);
+      if (!el) return;
+      const cur = el.value;
+      el.innerHTML = "";
+      items.forEach((item) => {
+        const opt = document.createElement("option");
+        if (typeof item === "string") {
+          opt.value = item;
+          opt.textContent = item;
+        } else {
+          opt.value = item[valueKey];
+          opt.textContent = labelFn ? labelFn(item) : (item.label || item.id);
+        }
+        el.appendChild(opt);
+      });
+      if (cur) el.value = cur;
+    }
+
+    function fillPresetLists(data) {
+      const presets = data.presets || (data.body_presets || []).map((id) => ({ id, label: id, playable: true }));
+      const playable = presets.filter((p) => p.playable);
+      const other = presets.filter((p) => !p.playable);
+      const ordered = playable.concat(other);
+      fillSelect("n_preset", ordered, "id", (p) => (p.playable ? p.label : p.label + " (NPC)"));
+      fillSelect("p_preset", ordered, "id", (p) => (p.playable ? p.label : p.label + " (NPC)"));
+      fillSelect("n_culture", data.culture_presets || []);
+      fillSelect("n_phon", data.phonology_presets || []);
+      state.presets = ordered;
+      const np = $("n_preset");
+      if (np && !np.dataset.bound) {
+        np.dataset.bound = "1";
+        np.addEventListener("change", () => {
+          const found = (state.presets || []).find((p) => p.id === np.value);
+          if (found && found.culture_preset) $("n_culture").value = found.culture_preset;
+        });
+      }
+    }
+
+    async function doApplyPreset() {
+      if (!state.spec) { setStatus("Create or load a creature first"); return; }
+      collectPropsIntoSpec();
+      pushUndo();
+      const data = await api("/api/apply-preset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spec: state.spec, preset: $("p_preset").value }),
+      });
+      state.spec = data.spec;
+      fillProps();
+      renderFragments();
+      await refreshGraph();
+      refreshImages();
+      setStatus("Applied body type " + (state.spec.preset || ""));
+    }
+
+    function renderSwatches() {
+      const box = $("colorSwatches");
+      box.innerHTML = "";
+      const cur = (state.spec && state.spec.color && state.spec.color[0]) || 3;
+      DF_COLORS.forEach((pair, i) => {
+        const b = document.createElement("button");
+        b.className = "swatch" + (i === cur ? " active" : "");
+        b.style.background = pair[0];
+        b.title = pair[1];
+        b.onclick = () => {
+          pushUndo();
+          state.spec.color = [i, 0, 0];
+          renderSwatches();
+          doPreview().catch((e) => setStatus(e.message));
+        };
+        box.appendChild(b);
+      });
+    }
+
+    function renderProjects(projects) {
+      const box = $("projectList");
+      box.innerHTML = "";
+      (projects || []).forEach((p) => {
+        const b = document.createElement("button");
+        b.className = "project" + (state.path && state.path.indexOf(p.id) >= 0 ? " active" : "");
+        b.textContent = (p.id || "?") + " — " + (p.name || "");
+        b.onclick = () => loadPath(p.path);
+        box.appendChild(b);
+      });
+      if (!(projects || []).length) box.textContent = "No projects yet";
+    }
+
+    function renderFragments() {
+      const box = $("fragments");
+      box.innerHTML = "";
+      if (!state.spec) return;
+      if ((state.spec.body_mode || "") === "custom" && state.spec.custom_body) {
+        const note = document.createElement("div");
+        note.className = "issue-info";
+        note.textContent = "Custom body object " + ((state.spec.custom_body.object_id) || "") +
+          " — parts are authored in the plan (not vanilla fragment checkboxes).";
+        box.appendChild(note);
+        const filter = ($("fragFilter").value || "").toLowerCase();
+        (state.spec.custom_body.parts || []).forEach((part) => {
+          const label = (part.id || "") + " [" + (part.category || "?") + "] " + (part.name || "");
+          if (filter && label.toLowerCase().indexOf(filter) < 0) return;
+          const lab = document.createElement("label");
+          lab.textContent = label + " " + ((part.flags || []).join(",") || "");
+          box.appendChild(lab);
+        });
+        return;
+      }
+      const filter = ($("fragFilter").value || "").toLowerCase();
+      const selected = new Set((state.spec && state.spec.body_fragments) || []);
+      state.catalogBodies
+        .filter((n) => !filter || n.toLowerCase().includes(filter))
+        .forEach((name) => {
+          const lab = document.createElement("label");
+          const cb = document.createElement("input");
+          cb.type = "checkbox";
+          cb.checked = selected.has(name);
+          cb.addEventListener("change", () => {
+            pushUndo();
+            const fr = new Set(state.spec.body_fragments || []);
+            if (cb.checked) fr.add(name); else fr.delete(name);
+            state.spec.body_fragments = Array.from(fr);
+            refreshGraph();
+          });
+          lab.appendChild(cb);
+          lab.appendChild(document.createTextNode(name));
+          box.appendChild(lab);
+        });
+    }
+
+    function layoutNodes(nodes) {
+      const byFrag = {};
+      nodes.forEach((n) => {
+        (byFrag[n.fragment] || (byFrag[n.fragment] = [])).push(n);
+      });
+      const fragNames = Object.keys(byFrag);
+      const positions = {};
+      const W = Math.max(800, window.innerWidth - 750);
+      const H = Math.max(500, window.innerHeight - 200);
+      fragNames.forEach((fname, fi) => {
+        const parts = byFrag[fname];
+        const cx = 120 + (fi % 4) * (W / 4);
+        const cy = 100 + Math.floor(fi / 4) * 180;
+        parts.forEach((p, i) => {
+          const a = (i / Math.max(parts.length, 1)) * Math.PI * 2;
+          const r = 40 + parts.length * 2;
+          positions[p.id] = {
+            x: cx + Math.cos(a) * r,
+            y: cy + Math.sin(a) * r,
+            ...p,
+          };
+        });
+      });
+      return { positions, W, H };
+    }
+
+    function flagColor(flags, functionTags) {
+      const tags = functionTags || [];
+      if (tags.includes("vital")) return "#c45a5a";
+      if (tags.includes("manipulation")) return "#c4a35a";
+      if (tags.includes("locomotion")) return "#5a8f7b";
+      if (tags.includes("sensory")) return "#6a9ac4";
+      if (tags.includes("offense")) return "#c47a5a";
+      if (tags.includes("defense")) return "#7a7a9a";
+      if ((flags || []).includes("THOUGHT")) return "#c4a35a";
+      if ((flags || []).includes("GRASP")) return "#6a9ac4";
+      if ((flags || []).includes("STANCE")) return "#6a9a6a";
+      if ((flags || []).includes("HEAD")) return "#c46a9a";
+      if ((flags || []).includes("FLIER")) return "#9a6ac4";
+      return "#6a7078";
+    }
+
+    function functionTagsFor(nodeId) {
+      const fn = (state.cost && state.cost.functions) || {};
+      const tags = [];
+      Object.keys(fn).forEach((t) => {
+        if ((fn[t] || []).includes(nodeId)) tags.push(t);
+      });
+      return tags;
+    }
+
+    function renderCost(cost) {
+      state.cost = cost || null;
+      if (!cost) {
+        $("costRole").textContent = "(run Validate)";
+        $("costBars").innerHTML = "";
+        $("costWarnings").innerHTML = "";
+        $("costParts").innerHTML = "";
+        $("costEvo").textContent = "";
+        return;
+      }
+      $("costRole").textContent = "Role: " + (cost.role || "?") + " (heuristic)";
+      const bars = $("costBars");
+      bars.innerHTML = "";
+      const axes = cost.axes || {};
+      Object.keys(axes).forEach((k) => {
+        const v = axes[k];
+        const div = document.createElement("div");
+        div.className = "cost-bar";
+        div.innerHTML = '<div class="label"><span>' + k + '</span><span>' + v + '</span></div>' +
+          '<div class="track"><div class="fill" style="width:' + v + '%"></div></div>';
+        bars.appendChild(div);
+      });
+      const warn = $("costWarnings");
+      warn.innerHTML = "";
+      (cost.warnings || []).forEach((w) => {
+        const d = document.createElement("div");
+        d.className = "issue-" + (w.severity || "info");
+        d.textContent = "[" + (w.code || "?") + "] " + (w.message || "");
+        warn.appendChild(d);
+      });
+      if (!(cost.warnings || []).length) warn.innerHTML = '<div class="issue-info">No cost warnings</div>';
+      const parts = $("costParts");
+      parts.innerHTML = "";
+      (cost.part_costs || []).slice(0, 12).forEach((p) => {
+        const d = document.createElement("div");
+        d.textContent = p.id + " (" + (p.category || "-") + "): " + p.cost + (p.notes ? " - " + p.notes : "");
+        parts.appendChild(d);
+      });
+      const evo = cost.evolution || {};
+      const evoBits = [];
+      if ((evo.evolutionary_path || []).length) evoBits.push("Path: " + evo.evolutionary_path.join(" -> "));
+      if ((evo.suggested_fragments || []).length) evoBits.push("Suggest: " + evo.suggested_fragments.join(", "));
+      (evo.warnings || []).forEach((w) => evoBits.push("[" + w.code + "] " + w.message));
+      $("costEvo").textContent = evoBits.join("\n") || "No evolution hints";
+    }
+
+    function renderGraph() {
+      const svg = $("graph");
+      svg.innerHTML = "";
+      if (!state.graph || !state.graph.nodes) return;
+      const { positions, W, H } = layoutNodes(state.graph.nodes);
+      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      (state.graph.edges || []).forEach((e) => {
+        if (e.type !== "CON") return;
+        const a = positions[e.from], b = positions[e.to];
+        if (!a || !b) return;
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
+        line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
+        line.setAttribute("class", "edge");
+        svg.appendChild(line);
+      });
+      Object.values(positions).forEach((n) => {
+        const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        g.setAttribute("class", "node");
+        g.setAttribute("transform", `translate(${n.x},${n.y})`);
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        c.setAttribute("r", 12);
+        c.setAttribute("fill", flagColor(n.flags, functionTagsFor(n.id)));
+        const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        t.setAttribute("text-anchor", "middle");
+        t.setAttribute("y", 22);
+        t.textContent = n.id;
+        g.appendChild(c);
+        g.appendChild(t);
+        g.addEventListener("click", () => {
+          state.selected = n;
+          const tags = functionTagsFor(n.id);
+          $("selInfo").textContent = n.id + " flags=" + ((n.flags || []).join(",") || "none") +
+            " fn=" + (tags.join(",") || "-");
+          setStatus("Selected " + n.id);
+        });
+        let dragging = false;
+        g.addEventListener("mousedown", (ev) => {
+          dragging = true;
+          const move = (e2) => {
+            if (!dragging) return;
+            const pt = svg.createSVGPoint();
+            pt.x = e2.clientX; pt.y = e2.clientY;
+            const ctm = svg.getScreenCTM().inverse();
+            const p = pt.matrixTransform(ctm);
+            n.x = p.x; n.y = p.y;
+            g.setAttribute("transform", `translate(${n.x},${n.y})`);
+          };
+          const up = () => {
+            dragging = false;
+            window.removeEventListener("mousemove", move);
+            window.removeEventListener("mouseup", up);
+            renderGraph();
+          };
+          window.addEventListener("mousemove", move);
+          window.addEventListener("mouseup", up);
+          ev.preventDefault();
+        });
+        svg.appendChild(g);
+      });
+    }
+
+    function bust(url) { return url + "?t=" + Date.now(); }
+
+    function refreshImages() {
+      const t = Date.now();
+      $("imgSheet").src = "/api/image/body?t=" + t;
+      $("imgPreview").src = "/api/image/preview?t=" + t;
+      $("imgPortrait").src = "/api/image/portrait?t=" + t;
+      $("imgStudioPreview").src = "/api/image/preview?t=" + t;
+      $("imgStudioPortrait").src = "/api/image/portrait?t=" + t;
+    }
+
+    async function doPreview() {
+      if (!state.spec) return;
+      collectPropsIntoSpec();
+      await api("/api/preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spec: state.spec }),
+      });
+      refreshImages();
+    }
+
+    async function refreshGraph() {
+      collectPropsIntoSpec();
+      if (state.path) {
+        await api("/api/spec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: state.path, spec: state.spec }),
+        });
+      }
+      const data2 = await api("/api/catalog");
+      state.graph = data2.graph;
+      renderGraph();
+    }
+
+    async function loadPath(path) {
+      const data = await api("/api/spec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      });
+      state.spec = data.spec;
+      state.path = data.path;
+      fillProps();
+      renderFragments();
+      await refreshGraph();
+      refreshImages();
+      const st = await api("/api/status");
+      renderProjects(st.projects);
+      setStatus("Loaded " + path);
+    }
+
+    async function doValidate(fix) {
+      collectPropsIntoSpec();
+      const data = await api("/api/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spec: state.spec, fix }),
+      });
+      if (data.spec) {
+        state.spec = data.spec;
+        fillProps();
+        renderFragments();
+        await refreshGraph();
+      }
+      const box = $("issues");
+      box.innerHTML = "";
+      (data.issues || []).forEach((i) => {
+        const d = document.createElement("div");
+        d.className = "issue-" + i.severity;
+        d.textContent = `[${i.severity}] ${i.code}: ${i.message}`;
+        box.appendChild(d);
+      });
+      if (!(data.issues || []).length) box.innerHTML = '<div class="issue-info">No issues</div>';
+      renderCost(data.cost);
+      if (data.cost) renderGraph();
+      setStatus(data.ok ? "Valid" : "Has errors");
+      logPipe("validate ok=" + data.ok + " issues=" + (data.issues || []).length);
+    }
+
+    async function doArt() {
+      collectPropsIntoSpec();
+      setStatus("Generating tiles...");
+      const data = await api("/api/art", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          spec: state.spec,
+          no_sd: $("g_nosd").checked,
+          workers: $("g_workers").checked ? 4 : 1,
+        }),
+      });
+      refreshImages();
+      $("artMeta").textContent = data.sd_used ? "Used Stable Diffusion draft" : "Procedural pixel art";
+      setStatus("Art written");
+      logPipe("art body=" + data.body);
+    }
+
+    document.querySelectorAll(".nav-tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".nav-tab").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
+        $("view-" + btn.getAttribute("data-view")).classList.add("active");
+        if (btn.getAttribute("data-view") === "graphics") refreshImages();
+        if (btn.getAttribute("data-view") === "body") renderGraph();
+      });
+    });
+
+    document.querySelectorAll(".tabs button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tabs button").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        ["propsPanel", "costPanel", "rawPanel"].forEach((id) => $(id).classList.remove("active"));
+        $(btn.getAttribute("data-tab")).classList.add("active");
+      });
+    });
+
+    $("btnNew").onclick = async () => {
+      const data = await api("/api/new", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: $("n_id").value,
+          name: $("n_name").value,
+          preset: $("n_preset").value,
+          culture: $("n_culture").value,
+          phonology: $("n_phon").value,
+        }),
+      });
+      state.spec = data.spec;
+      state.path = data.path;
+      fillProps();
+      renderFragments();
+      await refreshGraph();
+      refreshImages();
+      const st = await api("/api/status");
+      renderProjects(st.projects);
+      setStatus("Created " + data.path);
+    };
+
+    $("btnApplyPreset").onclick = () => doApplyPreset().catch((e) => setStatus(e.message));
+    $("btnSave").onclick = async () => {
+      collectPropsIntoSpec();
+      pushUndo();
+      const data = await api("/api/spec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: state.path, spec: state.spec }),
+      });
+      state.path = data.path;
+      setStatus("Saved " + data.path);
+    };
+
+    $("btnLoadPrompt").onclick = async () => {
+      const path = prompt("Path to creature.json", state.path || "");
+      if (path) await loadPath(path);
+    };
+
+    $("btnUndo").onclick = () => {
+      const prev = state.undo.pop();
+      if (!prev) { setStatus("Nothing to undo"); return; }
+      state.spec = JSON.parse(prev);
+      fillProps();
+      renderFragments();
+      refreshGraph();
+      setStatus("Undo");
+    };
+
+    $("btnValidate").onclick = () => doValidate(false);
+    $("btnFix").onclick = () => doValidate(true);
+    $("btnPValidate").onclick = () => doValidate($("pipeFix").checked);
+    $("btnArt").onclick = () => doArt().catch((e) => setStatus(e.message));
+    $("btnPArt").onclick = () => doArt().catch((e) => { logPipe(e.message); setStatus(e.message); });
+
+    $("btnRaw").onclick = async () => {
+      collectPropsIntoSpec();
+      if (state.path) {
+        await api("/api/spec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: state.path, spec: state.spec }),
+        });
+      }
+      const data = await api("/api/raw_preview");
+      $("rawPreview").textContent = data.raw;
+    };
+
+    $("btnPAnalyze").onclick = async () => {
+      collectPropsIntoSpec();
+      const data = await api("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spec: state.spec, fix_layout: $("pipeFix").checked }),
+      });
+      if (data.spec) { state.spec = data.spec; fillProps(); }
+      renderCost(data.cost);
+      logPipe(JSON.stringify({ role: data.cost && data.cost.role, axes: data.cost && data.cost.axes }, null, 2));
+      setStatus("Analyzed: " + ((data.cost && data.cost.role) || "?"));
+    };
+
+    $("btnPGenerate").onclick = async () => {
+      collectPropsIntoSpec();
+      const data = await api("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          spec: state.spec,
+          fix: $("pipeFix").checked,
+          adventure_kit: $("pipeAdv").checked,
+        }),
+      });
+      logPipe("generated " + data.root + "\n" + (data.files || []).join("\n"));
+      setStatus("Generated " + data.root);
+    };
+
+    $("btnPAdv").onclick = async () => {
+      const data = await api("/api/adventure-kit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spec: state.spec }),
+      });
+      logPipe("adventure kit\n" + (data.files || []).join("\n"));
+      setStatus("Adventure kit staged");
+    };
+
+    $("btnPInstall").onclick = async () => {
+      const data = await api("/api/install", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spec: state.spec }),
+      });
+      logPipe("installed " + data.dest);
+      setStatus("Installed " + data.dest);
+    };
+
+    $("btnPPack").onclick = async () => {
+      const data = await api("/api/pack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spec: state.spec }),
+      });
+      logPipe("zip " + data.zip);
+      setStatus("Packed " + data.zip);
+    };
+
+    $("fragFilter").oninput = renderFragments;
+    ["p_id","p_name","p_desc","p_prompt","p_gfx","p_int","p_equip","p_doors","p_site"].forEach((id) => {
+      $(id).addEventListener("change", () => { pushUndo(); collectPropsIntoSpec(); });
+    });
+    ["imgSheet","imgPreview","imgPortrait","imgStudioPreview","imgStudioPortrait"].forEach((id) => {
+      $(id).addEventListener("error", () => { $(id).removeAttribute("src"); });
+    });
+
+    async function loadInitial() {
+      try {
+        const st = await api("/api/status");
+        renderProjects(st.projects);
+        $("sysMeta").textContent = (st.df_root || "DF path unset") +
+          (st.dfhack ? " | DFHack present" : " | DFHack not installed");
+        try {
+          const presets = await api("/api/presets");
+          fillPresetLists(presets);
+        } catch (e) {
+          fillPresetLists({
+            body_presets: ["humanoid_civ"],
+            culture_presets: ["dwarf_industry"],
+            phonology_presets: ["harsh", "liquid", "guttural"],
+          });
+        }
+        const cat = await api("/api/catalog");
+        state.catalogBodies = cat.bodies || [];
+        renderFragments();
+        try {
+          const sp = await api("/api/spec");
+          state.spec = sp.spec;
+          state.path = sp.path;
+          fillProps();
+          state.graph = cat.graph;
+          renderFragments();
+          renderGraph();
+          refreshImages();
+          setStatus("Loaded " + state.path);
+        } catch (e) {
+          setStatus("Create a creature or pick a project");
+        }
+      } catch (e) {
+        setStatus("Catalog error: " + e.message);
+      }
+    }
+
+    loadInitial();
+  </script>
+</body>
+</html>

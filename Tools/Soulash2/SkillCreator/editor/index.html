@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Soulash 2 Skill Studio</title>
+  <style>
+    :root {
+      --bg: #141618;
+      --panel: #1e2226;
+      --panel2: #262b30;
+      --ink: #e8e4d9;
+      --muted: #9a9588;
+      --accent: #7aa8c4;
+      --off: #c45a5a;
+      --def: #5a8f7b;
+      --util: #c4a35a;
+      --line: #33383e;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font-family: "Segoe UI", Candara, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      display: grid;
+      grid-template-rows: 52px 1fr 140px;
+    }
+    header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 0 14px;
+      background: linear-gradient(180deg, #1c2830, #1a1c1e);
+      border-bottom: 1px solid #2a4050;
+    }
+    header h1 { font-size: 0.92rem; margin: 0 10px 0 0; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; }
+    .nav-tab { background: transparent; color: var(--muted); border: 1px solid transparent; border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+    .nav-tab.active { color: var(--accent); border-color: var(--accent); background: #1a2428; }
+    .status { margin-left: auto; font-size: 0.78rem; color: var(--muted); }
+    button, select, input, textarea {
+      background: var(--panel2); color: var(--ink); border: 1px solid #444; border-radius: 4px; padding: 6px 10px; font: inherit;
+    }
+    button { cursor: pointer; }
+    button:hover { border-color: var(--accent); }
+    button.primary { background: #243038; border-color: var(--accent); color: var(--accent); }
+    .workspace { display: grid; grid-template-columns: 280px 1fr 340px; min-height: 0; }
+    .sidebar { background: var(--panel); border-right: 1px solid var(--line); overflow: auto; padding: 10px; }
+    .main { overflow: auto; padding: 14px; }
+    .fx-rail {
+      background: var(--panel);
+      border-left: 1px solid var(--line);
+      overflow: auto;
+      padding: 12px 14px;
+    }
+    .fx-rail h2 { margin-bottom: 4px; }
+    .fx-id { font-size: 0.95rem; margin: 0 0 4px; }
+    .fx-id code { color: var(--accent); }
+    .fx-does { font-size: 0.84rem; line-height: 1.45; margin: 10px 0 12px; }
+    .fx-place {
+      background: var(--panel2);
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      padding: 8px 10px;
+      margin: 6px 0;
+    }
+    .fx-place strong { display: block; color: var(--accent); font-size: 0.78rem; margin-bottom: 3px; }
+    .fx-place .path { font-family: Consolas, monospace; font-size: 0.72rem; color: var(--util); }
+    .fx-place p { margin: 4px 0 0; font-size: 0.75rem; color: var(--muted); line-height: 1.35; }
+    .fx-limits { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .fx-limits li { font-size: 0.75rem; color: var(--muted); margin: 4px 0; line-height: 1.35; }
+    .fx-warn { color: var(--off); font-size: 0.75rem; line-height: 1.4; margin: 8px 0 0; }
+    .count-warn { color: var(--off); font-size: 0.75rem; margin: 4px 0 8px; }
+    .fx-section { font-size: 0.72rem; color: var(--muted); margin: 14px 0 4px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .fx-ex { font-family: Consolas, monospace; font-size: 0.72rem; color: var(--muted); margin: 3px 0; }
+    tr.fx-sel { background: #243038; }
+    table tbody tr { cursor: pointer; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; }
+    label { font-size: 0.78rem; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+    .tree-item { display: grid; grid-template-columns: 44px 90px 1fr; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+    .kind-ability { color: var(--off); }
+    .kind-amplifier { color: var(--util); }
+    .kind-passive { color: var(--def); }
+    .kind-item { color: #b89b6a; }
+    .kind-creature { color: #8f7bc4; }
+    .kind-stacker { color: #6a9bb8; }
+    .kind-stat { color: #c9b227; }
+    .fx-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 4px 8px; margin: 0 6px 6px 0; font-size: 0.8rem; }
+    .fx-chip button { padding: 0 6px; font-size: 0.75rem; }
+    .hint { font-size: 0.75rem; color: var(--muted); max-width: 640px; margin: 0 0 8px; }
+    select { min-width: 240px; max-width: 460px; }
+    footer { background: var(--panel); border-top: 1px solid var(--line); padding: 8px 12px; overflow: auto; font-family: Consolas, monospace; font-size: 0.78rem; white-space: pre-wrap; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+    .hidden { display: none; }
+    h2 { font-size: 1rem; margin: 0 0 10px; color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Skill Studio</h1>
+    <button class="nav-tab active" data-tab="tree">Tree</button>
+    <button class="nav-tab" data-tab="skill">Skill</button>
+    <button class="nav-tab" data-tab="add">Add</button>
+    <button class="nav-tab" data-tab="entities">Items / Creatures</button>
+    <button class="nav-tab" data-tab="races">Races</button>
+    <button class="nav-tab" data-tab="buildings">Buildings</button>
+    <button class="nav-tab" data-tab="catalog">Catalog</button>
+    <button class="nav-tab" data-tab="json">JSON</button>
+    <a class="nav-tab" href="/planner.html" style="text-decoration:none">Planner</a>
+    <span class="status" id="status">No spec</span>
+    <button class="primary" id="btnValidate">Validate</button>
+    <button class="primary" id="btnWrite">Write files</button>
+  </header>
+  <div class="workspace">
+    <aside class="sidebar">
+      <div class="row">
+        <button id="btnNew">New skill</button>
+        <button class="primary" id="btnLoad">Load</button>
+        <button id="btnReload">Reload</button>
+      </div>
+      <label>Projects (staging / live / workshop)
+        <select id="projects"><option value="">— pick a mod —</option></select>
+      </label>
+      <p class="hint">Select a project then click <strong>Load</strong>. Staging = Output skill.json. Live/workshop folders import into Output for editing.</p>
+      <label>Or paste folder / skill.json path
+        <input id="loadPath" placeholder="D:\...\Output\Soulash2\acid_magic\skill.json" style="min-width:100%" />
+      </label>
+      <div class="row">
+        <button id="btnLoadPath">Load path</button>
+        <label style="flex-direction:row;align-items:center;gap:6px;color:var(--muted);font-size:0.75rem">
+          <input type="checkbox" id="loadForce" /> Force re-import
+        </label>
+      </div>
+      <p id="meta" style="color:var(--muted);font-size:0.78rem;margin-top:12px;"></p>
+    </aside>
+    <main class="main">
+      <section id="tab-tree">
+        <h2>Skill tree by unlock level</h2>
+        <p class="hint">A level can grant both a milestone and +1 statistic. Stats are listed on the same row as the unlock, not instead of it.</p>
+        <div id="tree"></div>
+      </section>
+      <section id="tab-skill" class="hidden">
+        <h2>Skill / mod.json</h2>
+        <p class="hint">Official docs §5.1: <code>starting_gear</code> (first always grants, first+second is a create choice). Docs exp_sources omit <code>walk</code>, <code>carve</code>, and <code>production</code> — those are valid in live JSON. <code>thumbnail</code> is a 4:3 PNG for Steam. <code>disable_portraits</code> is global and overrides other mods — leave it off. File name is still <code>ability_amplifiers.json</code> (docs wrongly say amplifiers.json).</p>
+        <div class="row">
+          <label>Combat skill
+            <select id="skillCombat">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </label>
+          <label>Difficulty <input id="skillDiff" type="number" value="2" /></label>
+          <label>level_start <input id="skillLevelStart" type="number" placeholder="optional" /></label>
+          <label>Thumbnail <input id="skillThumb" placeholder="thumbnail.png" /></label>
+        </div>
+        <div class="row">
+          <label>Description <input id="skillDesc" style="min-width:420px" /></label>
+        </div>
+        <h2 style="margin-top:16px;">Stat points</h2>
+        <p class="hint">Milestones stay on their unlock levels. The engine allows +1 statistic on the same level. Default keeps early vanilla stats (2, 4, 5, 7, 8, 10) then every level 11–49. Vanilla Pyromancy interleaves some empty post-10 levels, which is why a milestone can show with no +1. Filling 11–49 does not move anything.</p>
+        <div class="row">
+          <label>Preset
+            <select id="skillStatPreset">
+              <option value="default">default (early + every 11–49)</option>
+              <option value="vanilla">vanilla (interleaved)</option>
+              <option value="after10">after10 (11–49 only)</option>
+              <option value="none">none</option>
+            </select>
+          </label>
+          <button type="button" id="btnApplyStatPreset">Apply preset</button>
+          <button type="button" id="btnFillStats">Fill +1 on 11–49</button>
+        </div>
+        <p class="hint" id="skillStatList"></p>
+        <p class="hint">Thematic 32×32 sheets: <code>python s2_skill_cli.py generate-icons --id … --overwrite</code> (starts the SD server; use <code>--no-sd</code> for procedural). <code>write</code> does not generate art.</p>
+        <h2 style="margin-top:16px;">Exp sources</h2>
+        <div class="row">
+          <label>Source <select id="expId"></select></label>
+          <label>Rate <input id="expRate" type="number" value="2" /></label>
+          <label>production_action id <input id="expProd" placeholder="only for production" /></label>
+          <button type="button" id="btnAddExp">Add source</button>
+        </div>
+        <div id="expList"></div>
+        <h2 style="margin-top:16px;">Starting gear</h2>
+        <div class="row">
+          <label>First id:amount <input id="gearFirst" placeholder="70:1" /></label>
+          <label>Second (optional) <input id="gearSecond" placeholder="111:1" /></label>
+          <button type="button" id="btnAddGear">Add choice</button>
+        </div>
+        <div id="gearList"></div>
+        <div class="row" style="margin-top:12px;">
+          <button class="primary" id="btnSaveSkill">Save skill fields</button>
+        </div>
+        <h2 style="margin-top:18px;">Production actions</h2>
+        <p class="hint">Docs §9: clone a vanilla action (Cut Wood / Mine / Harvest). Id needs a mod prefix. Producer entities are still out of scope — this only writes <code>character.json</code> production_actions. Milestone kind is <code>production_action</code>.</p>
+        <div class="row">
+          <label>Search vanilla <input id="prodSearch" placeholder="mine" /></label>
+          <button type="button" id="btnSearchProd">Search</button>
+          <label>Unlock level <input id="prodLevel" type="number" placeholder="optional" /></label>
+        </div>
+        <div id="prodSearchHits"></div>
+        <div id="prodList"></div>
+      </section>
+      <section id="tab-add" class="hidden">
+        <h2>Add unlock</h2>
+        <div class="row">
+          <label>Kind
+            <select id="addKind">
+              <option value="ability">ability</option>
+              <option value="amplifier">amplifier</option>
+              <option value="passive">passive</option>
+              <option value="stacker">stacker</option>
+            </select>
+          </label>
+          <label>Unlock level <input id="addLevel" type="number" value="1" min="0" max="50" /></label>
+          <label>Id <input id="addId" placeholder="geomancy_stone_bolt" /></label>
+          <label>Name <input id="addName" placeholder="Stone Bolt" /></label>
+        </div>
+        <div class="row" id="abilityCloneRow">
+          <label>Clone ability from vanilla / workshop
+            <input id="abSearch" placeholder="fireball" />
+          </label>
+          <button type="button" id="btnSearchAb">Search abilities</button>
+        </div>
+        <div id="abSearchHits"></div>
+        <div class="row" id="abilityFields">
+          <label>Target <select id="addTarget"></select></label>
+          <label>Range <input id="addRange" type="number" value="4" /></label>
+          <label>Min range <input id="addMinRange" type="number" placeholder="optional" /></label>
+          <label>Stamina <input id="addStamina" type="number" value="0" /></label>
+          <label>Health cost <input id="addHealth" type="number" value="0" /></label>
+          <label>Damage [min,max] <input id="addDamage" value="[2,6]" /></label>
+          <label>Damage type <select id="addDmgType"></select></label>
+          <label>Animation id <input id="addAnim" placeholder="0 (vanilla) or cloned id" value="0" /></label>
+        </div>
+        <p class="hint" id="abilityDescHint">Empty description becomes <code>::damage ::damage_type</code> when damage is set (docs §6.2). Entity cost / item type / ammo: JSON tab or <code>add-ability --cost-item --cost-item-type --ammo</code>.</p>
+        <div class="row" id="animCloneRow">
+          <label>Clone animation from vanilla / workshop
+            <input id="animSearch" placeholder="fireball" />
+          </label>
+          <button type="button" id="btnSearchAnim">Search FX</button>
+          <label>Theme tint (vanilla glyphs)
+            <select id="animArt">
+              <option value="">no extra tint</option>
+              <option value="auto">auto theme</option>
+              <option value="steam">steam</option>
+              <option value="water">water</option>
+              <option value="blood">blood</option>
+              <option value="ice">ice</option>
+              <option value="lightning">lightning</option>
+              <option value="earth">earth</option>
+              <option value="fire">fire</option>
+              <option value="poison">poison</option>
+              <option value="arcane">arcane</option>
+            </select>
+          </label>
+        </div>
+        <div id="animSearchHits"></div>
+        <div class="row" id="abilityEffectRow">
+          <label>Ability effect
+            <select id="addAbEffect"></select>
+          </label>
+          <label>Value <input id="addAbEffectValue" placeholder="1" /></label>
+          <button type="button" id="btnAddAbEffect">Add effect</button>
+        </div>
+        <p class="hint" id="addAbEffectHint"></p>
+        <p class="count-warn hidden" id="addAbCountWarn"></p>
+        <div id="abEffectList"></div>
+        <div class="row hidden" id="ampFields">
+          <label>Type <select id="addAmpType"></select></label>
+          <label>Bonus effect <select id="addBonusEffect"></select></label>
+          <label>Bonus value <input id="addBonusValue" placeholder="10" /></label>
+          <label>cost_stamina <input id="addCostStamina" placeholder="-2" /></label>
+          <label>range+ <input id="addAmpRange" placeholder="1" /></label>
+          <label>description <input id="addAmpDesc" placeholder="tooltip (amplifiers use this)" /></label>
+        </div>
+        <p class="hint hidden" id="addAmpEffectHint"></p>
+        <div class="row hidden" id="passFields">
+          <label>Passive effect <select id="addPassEffect"></select></label>
+          <label>Value <input id="addPassValue" placeholder="0.08" /></label>
+        </div>
+        <div class="row hidden" id="passMeta">
+          <label>apply_mode
+            <select id="addApplyMode">
+              <option value="">everyone</option>
+              <option value="party_only">party_only</option>
+              <option value="solo_only">solo_only</option>
+            </select>
+          </label>
+          <label>restrict_tags <input id="addRestrictTags" placeholder="9,4 (optional)" /></label>
+          <label>Innate
+            <select id="addInnate">
+              <option value="false">false (skill unlock)</option>
+              <option value="true">true (empty requirements)</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint hidden" id="addPassEffectHint"></p>
+        <div class="row hidden" id="stackerFields">
+          <label>Per-stack effect <select id="addStEffect"></select></label>
+          <label>Value <input id="addStValue" placeholder="0.01" /></label>
+          <button type="button" id="btnAddStEffect">Add bonus</button>
+        </div>
+        <p class="hint hidden" id="addStEffectHint"></p>
+        <div id="stEffectList"></div>
+        <div class="row hidden" id="stackerMeta">
+          <label>max_stacks <input id="addStMax" type="number" value="10" /></label>
+          <label>duration (turns) <input id="addStDuration" type="number" value="3" /></label>
+          <label>apply_caster
+            <select id="addStCaster">
+              <option value="false">false (debuff on target)</option>
+              <option value="true">true (buff on caster)</option>
+            </select>
+          </label>
+          <label>on_max_stacks_cast <input id="addStCast" placeholder="optional ability id" /></label>
+          <label>Bind to ability
+            <select id="addStBind"><option value="">—</option></select>
+          </label>
+          <label>stacker_count <input id="addStCount" type="number" value="1" /></label>
+        </div>
+        <button class="primary" id="btnAdd">Add + milestone</button>
+      </section>
+      <section id="tab-entities" class="hidden">
+        <h2>Items and creatures</h2>
+        <p style="color:var(--muted);font-size:0.82rem;">Create entities this skill needs (summons, skill books, weapons). <code>write</code> emits <code>entities/*.json</code>.</p>
+        <div class="row">
+          <label>Role
+            <select id="entRole">
+              <option value="creature">creature (summon / enemy)</option>
+              <option value="item">item (book / weapon / usable)</option>
+              <option value="tile">tile (summoned terrain)</option>
+            </select>
+          </label>
+          <label>Preset
+            <select id="entPreset">
+              <option value="summon">summon (ally)</option>
+              <option value="enemy">enemy</option>
+              <option value="skill_book">skill_book</option>
+              <option value="weapon">weapon</option>
+              <option value="usable">usable</option>
+              <option value="generic">generic item</option>
+            </select>
+          </label>
+          <label>Id <input id="entId" placeholder="skilltest_stone_warden" /></label>
+          <label>Name <input id="entName" placeholder="Stone Warden" /></label>
+        </div>
+        <div class="row">
+          <label>Health <input id="entHealth" type="number" value="80" /></label>
+          <label>Damage [min,max] <input id="entDamage" value="[3,6]" /></label>
+          <label>Damage type <input id="entDmgType" value="physical" /></label>
+          <label>Glyph index <input id="entGlyph" type="number" value="90" /></label>
+          <label>Bind summon to ability
+            <select id="entSummonAb"><option value="">—</option></select>
+          </label>
+          <label>Book recipe unlock level <input id="entRecipeLevel" type="number" placeholder="44" /></label>
+        </div>
+        <div class="row">
+          <label>granted_passive <input id="entGranted" placeholder="core_2_feed_on_electricity" /></label>
+          <label>Innate milestone ids <input id="entMiles" placeholder="optional skills.milestones" /></label>
+          <label>No health regen
+            <select id="entNoRegen"><option value="false">false</option><option value="true">true</option></select>
+          </label>
+          <label>loot_exclude
+            <select id="entLootEx"><option value="false">false</option><option value="true">true</option></select>
+          </label>
+        </div>
+        <div class="row">
+          <button class="primary" id="btnAddEntity">Create entity</button>
+        </div>
+        <h2 style="margin-top:18px;">Clone from vanilla / workshop</h2>
+        <p class="hint">Search core_2 + workshop entities. <strong>Load</strong> fills the form (and JSON preview) without copying into the skill. <strong>Clone</strong> copies into this skill (needs a project loaded).</p>
+        <div class="row">
+          <label>Search <input id="entSearch" placeholder="golem" /></label>
+          <label>Role filter
+            <select id="entSearchRole">
+              <option value="">all</option>
+              <option value="creature">creature</option>
+              <option value="item">item</option>
+              <option value="tile">tile</option>
+            </select>
+          </label>
+          <button type="button" id="btnSearchEnt">Search</button>
+        </div>
+        <div id="entSearchHits"></div>
+        <pre id="entPreview" class="hint" style="max-height:220px;overflow:auto;white-space:pre-wrap;background:var(--panel2);padding:8px;border-radius:4px;display:none;"></pre>
+        <h2 style="margin-top:18px;">In this skill</h2>
+        <div id="entList"></div>
+      </section>
+      <section id="tab-races" class="hidden">
+        <h2>Races</h2>
+        <p class="hint"><code>write</code> emits a merge-only <code>character.json</code> (races / tags / control_actions). Never a full vanilla copy. Player training halls live on the <strong>Buildings</strong> tab. Starting abilities go on the race as <code>abilities</code>, not skill milestones. Tame-style actions are <code>control_actions</code>, not milestone rewards.</p>
+        <div class="row">
+          <label>Name <input id="raceName" placeholder="Stonefolk" /></label>
+          <label>Id <input id="raceId" placeholder="skilltest_stonefolk" /></label>
+          <label>Playable
+            <select id="racePlayable">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </label>
+        </div>
+        <div class="row">
+          <label>Statistics <input id="raceStats" placeholder="strength=2,endurance=1" /></label>
+          <label>Tags <input id="raceTags" placeholder="9" /></label>
+          <label>Passives <input id="racePassives" placeholder="core_2_infravision" /></label>
+          <label>Starting abilities <input id="raceAbilities" placeholder="skilltest_stone_bolt" /></label>
+        </div>
+        <div class="row">
+          <label>Description <input id="raceDesc" placeholder="Hardy folk of the deep stone." style="min-width:320px" /></label>
+        </div>
+        <div class="row">
+          <label>Starting items <input id="raceItems" placeholder="70, skilltest_book" /></label>
+          <label>Starting recipes <input id="raceRecipes" placeholder="optional" /></label>
+          <label>Adult entity <input id="raceAdultEnt" placeholder="optional base_entities.adult" /></label>
+          <label>Orphan surname <input id="raceOrphan" placeholder="Stone" /></label>
+        </div>
+        <div class="row">
+          <label>settlement.max <input id="raceSettleMax" type="number" placeholder="optional" /></label>
+          <label>No trading
+            <select id="raceNoTrade"><option value="false">false</option><option value="true">true</option></select>
+          </label>
+          <label>Collapse on leader death
+            <select id="raceCollapse"><option value="false">false</option><option value="true">true</option></select>
+          </label>
+          <label>Birth resource <input id="raceBirth" placeholder="core_2_Vampire_Blood" /></label>
+          <label>No settlement block
+            <select id="raceNoSettle"><option value="true">true (playable only)</option><option value="false">false</option></select>
+          </label>
+        </div>
+        <div class="row">
+          <label>New character tag name <input id="raceNewTag" placeholder="stonefolk (optional)" /></label>
+          <label>Control action tag <input id="raceControlTag" placeholder="optional creature tag" /></label>
+          <button class="primary" id="btnAddRace">Create race</button>
+        </div>
+        <h2 style="margin-top:18px;">Clone from vanilla / workshop</h2>
+        <p class="hint">Human <code>0</code> (full civ), Vampire <code>6</code> (birth_cost / aggression), Skeleton <code>17</code> (collapse_on_leader_death). Default clone is a playable race without maps. <code>--keep-id --overlay</code> patches a vanilla id like workshop Draken.</p>
+        <div class="row">
+          <label>Search <input id="raceSearch" placeholder="vampire" /></label>
+          <button id="btnSearchRace">Search</button>
+          <label style="flex-direction:row;align-items:center;gap:6px;">
+            <input type="checkbox" id="raceKeepId" /> keep vanilla id
+          </label>
+          <label style="flex-direction:row;align-items:center;gap:6px;">
+            <input type="checkbox" id="raceOverlay" /> overlay patch (Draken-style)
+          </label>
+          <label style="flex-direction:row;align-items:center;gap:6px;">
+            <input type="checkbox" id="raceCiv" /> keep civilization
+          </label>
+        </div>
+        <div id="raceSearchHits"></div>
+        <h2 style="margin-top:18px;">Control action</h2>
+        <p class="hint">Tame / Control Undead live on <code>character.json</code>, not skill milestones. Clone vanilla then retarget tags.</p>
+        <div class="row">
+          <label>Name <input id="caName" placeholder="Control Elementals" /></label>
+          <label>Target tags <input id="caTags" placeholder="3" /></label>
+          <label>Clone from
+            <select id="caClone">
+              <option value="core_2_tame">core_2_tame</option>
+              <option value="core_2_control_undead">core_2_control_undead</option>
+            </select>
+          </label>
+          <button id="btnAddControl">Add control action</button>
+        </div>
+        <h2 style="margin-top:18px;">In this spec</h2>
+        <div id="raceList"></div>
+      </section>
+      <section id="tab-buildings" class="hidden">
+        <h2>Buildings</h2>
+        <p class="hint">Player settlement halls that train this skill use <code>enables: [skill_id]</code>, like vanilla Collegium Magicae / Dojo. Clone a 0.10 template rather than inventing maps. <code>write</code> emits <code>buildings/*.json</code>. Do not invent <code>.smap</code> files — copy an existing map if a civ building needs one.</p>
+        <div class="row">
+          <label>Name <input id="bldgName" placeholder="Test Hall" /></label>
+          <label>Id <input id="bldgId" placeholder="skilltest_hall" /></label>
+          <label>Template
+            <select id="bldgTemplate">
+              <option value="magic">magic (Collegium 389)</option>
+              <option value="combat">combat (Dojo 387)</option>
+              <option value="farm">farm (Chicken Ranch 404)</option>
+            </select>
+          </label>
+          <button class="primary" id="btnAddTrainingHall">Add training hall</button>
+        </div>
+        <h2 style="margin-top:18px;">Clone from vanilla / workshop</h2>
+        <div class="row">
+          <label>Search <input id="bldgSearch" placeholder="collegium" /></label>
+          <button id="btnSearchBldg">Search</button>
+        </div>
+        <div id="bldgSearchHits"></div>
+        <h2 style="margin-top:18px;">In this spec</h2>
+        <div id="bldgList"></div>
+      </section>
+      <section id="tab-catalog" class="hidden">
+        <h2>Effect catalog</h2>
+        <div class="row">
+          <label>Kind
+            <select id="catKind">
+              <option value="">all</option>
+              <option>ability</option>
+              <option>ability_key</option>
+              <option>passive</option>
+              <option>amplifier</option>
+              <option>amplifier_field</option>
+              <option>passive_field</option>
+              <option>stacker</option>
+              <option>stacker_field</option>
+              <option>skill_field</option>
+              <option>milestone_field</option>
+            </select>
+          </label>
+          <label>Filter <input id="catFilter" placeholder="bleed" /></label>
+        </div>
+        <table>
+          <thead><tr><th>kind</th><th>id</th><th>schema</th><th>n</th><th>conf</th><th>valid in</th><th>description</th></tr></thead>
+          <tbody id="catBody"></tbody>
+        </table>
+      </section>
+      <section id="tab-json" class="hidden">
+        <h2>Spec JSON</h2>
+        <textarea id="specJson" style="width:100%;height:420px;"></textarea>
+        <div class="row"><button id="btnSaveJson">Save spec</button></div>
+      </section>
+    </main>
+    <aside class="fx-rail" id="fxRail">
+      <h2>Effect info</h2>
+      <div id="fxCard">
+        <p class="fx-empty">Pick an effect in Add, or click a catalog row, to see what it does and where it is valid.</p>
+      </div>
+      <div class="fx-limits" id="fxLimits"></div>
+    </aside>
+  </div>
+  <footer id="log">Ready.</footer>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let catalog = { effects: [], enums: {}, dropdowns: {}, cards: {}, limits: {} };
+    let spec = null;
+    let abilityExtras = {};
+    let stackerExtras = {};
+
+    function log(msg) { $("log").textContent = typeof msg === "string" ? msg : JSON.stringify(msg, null, 2); }
+
+    const LAST = {
+      get(k) { try { return localStorage.getItem("s2studio." + k) || ""; } catch { return ""; } },
+      set(k, v) { try { if (v) localStorage.setItem("s2studio." + k, v); } catch {} }
+    };
+
+    function parseMaybe(raw, fallback) {
+      const text = (raw || "").trim();
+      if (!text) return fallback;
+      try { return JSON.parse(text); } catch { return text; }
+    }
+
+    function findChoice(list, id) {
+      return (list || []).find(e => e.id === id) || null;
+    }
+
+    function fillGroupedSelect(sel, items, lastKey, extraTop) {
+      const last = LAST.get(lastKey);
+      const groups = [];
+      const seen = new Set();
+      if (last && items.some(e => e.id === last)) {
+        const hit = items.find(e => e.id === last);
+        groups.push(["Last used", [hit]]);
+      }
+      if (extraTop && extraTop.length) groups.push(...extraTop);
+      for (const e of items || []) {
+        if (!seen.has(e.group)) {
+          seen.add(e.group);
+          groups.push([e.group, items.filter(x => x.group === e.group)]);
+        }
+      }
+      sel.innerHTML = groups.map(([label, rows]) =>
+        `<optgroup label="${label}">` +
+        rows.map(e => `<option value="${e.id}">${e.label} (${e.id})</option>`).join("") +
+        `</optgroup>`
+      ).join("");
+      if (last && [...sel.options].some(o => o.value === last)) sel.value = last;
+      else if (sel.options.length) sel.selectedIndex = 0;
+    }
+
+    function fillSimpleSelect(sel, items, lastKey, emptyLabel) {
+      const last = LAST.get(lastKey);
+      const opts = (emptyLabel != null) ? `<option value="">${emptyLabel}</option>` : "";
+      sel.innerHTML = opts + (items || []).map(e => `<option value="${e.id}">${e.label || e.id}</option>`).join("");
+      if (last && [...sel.options].some(o => o.value === last)) sel.value = last;
+    }
+
+    function schemaPlaceholder(schema) {
+      if (schema === "range" || schema === "list" || schema === "array" || schema === "int_pair") return "[min,max]";
+      if (schema === "float") return "0.1";
+      if (schema === "int") return "1";
+      if (schema === "bool") return "true";
+      if (schema === "string") return "id";
+      return "value";
+    }
+
+    function bindRemember(sel, lastKey, onChange) {
+      sel.addEventListener("change", () => {
+        LAST.set(lastKey, sel.value);
+        if (onChange) onChange();
+      });
+    }
+
+    function esc(s) {
+      return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[c]));
+    }
+
+    function renderFxCard(id) {
+      const el = $("fxCard");
+      const card = (catalog.cards || {})[id];
+      if (!id || !card) {
+        el.innerHTML = `<p class="fx-empty">Pick an effect in Add, or click a catalog row, to see what it does and where it is valid.</p>`;
+        return;
+      }
+      const places = (card.valid_in || []).map(v =>
+        `<div class="fx-place"><strong>${esc(v.place)}</strong><div class="path">${esc(v.path)}</div><p>${esc(v.how)}</p></div>`
+      ).join("") || `<p class="fx-empty">No known JSON slot for this id.</p>`;
+      const fields = (card.docs_fields || []).length
+        ? `<p class="hint">${esc((card.docs_fields || []).join(" · "))}</p>` : "";
+      const examples = (card.examples || []).map(ex => {
+        const val = ex.value === undefined ? "" : JSON.stringify(ex.value);
+        return `<div class="fx-ex">${esc(ex.file || "")}${val ? " → " + esc(val) : ""}</div>`;
+      }).join("");
+      el.innerHTML =
+        `<div class="fx-id">${esc(card.label)} <code>${esc(card.id)}</code></div>` +
+        `<p class="hint">${esc((card.kinds || []).join(" · "))}${card.confidence ? " · " + esc(card.confidence) : ""}${(card.schemas || []).length ? " · " + esc((card.schemas || []).join(", ")) : ""}</p>` +
+        `<p class="fx-does">${esc(card.does)}</p>` +
+        `<div class="fx-section">Where valid</div>${places}` +
+        fields +
+        (examples ? `<div class="fx-section">Examples</div>${examples}` : "") +
+        ((card.sources || []).length ? `<p class="hint">Sources: ${esc((card.sources || []).join(", "))}</p>` : "");
+    }
+
+    function syncFxCardFromAdd() {
+      const k = $("addKind").value;
+      const id = k === "ability" ? $("addAbEffect").value
+        : k === "amplifier" ? $("addBonusEffect").value
+        : k === "passive" ? $("addPassEffect").value
+        : $("addStEffect").value;
+      renderFxCard(id);
+    }
+
+    function updateEffectHint(selectId, list, hintId, valueId) {
+      const choice = findChoice(list, $(selectId).value);
+      const hint = $(hintId);
+      if (hint) hint.textContent = choice ? `${choice.description || ""}  ·  ${choice.schema}`.trim() : "";
+      const val = $(valueId);
+      if (val && choice) val.placeholder = schemaPlaceholder(choice.schema);
+      if (choice && choice.id === "damage_type") {
+        const dts = (catalog.dropdowns && catalog.dropdowns.damage_type) || [];
+        if (dts.length && val && !val.value) val.value = LAST.get("damageType") || "physical";
+      }
+      if (choice && choice.kind === "ability_key" && val) {
+        const ents = (spec && spec.entities) || [];
+        if (ents.length && !val.value) val.placeholder = ents[0].id;
+      }
+      syncFxCardFromAdd();
+    }
+
+    function renderLimits() {
+      const L = catalog.limits || {};
+      const order = ["ability_effects", "amplifier_bonuses", "passive_effects", "ability_slots_total", "stacker_effects"];
+      const items = order.map(k => {
+        const row = L[k];
+        if (!row) return "";
+        const seen = row.seen && row.seen !== row.normal ? ` (highest seen ${row.seen})` : "";
+        return `<li><strong>${esc(row.label)}</strong> — typical <strong>${row.normal}</strong>${esc(seen)}. ${esc(row.note || "")}</li>`;
+      }).join("");
+      $("fxLimits").innerHTML =
+        `<div class="fx-section">Observed counts</div><ul style="padding-left:18px;margin:6px 0;">${items}</ul>` +
+        `<p class="fx-warn">${esc(L.warning || "Observed counts only. The F2 editor may wipe extra rows; JSON can still work. The game does not publish an engine cap.")}</p>`;
+    }
+
+    function abilityEffectCount() {
+      return Object.keys(abilityExtras).length + ($("addDamage").value.trim() ? 1 : 0) + ($("addDmgType").value ? 1 : 0);
+    }
+
+    function updateAbilityCountWarn() {
+      const el = $("addAbCountWarn");
+      if (!el) return;
+      const n = abilityEffectCount();
+      const lim = (catalog.limits || {}).ability_effects || {};
+      const typical = lim.normal || 8;
+      const seen = lim.seen || typical;
+      if (n > seen) {
+        el.classList.remove("hidden");
+        el.textContent = `${n} effects (vanilla typically ${typical}; F2 editor may wipe past ${seen}). JSON authored here can still work. The game does not publish an engine cap.`;
+      } else {
+        el.classList.add("hidden");
+        el.textContent = "";
+      }
+    }
+    function renderAbilityExtras() {
+      const keys = Object.keys(abilityExtras);
+      $("abEffectList").innerHTML = keys.map(k => {
+        const v = abilityExtras[k];
+        const shown = typeof v === "object" ? JSON.stringify(v) : String(v);
+        return `<span class="fx-chip" data-show="${k}"><code>${k}</code> ${shown} <button type="button" data-fx="${k}">×</button></span>`;
+      }).join("");
+      $("abEffectList").querySelectorAll(".fx-chip").forEach(chip => {
+        chip.style.cursor = "pointer";
+        chip.onclick = (ev) => {
+          if (ev.target.tagName === "BUTTON") return;
+          renderFxCard(chip.dataset.show);
+        };
+      });
+      $("abEffectList").querySelectorAll("button[data-fx]").forEach(btn => {
+        btn.onclick = () => { delete abilityExtras[btn.dataset.fx]; renderAbilityExtras(); };
+      });
+      updateAbilityCountWarn();
+    }
+
+    function renderStackerExtras() {
+      const keys = Object.keys(stackerExtras);
+      $("stEffectList").innerHTML = keys.map(k => {
+        const v = stackerExtras[k];
+        const shown = typeof v === "object" ? JSON.stringify(v) : String(v);
+        return `<span class="fx-chip" data-show="${k}"><code>${k}</code> ${shown} <button type="button" data-st="${k}">×</button></span>`;
+      }).join("");
+      $("stEffectList").querySelectorAll("button[data-st]").forEach(btn => {
+        btn.onclick = () => { delete stackerExtras[btn.dataset.st]; renderStackerExtras(); };
+      });
+    }
+
+    function fillStudioDropdowns() {
+      const d = catalog.dropdowns || {};
+      fillGroupedSelect($("addAbEffect"), d.ability || [], "abilityEffect");
+      fillGroupedSelect($("addBonusEffect"), d.amplifier || [], "amplifierEffect");
+      fillGroupedSelect($("addPassEffect"), d.passive || [], "passiveEffect");
+      fillGroupedSelect($("addStEffect"), d.stacker || [], "stackerEffect");
+      fillSimpleSelect($("addTarget"), d.target || [], "target");
+      fillSimpleSelect($("addDmgType"), d.damage_type || [], "damageType");
+      fillSimpleSelect($("expId"), d.exp_source || []);
+      fillSimpleSelect($("addAmpType"), [{id:"", label:"auto"}, ...(d.amplifier_type||[]).map(t => ({id:t, label:t}))], "ampType");
+      updateEffectHint("addAbEffect", d.ability, "addAbEffectHint", "addAbEffectValue");
+      updateEffectHint("addBonusEffect", d.amplifier, "addAmpEffectHint", "addBonusValue");
+      updateEffectHint("addPassEffect", d.passive, "addPassEffectHint", "addPassValue");
+      updateEffectHint("addStEffect", d.stacker, "addStEffectHint", "addStValue");
+    }
+
+    async function api(path, opts) {
+      const r = await fetch(path, opts);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || r.statusText);
+      return data;
+    }
+
+    function showTab(id) {
+      document.querySelectorAll(".nav-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === id));
+      ["tree","skill","add","catalog","json","entities","races","buildings"].forEach(t => $(`tab-${t}`).classList.toggle("hidden", t !== id));
+    }
+
+    function treeRowsFromSpec(s) {
+      const rows = [];
+      for (const m of (s && s.milestones) || []) {
+        const rew = (m.rewards && m.rewards[0]) || {};
+        const kind = Object.keys(rew)[0] || "";
+        rows.push({
+          level: m.innate ? "innate" : (m.requirements && m.requirements.skill),
+          id: m.id,
+          name: m.name,
+          kind,
+          reward: rew[kind] || ""
+        });
+      }
+      for (const lv of (s && s.skill && s.skill.stat_points) || []) {
+        rows.push({ level: lv, id: "stat_" + lv, name: "+1 statistic", kind: "stat", reward: "" });
+      }
+      rows.sort((a, b) => {
+        const la = a.level === "innate" ? -1 : Number(a.level ?? 10000);
+        const lb = b.level === "innate" ? -1 : Number(b.level ?? 10000);
+        if (la !== lb) return la - lb;
+        const ka = a.kind === "stat" ? 0 : 1;
+        const kb = b.kind === "stat" ? 0 : 1;
+        if (ka !== kb) return ka - kb;
+        return String(a.name || "").localeCompare(String(b.name || ""));
+      });
+      return rows;
+    }
+
+    function renderTree() {
+      const rows = treeRowsFromSpec(spec);
+      $("tree").innerHTML = rows.map(m => {
+        const kind = m.kind || "";
+        const rid = m.reward || "";
+        const lvl = m.level === "innate" ? "inn" : (m.level ?? "?");
+        return `<div class="tree-item"><strong>L${lvl}</strong><span class="kind-${kind}">${kind || "stat"}</span><span>${m.name || ""} ${rid ? `<code>${rid}</code>` : ""}</span></div>`;
+      }).join("") || "<p>No unlocks yet.</p>";
+      const stackers = (spec && spec.stackers) || [];
+      if (stackers.length) {
+        $("tree").innerHTML += `<h2 style="margin-top:16px;">Stackers</h2>` + stackers.map(s => {
+          const fx = (s.effects || []).map(e => e.effect).join(", ") || "(max-stacks cast)";
+          return `<div class="tree-item"><strong>stk</strong><span class="kind-stacker">stacker</span><span>${s.name||s.id} <code>${s.id}</code> ${fx}</span></div>`;
+        }).join("");
+      }
+      $("specJson").value = spec ? JSON.stringify(spec, null, 2) : "";
+      const nEnt = (spec && spec.entities || []).length;
+      const nSt = (spec && spec.stackers || []).length;
+      const nAn = (spec && spec.animations || []).length;
+      const nRace = (spec && spec.races || []).length;
+      const nBldg = (spec && spec.buildings || []).length;
+      $("meta").textContent = spec ? `${spec.skill?.name || ""} (${spec.skill_id})\n${(spec.abilities||[]).length} abilities, ${(spec.amplifiers||[]).length} amplifiers, ${(spec.passives||[]).length} passives, ${nSt} stackers, ${nAn} animations, ${(spec.milestones||[]).length} milestones, ${nEnt} entities, ${nRace} races, ${nBldg} buildings` : "";
+      const anims = (spec && spec.animations) || [];
+      if (anims.length) {
+        $("tree").innerHTML += `<h2 style="margin-top:16px;">Animations</h2>` + anims.map(a =>
+          `<div class="tree-item"><strong>fx</strong><span class="kind-stacker">animation</span><span>${a.name||a.id} <code>${a.id}</code></span></div>`
+        ).join("");
+      }
+      renderEntities();
+      renderRaces();
+      renderBuildings();
+      renderSkill();
+      const bind = $("addStBind");
+      if (bind) {
+        const cur = bind.value;
+        bind.innerHTML = `<option value="">—</option>` + ((spec && spec.abilities) || []).map(a => `<option value="${a.id}">${a.name||a.id}</option>`).join("");
+        if (cur) bind.value = cur;
+      }
+    }
+
+    function renderRaces() {
+      const races = (spec && spec.races) || [];
+      const actions = (spec && spec.control_actions) || [];
+      let html = races.map(r => {
+        const kit = [...(r.passives||[]), ...(r.abilities||[])].join(", ");
+        return `<div class="ent-card"><strong>${esc(r.name||r.id)}</strong> <code>${esc(r.id)}</code> playable=${r.playable} ${kit ? `<em style="color:var(--muted)">${esc(kit)}</em>` : ""}</div>`;
+      }).join("") || "<p>No races yet.</p>";
+      if (actions.length) {
+        html += `<h2 style="margin-top:18px;">Control actions</h2>` + actions.map(a =>
+          `<div class="ent-card"><strong>${esc(a.name||a.id)}</strong> <code>${esc(a.id)}</code> tags=${esc((a.tags||[]).join(","))}</div>`
+        ).join("");
+      }
+      $("raceList").innerHTML = html;
+    }
+
+    function renderBuildings() {
+      const rows = (spec && spec.buildings) || [];
+      $("bldgList").innerHTML = rows.map(b => {
+        const enables = (b.enables || []).join(", ") || "-";
+        return `<div class="ent-card"><strong>${esc(b.name||b.id)}</strong> <code>${esc(b.id)}</code> enables=${esc(enables)} group=${esc(b.group||"-")}</div>`;
+      }).join("") || "<p>No buildings yet.</p>";
+    }
+
+    function renderSkill() {
+      const skill = (spec && spec.skill) || {};
+      const mod = (spec && spec.mod) || {};
+      if ($("skillCombat")) $("skillCombat").value = skill.combat_skill === false ? "false" : "true";
+      if ($("skillDiff")) $("skillDiff").value = skill.difficulty != null ? skill.difficulty : 2;
+      if ($("skillLevelStart")) $("skillLevelStart").value = skill.level_start != null ? skill.level_start : "";
+      if ($("skillThumb")) $("skillThumb").value = mod.thumbnail || "";
+      if ($("skillDesc")) $("skillDesc").value = skill.description || "";
+      if ($("skillStatList")) {
+        const pts = skill.stat_points || [];
+        $("skillStatList").textContent = pts.length ? ("stat_points: " + pts.join(", ")) : "No stat_points (no +1 statistic on level-up).";
+      }
+      const srcs = skill.exp_sources || [];
+      if ($("expList")) {
+        $("expList").innerHTML = srcs.map((s, i) =>
+          `<span class="fx-chip"><code>${esc(s.id)}</code> rate=${esc(s.rate)}${s.production_action ? " action="+esc(s.production_action) : ""} <button type="button" data-exp="${i}">×</button></span>`
+        ).join("") || "<p class=\"hint\">No exp sources.</p>";
+        $("expList").querySelectorAll("button[data-exp]").forEach(btn => {
+          btn.onclick = () => {
+            spec.skill.exp_sources.splice(Number(btn.dataset.exp), 1);
+            renderSkill();
+          };
+        });
+      }
+      const gear = skill.starting_gear || [];
+      if ($("gearList")) {
+        $("gearList").innerHTML = gear.map((g, i) => {
+          const a = g.first ? `${g.first.id}:${g.first.amount}` : "";
+          const b = g.second ? ` or ${g.second.id}:${g.second.amount}` : "";
+          return `<span class="fx-chip">${esc(a)}${esc(b)} <button type="button" data-gear="${i}">×</button></span>`;
+        }).join("") || "<p class=\"hint\">No starting gear.</p>";
+        $("gearList").querySelectorAll("button[data-gear]").forEach(btn => {
+          btn.onclick = () => {
+            spec.skill.starting_gear.splice(Number(btn.dataset.gear), 1);
+            renderSkill();
+          };
+        });
+      }
+      const prods = (spec && spec.production_actions) || [];
+      if ($("prodList")) {
+        $("prodList").innerHTML = prods.map(p =>
+          `<div class="ent-card"><strong>${esc(p.name||p.id)}</strong> <code>${esc(p.id)}</code> tool=${esc(p.required_tool)}</div>`
+        ).join("") || "<p class=\"hint\">No production actions in this spec.</p>";
+      }
+    }
+
+    function splitCsv(s) {
+      return (s || "").split(/[,\s]+/).map(x => x.trim()).filter(Boolean);
+    }
+
+    function fillEntityForm(entity) {
+      if (!entity || typeof entity !== "object") return;
+      const comps = entity.components || [];
+      const role = entity._role || (comps.includes("actor") ? "creature" : comps.includes("background") ? "tile" : "item");
+      $("entRole").value = role;
+      $("entRole").dispatchEvent(new Event("change"));
+      const preset = role === "creature"
+        ? ((entity.tags || []).map(String).includes("5") ? "summon" : "enemy")
+        : role === "tile"
+          ? "tile"
+          : (entity.item && Number(entity.item.type) === 17 ? "skill_book" : "generic");
+      if ([...$("entPreset").options].some(o => o.value === preset || o.text === preset)) {
+        $("entPreset").value = preset;
+      }
+      $("entId").value = String(entity.id || "");
+      $("entName").value = String(entity.name || "");
+      if (entity.health != null) $("entHealth").value = String(entity.health);
+      const atk = entity.attack || {};
+      if (atk.damage != null) $("entDamage").value = typeof atk.damage === "string" ? atk.damage : JSON.stringify(atk.damage);
+      if (atk.damage_type) $("entDmgType").value = String(atk.damage_type);
+      const frames = (entity.glyph && entity.glyph.frames) || [];
+      if (frames[0] && frames[0].index != null) $("entGlyph").value = String(frames[0].index);
+      const granted = entity.resource && entity.resource.granted_passive;
+      $("entGranted").value = granted ? String(granted) : "";
+      const miles = entity.skills && entity.skills.milestones;
+      $("entMiles").value = Array.isArray(miles) ? miles.join(", ") : "";
+      $("entNoRegen").value = entity.can_regenerate_health === false ? "true" : "false";
+      const preview = $("entPreview");
+      preview.style.display = "block";
+      preview.textContent = JSON.stringify(entity, null, 2);
+    }
+
+    function renderEntities() {
+      const ents = (spec && spec.entities) || [];
+      $("entList").innerHTML = ents.map(e => {
+        const role = e._role || ((e.components||[]).includes("actor") ? "creature" : "item");
+        return `<div class="ent-card"><span class="kind-${role}">${role}</span> <strong>${esc(e.name||e.id)}</strong> <code>${esc(e.id)}</code>
+          <button type="button" data-load-spec="${esc(e.id)}">Load</button></div>`;
+      }).join("") || "<p>No items or creatures yet.</p>";
+      $("entList").querySelectorAll("button[data-load-spec]").forEach(btn => {
+        btn.onclick = () => {
+          const ent = ((spec && spec.entities) || []).find(x => String(x.id) === btn.dataset.loadSpec);
+          if (!ent) { log("Entity not in spec"); return; }
+          fillEntityForm(ent);
+          log("Loaded " + ent.id + " into form");
+        };
+      });
+      const sel = $("entSummonAb");
+      const cur = sel.value;
+      sel.innerHTML = `<option value="">—</option>` + ((spec && spec.abilities) || []).map(a => `<option value="${a.id}">${a.name||a.id}</option>`).join("");
+      if (cur) sel.value = cur;
+    }
+
+    function renderCatalog() {
+      const kind = LAST.get("catKind") || $("catKind").value;
+      if (kind) $("catKind").value = kind;
+      const q = ($("catFilter").value || "").toLowerCase();
+      const rows = (catalog.effects || []).filter(e => (!kind || e.kind === kind) && (!q || e.id.includes(q) || (e.description||"").toLowerCase().includes(q)));
+      $("catBody").innerHTML = rows.slice(0, 400).map(e => {
+        const card = (catalog.cards || {})[e.id] || {};
+        const where = (card.valid_in || []).map(v => v.place).join(", ");
+        return `<tr data-fx="${esc(e.id)}"><td>${esc(e.kind)}</td><td><code>${esc(e.id)}</code></td><td>${esc(e.value_schema)}</td><td>${e.count}</td><td>${esc(e.confidence)}</td><td>${esc(where)}</td><td>${esc((e.description||"").slice(0,140))}</td></tr>`;
+      }).join("");
+      $("catBody").querySelectorAll("tr[data-fx]").forEach(tr => {
+        tr.onclick = () => {
+          $("catBody").querySelectorAll("tr.fx-sel").forEach(x => x.classList.remove("fx-sel"));
+          tr.classList.add("fx-sel");
+          renderFxCard(tr.dataset.fx);
+        };
+      });
+    }
+
+    async function loadProject(path, force) {
+      if (!path) { log("Pick a project or paste a path first"); return; }
+      try {
+        const data = await api("/api/load", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({ path, force: !!force }),
+        });
+        spec = data.spec;
+        log((data.note || "Loaded") + " → " + data.path);
+        await refresh();
+      } catch (err) {
+        log("Load failed: " + (err && err.message ? err.message : err));
+      }
+    }
+
+    async function refresh() {
+      const st = await api("/api/status");
+      $("status").textContent = st.spec_id ? `${st.spec_id} — ${st.spec_path}` : "No spec";
+      const sel = $("projects");
+      sel.innerHTML = `<option value="">— pick a mod —</option>` + (st.projects||[]).map(p =>
+        `<option value="${esc(p.path)}">${esc(p.label || (p.source + ": " + (p.name || p.id)))}</option>`
+      ).join("");
+      if (st.spec_path) {
+        const match = (st.projects||[]).find(p => p.path === st.spec_path || p.id === st.spec_id);
+        if (match) sel.value = match.path;
+      }
+      try {
+        const s = await api("/api/spec");
+        spec = s.spec;
+      } catch { spec = null; }
+      renderTree();
+      renderSkill();
+    }
+
+    $("addKind").addEventListener("change", () => {
+      const k = $("addKind").value;
+      $("abilityFields").classList.toggle("hidden", k !== "ability");
+      $("abilityCloneRow").classList.toggle("hidden", k !== "ability");
+      $("abSearchHits").classList.toggle("hidden", k !== "ability");
+      $("animCloneRow").classList.toggle("hidden", k !== "ability");
+      $("animSearchHits").classList.toggle("hidden", k !== "ability");
+      $("abilityEffectRow").classList.toggle("hidden", k !== "ability");
+      $("addAbEffectHint").classList.toggle("hidden", k !== "ability");
+      $("abEffectList").classList.toggle("hidden", k !== "ability");
+      $("ampFields").classList.toggle("hidden", k !== "amplifier");
+      $("addAmpEffectHint").classList.toggle("hidden", k !== "amplifier");
+      $("passFields").classList.toggle("hidden", k !== "passive");
+      $("addPassEffectHint").classList.toggle("hidden", k !== "passive");
+      $("passMeta").classList.toggle("hidden", k !== "passive");
+      $("stackerFields").classList.toggle("hidden", k !== "stacker");
+      $("addStEffectHint").classList.toggle("hidden", k !== "stacker");
+      $("stEffectList").classList.toggle("hidden", k !== "stacker");
+      $("stackerMeta").classList.toggle("hidden", k !== "stacker");
+      $("addLevel").closest("label").classList.toggle("hidden", k === "stacker");
+      $("btnAdd").textContent = k === "stacker" ? "Add stacker" : "Add + milestone";
+      syncFxCardFromAdd();
+    });
+    document.querySelectorAll(".nav-tab").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
+    $("catKind").addEventListener("change", () => { LAST.set("catKind", $("catKind").value); renderCatalog(); });
+    $("catFilter").addEventListener("input", renderCatalog);
+    bindRemember($("addAbEffect"), "abilityEffect", () => updateEffectHint("addAbEffect", (catalog.dropdowns||{}).ability, "addAbEffectHint", "addAbEffectValue"));
+    bindRemember($("addBonusEffect"), "amplifierEffect", () => updateEffectHint("addBonusEffect", (catalog.dropdowns||{}).amplifier, "addAmpEffectHint", "addBonusValue"));
+    bindRemember($("addPassEffect"), "passiveEffect", () => updateEffectHint("addPassEffect", (catalog.dropdowns||{}).passive, "addPassEffectHint", "addPassValue"));
+    bindRemember($("addStEffect"), "stackerEffect", () => updateEffectHint("addStEffect", (catalog.dropdowns||{}).stacker, "addStEffectHint", "addStValue"));
+    bindRemember($("addTarget"), "target");
+    bindRemember($("addDmgType"), "damageType");
+    bindRemember($("addAmpType"), "ampType");
+
+    $("btnAddStEffect").onclick = () => {
+      const id = $("addStEffect").value;
+      if (!id) return;
+      LAST.set("stackerEffect", id);
+      const raw = $("addStValue").value.trim() || "0.01";
+      stackerExtras[id] = parseMaybe(raw, raw);
+      renderStackerExtras();
+    };
+
+    $("btnAddExp").onclick = () => {
+      if (!spec) { log("No spec"); return; }
+      const row = { id: $("expId").value, rate: Number($("expRate").value || 1) };
+      if ($("expProd").value.trim()) row.production_action = $("expProd").value.trim();
+      spec.skill = spec.skill || {};
+      spec.skill.exp_sources = spec.skill.exp_sources || [];
+      spec.skill.exp_sources.push(row);
+      renderSkill();
+    };
+    $("btnAddGear").onclick = () => {
+      if (!spec) { log("No spec"); return; }
+      const firstRaw = $("gearFirst").value.trim();
+      if (!firstRaw) { log("First id:amount required"); return; }
+      const parseRef = (raw) => {
+        const [id, amt] = raw.split(":");
+        return { id: (id || "").trim(), amount: Number(amt || 1) };
+      };
+      const choice = { first: parseRef(firstRaw) };
+      if ($("gearSecond").value.trim()) choice.second = parseRef($("gearSecond").value.trim());
+      spec.skill.starting_gear = spec.skill.starting_gear || [];
+      spec.skill.starting_gear.push(choice);
+      renderSkill();
+    };
+    $("btnSaveSkill").onclick = async () => {
+      if (!spec) { log("No spec"); return; }
+      const payload = {
+        combat_skill: $("skillCombat").value === "true",
+        difficulty: Number($("skillDiff").value),
+        description: $("skillDesc").value,
+        exp_sources: spec.skill.exp_sources || [],
+        starting_gear: spec.skill.starting_gear || [],
+        mod: { thumbnail: $("skillThumb").value.trim() }
+      };
+      if ($("skillLevelStart").value !== "") payload.level_start = Number($("skillLevelStart").value);
+      else payload.level_start = null;
+      const data = await api("/api/skill", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+      spec = data.spec;
+      log("Saved skill fields");
+      renderTree();
+    };
+    $("btnApplyStatPreset").onclick = async () => {
+      if (!spec) { log("No spec"); return; }
+      const data = await api("/api/skill", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ stat_preset: $("skillStatPreset").value }) });
+      spec = data.spec;
+      log("Applied stat_points preset " + $("skillStatPreset").value);
+      renderTree();
+    };
+    $("btnFillStats").onclick = async () => {
+      if (!spec) { log("No spec"); return; }
+      const data = await api("/api/skill", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ fill_stats_after_10: true }) });
+      spec = data.spec;
+      log("Filled +1 statistic on levels 11–49 (milestones unchanged)");
+      renderTree();
+    };
+    $("btnSearchProd").onclick = async () => {
+      const q = $("prodSearch").value.trim();
+      const data = await api("/api/production-actions/search?q=" + encodeURIComponent(q));
+      $("prodSearchHits").innerHTML = (data.results||[]).map(r =>
+        `<div class="ent-card"><code>${esc(r.id)}</code> ${esc(r.name)} tool=${esc(r.required_tool)} <button type="button" data-clone="${esc(r.id)}" data-name="${esc(r.name)}">Clone</button></div>`
+      ).join("") || "<p>No matches.</p>";
+      $("prodSearchHits").querySelectorAll("button[data-clone]").forEach(btn => {
+        btn.onclick = async () => {
+          const body = {
+            kind: "production_action",
+            payload: { clone_from: btn.dataset.clone, name: btn.dataset.name }
+          };
+          if ($("prodLevel").value !== "") body.unlock_level = Number($("prodLevel").value);
+          const cloned = await api("/api/add", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
+          spec = cloned.spec;
+          log("Cloned production action " + btn.dataset.clone);
+          renderSkill();
+          renderTree();
+        };
+      });
+    };
+
+    $("btnAddAbEffect").onclick = () => {
+      const id = $("addAbEffect").value;
+      if (!id) return;
+      LAST.set("abilityEffect", id);
+      const choice = findChoice((catalog.dropdowns||{}).ability, id);
+      let raw = $("addAbEffectValue").value.trim();
+      if (!raw) raw = choice && choice.schema === "null" ? "1" : "1";
+      abilityExtras[id] = parseMaybe(raw, raw);
+      renderAbilityExtras();
+    };
+
+    $("btnNew").onclick = async () => {
+      const id = prompt("Skill id (folder + skill_id)", "skilltest");
+      if (!id) return;
+      const name = prompt("Display name", id) || id;
+      const data = await api("/api/new", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ id, name }) });
+      spec = data.spec;
+      log("Created " + data.path);
+      await refresh();
+    };
+    $("btnLoad").onclick = async () => {
+      await loadProject($("projects").value, $("loadForce").checked);
+    };
+    $("btnLoadPath").onclick = async () => {
+      await loadProject($("loadPath").value.trim(), $("loadForce").checked);
+    };
+    $("projects").onchange = async () => {
+      if (!$("projects").value) return;
+      await loadProject($("projects").value, $("loadForce").checked);
+    };
+    $("projects").ondblclick = async () => {
+      await loadProject($("projects").value, $("loadForce").checked);
+    };
+    $("btnReload").onclick = refresh;
+    $("btnSearchAb").onclick = async () => {
+      const q = $("abSearch").value.trim();
+      if (q.length < 2 && !/^\d+$/.test(q)) { log("Type at least 2 characters"); return; }
+      const data = await api("/api/abilities/search?q=" + encodeURIComponent(q));
+      $("abSearchHits").innerHTML = (data.results||[]).map(r =>
+        `<div class="ent-card"><code>${esc(r.id)}</code> ${esc(r.name)} <em style="color:var(--muted)">${esc(r.source)}</em> <button data-clone="${esc(r.id)}" data-name="${esc(r.name)}">Clone</button></div>`
+      ).join("") || "<p>No matches.</p>";
+      $("abSearchHits").querySelectorAll("button[data-clone]").forEach(btn => {
+        btn.onclick = async () => {
+          const name = prompt("Ability name", btn.dataset.name || btn.dataset.clone) || btn.dataset.clone;
+          const cloned = await api("/api/clone-ability", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({
+            source: btn.dataset.clone, name, unlock_level: Number($("addLevel").value)
+          })});
+          spec = cloned.spec;
+          if (cloned.ability && cloned.ability.id) $("addId").value = cloned.ability.id;
+          if (cloned.ability && cloned.ability.name) $("addName").value = cloned.ability.name;
+          log("Cloned ability " + btn.dataset.clone + " -> " + (cloned.ability && cloned.ability.id));
+          renderTree();
+        };
+      });
+    };
+    $("btnSearchAnim").onclick = async () => {
+      const q = $("animSearch").value.trim();
+      if (q.length < 2) { log("Type at least 2 characters"); return; }
+      const data = await api("/api/animations/search?q=" + encodeURIComponent(q));
+      $("animSearchHits").innerHTML = (data.results||[]).map(r =>
+        `<div class="ent-card"><code>${esc(r.id)}</code> ${esc(r.name)} <em style="color:var(--muted)">${esc(r.source)}</em> <button data-clone="${esc(r.id)}">Clone</button></div>`
+      ).join("") || "<p>No matches.</p>";
+      $("animSearchHits").querySelectorAll("button[data-clone]").forEach(btn => {
+        btn.onclick = async () => {
+          const name = prompt("Animation name", btn.dataset.clone) || btn.dataset.clone;
+          const bind = $("addId").value.trim();
+          const cloned = await api("/api/clone-animation", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({
+            source: btn.dataset.clone, name, bind_ability: bind || undefined, art: $("animArt").value || undefined
+          })});
+          spec = cloned.spec;
+          if (cloned.animation && cloned.animation.id) $("addAnim").value = cloned.animation.id;
+          log("Cloned animation " + btn.dataset.clone + " -> " + (cloned.animation && cloned.animation.id));
+          renderTree();
+        };
+      });
+    };
+    $("btnAdd").onclick = async () => {
+      const kind = $("addKind").value;
+      const unlock_level = Number($("addLevel").value);
+      const id = $("addId").value.trim();
+      const name = $("addName").value.trim() || id;
+      if (!id) { log("Id required"); return; }
+      let payload = { id, name };
+      if (kind === "ability") {
+        payload.target = $("addTarget").value;
+        LAST.set("target", payload.target);
+        payload.range = Number($("addRange").value);
+        if ($("addMinRange").value !== "") payload.min_range = Number($("addMinRange").value);
+        payload.cost = {
+          stamina: Number($("addStamina").value || 0),
+          health: Number($("addHealth").value || 0)
+        };
+        if ($("addAnim").value.trim()) payload.animation = $("addAnim").value.trim();
+        payload.effects = {};
+        payload.effects_keys = {};
+        if ($("addDamage").value.trim()) {
+          try { payload.effects.damage = JSON.parse($("addDamage").value); } catch { payload.effects.damage = [2,6]; }
+        }
+        if ($("addDmgType").value) {
+          payload.effects.damage_type = $("addDmgType").value;
+          LAST.set("damageType", $("addDmgType").value);
+        }
+        const extras = { ...abilityExtras };
+        for (const [k, v] of Object.entries(extras)) {
+          const choice = findChoice((catalog.dropdowns||{}).ability, k);
+          if (choice && choice.kind === "ability_key") payload.effects_keys[k] = v;
+          else payload.effects[k] = v;
+        }
+        if (!Object.keys(payload.effects_keys).length) delete payload.effects_keys;
+      } else if (kind === "amplifier") {
+        if ($("addAmpType").value) payload.type = $("addAmpType").value;
+        LAST.set("amplifierEffect", $("addBonusEffect").value);
+        const be = $("addBonusEffect").value;
+        if (be) payload.bonuses = [{ effect: be, value: parseMaybe($("addBonusValue").value, 0) }];
+        if ($("addCostStamina").value) payload.cost_stamina = Number($("addCostStamina").value);
+        if ($("addAmpRange").value) payload.range = Number($("addAmpRange").value);
+        if ($("addAmpDesc").value.trim()) payload.description = $("addAmpDesc").value.trim();
+      } else if (kind === "passive") {
+        LAST.set("passiveEffect", $("addPassEffect").value);
+        const pe = $("addPassEffect").value;
+        payload.effects = pe ? [{ effect: pe, value: parseMaybe($("addPassValue").value, 0) }] : [];
+        if ($("addApplyMode").value) payload.apply_mode = $("addApplyMode").value;
+        const rtags = splitCsv($("addRestrictTags").value);
+        if (rtags.length) payload.restrict_tags = rtags;
+      } else if (kind === "stacker") {
+        LAST.set("stackerEffect", $("addStEffect").value);
+        const effects = Object.entries(stackerExtras).map(([effect, value]) => ({ effect, value }));
+        if (!effects.length && $("addStEffect").value) {
+          effects.push({ effect: $("addStEffect").value, value: parseMaybe($("addStValue").value, 0.01) });
+        }
+        payload.effects = effects;
+        payload.max_stacks = Number($("addStMax").value || 10);
+        payload.apply_caster = $("addStCaster").value === "true";
+        if ($("addStDuration").value !== "") payload.duration = Number($("addStDuration").value);
+        if ($("addStCast").value.trim()) {
+          payload.on_max_stacks_cast = $("addStCast").value.trim();
+          payload.max_stacks_cast_unlock = true;
+        }
+      }
+      const body = { kind, payload };
+      if (kind !== "stacker") body.unlock_level = unlock_level;
+      if (kind === "passive" && $("addInnate").value === "true") body.innate = true;
+      if (kind === "stacker" && $("addStBind").value) {
+        body.bind_ability = $("addStBind").value;
+        body.stacker_count = Number($("addStCount").value || 1);
+      }
+      const data = await api("/api/add", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
+      spec = data.spec;
+      log("Added " + kind + " " + id + (kind === "stacker" ? "" : " at L" + unlock_level));
+      if (kind === "stacker") stackerExtras = {};
+      renderTree();
+      showTab(kind === "stacker" ? "add" : "tree");
+    };
+    $("btnValidate").onclick = async () => {
+      const data = await api("/api/validate", { method: "POST", headers: {"Content-Type":"application/json"}, body: "{}" });
+      log(data.text);
+    };
+    $("btnWrite").onclick = async () => {
+      const data = await api("/api/write", { method: "POST", headers: {"Content-Type":"application/json"}, body: "{}" });
+      log("Wrote " + data.path);
+    };
+    $("btnSaveJson").onclick = async () => {
+      spec = JSON.parse($("specJson").value);
+      await api("/api/spec", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ spec }) });
+      log("Saved spec");
+      renderTree();
+    };
+
+    $("entRole").addEventListener("change", () => {
+      const role = $("entRole").value;
+      if (role === "item") $("entPreset").innerHTML = `<option>skill_book</option><option>weapon</option><option>usable</option><option>resource</option><option>generic</option>`;
+      else if (role === "tile") $("entPreset").innerHTML = `<option>tile</option>`;
+      else $("entPreset").innerHTML = `<option value="summon">summon (ally)</option><option>enemy</option>`;
+    });
+
+    $("btnAddEntity").onclick = async () => {
+      const role = $("entRole").value;
+      const name = $("entName").value.trim();
+      if (!name) { log("Name required"); return; }
+      const built = await api("/api/build-entity", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({
+        role, preset: $("entPreset").value, id: $("entId").value.trim(), name,
+        health: Number($("entHealth").value), damage: $("entDamage").value, damage_type: $("entDmgType").value,
+        glyph: Number($("entGlyph").value), description: name,
+        granted_passive: $("entGranted").value.trim() || undefined,
+        grant_milestone: $("entMiles").value.trim() || undefined,
+        no_health_regen: $("entNoRegen").value === "true"
+      })});
+      const recipeLevel = $("entRecipeLevel").value;
+      const data = await api("/api/add", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({
+        kind: role, payload: built.payload,
+        summon_ability: $("entSummonAb").value || undefined,
+        recipe_level: recipeLevel ? Number(recipeLevel) : undefined,
+        loot_exclude: $("entLootEx").value === "true"
+      })});
+      spec = data.spec;
+      log("Created " + role + " " + built.payload.id);
+      renderTree();
+    };
+
+    $("btnSearchEnt").onclick = async () => {
+      const q = $("entSearch").value.trim();
+      if (q.length < 2 && !/^\d+$/.test(q)) { log("Type at least 2 characters (or a numeric id)"); return; }
+      try {
+        const role = $("entSearchRole").value;
+        const url = "/api/entities/search?q=" + encodeURIComponent(q) + (role ? "&role=" + encodeURIComponent(role) : "");
+        const data = await api(url);
+        $("entSearchHits").innerHTML = (data.results||[]).map(r =>
+          `<div class="ent-card"><span class="kind-${esc(r.role)}">${esc(r.role)}</span> <code>${esc(r.id)}</code> ${esc(r.name)} <em style="color:var(--muted)">${esc(r.source)}</em>
+            <button type="button" data-load="${esc(r.id)}">Load</button>
+            <button type="button" data-clone="${esc(r.id)}" data-name="${esc(r.name)}">Clone</button></div>`
+        ).join("") || "<p>No matches.</p>";
+        $("entSearchHits").querySelectorAll("button[data-load]").forEach(btn => {
+          btn.onclick = async () => {
+            try {
+              const got = await api("/api/entities/get?id=" + encodeURIComponent(btn.dataset.load));
+              fillEntityForm(got.entity);
+              log("Loaded " + btn.dataset.load + " into form (not added to skill — use Clone or Create)");
+            } catch (err) {
+              log("Load failed: " + (err && err.message ? err.message : err));
+            }
+          };
+        });
+        $("entSearchHits").querySelectorAll("button[data-clone]").forEach(btn => {
+          btn.onclick = async () => {
+            if (!spec) { log("Load a skill project first, then Clone"); return; }
+            try {
+              const name = prompt("New name", btn.dataset.name || btn.dataset.clone) || btn.dataset.clone;
+              const data = await api("/api/clone-entity", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({
+                source: btn.dataset.clone, name, summon_ability: $("entSummonAb").value || undefined
+              })});
+              spec = data.spec;
+              log("Cloned " + btn.dataset.clone + " -> " + (data.entity&&data.entity.id));
+              renderTree();
+              renderEntities();
+            } catch (err) {
+              log("Clone failed: " + (err && err.message ? err.message : err));
+            }
+          };
+        });
+        log(`Found ${(data.results||[]).length} entities`);
+      } catch (err) {
+        log("Search failed: " + (err && err.message ? err.message : err));
+      }
+    };
+    $("entSearch").addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") { ev.preventDefault(); $("btnSearchEnt").click(); }
+    });
+
+    $("btnAddRace").onclick = async () => {
+      const name = $("raceName").value.trim();
+      if (!name) { log("Race name required"); return; }
+      const built = await api("/api/build-race", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({
+        name,
+        id: $("raceId").value.trim() || undefined,
+        statistics: $("raceStats").value.trim() || undefined,
+        tags: splitCsv($("raceTags").value),
+        passives: splitCsv($("racePassives").value),
+        abilities: splitCsv($("raceAbilities").value),
+        items: splitCsv($("raceItems").value),
+        recipes: splitCsv($("raceRecipes").value),
+        description: $("raceDesc").value.trim(),
+        unplayable: $("racePlayable").value === "false",
+        settle_max: $("raceSettleMax").value ? Number($("raceSettleMax").value) : undefined,
+        no_trading: $("raceNoTrade").value === "true",
+        collapse_on_leader_death: $("raceCollapse").value === "true",
+        birth_resource: $("raceBirth").value.trim() || undefined,
+        base_adult: $("raceAdultEnt").value.trim() || undefined,
+        orphan_surname: $("raceOrphan").value.trim() || undefined,
+        no_settle: $("raceNoSettle").value === "true",
+        new_tag: $("raceNewTag").value.trim() || undefined,
+        control_tag: $("raceControlTag").value.trim() || undefined
+      })});
+      if (built.error) { log(built.error); return; }
+      const data = await api("/api/add", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({
+        kind: "race",
+        payload: built.payload,
+        name_files: built.name_files,
+        tag: built.tag || undefined,
+        control_action: built.control_action || undefined
+      })});
+      spec = data.spec;
+      log("Created race " + (built.payload && built.payload.id));
+      renderTree();
+    };
+
+    $("btnSearchRace").onclick = async () => {
+      const q = $("raceSearch").value.trim();
+      if (q.length < 1) { log("Type a race name or id"); return; }
+      const data = await api("/api/races/search?q=" + encodeURIComponent(q));
+      $("raceSearchHits").innerHTML = (data.results||[]).map(r =>
+        `<div class="ent-card"><code>${esc(r.id)}</code> ${esc(r.name)} <em style="color:var(--muted)">${esc(r.source)} ${r.playable?"playable":"npc"}${r.civilization?" civ":""}</em> <button data-clone="${esc(r.id)}">Clone</button></div>`
+      ).join("") || "<p>No matches.</p>";
+      $("raceSearchHits").querySelectorAll("button[data-clone]").forEach(btn => {
+        btn.onclick = async () => {
+          const name = prompt("Race name", btn.dataset.clone) || btn.dataset.clone;
+          const cloned = await api("/api/clone-race", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({
+            source: btn.dataset.clone,
+            name,
+            keep_id: $("raceKeepId").checked,
+            overlay: $("raceOverlay").checked,
+            civilization: $("raceCiv").checked,
+            playable: true
+          })});
+          if (cloned.error) { log(cloned.error); return; }
+          spec = cloned.spec;
+          log("Cloned race " + btn.dataset.clone + " -> " + (cloned.race && cloned.race.id));
+          renderTree();
+        };
+      });
+    };
+
+    $("btnAddTrainingHall").onclick = async () => {
+      const name = $("bldgName").value.trim() || ((spec && spec.skill && spec.skill.name) ? spec.skill.name + " Hall" : "Training Hall");
+      const data = await api("/api/clone-building", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({
+        training: true,
+        template: $("bldgTemplate").value,
+        name,
+        new_id: $("bldgId").value.trim() || undefined
+      })});
+      spec = data.spec;
+      log("Training hall " + (data.building && data.building.id) + " enables=" + ((data.building && data.building.enables) || []).join(","));
+      renderTree();
+    };
+
+    $("btnSearchBldg").onclick = async () => {
+      const q = $("bldgSearch").value.trim();
+      if (q.length < 2 && !/^\d+$/.test(q)) { log("Type at least 2 characters"); return; }
+      const data = await api("/api/buildings/search?q=" + encodeURIComponent(q));
+      $("bldgSearchHits").innerHTML = (data.results||[]).map(r =>
+        `<div class="ent-card"><code>${esc(r.id)}</code> ${esc(r.name)} <em style="color:var(--muted)">${esc(r.source)} ${r.allow_player?"player":"civ"}</em> <button data-clone="${esc(r.id)}">Clone as trainer</button></div>`
+      ).join("") || "<p>No matches.</p>";
+      $("bldgSearchHits").querySelectorAll("button[data-clone]").forEach(btn => {
+        btn.onclick = async () => {
+          const name = prompt("Building name", btn.dataset.clone) || btn.dataset.clone;
+          const cloned = await api("/api/clone-building", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({
+            source: btn.dataset.clone,
+            name,
+            train: true
+          })});
+          spec = cloned.spec;
+          log("Cloned building " + btn.dataset.clone + " -> " + (cloned.building && cloned.building.id));
+          renderTree();
+        };
+      });
+    };
+
+    $("btnAddControl").onclick = async () => {
+      const name = $("caName").value.trim();
+      const tags = splitCsv($("caTags").value);
+      if (!name || !tags.length) { log("Control action needs a name and --tag"); return; }
+      const data = await api("/api/add", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({
+        kind: "control_action",
+        payload: {
+          clone_from: $("caClone").value,
+          name,
+          tags
+        }
+      })});
+      if (data.error) { log(data.error); return; }
+      spec = data.spec;
+      log("Added control action " + name);
+      renderTree();
+    };
+
+    (async () => {
+      catalog = await api("/api/catalog");
+      fillStudioDropdowns();
+      renderLimits();
+      renderCatalog();
+      await refresh();
+    })().catch(err => log(String(err)));
+  </script>
+</body>
+</html>

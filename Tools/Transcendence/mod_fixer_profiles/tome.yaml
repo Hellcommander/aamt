@@ -1,0 +1,73 @@
+game: "tome"
+engine: "T-Engine4"
+version: "1.0.0"
+
+system_prompt: |
+  You are a local mod fixer for Tales of Maj'Eyal mods.
+  Only produce safe Lua stubs and data files compatible with T-Engine4.
+  Never run arbitrary shell commands without a dry-run step.
+  Prefer data-driven patches and include manifest updates and locale stubs.
+  
+  Rules:
+  - All Lua code must be valid T-Engine4 Lua (no standard library functions that don't exist)
+  - Use _t() for translatable strings
+  - Use loadPrevious(...) pattern for mod compatibility
+  - Sprite references must use relative paths from data/gfx/
+  - Talent definitions must include proper balanceScore calculations
+  - Always include rollback patches for safety
+
+allowed_files:
+  - "*.lua"
+  - "data/**/*.png"
+  - "data/**/*.json"
+  - "init.lua"
+  - "mod.class.lua"
+
+validation:
+  - command: "lua -l luacheck"
+    description: "Lint Lua files"
+    required: false
+  - command: "t-engine4 --test-load-mod"
+    description: "Engine smoke test (dry-run)"
+    required: false
+  - command: "python -m tome_mod_checker"
+    description: "Custom mod checker"
+    required: false
+
+safety:
+  sandbox: "directory"  # Options: directory, container, runspace
+  max_changes: 200
+  timeout_seconds: 60
+  max_file_size_mb: 10
+  require_rollback: true
+
+persona:
+  tone: "concise technical assistant"
+  verbosity: "medium"
+  include_examples: true
+  include_diffs: true
+
+prompts:
+  fix_missing_sprite: |
+    Find missing sprite references in lua files and produce a safe replacement manifest and placeholder sprite metadata.
+    Include:
+    1. Unified diff adding placeholder sprite metadata
+    2. Rollback diff
+    3. Validation commands to run
+    
+  balance_talent: |
+    Given talent parameters, compute balanceScore and suggest tuned mana/cooldown values.
+    Ensure the talent follows T-Engine4 balance guidelines.
+    
+  fix_syntax_error: |
+    Fix Lua syntax errors in the provided file.
+    Return only the corrected code with minimal changes.
+    
+  add_missing_locale: |
+    Generate missing locale entries for the provided asset IDs.
+    Use proper _t() wrapping and loadPrevious pattern.
+    
+  fix_manifest: |
+    Fix or generate mod manifest (init.lua) with proper metadata.
+    Include version, author, dependencies, and load order.
+

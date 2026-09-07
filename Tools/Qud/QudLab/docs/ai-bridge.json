@@ -1,0 +1,20 @@
+{
+  "http://127.0.0.1:47821": {
+    "description": "Qud Lab shared mod-assistant cache (types, blueprints, sim logs) + local Ollama agent",
+    "usage": "Cursor/Windsurf/VS Code/Ollama should query this while qudlab serve is running. POST /ai/run for Cursor-like local prompts (scan all files, compile, simulate)."
+  },
+  "http://127.0.0.1:11434": {
+    "description": "Official Ollama HTTP API (https://github.com/ollama/ollama)",
+    "endpoints": ["/api/tags", "/api/chat (tools)", "/api/generate"]
+  },
+  "recommendedOllamaModels": [
+    "qwen3:8b",
+    "deepseek-r1:7b",
+    "deepseek-r1:14b"
+  ],
+  "notes": [
+    "ThreadingAPI is a separate WIP mod — not part of Qud Lab",
+    "Never send raw game texture bytes to models — metadata only",
+    "11GB 2080 Ti: qwen3:8b (tools) and deepseek-r1:7b fit in VRAM; deepseek-r1:14b uses CPU spillover"
+  ]
+}

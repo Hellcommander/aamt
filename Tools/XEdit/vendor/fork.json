@@ -1,0 +1,10 @@
+{
+  "repo": "https://github.com/TES5Edit/TES5Edit.git",
+  "branch": "dev-4.1.6",
+  "commit": "93cc0bc5a1251936c3c7859eee3150eda12a62d7",
+  "minVersion": "4.1.5q",
+  "definitions": "Core/wbDefinitionsSF1.pas",
+  "reflection": "Core/wbDefinitionsReflection.pas",
+  "nexus": "https://www.nexusmods.com/starfield/mods/239",
+  "notes": "Official TES5Edit development branch. GitHub Releases still ship 4.1.5f (2024-04); Starfield .esp editing, small/medium masters, blueprint flags, and current DLC records live on dev-4.1.6. Do not use the 4.1.5f SF1Edit in the game folder when a newer build is available."
+}

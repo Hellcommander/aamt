@@ -1,0 +1,56 @@
+{
+  "id": "nature_verdant_pulse",
+  "name": "Verdant Pulse",
+  "type": "spell",
+  "school": "Nature Magic",
+  "description": "A burst of green life energy that heals allies and harms undead",
+  "tags": ["healing", "nature", "pulse"],
+  "visual": {
+    "icon": {
+      "shape": "spiral leaf burst",
+      "palette": ["#4caf50", "#81c784", "#2e7d32"],
+      "style": "painterly",
+      "size": 32,
+      "contrast": "high",
+      "lighting": "soft rim light",
+      "glow": true
+    },
+    "fx": {
+      "frames": 4,
+      "motion": "expanding pulse",
+      "glow": true,
+      "size": 32,
+      "palette": ["#66bb6a", "#a5d6a7"]
+    },
+    "projectile": {
+      "shape": "leaf shard",
+      "frames": 2,
+      "size": 32,
+      "palette": ["#4caf50", "#81c784"]
+    },
+    "buff": {
+      "size": 16,
+      "simplified": true
+    }
+  },
+  "generation": {
+    "quality": "high",
+    "complexity": "medium",
+    "useAI": false,
+    "proceduralHints": "organic, flowing, nature-themed"
+  },
+  "textures": {
+    "baseColor": true,
+    "normal": false,
+    "roughness": false,
+    "emission": true,
+    "metallic": false
+  },
+  "export": {
+    "elin": true,
+    "terraria": true,
+    "starbound": true,
+    "transcendence": false
+  }
+}
+

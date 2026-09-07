@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon />
+    <RootNamespace>QudLab.Gui</RootNamespace>
+    <AssemblyName>QudLab.Gui</AssemblyName>
+    <Description>Qud Lab desktop launcher — serve, compile, simulate, local Ollama agent</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\QudLab.Core\QudLab.Core.csproj" />
+  </ItemGroup>
+
+</Project>

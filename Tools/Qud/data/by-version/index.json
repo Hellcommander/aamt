@@ -1,0 +1,13 @@
+{
+  "description": "ApiMigrator per-game-version profiles. Each folder holds obsolete_api_dump.json \u002B curated_rewrite_rules.json. Active copies live in data/ and are synced by DumpVersionControl.EnsureActiveProfile. switch-api writes by-version/active-override.json to pin a profile (omit that file when sharing).",
+  "liveGameFileVersion": "2.0.212.30",
+  "liveSteamBetaKey": "lang-experimental",
+  "liveSteamBuildId": "24964365",
+  "forcedFileVersion": null,
+  "versions": [
+    "2.0.211.51",
+    "2.0.212.29",
+    "2.0.212.30"
+  ],
+  "updated": "2026-09-06 17:29:25"
+}

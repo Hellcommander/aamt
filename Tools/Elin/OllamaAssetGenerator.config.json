@@ -1,0 +1,9 @@
+{
+  "modPath": "E:\\SteamLibrary\\steamapps\\common\\Elin\\Package\\Mod\\CustomRaceClassCreator",
+  "assetTypes": "all",
+  "systems": "all",
+  "quality": "high",
+  "generateSpritesheets": true,
+  "useOllama": true,
+  "outputDir": ""
+}
