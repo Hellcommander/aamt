@@ -6,8 +6,8 @@ namespace QudLab.Simulator;
 
 /// <summary>
 /// MIT stub compiled only when the private simulator pack is absent.
-/// Does not load or run Caves of Qud. Replace by unpacking the granted pack
-/// (RestrictedSimulator.cs next to the csproj).
+/// Does not load or run Caves of Qud. Install the compiled pack via
+/// Fetch-PrivatePack.ps1 (QudLab.Simulator.Private.dll).
 /// </summary>
 public sealed class RestrictedSimulator : IRestrictedSimulator
 {

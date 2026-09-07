@@ -6,6 +6,7 @@ artifacts/
 *.dll
 *.pdb
 pack/
+QudLab-private*.zip
 Workspace/Qud.Install.props
 Workspace/assembly-refs.json
 omnisharp.json

@@ -3,7 +3,10 @@
 ## Ground rules
 
 1. User must own Caves of Qud (Steam/GOG). Never bundle game DLLs or assets into the repo.
-1b. Restricted simulator sources are gitignored / download-only. Do not commit them. Public tree uses `PublicStubs`. Unpack with `Fetch-PrivatePack.ps1` only when access was granted.
+1b. Restricted simulator is gitignored / download-only (compiled DLL pack preferred).
+   Do not commit sources or `pack/private/`. Public tree uses MIT stubs +
+   `SimulatorFactory`. Granted users: `Fetch-PrivatePack.ps1`. Maintainers:
+   `Build-PrivatePack.ps1`.
 2. Prefer live install metadata: `qudlab setup` then `qudlab serve`, query `http://127.0.0.1:47821/`.
 3. Do **not** invent Qud type names — use `/type`, `/search`, `/browse`, `/mutations`, `/genotypes`, `/subtypes`.
 4. ThreadingAPI is a **separate WIP mod**, not part of this repo.

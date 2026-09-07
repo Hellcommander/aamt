@@ -119,7 +119,42 @@ Suggested Ollama models for 11GB 2080 Ti: **`qwen3:8b`** (tools), **`deepseek-r1
 - Fail closed without install / StreamingAssets / Managed
 - Simulator refuses non-debug / arena-style use
 - Dual license: `LICENSE-MIT.md` + `LICENSE-PROPRIETARY.md`
-- Restricted simulator / SimHost / Unity LoadFrom host are **download-only** (gitignored). A clone of AAMT does not include them; unpack with `Fetch-PrivatePack.ps1` after access is granted. MIT `PublicStubs` keep the solution building.
+
+## Private simulator pack (not in git)
+
+The restricted simulator loads real Caves of Qud assemblies and can drive
+turn/thread scenarios that would be dangerous to publish as source. The goal of
+the compiled pack is to **limit reverse engineering into a standalone arena
+game** — granted users get runtime capability, not maintainer source.
+
+| What | Who gets it | How |
+|------|-------------|-----|
+| MIT tree (stubs, `SimulatorFactory`, CLI, GUI, Unity shell) | Anyone with the repo | `git clone` |
+| Compiled pack (`QudLab.Simulator.Private.dll`, `QudLab.SimHost.Private.dll`) | People you explicitly allow | Out-of-band zip only |
+
+**Clone access does not include the simulator.** `pack/`, private DLLs, and
+`QudLab-private*.zip` are gitignored so a normal download cannot pull the pack.
+
+Granted users install from a zip you send:
+
+```powershell
+.\Fetch-PrivatePack.ps1 -Archive C:\path\to\QudLab-private.zip
+dotnet build QudLab.sln -c Release
+```
+
+Maintainers with gitignored sources locally:
+
+```powershell
+.\Build-PrivatePack.ps1    # writes QudLab-private-YYYYMMDD.zip — distribute manually
+```
+
+.NET DLLs can still be decompiled; compiled distribution plus no source in git
+raises the bar and keeps a clear grant boundary. See
+[src/QudLab.Simulator/README.md](src/QudLab.Simulator/README.md) and
+[LICENSE-PROPRIETARY.md](LICENSE-PROPRIETARY.md).
+
+Without the pack, `qudlab simulate` and SimHost refuse; compile, cache, UI, and
+AI adapters still work under MIT.
 
 ## Agents
 

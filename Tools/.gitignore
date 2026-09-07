@@ -183,6 +183,7 @@ Qud/QudLab/src/QudLab.Simulator/*.cs
 !Qud/QudLab/src/QudLab.Simulator/SimulatorFactory.cs
 Qud/QudLab/src/QudLab.SimHost/Program.cs
 Qud/QudLab/pack/
+Qud/QudLab/QudLab-private*.zip
 Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudManagedHost.cs
 Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudManagedHost.cs.meta
 Qud/QudLab/UnityProject/Assets/QudLab/Scripts/QudRestrictedObjectSim.cs

@@ -17,11 +17,17 @@ Open MIT components are separately licensed under LICENSE-MIT.md.
 
 ## Distribution
 
-Simulator, SimHost, and Unity LoadFrom host **sources are not in the public
-git tree**. Granting clone access to AAMT does not grant this license or these
-files. Recipients who are allowed to use the restricted simulator unpack a
-private archive with `Fetch-PrivatePack.ps1` (see `src/QudLab.Simulator/README.md`).
-Public clones compile MIT `PublicStubs` that refuse to simulate.
+Simulator and SimHost ship as **compiled portable `net8.0` DLLs** in an
+access-gated zip — not as public source. Unity LoadFrom host scripts may ship as
+`.cs` in the same archive. Maintainer sources stay gitignored.
+
+Granting clone access to AAMT does not grant this license or the pack. Granted
+users install with `Fetch-PrivatePack.ps1` (see
+`src/QudLab.Simulator/README.md`). Maintainers build the zip with
+`Build-PrivatePack.ps1`.
+
+Public clones compile MIT stubs and `SimulatorFactory` (reflection loader) that
+refuse to simulate until the pack is present.
 
 ## Requirements
 

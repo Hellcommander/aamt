@@ -43,7 +43,8 @@ are MIT: [Tools/Qud/QudLab/LICENSE-MIT.md](Tools/Qud/QudLab/LICENSE-MIT.md).
 
 The **restricted Caves of Qud simulator** and related host code are proprietary
 and **not shipped in the public tree**. Granting git access to AAMT does not
-grant the simulator. People who are allowed to use it unpack a private pack
+grant the simulator. Granted users unpack a **compiled DLL zip** via
+`Fetch-PrivatePack.ps1`; maintainers build it with `Build-PrivatePack.ps1`
 (see [THIRD_PARTY.md](THIRD_PARTY.md) and
 `Tools/Qud/QudLab/src/QudLab.Simulator/README.md`).
 
@@ -60,9 +61,10 @@ and so Caves of Qud assemblies/assets are never redistributed.
   catalogs. Regenerate locally; keeps the public repo ~22 MB instead of tens of GB.
 - Machine-local settings — copy from `*.example` via `Tools/Copy-LocalSettings.ps1`
 - Workshop or LocalLow mods you do not own
-- Private Qud Lab simulator sources (they stay on disk; git ignores them)
+- Private Qud Lab simulator sources and `pack/private/` DLLs (download-only)
 - Third-party clones listed in [THIRD_PARTY.md](THIRD_PARTY.md)
 - Secrets, Hugging Face tokens, Ollama keys
 
 Fetch public third-party trees with `Tools/Fetch-ThirdParty.ps1`.
-Unpack a granted Qud Lab private pack with `Tools/Qud/QudLab/Fetch-PrivatePack.ps1`.
+Build a Qud Lab private DLL pack with `Tools/Qud/QudLab/Build-PrivatePack.ps1`
+(maintainer only). Granted users install with `Fetch-PrivatePack.ps1`.

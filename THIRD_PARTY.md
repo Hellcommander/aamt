@@ -39,16 +39,30 @@ installers never belong in git.
 
 ## Qud Lab private pack (access-gated)
 
-| Local path (gitignored) | What | License |
-|---|---|---|
-| `Tools/Qud/QudLab/src/QudLab.Simulator/*.cs` (except `PublicStubs/`) | Restricted debug simulator | [LICENSE-PROPRIETARY.md](Tools/Qud/QudLab/LICENSE-PROPRIETARY.md) |
-| `Tools/Qud/QudLab/src/QudLab.SimHost/Program.cs` | SimHost process | Same |
-| `Tools/Qud/QudLab/UnityProject/.../QudManagedHost.cs` | Unity LoadFrom install host | Same |
-| `Tools/Qud/QudLab/UnityProject/.../QudRestrictedObjectSim.cs` | Unity restricted object sim | Same |
-| `Tools/Qud/QudLab/UnityProject/.../QudZoneGetProbe.cs` | Unity GetZone probe | Same |
+**Granted users** receive a zip of portable **`net8.0` IL** (not simulator source):
 
-Public clones compile against MIT **PublicStubs** (simulate commands refuse until
-the pack is installed). Granting a git clone of AAMT does **not** grant this pack.
+| File in zip | Installed to | License |
+|---|---|---|
+| `QudLab.Simulator.Private.dll` | `pack/private/` (+ CLI bin dirs) | [LICENSE-PROPRIETARY.md](Tools/Qud/QudLab/LICENSE-PROPRIETARY.md) |
+| `QudLab.SimHost.Private.dll` | same | Same |
+| Optional Unity `QudManagedHost.cs`, … | `UnityProject/Assets/QudLab/Scripts/` | Same |
+
+| Maintainer-only (gitignored) | What |
+|---|---|
+| `Tools/Qud/QudLab/src/QudLab.Simulator/*.cs` (except `SimulatorFactory.cs`) | Simulator source compiled into the private DLL |
+| `Tools/Qud/QudLab/src/QudLab.SimHost/Program.cs` | SimHost source compiled into the private DLL |
+| `Tools/Qud/QudLab/pack/private/` | Local installed DLLs |
+
+```powershell
+# Maintainer (sources present):
+Tools\Qud\QudLab\Build-PrivatePack.ps1
+
+# Granted user:
+Tools\Qud\QudLab\Fetch-PrivatePack.ps1 -Archive C:\path\to\QudLab-private.zip
+```
+
+Public clones build MIT stubs + `SimulatorFactory` (simulate refuses until the
+pack is installed). Granting a git clone of AAMT does **not** grant the pack.
 
 Requires a legitimate Steam or GOG Caves of Qud install. Never bundle game DLLs.
 

@@ -118,7 +118,7 @@ if (Test-Path $simSrc) {
         Where-Object { $_.Directory.Name -ne 'PublicStubs' } |
         ForEach-Object {
             Copy-Item $_.FullName (Join-Path $sim $_.Name) -Force
-            Write-Host "  Simulator\$($_.Name) (source — rebuild Simulator.Private)"
+            Write-Host "  Simulator\$($_.Name) (source - rebuild Simulator.Private)"
             $copiedCs = $true
         }
 }
@@ -138,5 +138,5 @@ if ($copiedCs -and -not $installedDll) {
     Write-Host "Source pack installed. Build with .\Build-PrivatePack.ps1 then rebuild QudLab.sln."
 } else {
     Write-Host "Compiled pack in place (portable net8.0). Rebuild QudLab.sln so CLI/SimHost pick up the DLLs."
-    Write-Host "Game DLLs must stay in your Caves of Qud install. NO WARRANTY — use at your own risk."
+    Write-Host "Game DLLs must stay in your Caves of Qud install. NO WARRANTY - use at your own risk."
 }
