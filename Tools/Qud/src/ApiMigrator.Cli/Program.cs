@@ -24,6 +24,8 @@ switch (args[0].ToLowerInvariant())
 {
     case "migrate":
         return RunMigrate(args.Skip(1).ToArray());
+    case "fix-manifests":
+        return RunFixManifests(args.Skip(1).ToArray());
     case "refresh-dump":
         return RunRefreshDump(args.Skip(1).ToArray());
     case "resolve-cs0618":
@@ -137,6 +139,57 @@ int RunMigrate(string[] a)
     Console.WriteLine($"Remaining manual hits:    {report.TotalRemainingHits}");
     Console.WriteLine($"Report written to:        {reportPath}");
 
+    return 0;
+}
+
+int RunFixManifests(string[] a)
+{
+    var paths = new List<string>();
+    var apply = false;
+    var backup = true;
+    string? modFilter = null;
+
+    for (var i = 0; i < a.Length; i++)
+    {
+        if (IsolatedBootstrap.IsPathFlag(a[i]))
+        {
+            i = IsolatedBootstrap.ConsumePathArgs(a, i, paths);
+            continue;
+        }
+        switch (a[i])
+        {
+            case "--mod":
+                modFilter = IsolatedBootstrap.RequireValue(a, ref i, "--mod");
+                break;
+            case "--apply":
+                apply = true;
+                break;
+            case "--no-backup":
+                backup = false;
+                break;
+            case "--include-workshop":
+                paths.Add(SteamInstall.WorkshopContentDirOrFallback);
+                break;
+            default:
+                IsolatedBootstrap.RejectUnknown(a[i]);
+                break;
+        }
+    }
+
+    if (paths.Count == 0)
+        paths.Add(modsRoot);
+
+    Console.WriteLine("Scan roots:");
+    foreach (var p in paths) Console.WriteLine($"  {p}");
+    Console.WriteLine(apply ? "Mode: APPLY" : "Mode: DRY-RUN");
+
+    var exclude = new MigrationOptions().ExcludeDirs;
+    var results = ManifestFixer.FixTree(paths, exclude, modFilter, apply, backup, Console.WriteLine);
+    var fixes = results.Sum(r => r.AppliedFixes.Sum(f => f.Count));
+    Console.WriteLine();
+    Console.WriteLine("=== Summary ===");
+    Console.WriteLine($"Manifests rewritten: {results.Count(r => r.Changed)}");
+    Console.WriteLine($"Auto-fix rewrites:   {fixes}");
     return 0;
 }
 
@@ -875,6 +928,15 @@ static void PrintUsage()
               Dry-run by default; pass --apply to write changes (with .bak backups).
               Never writes under game StreamingAssets / Managed — mods and Workshop only.
               Repeat or space-separate --path values (one --path may list several dirs).
+              Manifest Dependency / LoadAfter keys are remapped from workshop folder ids and
+              old folder titles onto the live ModMap id (same pass as fix-manifests).
+
+          ApiMigrator.Cli fix-manifests [--path <dir> [<dir>...]] [--mod <name>] [--apply] [--no-backup]
+                                        [--include-workshop]
+              Rewrite manifest.json / config.json only: remap Dependencies and LoadAfter/LoadBefore
+              from Steam folder numbers / renamed folder titles to the id ModMap actually uses,
+              fill a missing id from the folder name, and keep the usual Dependency shorthand /
+              LoadAfter / version / loadOrder fixes. Dry-run by default.
 
           ApiMigrator.Cli refresh-dump [--managed <dir>] [--dll <name>]... [--dump <file>] [--save]
                                        [--no-version-sync]

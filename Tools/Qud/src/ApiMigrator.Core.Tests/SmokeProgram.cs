@@ -2064,7 +2064,7 @@ var engine = new RuleEngine(
             Backup = false,
             DumpPath = Path.Combine(toolsRoot, "data", "obsolete_api_dump.json"),
             RulesPath = Path.Combine(toolsRoot, "data", "curated_rewrite_rules.json"),
-            ExcludeDirs = { "_tools", "bin", "obj", ".git" },
+            ExcludeDirs = new List<string> { "_tools", "bin", "obj", ".git" },
         });
         var invXmlPath = Path.Combine(invRunMod, "InventoryActions.xml");
         Assert(File.Exists(invXmlPath), "MigrationRunner writes InventoryActions.xml sidecar");
@@ -2748,6 +2748,161 @@ var engine = new RuleEngine(
     AssertNotContains(dOut, "loadorder", "obsolete loadorder removed");
     AssertNotContains(dOut, "LoadOrder", "LoadOrder not reintroduced");
     AssertContains(dOut, "\"id\": \"tyrirshotguns\"", "id still original");
+}
+
+{
+    var tmp = Path.Combine(Path.GetTempPath(), "apimigrator-modid-" + Guid.NewGuid().ToString("N"));
+    var lib = Path.Combine(tmp, "More Modding Goodies!");
+    var shot = Path.Combine(tmp, "Shotguns!");
+    var leftover = Path.Combine(tmp, "1756765609");
+    var fishing = Path.Combine(tmp, "Qud Fishing");
+    Directory.CreateDirectory(lib);
+    Directory.CreateDirectory(shot);
+    Directory.CreateDirectory(leftover);
+    Directory.CreateDirectory(fishing);
+    File.WriteAllText(Path.Combine(lib, "manifest.json"),
+        """{"id":"moremoddinggoodies","title":"More Modding Goodies!","version":"1.0.0"}""");
+    File.WriteAllText(Path.Combine(lib, "workshop.json"),
+        """{"WorkshopId":3403942187,"Title":"More Modding Goodies!"}""");
+    File.WriteAllText(Path.Combine(shot, "manifest.json"),
+        """{"title":"Shotguns!","version":"1.3.0","Dependencies":{"3403942187":"*"},"LoadAfter":["3403942187","More Modding Goodies!"]}""");
+    File.WriteAllText(Path.Combine(fishing, "manifest.json"),
+        """{"id":"Qud_Fishing","title":"Qud Fishing","version":"1.0.0"}""");
+    File.WriteAllText(Path.Combine(fishing, "workshop.json"),
+        """{"WorkshopId":1756765609,"Title":"Qud Fishing"}""");
+    File.WriteAllText(Path.Combine(leftover, "workshop.json"),
+        """{"WorkshopId":1756765609,"Title":"Qud Fishing"}""");
+
+    try
+    {
+        var cat = ModIdCatalog.Build(new[] { tmp });
+        Assert(cat.Resolve("3403942187") == "moremoddinggoodies", "workshop id → manifest id");
+        Assert(cat.Resolve("More Modding Goodies!") == "moremoddinggoodies", "folder title → manifest id");
+        Assert(cat.Resolve("1756765609") == "Qud_Fishing", "numeric leftover workshop id prefers named folder");
+        Assert(cat.Resolve("Qud Fishing") == "Qud_Fishing", "folder name → manifest id");
+        Assert(cat.CanonicalIdForDirectory(shot) == "Shotguns", "missing id uses sanitized folder");
+
+        var src = File.ReadAllText(Path.Combine(shot, "manifest.json"));
+        var (fixedShot, shotFixes) = ManifestFixer.Fix(src, null, cat, cat.CanonicalIdForDirectory(shot));
+        AssertContains(fixedShot, "\"id\": \"Shotguns\"", "filled missing id");
+        AssertContains(fixedShot, "\"Dependency\": \"moremoddinggoodies\"", "workshop dep remapped");
+        AssertNotContains(fixedShot, "3403942187", "workshop folder id gone");
+        AssertContains(fixedShot, "\"LoadAfter\": \"moremoddinggoodies\"", "LoadAfter collapsed to canonical");
+        Assert(shotFixes.Any(f => f.RuleName.Contains("remap", StringComparison.OrdinalIgnoreCase)
+                               || f.RuleName.Contains("fill missing id", StringComparison.OrdinalIgnoreCase)),
+            "remap/fill recorded: " + string.Join("; ", shotFixes.Select(f => f.RuleName)));
+
+        var hyphen = """{ "id": "x", "version": "1.0.0", "Dependency": "actual-centipedes" }""";
+        var (hyphenOut, _) = ManifestFixer.Fix(hyphen);
+        AssertContains(hyphenOut, "\"Dependency\": \"actualcentipedes\"", "hyphen stripped to match ModInfo.ID");
+
+    const string stubsCycle = """
+        {
+          "id": "WMExtendedMutations_Stubs",
+          "version": "1.1.0",
+          "Dependency": "WMexMutationsStable",
+          "LoadBefore": "WMexMutationsStable",
+          "LoadAfter": ["Base", "WMexMutationsStable"]
+        }
+        """;
+    var (stubsOut, stubsFixes) = ManifestFixer.Fix(stubsCycle);
+    AssertNotContains(stubsOut, "\"Dependency\"", "LoadBefore host is not also a required Dependency");
+    AssertNotContains(stubsOut, "\"Dependencies\"", "no Dependencies object left");
+    AssertContains(stubsOut, "\"LoadBefore\": [", "LoadBefore is both WM editions");
+    AssertContains(stubsOut, "WMexMutationsBeta", "LoadBefore includes beta");
+    AssertContains(stubsOut, "WMexMutationsStable", "LoadBefore includes stable");
+    AssertContains(stubsOut, "\"LoadAfter\": \"Base\"", "LoadAfter is only Base");
+    Assert(stubsFixes.Any(f => f.RuleName.Contains("LoadBefore", StringComparison.OrdinalIgnoreCase)
+                            || f.RuleName.Contains("cycle", StringComparison.OrdinalIgnoreCase)
+                            || f.RuleName.Contains("beta or stable", StringComparison.OrdinalIgnoreCase)),
+        "cycle strip / WM family recorded: " + string.Join("; ", stubsFixes.Select(f => f.RuleName)));
+
+    const string wmRequiredStable = """
+        {
+          "id": "WMExtendedMutations_Extended",
+          "version": "1.1.0",
+          "Dependencies": {
+            "WMexMutationsStable": "*",
+            "WMExtendedMutations_Stubs": "*"
+          },
+          "LoadAfter": ["Base", "WMExtendedMutations_Stubs", "WMexMutationsStable"]
+        }
+        """;
+    var (wmReqOut, wmReqFixes) = ManifestFixer.Fix(wmRequiredStable);
+    AssertContains(wmReqOut, "\"WMexMutationsBeta|WMexMutationsStable\": \"*\"", "required beta OR stable (one key)");
+    AssertNotContains(wmReqOut, "\"WMexMutationsBeta\": \"*\"", "beta is not a separate required AND key");
+    AssertNotContains(wmReqOut, "\"WMexMutationsStable\": \"*\"", "stable is not a separate required AND key");
+    AssertContains(wmReqOut, "\"WMExtendedMutations_Stubs\": \"*\"", "stubs still required");
+    AssertContains(wmReqOut, "WMexMutationsBeta", "LoadAfter includes beta");
+    Assert(wmReqFixes.Any(f => f.RuleName.Contains("beta|stable", StringComparison.OrdinalIgnoreCase)
+                            || f.RuleName.Contains("beta or stable", StringComparison.OrdinalIgnoreCase)),
+        "WM family required recorded: " + string.Join("; ", wmReqFixes.Select(f => f.RuleName)));
+
+    const string wmLoadAfterOnly = """
+        { "id": "x", "version": "1.0.0", "LoadAfter": ["Base", "WMexMutationsStable"] }
+        """;
+    var (wmAfterOut, wmAfterFixes) = ManifestFixer.Fix(wmLoadAfterOnly);
+    AssertNotContains(wmAfterOut, "\"Dependency\"", "LoadAfter-only does not invent a required WM dep");
+    AssertNotContains(wmAfterOut, "\"Dependencies\"", "LoadAfter-only has no Dependencies object");
+    AssertContains(wmAfterOut, "WMexMutationsBeta", "LoadAfter gained beta");
+    AssertContains(wmAfterOut, "WMexMutationsStable", "LoadAfter kept stable");
+    Assert(wmAfterFixes.Any(f => f.RuleName.Contains("beta or stable", StringComparison.OrdinalIgnoreCase)),
+        "WM family LoadAfter recorded");
+
+    const string wmWorkshopDep = """
+        { "id": "x", "version": "1.0.0", "Dependency": "2198787801" }
+        """;
+    var (wmWsOut, _) = ManifestFixer.Fix(wmWorkshopDep);
+    AssertContains(wmWsOut, "\"Dependency\": \"WMexMutationsBeta|WMexMutationsStable\"",
+        "workshop stable id → single OR required dep");
+    AssertNotContains(wmWsOut, "2198787801", "workshop folder id not left as a required key");
+    AssertNotContains(wmWsOut, "\"WMexMutationsBeta\": \"*\"", "not AND-required beta");
+
+    const string wmAlreadyOr = """
+        {
+          "id": "WMexMutations_GelatinousPatch",
+          "version": "1.0.2",
+          "Dependency": "WMexMutationsBeta|WMexMutationsStable",
+          "LoadAfter": ["WMexMutationsBeta", "WMexMutationsStable"]
+        }
+        """;
+    var (wmOrOut, wmOrFixes) = ManifestFixer.Fix(wmAlreadyOr);
+    Assert(wmOrFixes.Count == 0, "already beta|stable OR + LoadAfter both is a no-op: "
+        + string.Join("; ", wmOrFixes.Select(f => f.RuleName)));
+    Assert(wmOrOut == wmAlreadyOr, "no-op returns original text");
+
+    const string wmAndBoth = """
+        {
+          "id": "x",
+          "version": "1.0.0",
+          "Dependencies": {
+            "WMexMutationsBeta": "*",
+            "WMexMutationsStable": "*"
+          }
+        }
+        """;
+    var (wmAndOut, _) = ManifestFixer.Fix(wmAndBoth);
+    AssertContains(wmAndOut, "\"Dependency\": \"WMexMutationsBeta|WMexMutationsStable\"",
+        "AND of both editions collapses to one OR key");
+    AssertNotContains(wmAndOut, "\"WMexMutationsBeta\": \"*\"", "AND beta key gone");
+
+    Assert(ManifestFixer.IsWmExtendedFamilyId("2065946296"), "beta workshop id is family");
+    Assert(ManifestFixer.MapWmExtendedToken("2198787801") == ManifestFixer.WmExtendedStableId,
+        "stable workshop id maps to named stable");
+    Assert(ManifestFixer.MapWmExtendedToken("WMexMutationsBeta|WMexMutationsStable")
+           == ManifestFixer.WmExtendedEitherId, "pipe is the either-token");
+    Assert(!ManifestFixer.IsWmExtendedFamilyId("WMExtendedMutations_Extended"),
+        "overlay id is not the WM host family");
+
+    Assert(!ManifestFixer.IsTargetFile(Path.Combine(tmp, "Packages", "manifest.json")),
+        "Unity Packages/manifest.json is not a CoQ mod manifest");
+    Assert(ManifestFixer.IsTargetFile(Path.Combine(shot, "manifest.json")),
+        "mod-root manifest.json is a CoQ target");
+    }
+    finally
+    {
+        try { Directory.Delete(tmp, true); } catch { /* best-effort */ }
+    }
 }
 
 // SteamInstall — registry + libraryfolders autodetection; truncated log paths resolve there

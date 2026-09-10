@@ -23,6 +23,18 @@ public static class MigrationRunner
         onLog?.Invoke($"Found {files.Count} candidate .cs/.xml files to scan.");
         onLog?.Invoke($"Found {manifestFiles.Count} manifest.json/config.json files to scan.");
 
+        ModIdCatalog catalog;
+        try
+        {
+            catalog = ModIdCatalog.Build(ModIdCatalog.DefaultScanRoots(options.Paths));
+            onLog?.Invoke($"Mod ID catalog: {catalog.CanonicalIds.Count} live mods (local + workshop aliases).");
+        }
+        catch (Exception ex)
+        {
+            onLog?.Invoke("WARNING: mod ID catalog failed (" + ex.Message + "); Dependency remap disabled.");
+            catalog = ModIdCatalog.Build(Array.Empty<string>());
+        }
+
         var report = new MigrationReport
         {
             Applied = options.Apply,
@@ -279,7 +291,11 @@ public static class MigrationRunner
                 continue;
             }
 
-            var (working, appliedFixes) = ManifestFixer.Fix(original, InferDepsForManifest(file, workingMap));
+            var (working, appliedFixes) = ManifestFixer.Fix(
+                original,
+                InferDepsForManifest(file, workingMap),
+                catalog,
+                catalog.CanonicalIdForDirectory(FileScanner.GetModRoot(file)));
             var changed = working != original;
             if (!changed) continue;
 

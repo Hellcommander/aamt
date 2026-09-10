@@ -2,7 +2,7 @@
 from pathlib import Path
 import re
 
-root = Path(r"E:\SteamLibrary\steamapps\workshop\content\333640\3769019231")
+root = Path(r"C:\Users\Arend\AppData\LocalLow\Freehold Games\CavesOfQud\Mods\Becoming v0.5")
 files = [
     "Disarm.cs",
     "Dislocate.cs",

@@ -312,13 +312,14 @@ CoQ deserializes `manifest.json` / `config.json` with typed fields. Common Works
 | Single required dep as `Dependencies` **object** / caret range | `{"moremoddinggoodies":"^1.4.0"}` | `"Dependency": "moremoddinggoodies"` — this is the `[JsonProperty]` setter on `ModManifest` that actually fills the required map. A `Dependencies` dictionary that never deserialized is why a dependent compiled (CS0234 / missing `tyrir.lib`) instead of **Missing Dependency** when the library mod failed |
 | Multiple required deps | `{ "a": "^1", "b": "1.2.0" }` | Keep `Dependencies` object; rewrite ranges to `"*"` |
 | Missing required library (C# `using tyrir.lib`) | no `Dependency` | Add `"Dependency": "moremoddinggoodies"` + `LoadAfter` (ModMap id, never a workshop folder number) |
-| Steam workshop folder id as a required key | `"3403942187": "*"` | **Strip** — `ModMap` is keyed by sanitized manifest `id`, not published-file id; a numeric required key always looks missing |
-| Missing compile-order pin | no `LoadAfter` | Add `LoadAfter` for every required manifest id (string if one, array if several). Weight 1 only; `Dependency` is what skips compile when the dep is not Active |
+| Steam workshop folder id or old folder title as a required key | `"3403942187": "*"` or `"More Modding Goodies!"` | **Remap** to the live ModMap id (`moremoddinggoodies`) using `workshop.json` / folder / title aliases. Unresolved published-file ids are still stripped |
+| Missing compile-order pin | no `LoadAfter` | Add `LoadAfter` for every required manifest id, **except** ids already in `LoadBefore`. A required `Dependency` is a load-after edge (weight 10M); putting the same id in both created a cycle so XML stub mods (e.g. `WMExtendedMutations_Stubs`) loaded *after* the host and dependents treated them as not Active |
+| WM Extended Mutations (beta **or** stable) | `"Dependency": "WMexMutationsStable"` or both keys as AND | One OR key `WMexMutationsBeta\|WMexMutationsStable` (vanilla two-key `Dependencies` is AND and fails if only one edition is installed). `LoadAfter` / `LoadBefore` list both ids separately. LoadBefore of either is still not also required. ThreadingAPI splits `\|` at resolve time |
 | Obsolete numeric `loadOrder` / `LoadOrder` | `1` or huge int | **Remove** the field (MODWARN / Int32 overflow MODERROR) |
 | Invalid `version` string | `"1.0 Beta"` | Semver-like `1.0.0` (strip words; unparseable → `1.0.0`, noted in report) |
 | Empty / null / `{}` manifest | blank file | Minimal `{ "version": "1.0.0" }` (never invents `id` / `title`) |
 
-`id` / `title` are never rewritten. Do not put workshop folder numbers in `Dependencies`.
+`id` / `title` are never rewritten when already set. A missing `id` is filled with the canonical ModMap id (sanitized folder name) so later folder renames do not break dependents. Workshop folder numbers and old titles in `Dependencies` / `LoadAfter` are remapped to that id when the library is installed locally.
 
 Live Steam roots are discovered by `SteamInstall` (prefers `D:\games\Steam` when that library has both the game and `workshop\content\333640`). Truncated compiler/Player.log paths (`<...>/steamapps/workshop/content/333640/<id>/File.cs`) resolve against that workshop folder — not a leftover `E:\SteamLibrary` copy.
 
