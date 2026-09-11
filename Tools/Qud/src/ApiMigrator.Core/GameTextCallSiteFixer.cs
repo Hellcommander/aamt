@@ -59,6 +59,18 @@ public static class GameTextCallSiteFixer
         @"""(?<pre>(?:[^""\\]|\\.)*)""\s*\+\s*(?<recv>(?:this\.)?\w+(?:\.\w+)*)\.poss\s*\(\s*""(?<word>[A-Za-z][\w\-]*)""\s*\)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    static readonly Regex SimpleObjectTextCall = new(
+        @"(?<recv>(?:this|base|[A-Za-z_]\w*)(?:\.[A-Za-z_]\w*)*(?:\[[^\]\r\n]+\])?)\.(?<method>t|an|does|Does|poss)\s*(?<paren>\()",
+        RegexOptions.Compiled);
+
+    static readonly Regex MakeTitleCaseCall = new(
+        @"Grammar\.MakeTitleCase\s*(?<paren>\()",
+        RegexOptions.Compiled);
+
+    static readonly Regex GetLiquidNameCall = new(
+        @"(?<recv>(?:this|base|[A-Za-z_]\w*)(?:\.[A-Za-z_]\w*)*)\.GetLiquidName\s*(?<paren>\()",
+        RegexOptions.Compiled);
+
     public static (string Content, int EditCount) Fix(string content)
     {
         if (string.IsNullOrEmpty(content))
@@ -68,6 +80,9 @@ public static class GameTextCallSiteFixer
         var working = RepairMangledXrlThe(content, ref edits);
         working = FixInterpolatedMessages(working, ref edits);
         working = FixInterpolatedTheShortName(working, ref edits);
+        working = FixSimpleObjectTextCalls(working, ref edits);
+        working = FixMakeTitleCase(working, ref edits);
+        working = FixGetLiquidName(working, ref edits);
         working = FixAnLambdas(working, ref edits);
         working = FixSimpleDidX(working, ref edits);
         working = FixSimpleXDidY(working, ref edits);
@@ -357,7 +372,114 @@ public static class GameTextCallSiteFixer
 
     static bool IsSafeReceiver(string expr) =>
         !string.IsNullOrWhiteSpace(expr) &&
+        expr is not "null" and not "true" and not "false" &&
         Regex.IsMatch(expr, @"^[\w\.]+(?:\[[^\]]+\])?$");
+
+    static string FixSimpleObjectTextCalls(string content, ref int edits)
+    {
+        var sb = new StringBuilder(content.Length + 64);
+        var last = 0;
+        var local = 0;
+        foreach (Match m in SimpleObjectTextCall.Matches(content))
+        {
+            if (m.Index < last || HitFilter.IsInsideComment(content, m.Index) ||
+                HitFilter.IsInsideStringLiteral(content, m.Index))
+                continue;
+
+            var recv = m.Groups["recv"].Value;
+            if (!IsSafeReceiver(recv) || recv is "XRL" or "Grammar")
+                continue;
+            if (!CallArgParser.TryParseArgumentList(
+                    content, m.Groups["paren"].Index, out var args, out var close))
+                continue;
+
+            var method = m.Groups["method"].Value;
+            string token;
+            if (method == "t")
+                token = "=object.the.name=";
+            else if (method == "an")
+                token = "=object.a.name=";
+            else
+            {
+                // The first argument is the grammatical word represented by the token;
+                // remaining obsolete flags only controlled the legacy string renderer.
+                if (args.Count < 1 || !TryStringLit(args[0], out var word) ||
+                    !IsSafeVerb(word))
+                    continue;
+                if (method is "does" or "Does")
+                    token = $"=object.{method}:{word}=";
+                else
+                {
+                    var definite = args.Count < 2 || args[1].Expression.Trim() != "false";
+                    token = $"=object.{(definite ? "the" : "a")}.name's:withTitles= {word}";
+                }
+            }
+
+            sb.Append(content, last, m.Index - last);
+            sb.Append('"').Append(token).Append("\".StartReplace().SetObject(")
+                .Append(recv).Append(").ToString()");
+            last = close + 1;
+            local++;
+        }
+        if (local == 0) return content;
+        edits += local;
+        sb.Append(content, last, content.Length - last);
+        return sb.ToString();
+    }
+
+    static string FixMakeTitleCase(string content, ref int edits)
+    {
+        var sb = new StringBuilder(content.Length + 64);
+        var last = 0;
+        var local = 0;
+        foreach (Match m in MakeTitleCaseCall.Matches(content))
+        {
+            if (m.Index < last || HitFilter.IsInsideComment(content, m.Index) ||
+                HitFilter.IsInsideStringLiteral(content, m.Index))
+                continue;
+            if (!CallArgParser.TryParseArgumentList(
+                    content, m.Groups["paren"].Index, out var args, out var close) ||
+                args.Count != 1 || string.IsNullOrWhiteSpace(args[0].Expression))
+                continue;
+            sb.Append(content, last, m.Index - last);
+            sb.Append("\"=text|title=\".StartReplace().SetArgument(\"text\", ")
+                .Append(args[0].Expression.Trim()).Append(").ToString()");
+            last = close + 1;
+            local++;
+        }
+        if (local == 0) return content;
+        edits += local;
+        sb.Append(content, last, content.Length - last);
+        return sb.ToString();
+    }
+
+    static string FixGetLiquidName(string content, ref int edits)
+    {
+        var sb = new StringBuilder(content.Length + 64);
+        var last = 0;
+        var local = 0;
+        foreach (Match m in GetLiquidNameCall.Matches(content))
+        {
+            if (m.Index < last || HitFilter.IsInsideComment(content, m.Index) ||
+                HitFilter.IsInsideStringLiteral(content, m.Index))
+                continue;
+            var recv = m.Groups["recv"].Value;
+            if (!IsSafeReceiver(recv) ||
+                !CallArgParser.TryParseArgumentList(
+                    content, m.Groups["paren"].Index, out var args, out var close) ||
+                args.Count != 0)
+                continue;
+            sb.Append(content, last, m.Index - last);
+            sb.Append("\"=LiquidVolume.liquid.name=\".StartReplace().SetArgument(\"LiquidVolume\", ")
+                .Append(recv).Append(").ToString()");
+            last = close + 1;
+            local++;
+        }
+        if (local == 0) return content;
+        edits += local;
+        sb.Append(content, last, content.Length - last);
+        return sb.ToString();
+    }
 
     static string FixAnLambdas(string content, ref int edits)
     {
@@ -657,30 +779,71 @@ public static class GameTextCallSiteFixer
             if (args.Count < 2)
                 continue;
 
-            // XDidY(who, verb, extra?, …, ColorAsBadFor?)
-            var who = args[0].Expression.Trim();
+            // XDidY(who, verb, extra?, …) or the same overload with out-of-order
+            // named Actor:/Verb: arguments (used by WM Extended Mutations).
+            var actorIndex = args.FindIndex(a => a.Name == "Actor");
+            var verbIndex = args.FindIndex(a => a.Name == "Verb");
+            var namedCore = actorIndex >= 0 || verbIndex >= 0;
+            if (namedCore && (actorIndex < 0 || verbIndex < 0))
+                continue;
+
+            var whoArg = namedCore ? args[actorIndex] : args[0];
+            var verbArg = namedCore ? args[verbIndex] : args[1];
+            var who = whoArg.Expression.Trim();
             if (!IsSafeReceiver(who) ||
-                !TryStringValue(content, args[1], m.Index, out var verb) ||
+                !TryStringValue(content, verbArg, m.Index, out var verb) ||
                 !IsSafeVerb(verb))
                 continue;
 
             string? extraLit = null;
             string? extraExpr = null;
             string endMark = "";
+            bool? fromDialog = null;
+            string? colorGood = null;
             string? colorBad = null;
             char? color = null;
             var ok = true;
-            for (var i = 2; i < args.Count; i++)
+            for (var i = namedCore ? 0 : 2; i < args.Count; i++)
             {
                 var a = args[i];
+                if (namedCore && a.Name is "Actor" or "Verb")
+                    continue;
+                if (a.Name == "Extra")
+                {
+                    if (a.Expression.Trim() == "null")
+                        continue;
+                    if (TryStringValue(content, a, m.Index, out var extra))
+                        extraLit = extra;
+                    else
+                        extraExpr = a.Expression.Trim();
+                    continue;
+                }
+                if (a.Name == "EndMark")
+                {
+                    if (a.Expression.Trim() == "null")
+                        continue;
+                    if (!TryStringValue(content, a, m.Index, out endMark) ||
+                        endMark.Length > 3 || !IsPunctuationEndMark(endMark))
+                        ok = false;
+                    if (!ok) break;
+                    continue;
+                }
                 if (a.Name is "ColorAsBadFor" or "ColorAsGoodFor")
                 {
                     if (a.Name == "ColorAsBadFor")
                         colorBad = a.Expression.Trim();
+                    else
+                        colorGood = a.Expression.Trim();
                     continue;
                 }
                 if (a.Name is "FromDialog")
                 {
+                    if (a.Expression.Trim() is not ("true" or "false"))
+                    {
+                        ok = false;
+                        break;
+                    }
+                    fromDialog = a.Expression.Trim() == "true";
                     continue;
                 }
                 if (a.Name is "UsePopup" or "AlwaysVisible" or "UseFullNames" or
@@ -743,6 +906,10 @@ public static class GameTextCallSiteFixer
             var emitParts = new List<string>();
             if (color is char colorValue)
                 emitParts.Add("'" + EscapeCharLiteral(colorValue) + "'");
+            if (fromDialog is bool fd)
+                emitParts.Add($"FromDialog: {(fd ? "true" : "false")}");
+            if (colorGood is not null)
+                emitParts.Add("ColorAsGoodFor: " + colorGood);
             if (colorBad is not null)
                 emitParts.Add("ColorAsBadFor: " + colorBad);
             var emit = emitParts.Count == 0
@@ -989,7 +1156,7 @@ public static class GameTextCallSiteFixer
     }
 
     static readonly Regex PronounProp = new(
-        @"(?<recv>(?:this|[A-Za-z_]\w*)(?:\.[A-Za-z_]\w*)*)\.(?<prop>a|A|the|The|its|Its|it|It|itself|Itself|Is)\b(?!\s*\()",
+        @"(?<recv>(?:this|[A-Za-z_]\w*)(?:\.[A-Za-z_]\w*)*(?:\[[^\]\r\n]+\])?)\.(?<prop>a|A|the|The|its|Its|it|It|itself|Itself|them|Them|itis|Itis|Is)\b(?!\s*\()",
         RegexOptions.Compiled);
 
     // Prior Apply bug: XRL.The (static) → "=object.The=".StartReplace().SetObject(XRL).ToString()
@@ -1019,14 +1186,14 @@ public static class GameTextCallSiteFixer
         foreach (Match m in PronounProp.Matches(content))
         {
             if (HitFilter.IsInsideComment(content, m.Index) ||
-                HitFilter.IsInsideStringLiteral(content, m.Index) ||
-                HitFilter.IsInsideGameTextToken(content, m.Index))
+                HitFilter.IsInsideStringLiteral(content, m.Index))
                 continue;
             var recv = m.Groups["recv"].Value;
             var prop = m.Groups["prop"].Value;
             if (!IsSafeReceiver(recv)) continue;
             if (HitFilter.IsPronounEnumName(recv)) continue;
-            if (HitFilter.IsCaseLabelOrAssignment(content, m.Index, m.Index + m.Length))
+            if (HitFilter.IsCaseLabelOrAssignment(content, m.Index, m.Index + m.Length) &&
+                !IsTernaryArm(content, m.Index, m.Index + m.Length))
                 continue;
             // Match obsolete_api_dump GameObject.The/the searchPattern (?![.=:#]):
             // XRL.The.Game / XRL.The.Player are the static helper, not article props.
@@ -1061,6 +1228,15 @@ public static class GameTextCallSiteFixer
         return content[afterMatch] is '.' or '=' or ':' or '#';
     }
 
+    static bool IsTernaryArm(string content, int expressionStart, int expressionEnd)
+    {
+        var after = expressionEnd;
+        while (after < content.Length && char.IsWhiteSpace(content[after])) after++;
+        if (after >= content.Length || content[after] != ':') return false;
+        var lineStart = content.LastIndexOf('\n', Math.Max(0, expressionStart - 1));
+        return content.IndexOf('?', lineStart + 1, expressionStart - lineStart - 1) >= 0;
+    }
+
     static string? PronounToken(string prop) => prop switch
     {
         "a" => "=object.a=",
@@ -1073,6 +1249,10 @@ public static class GameTextCallSiteFixer
         "It" => "=object.They=",
         "itself" => "=object.itself=",
         "Itself" => "=object.itself=",
+        "them" => "=object.them=",
+        "Them" => "=object.Them=",
+        "itis" => "=object.itis=",
+        "Itis" => "=object.Itis=",
         "Is" => "=object.verb:are=",
         _ => null,
     };

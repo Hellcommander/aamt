@@ -27,8 +27,12 @@ public static class BaseMutationSetterFixer
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     static readonly Regex TypeAssign = new(
-        @"^[ \t]*(?:base\.)?Type\s*=\s*""(?:[^""\\]|\\.)*""\s*;[ \t]*\r?\n?",
+        @"^[ \t]*(?:(?:base|this)\.)?Type\s*=\s*""(?:[^""\\]|\\.)*""\s*;[ \t]*\r?\n?",
         RegexOptions.Compiled | RegexOptions.Multiline);
+
+    static readonly Regex ExpressionBodyTypeAssign = new(
+        @"(?<ctor>\b[A-Za-z_]\w*\s*\(\s*\))\s*=>\s*(?:(?:base|this)\.)?Type\s*=\s*""(?:[^""\\]|\\.)*""\s*;",
+        RegexOptions.Compiled);
 
     public static (string Content, int EditCount) Fix(string content)
     {
@@ -67,6 +71,14 @@ public static class BaseMutationSetterFixer
             {
                 bodyEdits++;
                 return "";
+            });
+            nextBody = ExpressionBodyTypeAssign.Replace(nextBody, m =>
+            {
+                var ctorName = Regex.Match(m.Groups["ctor"].Value, @"[A-Za-z_]\w*").Value;
+                if (!ctorName.Equals(cm.Groups["name"].Value, StringComparison.Ordinal))
+                    return m.Value;
+                bodyEdits++;
+                return m.Groups["ctor"].Value + " { }";
             });
 
             if (bodyEdits == 0) continue;

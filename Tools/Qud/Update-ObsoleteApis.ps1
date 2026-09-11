@@ -1152,6 +1152,15 @@ function Repair-ProgrammaticCsFixes {
         })
     }
 
+    $harmonyParam = [ApiMigrator.Core.HarmonyPatchParameterFixer]::Fix($working)
+    $working = $harmonyParam.Item1
+    if ($harmonyParam.Item2 -gt 0) {
+        $fixList.Add([PSCustomObject]@{
+            Rule  = [ApiMigrator.Core.HarmonyPatchParameterFixer]::FixRuleName
+            Count = [int]$harmonyParam.Item2
+        })
+    }
+
     $sif = [ApiMigrator.Core.RemovedGameApiFixer]::Fix($working)
     $working = $sif.Item1
     if ($sif.Item2 -gt 0) {

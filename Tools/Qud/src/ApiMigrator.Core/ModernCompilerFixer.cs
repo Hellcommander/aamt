@@ -40,6 +40,9 @@ public static class ModernCompilerFixer
             new Regex(@"\.GiveDramsEvent\s*\(", RegexOptions.Compiled),
             _ => ".GiveDrams(", ref edits);
         working = ReplaceOutsideComments(working,
+            new Regex(@"\bBitType\.GetBitTier\s*\(\s*(?<bit>[^()]+)\s*\)", RegexOptions.Compiled),
+            m => "BitType.FetchBitById(" + m.Groups["bit"].Value.Trim() + ").Tier", ref edits);
+        working = ReplaceOutsideComments(working,
             new Regex(@"(?<![.\w])FetchBitById\s*\(", RegexOptions.Compiled),
             _ => "BitType.FetchBitByCode(", ref edits);
         working = ReplaceOutsideComments(working,
