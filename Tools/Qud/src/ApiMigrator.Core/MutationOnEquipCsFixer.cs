@@ -5,7 +5,8 @@ namespace ApiMigrator.Core;
 /// <summary>
 /// C# <c>MutationOnEquip</c> object-initializer / field assigns:
 /// <c>ClassName = "Name"</c> → <c>Mutation = "Name"</c>; drops literal <c>Variant = …</c>.
-/// Variable ClassName assigns stay for ManualAdvice.
+/// Variable ClassName assigns stay for ManualAdvice. Reads from a variable statically
+/// declared as MutationOnEquip use GetMutationEntry(); Variant no longer has a code equivalent.
 /// </summary>
 public static class MutationOnEquipCsFixer
 {
@@ -18,6 +19,10 @@ public static class MutationOnEquipCsFixer
 
     static readonly Regex VariantLit = new(
         @"\bVariant\s*=\s*(?:""[^""\\]*(?:\\.[^""\\]*)*""|null)\s*,?\s*",
+        RegexOptions.Compiled);
+
+    static readonly Regex MutationVariable = new(
+        @"\bMutationOnEquip\s+(?<name>[A-Za-z_]\w*)\b",
         RegexOptions.Compiled);
 
     public static (string Content, int EditCount) Fix(string content)
@@ -60,6 +65,38 @@ public static class MutationOnEquipCsFixer
             return "";
         });
 
+        foreach (Match declaration in MutationVariable.Matches(working))
+        {
+            var name = declaration.Groups["name"].Value;
+            var classRead = new Regex(@"\b" + Regex.Escape(name) + @"\.ClassName\b");
+            working = classRead.Replace(working, m =>
+            {
+                if (HitFilter.IsInsideComment(working, m.Index) ||
+                    HitFilter.IsInsideStringLiteral(working, m.Index) ||
+                    IsAssignmentTarget(working, m.Index + m.Length))
+                    return m.Value;
+                edits++;
+                return name + ".GetMutationEntry().Class";
+            });
+            var variantRead = new Regex(@"\b" + Regex.Escape(name) + @"\.Variant\b");
+            working = variantRead.Replace(working, m =>
+            {
+                if (HitFilter.IsInsideComment(working, m.Index) ||
+                    HitFilter.IsInsideStringLiteral(working, m.Index) ||
+                    IsAssignmentTarget(working, m.Index + m.Length))
+                    return m.Value;
+                edits++;
+                return "null";
+            });
+        }
+
         return edits == 0 ? (content, 0) : (working, edits);
+    }
+
+    static bool IsAssignmentTarget(string content, int after)
+    {
+        while (after < content.Length && char.IsWhiteSpace(content[after])) after++;
+        return after < content.Length && content[after] == '=' &&
+               (after + 1 >= content.Length || content[after + 1] != '=');
     }
 }

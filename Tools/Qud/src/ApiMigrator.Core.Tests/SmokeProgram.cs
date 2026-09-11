@@ -479,6 +479,43 @@ var engine = new RuleEngine(
     Assert(System.Text.RegularExpressions.Regex.IsMatch(fixedXml, @"<tag Name=""ExcludeFromDynamicEncounters""\s*/>"), "Exclude tag self-closing");
 }
 
+// Reported workshop regressions: Icy Glaciers duplicate Corpse and Gladiators MutationOnEquip.
+{
+    const string icyGlaciers = """
+        <objects>
+          <object Name="Wiz_SnowBear" Inherits="BaseBear">
+            <part Name="Corpse" CorpseChance="0" />
+            <mutation Name="Carnivorous" />
+            <part Name="Corpse" CorpseChance="50" CorpseBlueprint="Wiz_SnowBearCorpse" />
+          </object>
+        </objects>
+        """;
+    var (icyFixed, icyFixes) = ObjectBlueprintXmlFixer.Fix(icyGlaciers);
+    Assert(icyFixes.Any(f => f.RuleName == ObjectBlueprintXmlFixer.DuplicateNamedChildRuleName && f.Count == 1),
+        "Icy Glaciers duplicate Corpse merged");
+    Assert(icyFixed.Split("<part Name=\"Corpse\"", StringSplitOptions.None).Length - 1 == 1,
+        "Icy Glaciers has one Corpse part");
+    AssertContains(icyFixed, "CorpseChance=\"50\"", "Icy Glaciers later CorpseChance wins");
+    AssertContains(icyFixed, "CorpseBlueprint=\"Wiz_SnowBearCorpse\"", "Icy Glaciers corpse blueprint kept");
+
+    const string gladiators = """
+        <objects>
+          <object Name="Kai Seeker Tonic">
+            <part Name="MutationOnEquip" ClassName="Precognition" Level="30" Describe="false" />
+          </object>
+          <object Name="Kai Temporal Helm">
+            <part Name="MutationOnEquip" ClassName="TemporalFugue" Level="30" />
+          </object>
+        </objects>
+        """;
+    var (gladiatorsFixed, gladiatorsFixes) = ObjectBlueprintXmlFixer.Fix(gladiators);
+    Assert(gladiatorsFixes.Any(f => f.RuleName == ObjectBlueprintXmlFixer.MutationOnEquipClassNameRuleName && f.Count == 2),
+        "Gladiators MutationOnEquip ClassName migrated");
+    AssertNotContains(gladiatorsFixed, "ClassName=", "Gladiators ClassName removed");
+    AssertContains(gladiatorsFixed, "Mutation=\"Precognition\"", "Gladiators Precognition mutation retained");
+    AssertContains(gladiatorsFixed, "Mutation=\"TemporalFugue\"", "Gladiators TemporalFugue mutation retained");
+}
+
 // Trailing IPart after helpers → split into XRL.World.Parts
 {
     const string mixed = """
@@ -2226,6 +2263,9 @@ var engine = new RuleEngine(
             IComponent<GameObject>.XDidY(ParentObject, "breath", "a cone of " + GetBreathName(), "!", null, null,
               ParentObject, null, UseFullNames: false, IndefiniteSubject: false, null, null,
               DescribeSubjectDirection: true);
+            XDidY(Verb: "disappears", Actor: O);
+            XDidY(Actor: ParentObject, Verb: "rush", Extra: "from the depths to strike!",
+              EndMark: "!", ColorAsGoodFor: ParentObject);
           }
           void B(GameObject Object) {
             DidX("are", "incapacitated", "!", null, null, Object);
@@ -2237,11 +2277,35 @@ var engine = new RuleEngine(
     AssertNotContains(extendedOut, "XDidY(", "all extended XDidY calls gone");
     AssertNotContains(extendedOut, "DidX(", "extended DidX gone");
     AssertContains(extendedOut, "EmitMessage('C', ColorAsBadFor: ParentObject)", "color string becomes char");
+    AssertContains(extendedOut, "=subject.Does:disappears=", "named XDidY verb");
+    AssertContains(extendedOut, ".SetSubject(O).EmitMessage()", "named XDidY actor");
+    AssertContains(extendedOut, "EmitMessage(ColorAsGoodFor: ParentObject)", "named XDidY good color");
     AssertContains(extendedOut, ".SetArgument(\"extra\", \"a cone of \" + GetBreathName())", "dynamic extra retained");
     AssertContains(extendedOut, ".SetSubject(Object)", "trailing DidX subject retained");
     AssertNotContains(extendedOut, "string verb1", "consumed verb local removed");
     AssertNotContains(extendedOut, "string extra1", "consumed extra local removed");
     AssertNotContains(extendedOut, "string termiPun1", "consumed punctuation local removed");
+
+    const string becomingText = """
+        class BecomingText {
+          string M(GameObject target, GameObject item, string word) =>
+            target.t() + item.an() + target.does("carry") + target.Does("move") + target.poss("armor") +
+            target.them + target.itis + Grammar.MakeTitleCase(word);
+          string Flags(GameObject target) => target.t(int.MaxValue, Stripped: true, WithoutTitles: true);
+          string Liquid(LiquidVolume liquid) => liquid.GetLiquidName();
+        }
+        """;
+    var (becomingOut, becomingN) = GameTextCallSiteFixer.Fix(becomingText);
+    Assert(becomingN == 10, "Becoming GameText calls: " + becomingN);
+    AssertContains(becomingOut, "=object.the.name=", "t call");
+    AssertContains(becomingOut, "=object.a.name=", "an call");
+    AssertContains(becomingOut, "=object.does:carry=", "does call");
+    AssertContains(becomingOut, "=object.Does:move=", "Does call");
+    AssertContains(becomingOut, "=object.the.name's:withTitles= armor", "poss call");
+    AssertContains(becomingOut, "=object.them=", "them property");
+    AssertContains(becomingOut, "=object.itis=", "itis property");
+    AssertContains(becomingOut, "=text|title=", "MakeTitleCase call");
+    AssertContains(becomingOut, "=LiquidVolume.liquid.name=", "GetLiquidName call");
 
     const string sulfurLiquid = """
         namespace XRL.Liquids {
@@ -2491,6 +2555,24 @@ var engine = new RuleEngine(
     var (mutOut, mutN) = BaseMutationSetterFixer.Fix(mutSrc);
     Assert(mutN == 1, "SetVariant DisplayName removed");
     AssertNotContains(mutOut, "this.DisplayName =", "DisplayName setter gone");
+
+    var (exprMutOut, exprMutN) = BaseMutationSetterFixer.Fix(
+        "class EatersInterdiction : BaseMutation { public EatersInterdiction() => this.Type = \"Mental\"; }");
+    Assert(exprMutN == 1, "expression-bodied Type setter removed");
+    AssertContains(exprMutOut, "public EatersInterdiction() { }", "constructor remains valid");
+
+    const string mutationOnEquipReads = """
+        class C {
+          void M(GameObject item) {
+            MutationOnEquip mutationOnEquip = item.GetPart<MutationOnEquip>();
+            Add(mutationOnEquip.ClassName, mutationOnEquip.Variant);
+          }
+        }
+        """;
+    var (mutationReadsOut, mutationReadsN) = MutationOnEquipCsFixer.Fix(mutationOnEquipReads);
+    Assert(mutationReadsN == 2, "MutationOnEquip reads migrated");
+    AssertContains(mutationReadsOut, "mutationOnEquip.GetMutationEntry().Class", "ClassName read");
+    AssertContains(mutationReadsOut, "Add(mutationOnEquip.GetMutationEntry().Class, null)", "Variant read removed");
 }
 
 // Ollama leftover suggester — JSON parse, skip PreferHarmony, model tag resolve
@@ -2649,6 +2731,26 @@ var engine = new RuleEngine(
         """;
     var (_, n2) = HarmonyDynamicPatchFixer.Fix(already);
     Assert(n2 == 0, "already-dynamic Harmony patch left alone");
+}
+
+// Harmony parameter-name drift: Disarming.Disarm Object → Subject.
+{
+    const string harmonyParameter = """
+        using HarmonyLib;
+        [HarmonyPatch]
+        static class DisarmingPatch {
+          [HarmonyPatch(typeof(Disarming), nameof(Disarming.Disarm))]
+          public static void Postfix(GameObject Object, GameObject __result) {
+            if (__result == null || Object.Brain == null) return;
+            Object.Brain.PushGoal(new EquipObject(__result));
+          }
+        }
+        """;
+    var (harmonyParameterOut, harmonyParameterN) = HarmonyPatchParameterFixer.Fix(harmonyParameter);
+    Assert(harmonyParameterN == 1, "Harmony Disarm parameter migrated");
+    AssertContains(harmonyParameterOut, "Postfix(GameObject Subject, GameObject __result)", "Harmony signature");
+    AssertContains(harmonyParameterOut, "Subject.Brain.PushGoal", "Harmony body references");
+    AssertNotContains(harmonyParameterOut, "GameObject Object", "stale Harmony parameter gone");
 }
 
 // RemovedGameApiFixer — Options.Sifrah* if-block + leftover type report

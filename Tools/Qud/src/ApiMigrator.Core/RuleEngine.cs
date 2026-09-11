@@ -500,6 +500,18 @@ public sealed class RuleEngine
                     Count = sifEdits,
                 });
             }
+
+            // Harmony Prefix/Postfix argument names must match the current target signature.
+            var (harmonyParamFixed, harmonyParamEdits) = HarmonyPatchParameterFixer.Fix(working);
+            if (harmonyParamEdits > 0)
+            {
+                working = harmonyParamFixed;
+                fixes.Add(new AppliedFix
+                {
+                    RuleName = HarmonyPatchParameterFixer.FixRuleName,
+                    Count = harmonyParamEdits,
+                });
+            }
         }
 
         return (working, fixes);
