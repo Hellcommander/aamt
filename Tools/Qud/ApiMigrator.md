@@ -248,6 +248,14 @@ Naming.xml rewrites deprecated `*Var*` → `=var=`, camelCases `templatevar Name
 `DisableForcedConnections` from Worlds.xml `<cell>` tags (zone-only attribute); and appends missing
 closing tags when a truncated file fails well-formedness with an open-element stack (clears
 `Unexpected end of file` / “elements are not closed” MODERRORs — e.g. ChooseYourFighter expansions).
+
+For example, this pass merges Icy Glaciers' duplicate `Corpse` nodes (the later corpse settings
+win) and converts Gladiators of Qud's `MutationOnEquip ClassName=` attributes. A
+`Could not find XRL.World.Parts.Mutation.*` error is handled by `BlueprintTypeNamespaceFixer` when
+the mod declares that mutation in the wrong namespace. If a public class already exists in
+`XRL.World.Parts.Mutation` (as the current Gladiators `SoggyGlands` sources do), the reference is
+left intact: replacing it with an unrelated mutation would corrupt the mod, and the preceding C#
+compiler/assembly-load error must be resolved instead.
 Comment-only / irreparable XML is left alone. Unnamed skill/part WARNs are often a *side effect* of
 failed part ResolveType (see below). Worlds.xml zone `Load` create conflicts and unexpected
 cell-level `<builder>` are **report-only** (see Recent Player.log patterns below).

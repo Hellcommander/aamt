@@ -479,6 +479,43 @@ var engine = new RuleEngine(
     Assert(System.Text.RegularExpressions.Regex.IsMatch(fixedXml, @"<tag Name=""ExcludeFromDynamicEncounters""\s*/>"), "Exclude tag self-closing");
 }
 
+// Reported workshop regressions: Icy Glaciers duplicate Corpse and Gladiators MutationOnEquip.
+{
+    const string icyGlaciers = """
+        <objects>
+          <object Name="Wiz_SnowBear" Inherits="BaseBear">
+            <part Name="Corpse" CorpseChance="0" />
+            <mutation Name="Carnivorous" />
+            <part Name="Corpse" CorpseChance="50" CorpseBlueprint="Wiz_SnowBearCorpse" />
+          </object>
+        </objects>
+        """;
+    var (icyFixed, icyFixes) = ObjectBlueprintXmlFixer.Fix(icyGlaciers);
+    Assert(icyFixes.Any(f => f.RuleName == ObjectBlueprintXmlFixer.DuplicateNamedChildRuleName && f.Count == 1),
+        "Icy Glaciers duplicate Corpse merged");
+    Assert(icyFixed.Split("<part Name=\"Corpse\"", StringSplitOptions.None).Length - 1 == 1,
+        "Icy Glaciers has one Corpse part");
+    AssertContains(icyFixed, "CorpseChance=\"50\"", "Icy Glaciers later CorpseChance wins");
+    AssertContains(icyFixed, "CorpseBlueprint=\"Wiz_SnowBearCorpse\"", "Icy Glaciers corpse blueprint kept");
+
+    const string gladiators = """
+        <objects>
+          <object Name="Kai Seeker Tonic">
+            <part Name="MutationOnEquip" ClassName="Precognition" Level="30" Describe="false" />
+          </object>
+          <object Name="Kai Temporal Helm">
+            <part Name="MutationOnEquip" ClassName="TemporalFugue" Level="30" />
+          </object>
+        </objects>
+        """;
+    var (gladiatorsFixed, gladiatorsFixes) = ObjectBlueprintXmlFixer.Fix(gladiators);
+    Assert(gladiatorsFixes.Any(f => f.RuleName == ObjectBlueprintXmlFixer.MutationOnEquipClassNameRuleName && f.Count == 2),
+        "Gladiators MutationOnEquip ClassName migrated");
+    AssertNotContains(gladiatorsFixed, "ClassName=", "Gladiators ClassName removed");
+    AssertContains(gladiatorsFixed, "Mutation=\"Precognition\"", "Gladiators Precognition mutation retained");
+    AssertContains(gladiatorsFixed, "Mutation=\"TemporalFugue\"", "Gladiators TemporalFugue mutation retained");
+}
+
 // Trailing IPart after helpers → split into XRL.World.Parts
 {
     const string mixed = """
