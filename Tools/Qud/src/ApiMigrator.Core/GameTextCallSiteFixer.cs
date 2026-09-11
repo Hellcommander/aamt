@@ -33,7 +33,7 @@ public static class GameTextCallSiteFixer
         RegexOptions.Compiled);
 
     static readonly Regex DidXCall = new(
-        @"(?:(?:this|base)\.)?(?:IComponent\s*<\s*GameObject\s*>\s*\.)?DidX\s*(?<paren>\()",
+        @"(?<![A-Za-z0-9_])(?:(?:this|base)\.)?(?:IComponent\s*<\s*GameObject\s*>\s*\.)?DidX\s*(?<paren>\()",
         RegexOptions.Compiled);
 
     static readonly Regex XDidYCall = new(
@@ -82,6 +82,7 @@ public static class GameTextCallSiteFixer
         working = FixPronounProperties(working, ref edits);
         working = FixPronounNameConcat(working, ref edits);
         working = FixSimpleDidXToY(working, ref edits);
+        working = RemoveNowUnusedMessageLocals(working, ref edits);
 
         if (edits == 0)
             return (content, 0);
@@ -389,14 +390,29 @@ public static class GameTextCallSiteFixer
             var open = m.Groups["paren"].Index;
             if (!CallArgParser.TryParseArgumentList(content, open, out var args, out var close))
                 continue;
-            if (args.Count == 0 || !TryStringLit(args[0], out var verb) || !IsSafeToken(verb))
+            if (args.Count == 0)
+                continue;
+            string verb;
+            string? explicitSubject = null;
+            if (!TryStringValue(content, args[0], m.Index, out verb))
+            {
+                var isVerb = Regex.Match(args[0].Expression.Trim(),
+                    @"^(?<recv>(?:this\.)?[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\.Is$");
+                if (!isVerb.Success)
+                    continue;
+                explicitSubject = isVerb.Groups["recv"].Value;
+                verb = "are";
+            }
+            if (!IsSafeVerb(verb))
                 continue;
 
             string? extra = null;
+            string? extraExpr = null;
             string endMark = "";
             var fromDialog = (bool?)null;
             string? colorGood = null;
             string? colorBad = null;
+            char? color = null;
             var ok = true;
             var positionalSeen = 0;
 
@@ -406,14 +422,33 @@ public static class GameTextCallSiteFixer
                 {
                     positionalSeen++;
                     if (positionalSeen == 1) continue; // verb
-                    if (positionalSeen == 2 && TryStringLit(a, out var ex))
+                    if (positionalSeen == 2 && TryStringValue(content, a, m.Index, out var ex))
                     {
                         extra = ex;
                         continue;
                     }
-                    if (positionalSeen == 3 && TryStringLit(a, out var em) && em.Length <= 2)
+                    if (positionalSeen == 2 && a.Expression.Trim() != "null")
+                    {
+                        extraExpr = a.Expression.Trim();
+                        continue;
+                    }
+                    if (positionalSeen == 3 &&
+                        TryStringValue(content, a, m.Index, out var em) && em.Length <= 3)
                     {
                         endMark = em;
+                        continue;
+                    }
+                    if (positionalSeen is 4 or 5 &&
+                        TryStringValue(content, a, m.Index, out var colorText) &&
+                        (colorText.Length == 0 || TryColorChar(colorText, out _)))
+                    {
+                        if (TryColorChar(colorText, out var colorChar))
+                            color ??= colorChar;
+                        continue;
+                    }
+                    if (positionalSeen >= 4 && IsSafeReceiver(a.Expression.Trim()))
+                    {
+                        explicitSubject ??= a.Expression.Trim();
                         continue;
                     }
                     // Obsolete DidX has many trailing ColorString/bool/GameObject defaults.
@@ -426,13 +461,14 @@ public static class GameTextCallSiteFixer
                 switch (a.Name)
                 {
                     case "Verb":
-                        if (!TryStringLit(a, out verb) || !IsSafeToken(verb)) ok = false;
+                        if (!TryStringValue(content, a, m.Index, out verb) || !IsSafeVerb(verb)) ok = false;
                         break;
                     case "Extra":
-                        if (!TryStringLit(a, out extra!)) ok = false;
+                        if (!TryStringValue(content, a, m.Index, out extra!))
+                            extraExpr = a.Expression.Trim();
                         break;
                     case "EndMark":
-                        if (!TryStringLit(a, out endMark!) || endMark.Length > 2) ok = false;
+                        if (!TryStringValue(content, a, m.Index, out endMark!) || endMark.Length > 3) ok = false;
                         break;
                     case "FromDialog":
                         if (a.Expression.Trim() is "true" or "false")
@@ -445,6 +481,14 @@ public static class GameTextCallSiteFixer
                     case "ColorAsBadFor":
                         colorBad = a.Expression.Trim();
                         break;
+                    case "UseFullNames":
+                    case "IndefiniteSubject":
+                    case "DescribeSubjectDirection":
+                    case "DescribeSubjectDirectionLate":
+                    case "AlwaysVisible":
+                    case "SubjectPossessedBy":
+                    case "PossessiveObject":
+                        break;
                     default:
                         ok = false;
                         break;
@@ -456,12 +500,17 @@ public static class GameTextCallSiteFixer
 
             var identIndex = CallIdentIndex(m, "DidX");
             var replaceStart = Math.Min(m.Index, DottedReceiverStart(content, identIndex));
-            var subject = InferDidXSubject(content, m.Index, ReceiverChain(content, replaceStart, identIndex));
-            var template = extra is null
-                ? $"=subject.Does:{verb}={endMark}"
-                : $"=subject.Does:{verb}= {extra}{endMark}";
+            var subject = explicitSubject ??
+                InferDidXSubject(content, m.Index, ReceiverChain(content, replaceStart, identIndex));
+            var template = extra is not null
+                ? $"=subject.Does:{verb}= {extra}{endMark}"
+                : extraExpr is not null
+                    ? $"=subject.Does:{verb}= =extra={endMark}"
+                    : $"=subject.Does:{verb}={endMark}";
 
             var emitParts = new List<string>();
+            if (color is char colorValue)
+                emitParts.Add("'" + EscapeCharLiteral(colorValue) + "'");
             if (fromDialog is bool fd)
                 emitParts.Add($"FromDialog: {(fd ? "true" : "false")}");
             if (!string.IsNullOrEmpty(colorGood))
@@ -474,7 +523,10 @@ public static class GameTextCallSiteFixer
 
             sb.Append(content, last, replaceStart - last);
             sb.Append('"').Append(template).Append("\".StartReplace().SetSubject(")
-                .Append(subject).Append(").").Append(emit);
+                .Append(subject).Append(')');
+            if (extraExpr is not null)
+                sb.Append(".SetArgument(\"extra\", ").Append(extraExpr).Append(')');
+            sb.Append('.').Append(emit);
             last = close + 1;
             localEdits++;
         }
@@ -607,13 +659,16 @@ public static class GameTextCallSiteFixer
 
             // XDidY(who, verb, extra?, …, ColorAsBadFor?)
             var who = args[0].Expression.Trim();
-            if (!IsSafeReceiver(who) || !TryStringLit(args[1], out var verb) || !IsSafeToken(verb))
+            if (!IsSafeReceiver(who) ||
+                !TryStringValue(content, args[1], m.Index, out var verb) ||
+                !IsSafeVerb(verb))
                 continue;
 
             string? extraLit = null;
             string? extraExpr = null;
             string endMark = "";
             string? colorBad = null;
+            char? color = null;
             var ok = true;
             for (var i = 2; i < args.Count; i++)
             {
@@ -624,10 +679,15 @@ public static class GameTextCallSiteFixer
                         colorBad = a.Expression.Trim();
                     continue;
                 }
-                if (a.Name is "FromDialog" or "UsePopup" or "AlwaysVisible")
+                if (a.Name is "FromDialog")
                 {
-                    ok = false;
-                    break;
+                    continue;
+                }
+                if (a.Name is "UsePopup" or "AlwaysVisible" or "UseFullNames" or
+                    "IndefiniteSubject" or "DescribeSubjectDirection" or
+                    "DescribeSubjectDirectionLate" or "SubjectPossessedBy")
+                {
+                    continue;
                 }
                 if (a.Name is not null)
                 {
@@ -637,24 +697,30 @@ public static class GameTextCallSiteFixer
                 var expr = a.Expression.Trim();
                 if (expr is "null")
                     continue;
-                if (TryStringLit(a, out var lit) && lit.Length <= 2 && IsPunctuationEndMark(lit))
+                if (i == 2)
                 {
-                    endMark = lit;
+                    if (TryStringValue(content, a, m.Index, out var extra))
+                        extraLit = extra;
+                    else
+                        extraExpr = expr;
                     continue;
                 }
-                if (extraLit is null && extraExpr is null && TryStringLit(a, out var ex))
+                if (i == 3 && TryStringValue(content, a, m.Index, out var mark) &&
+                    mark.Length <= 3 && IsPunctuationEndMark(mark))
                 {
-                    extraLit = ex;
+                    endMark = mark;
                     continue;
                 }
-                if (colorBad is null && IsSafeReceiver(expr) && i == args.Count - 1)
+                if (i is 4 or 5 && TryStringValue(content, a, m.Index, out var colorText) &&
+                    (colorText.Length == 0 || TryColorChar(colorText, out _)))
+                {
+                    if (TryColorChar(colorText, out var colorChar))
+                        color ??= colorChar;
+                    continue;
+                }
+                if (colorBad is null && i >= 5 && IsSafeReceiver(expr))
                 {
                     colorBad = expr;
-                    continue;
-                }
-                if (extraLit is null && extraExpr is null)
-                {
-                    extraExpr = expr;
                     continue;
                 }
                 ok = false;
@@ -674,9 +740,14 @@ public static class GameTextCallSiteFixer
             else
                 template = $"=subject.Does:{verb}={endMark}";
 
-            var emit = colorBad is null
+            var emitParts = new List<string>();
+            if (color is char colorValue)
+                emitParts.Add("'" + EscapeCharLiteral(colorValue) + "'");
+            if (colorBad is not null)
+                emitParts.Add("ColorAsBadFor: " + colorBad);
+            var emit = emitParts.Count == 0
                 ? "EmitMessage()"
-                : $"EmitMessage(ColorAsBadFor: {colorBad})";
+                : "EmitMessage(" + string.Join(", ", emitParts) + ")";
             var chain = $"\"{template}\".StartReplace().SetSubject({who})";
             if (extraArg.Length > 0)
                 chain += $".SetArgument(\"extra\", {extraArg})";
@@ -764,31 +835,49 @@ public static class GameTextCallSiteFixer
             var who = args[0].Expression.Trim();
             var obj = args[3].Expression.Trim();
             if (!IsSafeReceiver(who) || !IsSafeReceiver(obj) ||
-                !TryStringLit(args[1], out var verb) || !IsSafeToken(verb) ||
-                !TryStringLit(args[2], out var prep) || prep.Length > 24)
+                !TryStringValue(content, args[1], m.Index, out var verb) || !IsSafeVerb(verb))
+                continue;
+
+            var prep = "";
+            if (args[2].Expression.Trim() != "null" &&
+                (!TryStringValue(content, args[2], m.Index, out prep) || prep.Length > 40))
                 continue;
 
             string extra = "";
+            string? extraExpr = null;
             string endMark = "";
+            string? colorGood = null;
+            string? colorBad = null;
+            var fromDialog = false;
             var ok = true;
             for (var i = 4; i < args.Count; i++)
             {
                 var a = args[i];
                 if (a.Name is not null)
                 {
-                    if (a.Name is "ColorAsBadFor" or "ColorAsGoodFor" or "FromDialog")
+                    switch (a.Name)
                     {
-                        ok = false;
-                        break;
+                        case "ColorAsGoodFor": colorGood = a.Expression.Trim(); break;
+                        case "ColorAsBadFor": colorBad = a.Expression.Trim(); break;
+                        case "FromDialog": fromDialog = a.Expression.Trim() == "true"; break;
+                        case "PossessiveObject":
+                        case "UseFullNames":
+                        case "IndefiniteSubject":
+                        case "DescribeSubjectDirection":
+                        case "DescribeSubjectDirectionLate":
+                        case "AlwaysVisible":
+                        case "SubjectPossessedBy":
+                            break;
+                        default: ok = false; break;
                     }
-                    ok = false;
-                    break;
+                    if (!ok) break;
+                    continue;
                 }
                 var expr = a.Expression.Trim();
-                if (expr is "null") continue;
-                if (TryStringLit(a, out var lit))
+                if (expr is "null" or "true" or "false" || IsSafeReceiver(expr)) continue;
+                if (TryStringValue(content, a, m.Index, out var lit))
                 {
-                    if (lit.Length <= 2 && IsPunctuationEndMark(lit) && endMark.Length == 0)
+                    if (lit.Length <= 3 && IsPunctuationEndMark(lit) && endMark.Length == 0)
                     {
                         endMark = lit;
                         continue;
@@ -799,16 +888,32 @@ public static class GameTextCallSiteFixer
                         continue;
                     }
                 }
-                ok = false;
-                break;
+                if (extra.Length == 0 && extraExpr is null)
+                    extraExpr = expr;
+                else
+                    ok = false;
+                if (!ok) break;
             }
             if (!ok) continue;
 
-            var template = $"=subject.Does:{verb}= {prep} =object.the.name={extra}{endMark}";
+            var template = $"=subject.Does:{verb}=";
+            if (prep.Length > 0) template += " " + prep;
+            template += " =object.the.name=" + extra;
+            if (extraExpr is not null) template += " =extra=";
+            template += endMark;
             var replaceStart = ReplaceStartForCall(content, m, "XDidYToZ");
             sb.Append(content, last, replaceStart - last);
             sb.Append('"').Append(template).Append("\".StartReplace().SetSubject(")
-                .Append(who).Append(").SetObject(").Append(obj).Append(").EmitMessage()");
+                .Append(who).Append(").SetObject(").Append(obj).Append(')');
+            if (extraExpr is not null)
+                sb.Append(".SetArgument(\"extra\", ").Append(extraExpr).Append(')');
+            var emitArgs = new List<string>();
+            if (fromDialog) emitArgs.Add("FromDialog: true");
+            if (colorGood is not null) emitArgs.Add("ColorAsGoodFor: " + colorGood);
+            if (colorBad is not null) emitArgs.Add("ColorAsBadFor: " + colorBad);
+            sb.Append(emitArgs.Count == 0
+                ? ".EmitMessage()"
+                : ".EmitMessage(" + string.Join(", ", emitArgs) + ")");
             last = close + 1;
             localEdits++;
         }
@@ -1037,8 +1142,85 @@ public static class GameTextCallSiteFixer
         return false;
     }
 
+    /// <summary>Accept a literal or a nearby local initialized from one.</summary>
+    static bool TryStringValue(
+        string content, CallArgParser.Arg arg, int callIndex, out string value)
+    {
+        if (TryStringLit(arg, out value))
+            return true;
+
+        var name = arg.Expression.Trim();
+        if (!Regex.IsMatch(name, @"^[A-Za-z_]\w*$"))
+            return false;
+        var start = Math.Max(0, callIndex - 800);
+        var window = content[start..callIndex];
+        var declaration = new Regex(
+            @"\b(?:string|var)\s+" + Regex.Escape(name) +
+            @"\s*=\s*(?<literal>""(?:[^""\\]|\\.)*"")\s*;",
+            RegexOptions.Compiled).Matches(window).Cast<Match>().LastOrDefault();
+        if (declaration is null)
+            return false;
+
+        var afterDeclaration = window[(declaration.Index + declaration.Length)..];
+        if (afterDeclaration.IndexOf('}') >= 0 ||
+            Regex.IsMatch(afterDeclaration, @"\b" + Regex.Escape(name) + @"\s*="))
+            return false;
+        return TryStringLit(new CallArgParser.Arg(null, declaration.Groups["literal"].Value), out value);
+    }
+
+    static string RemoveNowUnusedMessageLocals(string content, ref int edits)
+    {
+        var rx = new Regex(
+            @"(?m)^[ \t]*(?:string|var)\s+(?<name>(?:verb|extra|termi(?:p|pun)?|preposition)[A-Za-z0-9_]*)\s*=\s*""(?:[^""\\]|\\.)*""\s*;[ \t]*(?<eol>\r?\n|$)",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        var local = 0;
+        var next = rx.Replace(content, m =>
+        {
+            var name = m.Groups["name"].Value;
+            var declarations = Regex.Matches(content,
+                @"\b(?:string|var)\s+" + Regex.Escape(name) +
+                @"\s*=\s*""(?:[^""\\]|\\.)*""\s*;").Count;
+            if (Regex.Matches(content, @"\b" + Regex.Escape(name) + @"\b").Count != declarations)
+                return m.Value;
+            local++;
+            return m.Groups["eol"].Value;
+        });
+        edits += local;
+        return next;
+    }
+
     static bool IsSafeToken(string verb) =>
         Regex.IsMatch(verb, @"^[A-Za-z][\w\-]*$");
+
+    static bool IsSafeVerb(string verb) =>
+        verb.Length > 0 && char.IsLetter(verb[0]) &&
+        verb.All(c => char.IsLetterOrDigit(c) || c is ' ' or '_' or '-' or '\'');
+
+    static bool TryColorChar(string value, out char color)
+    {
+        color = default;
+        if (value.Length == 1)
+        {
+            color = value[0];
+            return true;
+        }
+        if (value.Length == 2 && value[0] == '&')
+        {
+            color = value[1];
+            return true;
+        }
+        return false;
+    }
+
+    static string EscapeCharLiteral(char value) => value switch
+    {
+        '\\' => "\\\\",
+        '\'' => "\\'",
+        '\n' => "\\n",
+        '\r' => "\\r",
+        '\t' => "\\t",
+        _ => value.ToString(),
+    };
 
     static bool IsIgnorableDidXPositional(string expr)
     {
@@ -1108,7 +1290,7 @@ public static class GameTextCallSiteFixer
     static string FixSimpleDidXToY(string content, ref int edits)
     {
         var callRx = new Regex(
-            @"(?:(?:this|base)\.)?(?:IComponent\s*<\s*GameObject\s*>\s*\.)?DidXToY\s*(?<paren>\()",
+            @"(?<![A-Za-z0-9_])(?:(?:this|base)\.)?(?:IComponent\s*<\s*GameObject\s*>\s*\.)?DidXToY\s*(?<paren>\()",
             RegexOptions.Compiled);
         var sb = new StringBuilder(content.Length + 64);
         var last = 0;
@@ -1122,28 +1304,64 @@ public static class GameTextCallSiteFixer
             var open = m.Groups["paren"].Index;
             if (!CallArgParser.TryParseArgumentList(content, open, out var args, out var close))
                 continue;
-            if (args.Count < 2 || !TryStringLit(args[0], out var verb) || !IsSafeToken(verb))
+            if (args.Count < 2 ||
+                !TryStringValue(content, args[0], m.Index, out var verb) || !IsSafeVerb(verb))
                 continue;
-            var obj = args[1].Expression.Trim();
+            var prep = "";
+            var objectIndex = 1;
+            var obj = args[objectIndex].Expression.Trim();
+            if (!IsSafeReceiver(obj) && args.Count >= 3 &&
+                TryStringValue(content, args[1], m.Index, out prep))
+            {
+                objectIndex = 2;
+                obj = args[objectIndex].Expression.Trim();
+            }
             if (!IsSafeReceiver(obj))
                 continue;
+            var extra = "";
+            var endMark = "";
+            string? colorGood = null;
+            string? colorBad = null;
+            var fromDialog = false;
             var ok = true;
-            for (var i = 2; i < args.Count; i++)
+            for (var i = objectIndex + 1; i < args.Count; i++)
             {
                 var a = args[i];
-                if (a.Name is "FromDialog" or "ColorAsGoodFor" or "ColorAsBadFor")
-                    continue;
                 if (a.Name is not null)
                 {
-                    ok = false;
-                    break;
+                    switch (a.Name)
+                    {
+                        case "FromDialog": fromDialog = a.Expression.Trim() == "true"; break;
+                        case "ColorAsGoodFor": colorGood = a.Expression.Trim(); break;
+                        case "ColorAsBadFor": colorBad = a.Expression.Trim(); break;
+                        case "PossessiveObject":
+                        case "UseFullNames":
+                        case "IndefiniteSubject":
+                        case "DescribeSubjectDirection":
+                        case "DescribeSubjectDirectionLate":
+                        case "AlwaysVisible":
+                            break;
+                        default: ok = false; break;
+                    }
+                    if (!ok) break;
+                    continue;
                 }
-                if (!IsIgnorableDidXPositional(a.Expression.Trim()) &&
-                    !IsSafeReceiver(a.Expression.Trim()))
+                var expr = a.Expression.Trim();
+                if (expr is "null" or "true" or "false" || IsSafeReceiver(expr))
+                    continue;
+                if (TryStringValue(content, a, m.Index, out var lit))
                 {
-                    ok = false;
-                    break;
+                    if (lit.Length <= 3 && IsPunctuationEndMark(lit))
+                        endMark = lit;
+                    else if (extra.Length == 0)
+                        extra = " " + lit;
+                    else
+                        ok = false;
+                    if (!ok) break;
+                    continue;
                 }
+                ok = false;
+                break;
             }
             if (!ok) continue;
 
@@ -1152,8 +1370,18 @@ public static class GameTextCallSiteFixer
             var subject = InferDidXSubject(content, m.Index, ReceiverChain(content, replaceStart, identIndex));
             sb.Append(content, last, replaceStart - last);
             sb.Append("\"=subject.Does:").Append(verb)
-                .Append("= =object.the.name=.\".StartReplace().SetSubject(")
-                .Append(subject).Append(").SetObject(").Append(obj).Append(").EmitMessage()");
+                .Append("=");
+            if (prep.Length > 0) sb.Append(' ').Append(prep);
+            sb.Append(" =object.the.name=").Append(extra).Append(endMark)
+                .Append("\".StartReplace().SetSubject(")
+                .Append(subject).Append(").SetObject(").Append(obj).Append(')');
+            var emitArgs = new List<string>();
+            if (fromDialog) emitArgs.Add("FromDialog: true");
+            if (colorGood is not null) emitArgs.Add("ColorAsGoodFor: " + colorGood);
+            if (colorBad is not null) emitArgs.Add("ColorAsBadFor: " + colorBad);
+            sb.Append(emitArgs.Count == 0
+                ? ".EmitMessage()"
+                : ".EmitMessage(" + string.Join(", ", emitArgs) + ")");
             last = close + 1;
             localEdits++;
         }

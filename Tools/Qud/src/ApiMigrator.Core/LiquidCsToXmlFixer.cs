@@ -23,6 +23,8 @@ public static class LiquidCsToXmlFixer
         ["FlameTemperature"] = "flameTemperature",
         ["VaporTemperature"] = "vaporTemperature",
         ["FreezeTemperature"] = "freezeTemperature",
+        ["Temperature"] = "temperature",
+        ["Weight"] = "weight",
         ["Combustibility"] = "combustibility",
         ["Fluidity"] = "fluidity",
         ["Evaporativity"] = "evaporativity",
@@ -50,15 +52,27 @@ public static class LiquidCsToXmlFixer
     };
 
     static readonly Regex PropAssign = new(
-        @"^[ \t]*(?:this\.)?(?<prop>FlameTemperature|VaporTemperature|FreezeTemperature|Combustibility|Fluidity|Evaporativity|Staining|ThermalConductivity|CirculatoryLossTerm|CirculatoryLossNoun|ValuePerDram|Cooling|Heating|Cleansing|ConsiderDangerousToContact|ConsiderDangerousToDrink|InterruptAutowalk|PureElectricalConductivity|MixedElectricalConductivity|EnableCleaning|SlipperyWhenFrozen|SlipperySaveVs|SlipperySaveTargetScale|SlipperySaveTargetBase|SlipperyParticle|SlipperyMessage|VaporObject)\s*=\s*(?<val>[^;]+);\s*\r?\n?",
+        @"^[ \t]*(?:this\.)?(?<prop>FlameTemperature|VaporTemperature|FreezeTemperature|Temperature|Weight|Combustibility|Fluidity|Evaporativity|Staining|ThermalConductivity|CirculatoryLossTerm|CirculatoryLossNoun|ValuePerDram|Cooling|Heating|Cleansing|ConsiderDangerousToContact|ConsiderDangerousToDrink|InterruptAutowalk|PureElectricalConductivity|MixedElectricalConductivity|EnableCleaning|SlipperyWhenFrozen|SlipperySaveVs|SlipperySaveTargetScale|SlipperySaveTargetBase|SlipperyParticle|SlipperyMessage|VaporObject)\s*=\s*(?<val>[^;\r\n]+);[ \t]*(?<eol>\r?\n|$)",
+        RegexOptions.Compiled | RegexOptions.Multiline);
+
+    static readonly Regex GlowsAssign = new(
+        @"^[ \t]*(?:this\.)?Glows\s*=\s*true\s*;[ \t]*(?<eol>\r?\n|$)",
+        RegexOptions.Compiled | RegexOptions.Multiline);
+
+    static readonly Regex BeforeRenderGlow = new(
+        @"^[ \t]*(?:public|protected|internal)\s+override\s+void\s+BeforeRender\s*\(\s*LiquidVolume\s+(?<liquid>[A-Za-z_]\w*)\s*\)\s*\{\s*if\s*\([^{}]+\)\s*\{\s*\k<liquid>\.AddLight\(\s*(?<level>\d+)\s*\)\s*;\s*\}\s*\}[ \t]*(?<eol>\r?\n|$)",
+        RegexOptions.Compiled | RegexOptions.Multiline);
+
+    static readonly Regex NoVaporOverride = new(
+        @"^[ \t]*(?:public|protected|internal)\s+override\s+bool\s+Vaporized\s*\([^)]*\)\s*(?:=>\s*false\s*;|\{\s*return\s+false\s*;\s*\})[ \t]*(?<eol>\r?\n|$)",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     static readonly Regex IsLiquidAttr = new(
-        @"^[ \t]*\[IsLiquid(?:Attribute)?\]\s*\r?\n?",
+        @"^[ \t]*\[IsLiquid(?:Attribute)?\][ \t]*(?<eol>\r?\n|$)",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     static readonly Regex IsLiquidOverride = new(
-        @"^[ \t]*(?:public|protected|internal)\s+override\s+bool\s+IsLiquid\s*(?:=>\s*true\s*;|{\s*get\s*(?:=>\s*true\s*;|{\s*return\s+true\s*;\s*})\s*})\s*\r?\n?",
+        @"^[ \t]*(?:public|protected|internal)\s+override\s+bool\s+IsLiquid\s*(?:=>\s*true\s*;|{\s*get\s*(?:=>\s*true\s*;|{\s*return\s+true\s*;\s*})\s*})[ \t]*(?<eol>\r?\n|$)",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     static readonly Regex BaseSlug = new(
@@ -66,23 +80,23 @@ public static class LiquidCsToXmlFixer
         RegexOptions.Compiled);
 
     static readonly Regex StringOverride = new(
-        @"^[ \t]*(?:public|protected|internal)\s+override\s+string\s+(?<meth>GetSmearedAdjective|GetSmearedName|GetStainedName|GetName|GetWaterRitualName|GetAdjective|GetColor)\s*\([^)]*\)\s*(?:=>\s*""(?<val>(?:[^""\\]|\\.)*)""\s*;|{\s*return\s*""(?<val2>(?:[^""\\]|\\.)*)""\s*;\s*})\s*\r?\n?",
+        @"^[ \t]*(?:public|protected|internal)\s+override\s+string\s+(?<meth>GetSmearedAdjective|GetSmearedName|GetStainedName|GetName|GetWaterRitualName|GetAdjective|GetColor)\s*\([^)]*\)\s*(?:=>\s*""(?<val>(?:[^""\\]|\\.)*)""\s*;|{\s*return\s*""(?<val2>(?:[^""\\]|\\.)*)""\s*;\s*})[ \t]*(?<eol>\r?\n|$)",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     static readonly Regex ValueOverride = new(
-        @"^[ \t]*(?:public|protected|internal)\s+override\s+float\s+GetValuePerDram\s*\(\s*\)\s*(?:=>\s*(?<val>-?\d+(?:\.\d+)?f?)\s*;|{\s*return\s*(?<val2>-?\d+(?:\.\d+)?f?)\s*;\s*})\s*\r?\n?",
+        @"^[ \t]*(?:public|protected|internal)\s+override\s+float\s+GetValuePerDram\s*\(\s*\)\s*(?:=>\s*(?<val>-?\d+(?:\.\d+)?f?)\s*;|{\s*return\s*(?<val2>-?\d+(?:\.\d+)?f?)\s*;\s*})[ \t]*(?<eol>\r?\n|$)",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     static readonly Regex GetColorsOverride = new(
-        @"^[ \t]*(?:public|protected|internal)\s+override\s+List\s*<\s*string\s*>\s+GetColors\s*\(\s*\)\s*=>\s*(?<src>LiquidBlood\.Colors|Colors)\s*;\s*\r?\n?",
+        @"^[ \t]*(?:public|protected|internal)\s+override\s+List\s*<\s*string\s*>\s+GetColors\s*\(\s*\)\s*(?:=>\s*(?<src>LiquidBlood\.Colors|(?:[A-Za-z_]\w*\.)?Colors)\s*;|{\s*return\s+(?<src2>LiquidBlood\.Colors|(?:[A-Za-z_]\w*\.)?Colors)\s*;\s*})[ \t]*(?<eol>\r?\n|$)",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     static readonly Regex ColorsField = new(
-        @"^[ \t]*(?:\[NonSerialized\]\s*)?(?:public|internal)\s+static\s+List\s*<\s*string\s*>\s+Colors\s*=\s*new\s+List\s*<\s*string\s*>\s*(?:\([^)]*\))?\s*\{(?<items>[^}]+)\}\s*;\s*\r?\n?",
+        @"^[ \t]*(?:\[NonSerialized\][ \t]*(?:\r?\n[ \t]*)?)?(?:public|internal)\s+static\s+List\s*<\s*string\s*>\s+Colors\s*=\s*new\s+List\s*<\s*string\s*>\s*(?:\([^)]*\))?\s*\{(?<items>[^}]+)\}[ \t]*;[ \t]*(?<eol>\r?\n|$)",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     static readonly Regex StainElementsOverride = new(
-        @"^[ \t]*(?:public|protected|internal)\s+override\s+void\s+StainElements\s*\(\s*LiquidVolume\s+\w+\s*,\s*GetItemElementsEvent\s+\w+\s*\)\s*\{\s*\w+\.Add\s*\(\s*""(?<el>[^""]+)""\s*,\s*(?<w>\d+)\s*\)\s*;\s*\}\s*\r?\n?",
+        @"^[ \t]*(?:public|protected|internal)\s+override\s+void\s+StainElements\s*\(\s*LiquidVolume\s+\w+\s*,\s*GetItemElementsEvent\s+\w+\s*\)\s*\{\s*\w+\.Add\s*\(\s*""(?<el>[^""]+)""\s*,\s*(?<w>\d+)\s*\)\s*;\s*\}[ \t]*(?<eol>\r?\n|$)",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
     static readonly Regex BaseRenderPrimary = new(
@@ -213,6 +227,9 @@ public static class LiquidCsToXmlFixer
 
             var body = content[(braceOpen + 1)..braceClose];
             var props = new Dictionary<string, string>(StringComparer.Ordinal);
+            var glows = false;
+            string? glowLight = null;
+            var noVapor = false;
             var bodyEdits = 0;
             var nextBody = PropAssign.Replace(body, m =>
             {
@@ -223,29 +240,61 @@ public static class LiquidCsToXmlFixer
                     return m.Value;
                 props[xmlName] = val;
                 bodyEdits++;
-                return "";
+                return m.Groups["eol"].Value;
             });
-            nextBody = IsLiquidOverride.Replace(nextBody, _ =>
+            nextBody = GlowsAssign.Replace(nextBody, m =>
+            {
+                glows = true;
+                bodyEdits++;
+                return m.Groups["eol"].Value;
+            });
+            nextBody = BeforeRenderGlow.Replace(nextBody, m =>
+            {
+                glows = true;
+                glowLight = m.Groups["level"].Value;
+                bodyEdits++;
+                return m.Groups["eol"].Value;
+            });
+            nextBody = NoVaporOverride.Replace(nextBody, m =>
+            {
+                noVapor = true;
+                bodyEdits++;
+                return m.Groups["eol"].Value;
+            });
+            var freezeObjects = ExtractFreezeObjects(ref nextBody, ref bodyEdits);
+            nextBody = IsLiquidOverride.Replace(nextBody, m =>
             {
                 bodyEdits++;
-                return "";
+                return m.Groups["eol"].Value;
             });
 
             string? colors = null;
             nextBody = ColorsField.Replace(nextBody, m =>
             {
-                if (!TryColorsFromItems(m.Groups["items"].Value, out colors))
+                // The field is still valid user code unless its companion obsolete
+                // GetColors override is migrated in the same class.
+                if (!GetColorsOverride.IsMatch(nextBody))
                     return m.Value;
+                if (!TryColorsFromItems(m.Groups["items"].Value, out var parsedColors))
+                {
+                    colors = null;
+                    return m.Value;
+                }
+                colors = parsedColors;
                 bodyEdits++;
-                return "";
+                return m.Groups["eol"].Value;
             });
             nextBody = GetColorsOverride.Replace(nextBody, m =>
             {
-                var src = m.Groups["src"].Value;
+                var src = m.Groups["src"].Success
+                    ? m.Groups["src"].Value
+                    : m.Groups["src2"].Value;
                 if (src == "LiquidBlood.Colors" && colors is null)
                     colors = "rK";
+                if (src != "LiquidBlood.Colors" && colors is null)
+                    return m.Value;
                 bodyEdits++;
-                return "";
+                return m.Groups["eol"].Value;
             });
             nextBody = StringOverride.Replace(nextBody, m =>
             {
@@ -257,18 +306,18 @@ public static class LiquidCsToXmlFixer
                 {
                     colors ??= UnescapeCs(val);
                     bodyEdits++;
-                    return "";
+                    return m.Groups["eol"].Value;
                 }
                 props[xmlName] = UnescapeCs(val);
                 bodyEdits++;
-                return "";
+                return m.Groups["eol"].Value;
             });
             nextBody = ValueOverride.Replace(nextBody, m =>
             {
                 var raw = m.Groups["val"].Success ? m.Groups["val"].Value : m.Groups["val2"].Value;
                 props["valuePerDram"] = raw.TrimEnd('f', 'F');
                 bodyEdits++;
-                return "";
+                return m.Groups["eol"].Value;
             });
             string? stainEl = null;
             string? stainW = null;
@@ -277,7 +326,7 @@ public static class LiquidCsToXmlFixer
                 stainEl = m.Groups["el"].Value;
                 stainW = m.Groups["w"].Value;
                 bodyEdits++;
-                return "";
+                return m.Groups["eol"].Value;
             });
 
             string? baseColor = null, baseTile = null, baseDetail = null, baseBg = null, smear = null;
@@ -324,10 +373,10 @@ public static class LiquidCsToXmlFixer
             });
 
             var beforeClass = content[last..cm.Index];
-            var nextBefore = IsLiquidAttr.Replace(beforeClass, _ =>
+            var nextBefore = IsLiquidAttr.Replace(beforeClass, m =>
             {
                 bodyEdits++;
-                return "";
+                return m.Groups["eol"].Value;
             });
 
             if (bodyEdits == 0)
@@ -353,13 +402,30 @@ public static class LiquidCsToXmlFixer
                 else
                     inner.Append(" />\n");
             }
+            foreach (var freeze in freezeObjects)
+            {
+                inner.Append("    <freezeObject Name=\"")
+                    .Append(XmlOverlayMerger.XmlEscape(freeze.Name))
+                    .Append("\" Threshold=\"").Append(freeze.Threshold)
+                    .Append("\" Verb=\"").Append(XmlOverlayMerger.XmlEscape(freeze.Verb))
+                    .Append("\" />\n");
+            }
+            if (noVapor)
+                inner.Append("    <part Name=\"NoVapor\" Class=\"NoVapor\" />\n");
 
-            var hasRenderBits = baseColor is not null || baseTile is not null || baseDetail is not null ||
+            var hasRenderBits = glows || baseColor is not null || baseTile is not null || baseDetail is not null ||
                                 baseBg is not null || smear is not null || secColor is not null ||
                                 algaeText is not null || algaeDetail is not null;
             if (hasRenderBits)
             {
                 inner.Append("    <render>\n");
+                if (glows)
+                {
+                    inner.Append("      <part Name=\"Glows\" Class=\"Glows\"");
+                    if (glowLight is not null)
+                        inner.Append(" LightLevel=\"").Append(glowLight).Append('"');
+                    inner.Append(" />\n");
+                }
                 if (algaeText is not null || algaeDetail is not null)
                 {
                     inner.Append("      <part Name=\"RenderSecondToAlgae\" Class=\"RenderSecondToAlgae\">\n");
@@ -430,15 +496,52 @@ public static class LiquidCsToXmlFixer
     {
         colors = "";
         var sb = new StringBuilder();
-        foreach (Match m in Regex.Matches(items, @"""(?<c>(?:[^""\\]|\\.)*)"""))
+        const string literalPattern = @"""(?<c>(?:[^""\\]|\\.)*)""";
+        foreach (Match m in Regex.Matches(items, literalPattern))
         {
             var c = UnescapeCs(m.Groups["c"].Value);
             if (c.Length == 0) return false;
             sb.Append(c);
         }
+        // Do not silently drop constants/expressions (for example GoldString).
+        // In that case preserve both the C# field and GetColors override.
+        var remainder = Regex.Replace(items, literalPattern, "");
+        if (remainder.Any(c => c != ',' && !char.IsWhiteSpace(c)))
+            return false;
         if (sb.Length == 0) return false;
         colors = sb.ToString();
         return true;
+    }
+
+    static List<(string Name, string Threshold, string Verb)> ExtractFreezeObjects(
+        ref string body, ref int edits)
+    {
+        var result = new List<(string Name, string Threshold, string Verb)>();
+        for (var index = 1; index <= 3; index++)
+        {
+            var nameRx = new Regex(
+                @"(?m)^[ \t]*(?:this\.)?FreezeObject" + index +
+                @"\s*=\s*""(?<value>(?:[^""\\]|\\.)*)""\s*;[ \t]*(?<eol>\r?\n|$)");
+            var thresholdRx = new Regex(
+                @"(?m)^[ \t]*(?:this\.)?FreezeObjectThreshold" + index +
+                @"\s*=\s*(?<value>\d+)\s*;[ \t]*(?<eol>\r?\n|$)");
+            var verbRx = new Regex(
+                @"(?m)^[ \t]*(?:this\.)?FreezeObjectVerb" + index +
+                @"\s*=\s*""(?<value>(?:[^""\\]|\\.)*)""\s*;[ \t]*(?<eol>\r?\n|$)");
+            var name = nameRx.Match(body);
+            var threshold = thresholdRx.Match(body);
+            var verb = verbRx.Match(body);
+            if (!name.Success || !threshold.Success || !verb.Success)
+                continue;
+
+            result.Add((UnescapeCs(name.Groups["value"].Value),
+                threshold.Groups["value"].Value, UnescapeCs(verb.Groups["value"].Value)));
+            body = nameRx.Replace(body, m => m.Groups["eol"].Value, 1);
+            body = thresholdRx.Replace(body, m => m.Groups["eol"].Value, 1);
+            body = verbRx.Replace(body, m => m.Groups["eol"].Value, 1);
+            edits += 3;
+        }
+        return result;
     }
 
     static bool TryLiteralValue(string expr, out string val)
@@ -450,9 +553,9 @@ public static class LiquidCsToXmlFixer
             val = t;
             return true;
         }
-        if (Regex.IsMatch(t, @"^-?\d+$"))
+        if (Regex.IsMatch(t, @"^-?\d+(?:\.\d+)?(?:[fFdDmM])?$"))
         {
-            val = t;
+            val = t.TrimEnd('f', 'F', 'd', 'D', 'm', 'M');
             return true;
         }
         if (t.Length >= 2 && t[0] == '"' && t[^1] == '"')

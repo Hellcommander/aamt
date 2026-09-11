@@ -161,18 +161,21 @@ public static class MigrationRunner
                 .ToDictionary(p => p, p => workingMap[p], StringComparer.OrdinalIgnoreCase);
             ApplySidecar(modGroup.Key, csMap, workingMap, preFixes, files, originals, onLog,
                 StatisticCtorFixer.FixMod, "Statistics.xml");
-            csMap = WithSidecar(modGroup.Key, "Liquids.xml",
-                modGroup.Where(p => workingMap.ContainsKey(p))
-                    .ToDictionary(p => p, p => workingMap[p], StringComparer.OrdinalIgnoreCase),
-                workingMap);
-            ApplySidecar(modGroup.Key, csMap, workingMap, preFixes, files, originals, onLog,
-                LiquidCsToXmlFixer.FixMod, "Liquids.xml");
+            // Extract Drank behavior while legacy BaseLiquid property literals (for example
+            // Temperature) are still present for the generated part to bind. The subsequent
+            // PreferXML pass merges the remaining liquid metadata into this same sidecar.
             csMap = WithSidecar(modGroup.Key, "Liquids.xml",
                 modGroup.Where(p => workingMap.ContainsKey(p))
                     .ToDictionary(p => p, p => workingMap[p], StringComparer.OrdinalIgnoreCase),
                 workingMap);
             ApplySidecar(modGroup.Key, csMap, workingMap, preFixes, files, originals, onLog,
                 LiquidDrankToPartFixer.FixMod, "Liquids.xml (OnDrink part)");
+            csMap = WithSidecar(modGroup.Key, "Liquids.xml",
+                modGroup.Where(p => workingMap.ContainsKey(p))
+                    .ToDictionary(p => p, p => workingMap[p], StringComparer.OrdinalIgnoreCase),
+                workingMap);
+            ApplySidecar(modGroup.Key, csMap, workingMap, preFixes, files, originals, onLog,
+                LiquidCsToXmlFixer.FixMod, "Liquids.xml");
         }
 
         if (preFixes.Count > 0)

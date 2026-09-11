@@ -108,9 +108,6 @@ public static class LiquidDrankToPartFixer
             var className = cm.Groups["name"].Value;
             if (VanillaLiquidClasses.Contains(className))
                 continue;
-            if (!InNamespace(working, cm.Index, "XRL.Liquids"))
-                continue;
-
             var braceOpen = working.IndexOf('{', cm.Index + cm.Length - 1);
             if (braceOpen < 0) continue;
             if (!CsText.TryFindMatchingBrace(working, braceOpen, out var braceClose))
@@ -168,6 +165,7 @@ public static class LiquidDrankToPartFixer
             }
             else
             {
+                drankBody = BindLiteralLiquidMembers(working[cm.Index..braceClose], drankBody);
                 partClassSource = BuildPartClass(partName, paramList, drankBody);
                 innerXml = $"    <part Name=\"{XmlOverlayMerger.XmlEscape(partName)}\" Class=\"{XmlOverlayMerger.XmlEscape(partName)}\" />\n";
             }
@@ -250,18 +248,35 @@ public static class LiquidDrankToPartFixer
         sb.AppendLine("\t\t\tvar " + targetId + " = E.Target;");
         sb.AppendLine("\t\t\tvar " + messageId + " = E.Message;");
         sb.AppendLine("\t\t\tbool " + exitId + " = E.ExitInterface;");
-        sb.AppendLine("\t\t\tbool __result = " + partName + "Body();");
-        sb.AppendLine("\t\t\tE.ExitInterface = " + exitId + ";");
-        sb.AppendLine("\t\t\treturn __result;");
-        sb.AppendLine();
-        sb.AppendLine("\t\t\tbool " + partName + "Body()");
+        sb.AppendLine("\t\t\ttry");
         sb.AppendLine("\t\t\t{");
         sb.AppendLine(indentedBody);
+        sb.AppendLine("\t\t\t}");
+        sb.AppendLine("\t\t\tfinally");
+        sb.AppendLine("\t\t\t{");
+        sb.AppendLine("\t\t\t\tE.ExitInterface = " + exitId + ";");
         sb.AppendLine("\t\t\t}");
         sb.AppendLine("\t\t}");
         sb.AppendLine("\t}");
         sb.AppendLine("}");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// A BaseLiquidPart does not inherit data properties from the old BaseLiquid class.
+    /// Inline simple literal values that are simultaneously moved to Liquids.xml.
+    /// </summary>
+    static string BindLiteralLiquidMembers(string classSpan, string body)
+    {
+        foreach (var member in new[] { "Temperature" })
+        {
+            var m = Regex.Match(classSpan,
+                @"(?m)^[ \t]*(?:this\.)?" + Regex.Escape(member) +
+                @"\s*=\s*(?<value>-?\d+(?:\.\d+)?(?:[fFdDmM])?)[ \t]*;");
+            if (m.Success)
+                body = Regex.Replace(body, @"\b" + Regex.Escape(member) + @"\b", m.Groups["value"].Value);
+        }
+        return body;
     }
 
     static string InsertPartClass(string content, string partSource)
@@ -313,19 +328,4 @@ public static class LiquidDrankToPartFixer
         return sb.ToString();
     }
 
-    static bool InNamespace(string content, int index, string ns)
-    {
-        var fileScoped = Regex.Match(content, @"^namespace\s+([\w.]+)\s*;", RegexOptions.Multiline);
-        if (fileScoped.Success)
-            return string.Equals(fileScoped.Groups[1].Value, ns, StringComparison.Ordinal);
-
-        Match? last = null;
-        foreach (Match m in Regex.Matches(content, @"\bnamespace\s+(?<ns>[\w.]+)\s*\{"))
-        {
-            if (m.Index >= index) break;
-            last = m;
-        }
-        return last is not null &&
-               string.Equals(last.Groups["ns"].Value, ns, StringComparison.Ordinal);
-    }
 }
