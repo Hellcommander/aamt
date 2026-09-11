@@ -264,7 +264,8 @@ public static class XmlOverlayMerger
     static bool InnerHasFragment(string inner, XmlFrag frag)
     {
         if (string.Equals(frag.Tag, "part", StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(frag.Tag, "stainElement", StringComparison.OrdinalIgnoreCase))
+            string.Equals(frag.Tag, "stainElement", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(frag.Tag, "freezeObject", StringComparison.OrdinalIgnoreCase))
         {
             if (string.IsNullOrEmpty(frag.NameAttr))
                 return Regex.IsMatch(inner, $@"<\s*{Regex.Escape(frag.Tag)}\b", RegexOptions.IgnoreCase);

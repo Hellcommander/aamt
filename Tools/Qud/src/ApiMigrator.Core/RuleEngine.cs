@@ -335,6 +335,18 @@ public sealed class RuleEngine
                 fixes.AddRange(tbFixes);
             }
 
+            // Current compiler signature repairs + healing for a few older malformed rewrites.
+            var (modernFixed, modernEdits) = ModernCompilerFixer.Fix(working);
+            if (modernEdits > 0)
+            {
+                working = modernFixed;
+                fixes.Add(new AppliedFix
+                {
+                    RuleName = ModernCompilerFixer.FixRuleName,
+                    Count = modernEdits,
+                });
+            }
+
             // CS1739: GetDisplayName(WithAnnotations:) → Annotations:
             var (gdnFixed, gdnEdits) = GetDisplayNameArgFixer.Fix(working);
             if (gdnEdits > 0)

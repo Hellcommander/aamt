@@ -2182,6 +2182,14 @@ var engine = new RuleEngine(
     var mergedAgain = XmlOverlayMerger.MergeMissingInner(mergedInner, "liquid", "ichor", incoming);
     Assert(mergedAgain == mergedInner, "second merge does not duplicate");
 
+    var freezeIncoming = """
+            <freezeObject Name="SmallBoulder" Threshold="1" Verb="solidify" />
+            <freezeObject Name="MediumBoulder" Threshold="100" Verb="solidify" />
+        """;
+    var freezeMerged = XmlOverlayMerger.MergeMissingInner(existingLiquid, "liquid", "ichor", freezeIncoming);
+    AssertContains(freezeMerged, "Name=\"SmallBoulder\"", "first freeze object merged");
+    AssertContains(freezeMerged, "Name=\"MediumBoulder\"", "second freeze object merged");
+
     AssertContains(ManualAdvice.DrankAdvice(), "MessageOnDrink", "DrankAdvice OnDrink");
     AssertContains(ManualAdvice.PreferXmlAdvice("Drank"), "LiquidDrankToPartFixer", "PreferXML.Drank");
     AssertContains(ManualAdvice.PreferHarmonyAdvice("Drank"), "Prefix/Postfix", "vanilla Drank Harmony");
@@ -2205,6 +2213,133 @@ var engine = new RuleEngine(
     AssertContains(gtFixed, "=text|initLowerIfArticle=", "InitLowerIfArticle");
     AssertContains(gtFixed, "=object.its=", "its property");
     AssertContains(gtFixed, "=object.verb:are=", "GetVerb");
+
+    // Real-world Winged-Monotone overload shapes: positional colors/subjects,
+    // variable-backed words, and long calls with optional named arguments.
+    const string extendedMessages = """
+        class ExtendedMessages {
+          void A(GameObject ParentObject, GameObject O) {
+            string verb1 = "begin to gather";
+            string extra1 = "psionic energy";
+            string termiPun1 = ".";
+            XDidY(ParentObject, verb1, extra1, termiPun1, "C", ParentObject);
+            IComponent<GameObject>.XDidY(ParentObject, "breath", "a cone of " + GetBreathName(), "!", null, null,
+              ParentObject, null, UseFullNames: false, IndefiniteSubject: false, null, null,
+              DescribeSubjectDirection: true);
+          }
+          void B(GameObject Object) {
+            DidX("are", "incapacitated", "!", null, null, Object);
+          }
+        }
+        """;
+    var (extendedOut, extendedN) = GameTextCallSiteFixer.Fix(extendedMessages);
+    Assert(extendedN >= 6, "extended message calls and locals: " + extendedN);
+    AssertNotContains(extendedOut, "XDidY(", "all extended XDidY calls gone");
+    AssertNotContains(extendedOut, "DidX(", "extended DidX gone");
+    AssertContains(extendedOut, "EmitMessage('C', ColorAsBadFor: ParentObject)", "color string becomes char");
+    AssertContains(extendedOut, ".SetArgument(\"extra\", \"a cone of \" + GetBreathName())", "dynamic extra retained");
+    AssertContains(extendedOut, ".SetSubject(Object)", "trailing DidX subject retained");
+    AssertNotContains(extendedOut, "string verb1", "consumed verb local removed");
+    AssertNotContains(extendedOut, "string extra1", "consumed extra local removed");
+    AssertNotContains(extendedOut, "string termiPun1", "consumed punctuation local removed");
+
+    const string sulfurLiquid = """
+        namespace XRL.Liquids {
+          class LiquidSulfur : BaseLiquid {
+            public LiquidSulfur() : base("liquidsulfur") {
+              FlameTemperature = 800;
+              Temperature = 360;
+              Weight = 0.3;
+              Glows = true;
+              FreezeObject1 = "SmallBoulder";
+              FreezeObjectThreshold1 = 1;
+              FreezeObjectVerb1 = "solidify";
+            }
+            public static List<string> Colors = new List<string>(3) { "A", "a", "y" };
+            public override List<string> GetColors() { return Colors; }
+            public override void BeforeRender(LiquidVolume Liquid) {
+              if (!Liquid.Sealed) { Liquid.AddLight(50); }
+            }
+            public override bool Vaporized(LiquidVolume Liquid, GameObject Object) { return false; }
+            public override bool Drank(LiquidVolume Liquid, int Volume, GameObject Target, StringBuilder Message, ref bool ExitInterface) {
+              Target.TemperatureChange(Temperature, Target);
+              ExitInterface = true;
+              return true;
+            }
+          }
+        }
+        """;
+    var (sulfurDrinkCs, sulfurDrinkN, _) = LiquidDrankToPartFixer.FixContent(sulfurLiquid);
+    Assert(sulfurDrinkN == 1, "sulfur Drank extracted first");
+    AssertContains(sulfurDrinkCs, "TemperatureChange(360, Target)", "part binds liquid Temperature literal");
+    AssertContains(sulfurDrinkCs, "try", "OnDrink body protected by finally");
+    AssertContains(sulfurDrinkCs, "E.ExitInterface = ExitInterface", "ExitInterface propagated");
+    AssertNotContains(sulfurDrinkCs, "SulfurOnDrinkBody", "no nested local return wrapper");
+    var (sulfurCs, sulfurN, sulfurXml) = LiquidCsToXmlFixer.FixContent(sulfurDrinkCs);
+    Assert(sulfurN >= 5, "consecutive sulfur fields migrated: " + sulfurN);
+    AssertNotContains(sulfurCs, "static List<string> Colors", "literal Colors field removed with getter");
+    AssertNotContains(sulfurCs, "GetColors()", "literal Colors getter removed");
+    Assert(sulfurXml.Any(l => l.InnerXml.Contains("<temperature>360</temperature>") &&
+                              l.InnerXml.Contains("<weight>0.3</weight>") &&
+                              l.InnerXml.Contains("<colors>Aay</colors>") &&
+                              l.InnerXml.Contains("<part Name=\"Glows\" Class=\"Glows\" LightLevel=\"50\" />") &&
+                              l.InnerXml.Contains("<part Name=\"NoVapor\" Class=\"NoVapor\" />") &&
+                              l.InnerXml.Contains("<freezeObject Name=\"SmallBoulder\" Threshold=\"1\" Verb=\"solidify\" />")),
+        "all consecutive liquid metadata emitted");
+    AssertNotContains(sulfurCs, "BeforeRender", "simple obsolete glow hook migrated");
+    AssertNotContains(sulfurCs, "Vaporized", "simple obsolete no-vapor hook migrated");
+
+    const string globalLiquid = """
+        class PoisonIchor : BaseLiquid {
+          public PoisonIchor() : base("poisonichor") { Temperature = 0; }
+          public override bool Drank(LiquidVolume Liquid, int Volume, GameObject Target, StringBuilder Message, ref bool ExitInterface) {
+            return true;
+          }
+        }
+        """;
+    var (globalDrinkOut, globalDrinkN, _) = LiquidDrankToPartFixer.FixContent(globalLiquid);
+    Assert(globalDrinkN == 1, "global-namespace liquid Drank extracted");
+    AssertContains(globalDrinkOut, "namespace XRL.Liquids.Parts", "global liquid gets namespaced part");
+    AssertNotContains(globalDrinkOut, "override bool Drank(LiquidVolume", "global obsolete Drank removed");
+
+    const string dynamicColors = """
+        class LiquidDynamic : BaseLiquid {
+          public static List<string> Colors = new List<string>(3) { "A", "a", GoldString };
+          public override List<string> GetColors() { return Colors; }
+        }
+        """;
+    var (dynamicColorsOut, _, _) = LiquidCsToXmlFixer.FixContent(dynamicColors);
+    AssertContains(dynamicColorsOut, "GoldString", "dynamic Colors field retained");
+    AssertContains(dynamicColorsOut, "GetColors()", "dynamic Colors getter retained");
+
+    const string modernDiagnostics = """
+        class ModernDiagnostics {
+          private int SecondDuration;
+          public override bool Render(RenderEvent E) { if (SecondDuration > 0) return false; return base.Render(E); }
+          void Damage(GameObject GO, GameObject attacker) {
+            TextBuilder stringBuilder = TextBuilder.Get();
+            int amount = 3;
+            GO.TakeDamage(amount, stringBuilder, null, null, null, attacker);
+            bool flag = false;
+            Brain.HasGoal("FleeLocation");
+            ParentObject.WantTurnTick(this);
+            E.Actor.GiveDramsEvent(10, "water");
+            FetchBitById('A');
+          }
+          bool Tick() { return base.Does = TurnTick; }
+        }
+        """;
+    var (modernOut, modernN) = ModernCompilerFixer.Fix(modernDiagnostics);
+    Assert(modernN >= 8, "modern compiler diagnostics fixed: " + modernN);
+    AssertContains(modernOut, "override void Render", "Render return type updated");
+    AssertContains(modernOut, "TakeDamage(ref amount, stringBuilder.ToString(),", "TakeDamage ref/TextBuilder fixed");
+    AssertContains(modernOut, "HasGoal<FleeLocation>()", "HasGoal generic fixed");
+    AssertContains(modernOut, "WantTurnTick()", "WantTurnTick arity fixed");
+    AssertContains(modernOut, ".GiveDrams(10", "GiveDramsEvent renamed");
+    AssertContains(modernOut, "BitType.FetchBitByCode('A')", "bit lookup renamed");
+    AssertNotContains(modernOut, "bool flag", "unused literal local removed");
+    AssertContains(modernOut, "SecondDuration = 0", "read-only default field explicitly initialized");
+    AssertContains(modernOut, "return base.WantTurnTick();", "older mangled tick return repaired");
 }
 
 // Improved Mutations follow-ups — FinalizeString CS1503, AppendSigned, DidX trailing defaults, itself, The+DisplayName
@@ -2455,8 +2590,9 @@ var engine = new RuleEngine(
               : $"{ParentObject.The}{ParentObject.ShortDisplayName} quells {displayName} spores.";
             var c = "As " + target.the + target.ShortDisplayName + " dissolves.";
             var d = absorber.The + absorber.ShortDisplayName + " burns brighter.";
-            var e = mutation.GetDisplayName(WithAnnotations: false);
-            return a + b + c + d + e;
+            var e = mutation?.GetDisplayName(WithAnnotations: false);
+            var f = sporePuffer?.GetDisplayName(WithAnnotations: false);
+            return a + b + c + d + e + f;
           }
         }
         """;
@@ -2470,7 +2606,7 @@ var engine = new RuleEngine(
     AssertNotContains(ccGt, "ParentObject.The", "The property gone");
     AssertNotContains(ccGt, "absorber.The", "absorber.The gone");
     var (ccGdn, gdnN) = GetDisplayNameArgFixer.Fix(ccGt);
-    Assert(gdnN == 1, "WithAnnotations rename count");
+    Assert(gdnN == 2, "WithAnnotations rename count");
     AssertContains(ccGdn, "GetDisplayName(Annotations: false)", "Annotations named arg");
     AssertNotContains(ccGdn, "WithAnnotations", "WithAnnotations gone");
 }
