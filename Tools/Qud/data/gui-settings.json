@@ -1,0 +1,21 @@
+{
+  "LastLocalMods": "d:\\games\\steam\\steamapps\\workshop\\content\\333640",
+  "LastWorkshop": "d:\\games\\steam\\steamapps\\workshop\\content\\333640",
+  "IncludeWorkshop": true,
+  "LastModFilter": "",
+  "LastCs0618Mod": "",
+  "OllamaUrl": "http://localhost:11434",
+  "OllamaModel": "codellama:7b-instruct",
+  "OllamaMaxHits": 1000,
+  "OllamaUseCloud": false,
+  "OllamaRememberApiKey": true,
+  "OllamaApiKey": "43cc227ea97d44ebbd73afbac1daa75e.i3Lo9fSqq4uMU5OZa8VT6t_P",
+  "RecentFolders": [
+    "d:\\games\\steam\\steamapps\\workshop\\content\\333640"
+  ],
+  "SelectedTab": 0,
+  "WindowWidth": 1180,
+  "WindowHeight": 760,
+  "WindowLeft": 690,
+  "WindowTop": 340
+}

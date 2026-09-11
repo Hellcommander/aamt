@@ -2,13 +2,10 @@
   "_meta": {
     "description": "Hand-verified, mechanically-safe find/replace rules applied by both the PowerShell CLI (Update-ObsoleteApis.ps1) and the C# ApiMigrator.Core engine used by the GUI. Compiled from data/charts/*.xml|*.json via ApiMigrator.Cli compile-rules. Regex syntax is .NET System.Text.RegularExpressions. Optional ensureUsings / requiresSubstring / enabled:false / postEnsureUsings as documented in data/charts/README.md.",
     "gameFileVersion": "2.0.212.30",
-    "capturedDate": "2026-09-06",
+    "capturedDate": "2026-09-11",
     "steamBetaKey": "lang-experimental",
     "steamBuildId": "24964365",
-    "notes": "Source of truth for edits: data/charts/ (compile-rules). Do not hand-edit this JSON except via compile."
-  },
-  "_addAction": {
-    "note": "AddActionFixer maps obsolete string AddAction overloads to AddAction(new InventoryAction { \u2026 }) when first arg is string/Name: and remaining args map to known InventoryAction fields. Classic (Name,Key,FireOnActor,Display,Command) vs modern (Name,Display,Command,\u2026) detected by 2nd positional char vs string. Skips Override (no InventoryAction field) while still consuming its positional arg. Named\u002Bpositional mixes skip already-filled slots. CS8209 \u0060_ = E.AddAction(...)\u0060 void discards are stripped. InventoryActionsXmlFixer (mod-scoped, runs first): literal Name/Display/Command/Key \u2192 AddXMLAction(\u0022Name\u0022) \u002B InventoryActions.xml overlay; same-file \u0060string cmd = \u0022\u2026\u0022\u0060 Command fields are resolved."
+    "notes": "Updated by refresh-dump --save."
   },
   "_addReplacerExpr": {
     "note": "ReplaceBuilder.AddReplacer: dump\u0027s generic obsolete message is now \u0027Decorate a valid method with VariableReplacer\u0027 (delegate/method-group forms). Value forms still \u2192 SetArgument (same arg order: Key/Alias, Value/Argument). Curated autofix: literal\u002Bliteral, literal\u002BexprWithDotOrCall, and literal\u002Bternary(? :) \u2192 SetArgument. Bare identifiers stay advice-only (string local vs Replacer method group)."
@@ -112,7 +109,7 @@
       "ensureUsings": [
         "XRL.World.Text"
       ],
-      "note": "From prior mod-fix work; Event.NewStringBuilder was removed in favor of the pooled TextBuilder.Get() factory. Always ensure using XRL.World.Text; TextBuilder is not in XRL.World. TextBuilderCsFixer reverts Get() to new StringBuilder() when the local is still passed to AppendName/Substitute."
+      "note": "From prior mod-fix work; Event.NewStringBuilder was removed in favor of the pooled TextBuilder.Get() factory. Always ensure using XRL.World.Text; TextBuilder is not in XRL.World. TextBuilderCsFixer reverts Get() to new StringBuilder() when the local is still passed to AppendName/Substitute, and retargets same-file ref StringBuilder parameters that receive a TextBuilder.Get local."
     },
     {
       "name": "XRL.World.TextBuilder -\u003E TextBuilder (wrong FQN)",
