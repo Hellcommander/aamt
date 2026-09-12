@@ -10,12 +10,18 @@ public static class ModernCompilerFixer
 {
     public const string FixRuleName = "current Qud compiler compatibility repairs";
 
-    static readonly Regex BoolRender = new(
-        @"\b(?<sig>(?:public|protected|internal)\s+(?:(?:sealed|unsafe)\s+)*override\s+)bool(?<tail>\s+Render\s*\(\s*RenderEvent\s+(?<event>[A-Za-z_]\w*)\s*\))",
+    static readonly Regex RenderOverride = new(
+        @"\b(?<sig>(?:public|protected|internal)\s+(?:(?:sealed|unsafe)\s+)*override\s+)(?<return>bool|void)(?<tail>\s+Render\s*\(\s*RenderEvent\s+(?<event>[A-Za-z_]\w*)\s*\))",
         RegexOptions.Compiled);
 
     static readonly Regex TakeDamageBuilder = new(
         @"\.TakeDamage\(\s*(?<amount>[A-Za-z_]\w*)\s*,\s*(?<builder>[A-Za-z_]\w*)\s*,",
+        RegexOptions.Compiled);
+
+    static readonly Regex VisualToRenderableSequence = new(
+        @"(?<head>ScopeDisposedList\s*<\s*IRenderable\s*>\s*\.\s*GetFromPoolFilledWith\s*\(\s*" +
+        @"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\.Select\s*\(\s*(?<item>[A-Za-z_]\w*)\s*=>\s*)" +
+        @"(?<visual>\k<item>\.renderable)(?<tail>\s*\)\s*\))",
         RegexOptions.Compiled);
 
     public static (string Content, int EditCount) Fix(string content)
@@ -27,6 +33,10 @@ public static class ModernCompilerFixer
         var edits = 0;
         working = FixRenderOverrides(working, ref edits);
         working = FixTakeDamageTextBuilder(working, ref edits);
+        working = ReplaceOutsideComments(working, VisualToRenderableSequence,
+            m => m.Groups["head"].Value + "(IRenderable)" + m.Groups["visual"].Value +
+                 m.Groups["tail"].Value,
+            ref edits);
         working = ReplaceOutsideComments(working,
             new Regex(@"\.(?<name>WantTurnTick)\(\s*(?:this|[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*\)", RegexOptions.Compiled),
             m => "." + m.Groups["name"].Value + "()", ref edits);
@@ -41,7 +51,7 @@ public static class ModernCompilerFixer
             _ => ".GiveDrams(", ref edits);
         working = ReplaceOutsideComments(working,
             new Regex(@"\bBitType\.GetBitTier\s*\(\s*(?<bit>[^()]+)\s*\)", RegexOptions.Compiled),
-            m => "BitType.FetchBitById(" + m.Groups["bit"].Value.Trim() + ").Tier", ref edits);
+            m => "BitType.BitMap[" + m.Groups["bit"].Value.Trim() + "].Tier", ref edits);
         working = ReplaceOutsideComments(working,
             new Regex(@"(?<![.\w])FetchBitById\s*\(", RegexOptions.Compiled),
             _ => "BitType.FetchBitByCode(", ref edits);
@@ -78,7 +88,7 @@ public static class ModernCompilerFixer
     static string FixRenderOverrides(string content, ref int edits)
     {
         var working = content;
-        foreach (Match m in BoolRender.Matches(content).Cast<Match>().Reverse())
+        foreach (Match m in RenderOverride.Matches(content).Cast<Match>().Reverse())
         {
             if (HitFilter.IsInsideComment(content, m.Index) || HitFilter.IsInsideStringLiteral(content, m.Index))
                 continue;
@@ -88,22 +98,18 @@ public static class ModernCompilerFixer
                 continue;
             var body = working[(open + 1)..close];
             var eventName = m.Groups["event"].Value;
-            var unsupportedReturn = Regex.Matches(body, @"\breturn\s+(?<expr>[^;]+);")
-                .Cast<Match>()
-                .Any(r =>
-                {
-                    var expr = r.Groups["expr"].Value.Trim();
-                    return expr is not "true" and not "false" &&
-                           !Regex.IsMatch(expr, @"^base\.Render\(\s*" + Regex.Escape(eventName) + @"\s*\)$");
-                });
-            if (unsupportedReturn)
+            // Render still returns bool in current Qud. Preserve correct source and only
+            // heal output from migrator versions that incorrectly changed it to void.
+            if (m.Groups["return"].Value == "bool")
                 continue;
 
             body = Regex.Replace(body,
-                @"\breturn\s+base\.Render\(\s*" + Regex.Escape(eventName) + @"\s*\)\s*;",
-                "base.Render(" + eventName + ");");
-            body = Regex.Replace(body, @"\breturn\s+(?:true|false)\s*;", "return;");
-            var newSig = m.Groups["sig"].Value + "void" + m.Groups["tail"].Value;
+                @"(?<!return\s)\bbase\.Render\(\s*" + Regex.Escape(eventName) + @"\s*\)\s*;",
+                "return base.Render(" + eventName + ");");
+            body = Regex.Replace(body, @"\breturn\s*;", "return true;");
+            if (!Regex.IsMatch(body.TrimEnd(), @"\breturn\s+[^;]+;\s*$"))
+                body = body.TrimEnd() + Environment.NewLine + "            return true;" + Environment.NewLine + "        ";
+            var newSig = m.Groups["sig"].Value + "bool" + m.Groups["tail"].Value;
             working = working[..m.Index] + newSig + working[(m.Index + m.Length)..(open + 1)] +
                       body + working[close..];
             edits++;

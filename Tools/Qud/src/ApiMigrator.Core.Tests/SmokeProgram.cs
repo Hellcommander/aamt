@@ -2343,6 +2343,7 @@ var engine = new RuleEngine(
     Assert(sulfurN >= 5, "consecutive sulfur fields migrated: " + sulfurN);
     AssertNotContains(sulfurCs, "static List<string> Colors", "literal Colors field removed with getter");
     AssertNotContains(sulfurCs, "GetColors()", "literal Colors getter removed");
+    AssertContains(sulfurCs, "TemperatureChange(360, Target)", "removed liquid property references bind to literals");
     Assert(sulfurXml.Any(l => l.InnerXml.Contains("<temperature>360</temperature>") &&
                               l.InnerXml.Contains("<weight>0.3</weight>") &&
                               l.InnerXml.Contains("<colors>Aay</colors>") &&
@@ -2391,11 +2392,15 @@ var engine = new RuleEngine(
             FetchBitById('A');
           }
           bool Tick() { return base.Does = TurnTick; }
+          void Icons(IEnumerable<MissileWeaponAreaWeaponStatus> statuses) {
+            using var icons = ScopeDisposedList<IRenderable>.GetFromPoolFilledWith(statuses.Select(s => s.renderable));
+          }
         }
         """;
     var (modernOut, modernN) = ModernCompilerFixer.Fix(modernDiagnostics);
     Assert(modernN >= 8, "modern compiler diagnostics fixed: " + modernN);
-    AssertContains(modernOut, "override void Render", "Render return type updated");
+    AssertContains(modernOut, "override bool Render", "current bool Render return type preserved");
+    AssertContains(modernOut, "return base.Render(E)", "Render return value preserved");
     AssertContains(modernOut, "TakeDamage(ref amount, stringBuilder.ToString(),", "TakeDamage ref/TextBuilder fixed");
     AssertContains(modernOut, "HasGoal<FleeLocation>()", "HasGoal generic fixed");
     AssertContains(modernOut, "WantTurnTick()", "WantTurnTick arity fixed");
@@ -2404,6 +2409,14 @@ var engine = new RuleEngine(
     AssertNotContains(modernOut, "bool flag", "unused literal local removed");
     AssertContains(modernOut, "SecondDuration = 0", "read-only default field explicitly initialized");
     AssertContains(modernOut, "return base.WantTurnTick();", "older mangled tick return repaired");
+    AssertContains(modernOut, "Select(s => (IRenderable)s.renderable)",
+        "Visual value sequence cast to IRenderable");
+
+    const string mangledRender = "class OldOutput { public override void Render(RenderEvent E) { base.Render(E); } }";
+    var (healedRender, healedRenderN) = ModernCompilerFixer.Fix(mangledRender);
+    Assert(healedRenderN == 1, "older void Render output healed");
+    AssertContains(healedRender, "override bool Render", "void Render changed back to bool");
+    AssertContains(healedRender, "return base.Render(E);", "base Render result returned");
 }
 
 // Improved Mutations follow-ups — FinalizeString CS1503, AppendSigned, DidX trailing defaults, itself, The+DisplayName

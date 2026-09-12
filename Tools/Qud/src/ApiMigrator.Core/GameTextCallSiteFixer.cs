@@ -670,6 +670,15 @@ public static class GameTextCallSiteFixer
         var window = content[start..index];
         if (Regex.IsMatch(window, @"\b(?:Apply|Remove)\s*\(\s*GameObject\s+Object\b"))
             return "Object";
+        foreach (Match classMatch in Regex.Matches(content[..index],
+                     @"\bclass\s+[A-Za-z_]\w*\s*:\s*(?<bases>[^\{]+)\{"))
+        {
+            if (!Regex.IsMatch(classMatch.Groups["bases"].Value, @"\bEffect\b"))
+                continue;
+            var open = classMatch.Index + classMatch.Length - 1;
+            if (CsText.TryFindMatchingBrace(content, open, out var close) && close >= index)
+                return "Object";
+        }
         return "ParentObject";
     }
 
