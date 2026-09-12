@@ -18,6 +18,12 @@ public static class ModernCompilerFixer
         @"\.TakeDamage\(\s*(?<amount>[A-Za-z_]\w*)\s*,\s*(?<builder>[A-Za-z_]\w*)\s*,",
         RegexOptions.Compiled);
 
+    static readonly Regex VisualToRenderableSequence = new(
+        @"(?<head>ScopeDisposedList\s*<\s*IRenderable\s*>\s*\.\s*GetFromPoolFilledWith\s*\(\s*" +
+        @"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\.Select\s*\(\s*(?<item>[A-Za-z_]\w*)\s*=>\s*)" +
+        @"(?<visual>\k<item>\.renderable)(?<tail>\s*\)\s*\))",
+        RegexOptions.Compiled);
+
     public static (string Content, int EditCount) Fix(string content)
     {
         if (string.IsNullOrEmpty(content))
@@ -27,6 +33,10 @@ public static class ModernCompilerFixer
         var edits = 0;
         working = FixRenderOverrides(working, ref edits);
         working = FixTakeDamageTextBuilder(working, ref edits);
+        working = ReplaceOutsideComments(working, VisualToRenderableSequence,
+            m => m.Groups["head"].Value + "(IRenderable)" + m.Groups["visual"].Value +
+                 m.Groups["tail"].Value,
+            ref edits);
         working = ReplaceOutsideComments(working,
             new Regex(@"\.(?<name>WantTurnTick)\(\s*(?:this|[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)\s*\)", RegexOptions.Compiled),
             m => "." + m.Groups["name"].Value + "()", ref edits);

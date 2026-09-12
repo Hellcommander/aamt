@@ -2391,10 +2391,13 @@ var engine = new RuleEngine(
             FetchBitById('A');
           }
           bool Tick() { return base.Does = TurnTick; }
+          void Icons(IEnumerable<MissileWeaponAreaWeaponStatus> statuses) {
+            using var icons = ScopeDisposedList<IRenderable>.GetFromPoolFilledWith(statuses.Select(s => s.renderable));
+          }
         }
         """;
     var (modernOut, modernN) = ModernCompilerFixer.Fix(modernDiagnostics);
-    Assert(modernN >= 8, "modern compiler diagnostics fixed: " + modernN);
+    Assert(modernN >= 9, "modern compiler diagnostics fixed: " + modernN);
     AssertContains(modernOut, "override void Render", "Render return type updated");
     AssertContains(modernOut, "TakeDamage(ref amount, stringBuilder.ToString(),", "TakeDamage ref/TextBuilder fixed");
     AssertContains(modernOut, "HasGoal<FleeLocation>()", "HasGoal generic fixed");
@@ -2404,6 +2407,8 @@ var engine = new RuleEngine(
     AssertNotContains(modernOut, "bool flag", "unused literal local removed");
     AssertContains(modernOut, "SecondDuration = 0", "read-only default field explicitly initialized");
     AssertContains(modernOut, "return base.WantTurnTick();", "older mangled tick return repaired");
+    AssertContains(modernOut, "Select(s => (IRenderable)s.renderable)",
+        "Visual value sequence cast to IRenderable");
 }
 
 // Improved Mutations follow-ups — FinalizeString CS1503, AppendSigned, DidX trailing defaults, itself, The+DisplayName
