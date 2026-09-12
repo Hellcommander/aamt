@@ -21,6 +21,8 @@ public static class BlueprintTypeNamespaceFixer
     public const string FixRuleNameUsing = "ensure using for moved blueprint types";
     public const string FixRuleNamePartialSync =
         "partial class namespace → match moved IPart/mutation/builder";
+    public const string FixRuleNameStalePartsUsing =
+        "remove stale custom .Parts using after namespace migration";
 
     public const string PartsNs = "XRL.World.Parts";
     public const string MutationNs = "XRL.World.Parts.Mutation";
@@ -110,6 +112,8 @@ public static class BlueprintTypeNamespaceFixer
             }
         }
 
+        RemovePreviouslyMigratedPartsUsings(working, result);
+
         if (moved.Count == 0) return result;
 
         SyncPartialClassNamespaces(working, result, moved);
@@ -152,6 +156,57 @@ public static class BlueprintTypeNamespaceFixer
         }
 
         return result;
+    }
+
+    static void RemovePreviouslyMigratedPartsUsings(
+        Dictionary<string, string> working,
+        ModFixResult result)
+    {
+        var targetTypes = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var content in working.Values)
+        {
+            foreach (Match ns in NamespaceBlockRx.Matches(content))
+            {
+                if (!ns.Groups["ns"].Value.Equals(PartsNs, StringComparison.Ordinal)) continue;
+                var close = FindMatchingBrace(content, ns.Groups["body"].Index);
+                if (close < 0) continue;
+                var body = content.Substring(ns.Groups["body"].Index + 1,
+                    close - ns.Groups["body"].Index - 1);
+                foreach (var type in ClassifyPublicClasses(body)) targetTypes.Add(type.Name);
+            }
+        }
+        if (targetTypes.Count == 0) return;
+
+        var declaredNamespaces = NamespaceBlockRx.Matches(string.Join("\n", working.Values))
+            .Cast<Match>().Select(m => m.Groups["ns"].Value)
+            .ToHashSet(StringComparer.Ordinal);
+        var rx = new Regex(@"(?m)^[ \t]*using\s+(?<ns>[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*\.Parts)\s*;[ \t]*\r?\n?",
+            RegexOptions.Compiled);
+
+        foreach (var path in working.Keys.ToList())
+        {
+            var content = working[path];
+            var count = 0;
+            var next = rx.Replace(content, m =>
+            {
+                var oldNs = m.Groups["ns"].Value;
+                var rootNs = oldNs[..^".Parts".Length];
+                var belongsToMod = declaredNamespaces.Any(ns =>
+                    ns.Equals(rootNs, StringComparison.Ordinal) ||
+                    ns.StartsWith(rootNs + ".", StringComparison.Ordinal));
+                if (declaredNamespaces.Contains(oldNs) || !belongsToMod ||
+                    !ReferencesAnyType(content, targetTypes))
+                    return m.Value;
+                count++;
+                return "";
+            });
+            if (count == 0) continue;
+            if (ReferencesAnyType(next, targetTypes) && !HasUsing(next, PartsNs))
+                next = UsingInserter.EnsureUsings(next, new[] { PartsNs }).Content;
+            working[path] = next;
+            result.UpdatedContents[path] = next;
+            result.Fixes.Add((path, new AppliedFix { RuleName = FixRuleNameStalePartsUsing, Count = count }));
+        }
     }
 
     /// <summary>

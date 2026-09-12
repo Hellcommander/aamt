@@ -447,7 +447,8 @@ function Remove-NullableRefAnnotations {
         'Boolean','Byte','SByte','Int16','UInt16','Int32','UInt32','Int64','UInt64','Single','Double','Decimal','Char',
         'DialogResult','DateTime','DateTimeOffset','TimeSpan','Guid','IntPtr','UIntPtr','Half','Rune','Index','Range',
         'DayOfWeek','ConsoleKey','ConsoleModifiers','KeyCode','Color','Color32','Vector2','Vector3','Vector4','Quaternion',
-        'Rect','RectInt','Bounds','BoundsInt','Ray','Ray2D','Plane','Matrix4x4','Vector2Int','Vector3Int','LayerMask','Hash128'
+        'Rect','RectInt','Bounds','BoundsInt','Ray','Ray2D','Plane','Matrix4x4','Vector2Int','Vector3Int','LayerMask','Hash128',
+        'LightLevel'
     )) { [void]$preserve.Add($v) }
 
     foreach ($m in [regex]::Matches($Content, '\benum\s+(?<name>[A-Za-z_][\w]*)\b')) {
