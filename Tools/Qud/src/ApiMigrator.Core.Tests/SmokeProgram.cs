@@ -642,6 +642,25 @@ var engine = new RuleEngine(
     var ns2 = BlueprintTypeNamespaceFixer.FixMod(map2);
     AssertContains(ns2.UpdatedContents["EnhancedAIMemoryPart.cs"], "namespace XRL.World.Parts", "memory part moved");
     AssertContains(ns2.UpdatedContents["EnhancedAIMemoryPart.cs"], "using ThreadingAPI;", "old ns using after move");
+
+    // Heal an already-migrated mod whose custom .Parts namespace no longer exists.
+    var staleParts = BlueprintTypeNamespaceFixer.FixMod(new Dictionary<string, string>
+    {
+        ["FearMyGlimmer.cs"] = """
+            using FearMyGlimmer.Parts;
+            namespace XRL.World.Parts { public class FearMyGlimmerPart : IPart { } }
+            """,
+        ["PlayerMutator.cs"] = """
+            using FearMyGlimmer.Parts;
+            namespace FearMyGlimmer.HarmonyPatches { public class PlayerMutator { FearMyGlimmerPart Part; } }
+            """,
+    });
+    AssertNotContains(staleParts.UpdatedContents["FearMyGlimmer.cs"], "using FearMyGlimmer.Parts;",
+        "stale self using removed");
+    AssertNotContains(staleParts.UpdatedContents["PlayerMutator.cs"], "using FearMyGlimmer.Parts;",
+        "stale consumer using removed");
+    AssertContains(staleParts.UpdatedContents["PlayerMutator.cs"], "using XRL.World.Parts;",
+        "migrated part consumer imports target namespace");
 }
 
 // Partial siblings without : IPart must move with the primary partial (Broodmother Commands)
@@ -793,6 +812,38 @@ var engine = new RuleEngine(
     AssertContains(cleaned, "DialogResult?", "DialogResult? kept");
     AssertContains(cleaned, "go?.Blueprint", "?. kept");
     AssertContains(cleaned, "?? \"x\"", "?? kept");
+
+    // LightLevel is a CoQ enum. Stripping its nullable marker breaks optional-cell
+    // GetLight() assignments and null switch arms (Vampirism Nightbeast).
+    const string lightLevelSrc = """
+        class StealthCore {
+          public static LightLevel? LightLevel;
+          static bool Shrouded() => LightLevel switch {
+            XRL.World.LightLevel.None => true,
+            null => false,
+            _ => false
+          };
+          static void Refresh() { LightLevel = The.Player.CurrentCell?.GetLight(); }
+        }
+        """;
+    var (lightLevelCleaned, lightLevelEdits) = NullableAnnotationCleaner.Clean(lightLevelSrc);
+    AssertContains(lightLevelCleaned, "LightLevel? LightLevel", "CoQ LightLevel? kept");
+    AssertContains(lightLevelCleaned, "CurrentCell?.GetLight()", "nullable GetLight assignment kept");
+    AssertContains(lightLevelCleaned, "null => false", "nullable enum null switch arm kept");
+    Assert(lightLevelEdits == 0, "valid LightLevel? source must not be edited");
+
+    var (healedLightLevel, healedLightLevelEdits) = ModernCompilerFixer.Fix(
+        lightLevelSrc.Replace("LightLevel? LightLevel", "LightLevel LightLevel", StringComparison.Ordinal));
+    Assert(healedLightLevelEdits == 1, "previously stripped LightLevel field healed once");
+    AssertContains(healedLightLevel, "LightLevel? LightLevel", "stripped CoQ LightLevel? restored");
+    var (stableLightLevel, stableLightLevelEdits) = ModernCompilerFixer.Fix(healedLightLevel);
+    Assert(stableLightLevelEdits == 0 && stableLightLevel == healedLightLevel,
+        "LightLevel backward repair idempotent");
+
+    var (requiredLightLevel, requiredLightLevelEdits) = ModernCompilerFixer.Fix(
+        "class C { public static LightLevel LightLevel; static bool Lit() => LightLevel == XRL.World.LightLevel.Light; }");
+    Assert(requiredLightLevelEdits == 0, "required LightLevel field left non-nullable");
+    AssertNotContains(requiredLightLevel, "LightLevel?", "non-nullable LightLevel not broadened");
     // Engine path records the fix
     var (viaEngine, fixes) = engine.ApplyCuratedRules(src, "NullableSmoke.cs");
     AssertNotContains(viaEngine, "#nullable", "engine strip directive");
@@ -2377,6 +2428,24 @@ var engine = new RuleEngine(
     AssertContains(dynamicColorsOut, "GoldString", "dynamic Colors field retained");
     AssertContains(dynamicColorsOut, "GetColors()", "dynamic Colors getter retained");
 
+    const string strippedLiquid = """
+        class LiquidSulfur : BaseLiquid {
+          public LiquidSulfur() : base("liquidsulfur") { }
+          public override List<string> GetColors() { return Colors; }
+          bool Burns(GameObject GO) => GO.Physics.FlameTemperature > Temperature;
+        }
+        """;
+    var strippedPath = Path.Combine("mod", "LiquidSulfur.cs");
+    var strippedXmlPath = Path.Combine("mod", "Liquids.xml");
+    var strippedFix = LiquidCsToXmlFixer.FixMod("mod", new Dictionary<string, string>
+    {
+        [strippedPath] = strippedLiquid,
+        [strippedXmlPath] = "<liquids><liquid Name=\"liquidsulfur\"><temperature>360</temperature><colors>Aay</colors></liquid></liquids>",
+    });
+    Assert(strippedFix.UpdatedContents.ContainsKey(strippedPath), "stripped liquid output repaired from XML");
+    AssertNotContains(strippedFix.UpdatedContents[strippedPath], "GetColors()", "dangling Colors getter removed");
+    AssertContains(strippedFix.UpdatedContents[strippedPath], "FlameTemperature > 360", "dangling Temperature rebound from XML");
+
     const string modernDiagnostics = """
         class ModernDiagnostics {
           private int SecondDuration;
@@ -2417,6 +2486,19 @@ var engine = new RuleEngine(
     Assert(healedRenderN == 1, "older void Render output healed");
     AssertContains(healedRender, "override bool Render", "void Render changed back to bool");
     AssertContains(healedRender, "return base.Render(E);", "base Render result returned");
+
+    var (healedBit, healedBitN) = ModernCompilerFixer.Fix(
+        "var tier = BitType.FetchBitById(Bit.Key).Tier;");
+    Assert(healedBitN == 1, "older invalid qualified bit lookup healed");
+    AssertContains(healedBit, "BitType.BitMap[Bit.Key].Tier", "qualified bit lookup uses BitMap");
+
+    var (healedEffect, healedEffectN) = GameTextCallSiteFixer.Fix("""
+        class CrystniumGasEffect : Effect {
+          void Expire() { "gone".StartReplace().SetSubject(ParentObject).EmitMessage(); }
+        }
+        """);
+    Assert(healedEffectN == 1, "older invalid Effect message subject healed");
+    AssertContains(healedEffect, "SetSubject(Object)", "Effect message uses Object");
 }
 
 // Improved Mutations follow-ups — FinalizeString CS1503, AppendSigned, DidX trailing defaults, itself, The+DisplayName

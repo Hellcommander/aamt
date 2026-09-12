@@ -40,6 +40,8 @@ public static class NullableAnnotationCleaner
         "KeyCode", "Color", "Color32", "Vector2", "Vector3", "Vector4", "Quaternion",
         "Rect", "RectInt", "Bounds", "BoundsInt", "Ray", "Ray2D", "Plane", "Matrix4x4",
         "Vector2Int", "Vector3Int", "LayerMask", "Hash128",
+        // CoQ enum returned by Cell.GetLight(). It is commonly nullable when a cell is absent.
+        "LightLevel",
         // CoQ: XRL.Version is a struct (System.Version is a class — only preserve when
         // the file aliases/qualifies XRL.Version; see Clean).
         "XRL.Version",

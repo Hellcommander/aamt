@@ -24,6 +24,11 @@ public static class ModernCompilerFixer
         @"(?<visual>\k<item>\.renderable)(?<tail>\s*\)\s*\))",
         RegexOptions.Compiled);
 
+    static readonly Regex NonNullableLightLevelField = new(
+        @"(?m)^(?<prefix>[ \t]*(?:public|private|protected|internal)\s+(?:(?:static|readonly|volatile)\s+)*)" +
+        @"(?<type>(?:XRL\.World\.)?LightLevel)(?<tail>\s+(?<name>[A-Za-z_]\w*)\s*;)",
+        RegexOptions.Compiled);
+
     public static (string Content, int EditCount) Fix(string content)
     {
         if (string.IsNullOrEmpty(content))
@@ -32,6 +37,7 @@ public static class ModernCompilerFixer
         var working = content;
         var edits = 0;
         working = FixRenderOverrides(working, ref edits);
+        working = FixNullableLightLevelFields(working, ref edits);
         working = FixTakeDamageTextBuilder(working, ref edits);
         working = ReplaceOutsideComments(working, VisualToRenderableSequence,
             m => m.Groups["head"].Value + "(IRenderable)" + m.Groups["visual"].Value +
@@ -51,6 +57,9 @@ public static class ModernCompilerFixer
             _ => ".GiveDrams(", ref edits);
         working = ReplaceOutsideComments(working,
             new Regex(@"\bBitType\.GetBitTier\s*\(\s*(?<bit>[^()]+)\s*\)", RegexOptions.Compiled),
+            m => "BitType.BitMap[" + m.Groups["bit"].Value.Trim() + "].Tier", ref edits);
+        working = ReplaceOutsideComments(working,
+            new Regex(@"\bBitType\.FetchBitById\s*\(\s*(?<bit>[^()]+)\s*\)\.Tier", RegexOptions.Compiled),
             m => "BitType.BitMap[" + m.Groups["bit"].Value.Trim() + "].Tier", ref edits);
         working = ReplaceOutsideComments(working,
             new Regex(@"(?<![.\w])FetchBitById\s*\(", RegexOptions.Compiled),
@@ -83,6 +92,29 @@ public static class ModernCompilerFixer
         working = RemoveUnusedLiteralLocals(working, ref edits);
         working = InitializeReadOnlyDefaultFields(working, ref edits);
         return (working, edits);
+    }
+
+    static string FixNullableLightLevelFields(string content, ref int edits)
+    {
+        var working = content;
+        foreach (Match field in NonNullableLightLevelField.Matches(content).Cast<Match>().Reverse())
+        {
+            if (HitFilter.IsInsideComment(content, field.Index) || HitFilter.IsInsideStringLiteral(content, field.Index))
+                continue;
+
+            var name = Regex.Escape(field.Groups["name"].Value);
+            var nullableSwitch = new Regex(
+                @"\b" + name + @"\s+switch\s*\{(?:(?!\}).){0,1000}\bnull\s*=>",
+                RegexOptions.Singleline);
+            if (!nullableSwitch.IsMatch(content))
+                continue;
+
+            var replacement = field.Groups["prefix"].Value + field.Groups["type"].Value + "?" +
+                              field.Groups["tail"].Value;
+            working = working[..field.Index] + replacement + working[(field.Index + field.Length)..];
+            edits++;
+        }
+        return working;
     }
 
     static string FixRenderOverrides(string content, ref int edits)

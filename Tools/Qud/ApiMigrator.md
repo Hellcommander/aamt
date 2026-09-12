@@ -171,9 +171,10 @@ Launch-ApiMigrator.bat
 The bar under the title pins which **API dump profile** migrate uses (`public` vs `lang-experimental`
 vs follow Steam). Same pin as `Switch-Api.bat` / `switch-api`.
 
-Double-click it, or run it from a terminal. It just does `dotnet run -c Release -r win-x64`
-inside `src\ApiMigratorGui`. First launch will restore/build the project (a few seconds);
-subsequent launches are fast.
+Double-click it, or run it from a terminal. It builds `src\ApiMigratorGui` in Release for
+`win-x64`, then starts the resulting executable. The launcher performs that incremental build
+every time so an executable left in `bin` cannot silently use an older `ApiMigrator.Core.dll`.
+First launch will restore/build the project (a few seconds); subsequent launches are fast.
 
 Equivalent manual command:
 
@@ -185,6 +186,13 @@ dotnet run -c Release -r win-x64
 Requires the .NET 8 SDK (or newer) — already present on this machine (`dotnet --list-sdks`).
 All ApiMigrator app hosts (CLI, GUI, tests) are built for **x64** only (`PlatformTarget=x64`,
 `RuntimeIdentifier=win-x64`) — not AnyCPU.
+
+### Rebuilding in Visual Studio
+
+Open `ApiMigrator.sln` in Visual Studio 2022 with the **.NET desktop development** workload,
+select **Release | x64**, then choose **Build → Rebuild Solution**. The solution contains the GUI,
+CLI, Core library, and Core tests; the GUI output is written beneath
+`src\ApiMigratorGui\bin\Release\net8.0-windows\win-x64`.
 
 ### GUI tabs
 
@@ -703,6 +711,7 @@ earlier in the same file.
 
 ```
   README.md / ApiMigrator.md       - this file / migrator details
+  ApiMigrator.sln                   - Visual Studio rebuild solution (GUI / CLI / Core / tests)
   Launch-Gui.bat                    - menu of all Qud GUIs
   Launch-ApiMigrator.bat            - Obsolete-API Migrator GUI
   Switch-Api.bat                    - pin dump+rules to public / lang / live (or --list)
