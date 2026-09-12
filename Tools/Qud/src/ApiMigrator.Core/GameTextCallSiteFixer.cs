@@ -97,6 +97,7 @@ public static class GameTextCallSiteFixer
         working = FixPronounProperties(working, ref edits);
         working = FixPronounNameConcat(working, ref edits);
         working = FixSimpleDidXToY(working, ref edits);
+        working = FixEffectParentObjectSubjects(working, ref edits);
         working = RemoveNowUnusedMessageLocals(working, ref edits);
 
         if (edits == 0)
@@ -680,6 +681,40 @@ public static class GameTextCallSiteFixer
                 return "Object";
         }
         return "ParentObject";
+    }
+
+    static string FixEffectParentObjectSubjects(string content, ref int edits)
+    {
+        var working = content;
+        var classes = Regex.Matches(content,
+                @"\bclass\s+[A-Za-z_]\w*\s*:\s*(?<bases>[^\{]+)\{")
+            .Cast<Match>()
+            .Reverse();
+        foreach (var classMatch in classes)
+        {
+            if (!Regex.IsMatch(classMatch.Groups["bases"].Value, @"\bEffect\b"))
+                continue;
+            var open = classMatch.Index + classMatch.Length - 1;
+            if (!CsText.TryFindMatchingBrace(working, open, out var close))
+                continue;
+            var body = working[(open + 1)..close];
+            if (Regex.IsMatch(body, @"\bGameObject\s+ParentObject\b"))
+                continue;
+            var count = 0;
+            var repaired = Regex.Replace(body, @"\.SetSubject\(\s*ParentObject\s*\)", m =>
+            {
+                if (HitFilter.IsInsideComment(body, m.Index) ||
+                    HitFilter.IsInsideStringLiteral(body, m.Index))
+                    return m.Value;
+                count++;
+                return ".SetSubject(Object)";
+            });
+            if (count == 0)
+                continue;
+            working = working[..(open + 1)] + repaired + working[close..];
+            edits += count;
+        }
+        return working;
     }
 
     static readonly HashSet<string> ComponentReceiverLeaves = new(StringComparer.Ordinal)

@@ -2377,6 +2377,24 @@ var engine = new RuleEngine(
     AssertContains(dynamicColorsOut, "GoldString", "dynamic Colors field retained");
     AssertContains(dynamicColorsOut, "GetColors()", "dynamic Colors getter retained");
 
+    const string strippedLiquid = """
+        class LiquidSulfur : BaseLiquid {
+          public LiquidSulfur() : base("liquidsulfur") { }
+          public override List<string> GetColors() { return Colors; }
+          bool Burns(GameObject GO) => GO.Physics.FlameTemperature > Temperature;
+        }
+        """;
+    var strippedPath = Path.Combine("mod", "LiquidSulfur.cs");
+    var strippedXmlPath = Path.Combine("mod", "Liquids.xml");
+    var strippedFix = LiquidCsToXmlFixer.FixMod("mod", new Dictionary<string, string>
+    {
+        [strippedPath] = strippedLiquid,
+        [strippedXmlPath] = "<liquids><liquid Name=\"liquidsulfur\"><temperature>360</temperature><colors>Aay</colors></liquid></liquids>",
+    });
+    Assert(strippedFix.UpdatedContents.ContainsKey(strippedPath), "stripped liquid output repaired from XML");
+    AssertNotContains(strippedFix.UpdatedContents[strippedPath], "GetColors()", "dangling Colors getter removed");
+    AssertContains(strippedFix.UpdatedContents[strippedPath], "FlameTemperature > 360", "dangling Temperature rebound from XML");
+
     const string modernDiagnostics = """
         class ModernDiagnostics {
           private int SecondDuration;
@@ -2417,6 +2435,19 @@ var engine = new RuleEngine(
     Assert(healedRenderN == 1, "older void Render output healed");
     AssertContains(healedRender, "override bool Render", "void Render changed back to bool");
     AssertContains(healedRender, "return base.Render(E);", "base Render result returned");
+
+    var (healedBit, healedBitN) = ModernCompilerFixer.Fix(
+        "var tier = BitType.FetchBitById(Bit.Key).Tier;");
+    Assert(healedBitN == 1, "older invalid qualified bit lookup healed");
+    AssertContains(healedBit, "BitType.BitMap[Bit.Key].Tier", "qualified bit lookup uses BitMap");
+
+    var (healedEffect, healedEffectN) = GameTextCallSiteFixer.Fix("""
+        class CrystniumGasEffect : Effect {
+          void Expire() { "gone".StartReplace().SetSubject(ParentObject).EmitMessage(); }
+        }
+        """);
+    Assert(healedEffectN == 1, "older invalid Effect message subject healed");
+    AssertContains(healedEffect, "SetSubject(Object)", "Effect message uses Object");
 }
 
 // Improved Mutations follow-ups — FinalizeString CS1503, AppendSigned, DidX trailing defaults, itself, The+DisplayName

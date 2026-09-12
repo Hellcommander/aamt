@@ -53,6 +53,9 @@ public static class ModernCompilerFixer
             new Regex(@"\bBitType\.GetBitTier\s*\(\s*(?<bit>[^()]+)\s*\)", RegexOptions.Compiled),
             m => "BitType.BitMap[" + m.Groups["bit"].Value.Trim() + "].Tier", ref edits);
         working = ReplaceOutsideComments(working,
+            new Regex(@"\bBitType\.FetchBitById\s*\(\s*(?<bit>[^()]+)\s*\)\.Tier", RegexOptions.Compiled),
+            m => "BitType.BitMap[" + m.Groups["bit"].Value.Trim() + "].Tier", ref edits);
+        working = ReplaceOutsideComments(working,
             new Regex(@"(?<![.\w])FetchBitById\s*\(", RegexOptions.Compiled),
             _ => "BitType.FetchBitByCode(", ref edits);
         working = ReplaceOutsideComments(working,

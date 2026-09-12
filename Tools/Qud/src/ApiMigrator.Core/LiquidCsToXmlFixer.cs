@@ -142,6 +142,12 @@ public static class LiquidCsToXmlFixer
 
         var liquids = new List<(string Name, string InnerXml)>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var xmlPath = Path.Combine(modRoot, "Liquids.xml");
+        string existing = "";
+        if (pathToContent.TryGetValue(xmlPath, out var fromMap))
+            existing = fromMap;
+        else if (File.Exists(xmlPath))
+            existing = File.ReadAllText(xmlPath);
 
         foreach (var (path, content) in pathToContent)
         {
@@ -150,8 +156,10 @@ public static class LiquidCsToXmlFixer
             if (content.IndexOf("BaseLiquid", StringComparison.Ordinal) < 0)
                 continue;
 
-            var (next, edits, extracted) = FixContent(content);
-            if (edits == 0)
+            var (repaired, repairEdits) = RepairFromExistingXml(content, existing);
+            var (next, edits, extracted) = FixContent(repaired);
+            var totalEdits = repairEdits + edits;
+            if (totalEdits == 0)
                 continue;
 
             var addedHere = 0;
@@ -167,22 +175,22 @@ public static class LiquidCsToXmlFixer
                 addedHere++;
             }
 
-            if (addedHere == 0)
-                continue;
+            if (extracted.Count > 0 && addedHere == 0)
+            {
+                if (repairEdits == 0)
+                    continue;
+                // Keep the historical duplicate-liquid safeguard: apply only the
+                // independent repair, not metadata stripping we could not collect.
+                next = repaired;
+                totalEdits = repairEdits;
+            }
 
             result.UpdatedContents[path] = next;
-            result.Fixes.Add((path, new AppliedFix { RuleName = FixRuleName, Count = edits }));
+            result.Fixes.Add((path, new AppliedFix { RuleName = FixRuleName, Count = totalEdits }));
         }
 
         if (liquids.Count == 0)
             return result;
-
-        var xmlPath = Path.Combine(modRoot, "Liquids.xml");
-        string existing = "";
-        if (pathToContent.TryGetValue(xmlPath, out var fromMap))
-            existing = fromMap;
-        else if (File.Exists(xmlPath))
-            existing = File.ReadAllText(xmlPath);
 
         var merged = XmlOverlayMerger.MergeNamedChildren(existing, "liquids", "liquid", liquids);
         foreach (var liq in liquids)
@@ -195,6 +203,65 @@ public static class LiquidCsToXmlFixer
             Count = liquids.Count,
         }));
         return result;
+    }
+
+    static (string Content, int EditCount) RepairFromExistingXml(string content, string liquidsXml)
+    {
+        if (string.IsNullOrWhiteSpace(content) || string.IsNullOrWhiteSpace(liquidsXml))
+            return (content, 0);
+
+        var working = content;
+        var edits = 0;
+        foreach (Match cm in ClassDecl.Matches(content).Cast<Match>().Reverse())
+        {
+            if (!Regex.IsMatch(cm.Groups["bases"].Value, @"\bBaseLiquid\b"))
+                continue;
+            var open = working.IndexOf('{', cm.Index + cm.Length - 1);
+            if (open < 0 || !CsText.TryFindMatchingBrace(working, open, out var close))
+                continue;
+            var body = working[(open + 1)..close];
+            var classSpan = working[cm.Index..close];
+            var liquidName = LiquidXmlName(cm.Groups["name"].Value, classSpan);
+            if (!XmlOverlayMerger.TryFindNamedElement(liquidsXml, "liquid", liquidName,
+                    out _, out var innerStart, out var innerEnd, out _))
+                continue;
+            var xmlBody = liquidsXml[innerStart..innerEnd];
+            var bodyEdits = 0;
+
+            if (Regex.IsMatch(xmlBody, @"<\s*colors\b", RegexOptions.IgnoreCase) &&
+                !ColorsField.IsMatch(body))
+            {
+                body = GetColorsOverride.Replace(body, m =>
+                {
+                    bodyEdits++;
+                    return m.Groups["eol"].Value;
+                });
+            }
+
+            var temperature = Regex.Match(xmlBody,
+                @"<\s*temperature\s*>\s*(?<value>-?\d+(?:\.\d+)?)\s*<\s*/\s*temperature\s*>",
+                RegexOptions.IgnoreCase);
+            if (temperature.Success &&
+                !Regex.IsMatch(body, @"\b(?:var|bool|byte|short|int|long|float|double|decimal|string)\s+Temperature\b") &&
+                !Regex.IsMatch(body, @"(?<![.\w])Temperature\s*(?:[+\-*/%]?=|\+\+|--)"))
+            {
+                var value = temperature.Groups["value"].Value;
+                body = Regex.Replace(body, @"(?<![.\w])Temperature\b", m =>
+                {
+                    if (HitFilter.IsInsideComment(body, m.Index) ||
+                        HitFilter.IsInsideStringLiteral(body, m.Index))
+                        return m.Value;
+                    bodyEdits++;
+                    return value;
+                });
+            }
+
+            if (bodyEdits == 0)
+                continue;
+            working = working[..(open + 1)] + body + working[close..];
+            edits += bodyEdits;
+        }
+        return (working, edits);
     }
 
     public static (string Content, int EditCount, List<(string Name, string InnerXml)> Liquids) FixContent(string content)

@@ -1047,6 +1047,15 @@ function Repair-ProgrammaticCsFixes {
         }
     }
 
+    $modern = [ApiMigrator.Core.ModernCompilerFixer]::Fix($working)
+    $working = $modern.Item1
+    if ($modern.Item2 -gt 0) {
+        $fixList.Add([PSCustomObject]@{
+            Rule  = [ApiMigrator.Core.ModernCompilerFixer]::FixRuleName
+            Count = [int]$modern.Item2
+        })
+    }
+
     $gdn = [ApiMigrator.Core.GetDisplayNameArgFixer]::Fix($working)
     $working = $gdn.Item1
     if ($gdn.Item2 -gt 0) {
