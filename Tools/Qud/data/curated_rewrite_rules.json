@@ -2,7 +2,7 @@
   "_meta": {
     "description": "Hand-verified, mechanically-safe find/replace rules applied by both the PowerShell CLI (Update-ObsoleteApis.ps1) and the C# ApiMigrator.Core engine used by the GUI. Compiled from data/charts/*.xml|*.json via ApiMigrator.Cli compile-rules. Regex syntax is .NET System.Text.RegularExpressions. Optional ensureUsings / requiresSubstring / enabled:false / postEnsureUsings as documented in data/charts/README.md.",
     "gameFileVersion": "2.0.212.30",
-    "capturedDate": "2026-09-11",
+    "capturedDate": "2026-09-12",
     "steamBetaKey": "lang-experimental",
     "steamBuildId": "24964365",
     "notes": "Source of truth for edits: data/charts/ (compile-rules). Do not hand-edit this JSON except via compile."

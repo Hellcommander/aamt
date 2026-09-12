@@ -1,6 +1,12 @@
 {
-  "notes": "Snapshot of pruned public dump + rules at switch-away time.",
   "gameFileVersion": "2.0.211.51",
-  "updated": "2026-08-16 02:36:01",
-  "steamBetaKey": "public"
+  "steamBetaKey": "public",
+  "steamBuildId": "24626113",
+  "notes": null,
+  "updated": "2026-09-12 03:00:20",
+  "files": [
+    "obsolete_api_dump.json",
+    "curated_rewrite_rules.json",
+    "charts/"
+  ]
 }

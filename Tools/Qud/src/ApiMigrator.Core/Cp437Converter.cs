@@ -373,7 +373,12 @@ public static class Cp437Converter
             string original;
             try
             {
-                original = File.ReadAllText(file);
+                // Use StreamReader with UTF-8 and BOM detection. This is crucial for handling
+                // files with Unicode characters correctly, which is the source of the hang.
+                using (var reader = new StreamReader(file, Encoding.UTF8, true))
+                {
+                    original = reader.ReadToEnd();
+                }
             }
             catch (Exception ex)
             {
@@ -640,7 +645,7 @@ public static class Cp437Converter
 
         var prefix = source.Substring(start, prefixLen);
         _ = bodyStartIndex; // retained for clarity / future diagnostics
-        return (prefix + body + "\"", hits);
+        return (prefix + body + "\"\"", hits);
     }
 
     private static (string Chunk, List<Hit> Hits) ConvertCsQuoted(string source, ref int i, char quote, bool convertAmbiguous, bool isChar)

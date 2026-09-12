@@ -2,10 +2,10 @@
   "_meta": {
     "description": "Hand-verified, mechanically-safe find/replace rules applied by both the PowerShell CLI (Update-ObsoleteApis.ps1) and the C# ApiMigrator.Core engine used by the GUI. Compiled from data/charts/*.xml|*.json via ApiMigrator.Cli compile-rules. Regex syntax is .NET System.Text.RegularExpressions. Optional ensureUsings / requiresSubstring / enabled:false / postEnsureUsings as documented in data/charts/README.md.",
     "gameFileVersion": "2.0.212.30",
-    "capturedDate": "2026-09-11",
+    "capturedDate": "2026-09-12",
     "steamBetaKey": "lang-experimental",
     "steamBuildId": "24964365",
-    "notes": "Updated by refresh-dump --save."
+    "notes": "Updated by compile-rules."
   },
   "_addReplacerExpr": {
     "note": "ReplaceBuilder.AddReplacer: dump\u0027s generic obsolete message is now \u0027Decorate a valid method with VariableReplacer\u0027 (delegate/method-group forms). Value forms still \u2192 SetArgument (same arg order: Key/Alias, Value/Argument). Curated autofix: literal\u002Bliteral, literal\u002BexprWithDotOrCall, and literal\u002Bternary(? :) \u2192 SetArgument. Bare identifiers stay advice-only (string local vs Replacer method group)."
