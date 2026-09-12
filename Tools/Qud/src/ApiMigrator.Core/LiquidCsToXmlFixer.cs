@@ -227,6 +227,7 @@ public static class LiquidCsToXmlFixer
 
             var body = content[(braceOpen + 1)..braceClose];
             var props = new Dictionary<string, string>(StringComparer.Ordinal);
+            var literalPropertyValues = new Dictionary<string, string>(StringComparer.Ordinal);
             var glows = false;
             string? glowLight = null;
             var noVapor = false;
@@ -239,6 +240,8 @@ public static class LiquidCsToXmlFixer
                 if (!PropToXml.TryGetValue(prop, out var xmlName))
                     return m.Value;
                 props[xmlName] = val;
+                if (Regex.IsMatch(m.Groups["val"].Value.Trim(), @"^(?:true|false|-?\d+(?:\.\d+)?(?:[fFdDmM])?)$"))
+                    literalPropertyValues[prop] = m.Groups["val"].Value.Trim();
                 bodyEdits++;
                 return m.Groups["eol"].Value;
             });
@@ -296,6 +299,27 @@ public static class LiquidCsToXmlFixer
                 bodyEdits++;
                 return m.Groups["eol"].Value;
             });
+            foreach (var (property, value) in literalPropertyValues)
+            {
+                // A same-named local/member or a later mutation makes literal binding
+                // ambiguous. Leave those cases for manual migration instead of emitting
+                // invalid code such as `int 360` or `360++`.
+                if (Regex.IsMatch(nextBody,
+                        @"\b(?:var|bool|byte|short|int|long|float|double|decimal|string)\s+" +
+                        Regex.Escape(property) + @"\b") ||
+                    Regex.IsMatch(nextBody,
+                        @"(?<![.\w])" + Regex.Escape(property) + @"\s*(?:[+\-*/%]?=|\+\+|--)"))
+                    continue;
+                var propertyReference = new Regex(@"(?<![.\w])" + Regex.Escape(property) + @"\b");
+                nextBody = propertyReference.Replace(nextBody, m =>
+                {
+                    if (HitFilter.IsInsideComment(nextBody, m.Index) ||
+                        HitFilter.IsInsideStringLiteral(nextBody, m.Index))
+                        return m.Value;
+                    bodyEdits++;
+                    return value;
+                });
+            }
             nextBody = StringOverride.Replace(nextBody, m =>
             {
                 var meth = m.Groups["meth"].Value;
