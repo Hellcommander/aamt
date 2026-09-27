@@ -236,27 +236,28 @@ def _load_into_studio(raw_path: str, *, force_import: bool = False) -> Dict[str,
             "counts": _spec_counts(spec),
         }
 
-    # DIRECTORY: ALWAYS assemble full mod folder
-    if path.is_dir():
-        spec = load_mod_folder(path)
+if path.is_dir():
+    # ALWAYS assemble full mod folder
+    spec = load_mod_folder(path)
 
-        dest = staging_dir(spec) / "skill.json"
-        save_spec(spec, dest)
+    dest = staging_dir(spec) / "skill.json"
+    save_spec(spec, dest)
 
-        _STATE["spec_path"] = str(dest.resolve())
-        counts = _spec_counts(spec)
+    _STATE["spec_path"] = str(dest.resolve())
+    counts = _spec_counts(spec)
 
-        return {
-            "path": str(dest),
-            "spec": spec,
-            "imported": True,
-            "counts": counts,
-            "note": (
-                f"Loaded into staging {dest} ({counts['abilities']} abilities, "
-                f"{counts['amplifiers']} amplifiers, {counts['milestones']} milestones, "
-                f"{counts['stackers']} stackers, {counts['animations']} animations)"
-            ),
-        }
+    return {
+        "path": str(dest),
+        "spec": spec,
+        "imported": True,
+        "counts": counts,
+        "note": (
+            f"Loaded into staging {dest} ({counts['abilities']} abilities, "
+            f"{counts['amplifiers']} amplifiers, {counts['milestones']} milestones, "
+            f"{counts['stackers']} stackers, {counts['animations']} animations)"
+        ),
+    }
+
 
     raise ValueError("Path is neither a skill.json nor a mod folder")
 
