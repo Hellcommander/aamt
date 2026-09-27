@@ -159,7 +159,6 @@ def _project_row(*, source: str, path: Path, spec: Optional[Dict[str, Any]] = No
 
 
 def _projects() -> list:
-    """Staging skill.json first, then live/workshop skill mods (folder paths)."""
     items: list = []
     seen: set = set()
     root = output_root()
@@ -186,7 +185,6 @@ def _projects() -> list:
                 continue
             if child.name in ("core_2",) or child.name.startswith("core_"):
                 continue
-            # Skill mods have skills.json or a milestones tree; skip pure race/building packs.
             if not (child / "skills.json").is_file() and not (child / "milestones").is_dir():
                 continue
             if child.name in seen:
@@ -210,6 +208,10 @@ def _projects() -> list:
             )
             seen.add(child.name)
 
+    _scan_mod_root(mods_dir(), "live")
+    _scan_mod_root(workshop_root(), "workshop")
+
+    return items
 
 def _load_into_studio(raw_path: str, *, force_import: bool = False) -> Dict[str, Any]:
     """Load a skill.json or mod folder into the studio (always editable via Output staging)."""
