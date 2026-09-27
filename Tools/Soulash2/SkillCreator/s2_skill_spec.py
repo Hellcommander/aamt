@@ -1296,10 +1296,9 @@ _DISK_LIST_KEYS = (
 
 
 def load_mod_folder(folder: Path) -> Dict[str, Any]:
-    """Assemble a studio spec from a Geomancy-layout mod folder (live JSON, not skill.json)."""
     folder = Path(folder)
-    if not folder.exists():
-        raise FileNotFoundError(f"Mod path does not exist: {folder}")
+    if not folder.is_dir():
+        raise FileNotFoundError(f"Mod folder not found: {folder}")
     mod = _read_json_file(folder / "mod.json")
     if not isinstance(mod, dict):
         mod = {}
