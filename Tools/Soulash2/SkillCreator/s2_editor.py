@@ -191,6 +191,7 @@ def _projects() -> list:
                 continue
             if child.name in seen:
                 continue
+
             name = child.name
             if (child / "skills.json").is_file():
                 try:
@@ -199,18 +200,15 @@ def _projects() -> list:
                         name = skills[0].get("name") or name
                 except Exception:
                     pass
-            items.append(_project_row(source=source, path=child, spec={"id": child.name, "skill": {"name": name}}))
-            seen.add(child.name)
 
-    try:
-        _scan_mod_root(mods_dir(), "live")
-    except Exception:
-        pass
-    try:
-        _scan_mod_root(workshop_root(), "workshop")
-    except Exception:
-        pass
-    return items
+            items.append(
+                _project_row(
+                    source=source,
+                    path=child,
+                    spec={"id": child.name, "skill": {"name": name}},
+                )
+            )
+            seen.add(child.name)
 
 
 def _load_into_studio(raw_path: str, *, force_import: bool = False) -> Dict[str, Any]:
@@ -236,30 +234,31 @@ def _load_into_studio(raw_path: str, *, force_import: bool = False) -> Dict[str,
             "counts": _spec_counts(spec),
         }
 
-if path.is_dir():
-    # ALWAYS assemble full mod folder
-    spec = load_mod_folder(path)
+    if path.is_dir():
+        # ALWAYS assemble full mod folder
+        spec = load_mod_folder(path)
 
-    dest = staging_dir(spec) / "skill.json"
-    save_spec(spec, dest)
+        dest = staging_dir(spec) / "skill.json"
+        save_spec(spec, dest)
 
-    _STATE["spec_path"] = str(dest.resolve())
-    counts = _spec_counts(spec)
+        _STATE["spec_path"] = str(dest.resolve())
+        counts = _spec_counts(spec)
 
-    return {
-        "path": str(dest),
-        "spec": spec,
-        "imported": True,
-        "counts": counts,
-        "note": (
-            f"Loaded into staging {dest} ({counts['abilities']} abilities, "
-            f"{counts['amplifiers']} amplifiers, {counts['milestones']} milestones, "
-            f"{counts['stackers']} stackers, {counts['animations']} animations)"
-        ),
-    }
-
+        return {
+            "path": str(dest),
+            "spec": spec,
+            "imported": True,
+            "counts": counts,
+            "note": (
+                f"Loaded into staging {dest} ({counts['abilities']} abilities, "
+                f"{counts['amplifiers']} amplifiers, {counts['milestones']} milestones, "
+                f"{counts['stackers']} stackers, {counts['animations']} animations)"
+            ),
+        }
 
     raise ValueError("Path is neither a skill.json nor a mod folder")
+
+
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -275,12 +274,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = urlparse(self.path).path
+
         if path in ("/", "/index.html"):
             self._serve(EDITOR_DIR / "index.html", "text/html; charset=utf-8")
             return
+
         if path in ("/planner", "/planner.html"):
             self._serve(EDITOR_DIR / "planner.html", "text/html; charset=utf-8")
             return
+
         if path == "/api/status":
             spec = _try_spec()
             game = None
@@ -301,26 +303,27 @@ class Handler(BaseHTTPRequestHandler):
                     "projects": _projects(),
                 },
             )
-          return
-            if path == "/api/mod-content":
-    try:
-        spec = load_spec(_current())
-        _json_response(
-            self,
-            200,
-            {
-                "skill": spec.get("skill"),
-                "abilities": spec.get("abilities"),
-                "passives": spec.get("passives"),
-                "amplifiers": spec.get("amplifiers"),
-                "milestones": spec.get("milestones"),
-                "stackers": spec.get("stackers"),
-                "animations": spec.get("animations"),
-            },
-        )
-    except Exception as exc:
-        _json_response(self, 400, {"error": str(exc)})
-    return
+            return
+
+        if path == "/api/mod-content":
+            try:
+                spec = load_spec(_current())
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "skill": spec.get("skill"),
+                        "abilities": spec.get("abilities"),
+                        "passives": spec.get("passives"),
+                        "amplifiers": spec.get("amplifiers"),
+                        "milestones": spec.get("milestones"),
+                        "stackers": spec.get("stackers"),
+                        "animations": spec.get("animations"),
+                    },
+                )
+            except Exception as exc:
+                _json_response(self, 400, {"error": str(exc)})
+            return
 
         if path == "/api/spec":
             try:

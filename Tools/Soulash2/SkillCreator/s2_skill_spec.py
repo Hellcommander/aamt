@@ -47,7 +47,7 @@ def require_paid_passive_level(
     *,
     innate: bool = False,
     what: str = "Passive",
-) -> None:
+    ) -> None:
     if innate or level is None:
         return
     if int(level) < PAID_UNLOCK_MIN:
@@ -460,7 +460,7 @@ def add_combat_mastery(
     *,
     unlock_level: int = MASTERY_LEVEL,
     name: Optional[str] = None,
-) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:
     """Unique combat-branch mastery: +10% all five attributes (Skill Stat Rebalance)."""
     skill_name = str((spec.get("skill") or {}).get("name") or spec.get("skill_id") or "Skill")
     pid = f"{spec['skill_id']}_mastery"
@@ -485,7 +485,7 @@ def _milestone(
     kind: str,
     reward_id: str,
     innate: bool = False,
-) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:
     mile = {
         "id": mid,
         "name": name,
@@ -533,7 +533,7 @@ def _upsert_milestone(
     kind: str,
     reward_id: str,
     innate: bool = False,
-) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:
     existing = next((m for m in spec.get("milestones") or [] if m.get("id") == mid), None)
     if existing:
         if innate:
@@ -568,7 +568,7 @@ def add_ability(
     *,
     unlock_level: Optional[int] = None,
     no_milestone: bool = False,
-) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:
     _ensure_lists(spec)
     ability = deepcopy(ability)
     ability.pop("_cloned_from", None)
@@ -624,7 +624,7 @@ def add_passive(
     unlock_level: Optional[int] = None,
     no_milestone: bool = False,
     innate: bool = False,
-) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:
     _ensure_lists(spec)
     require_paid_passive_level(unlock_level, innate=innate, what=f"Passive {passive.get('id')}")
     passive = deepcopy(passive)
@@ -658,7 +658,7 @@ def add_amplifier(
     *,
     unlock_level: Optional[int] = None,
     no_milestone: bool = False,
-) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:
     _ensure_lists(spec)
     amplifier = deepcopy(amplifier)
     amplifier.setdefault("image", 0)
@@ -688,7 +688,7 @@ def _milestone_grants(mile: Dict[str, Any], kind: str, reward_id: str) -> bool:
     return False
 
 
-_KIND_BUCKET = {
+    _KIND_BUCKET = {
     "ability": ("abilities", "Ability"),
     "passive": ("passives", "Passive"),
     "amplifier": ("amplifiers", "Amplifier"),
@@ -729,7 +729,7 @@ def add_stacker(
     *,
     bind_ability: Optional[str] = None,
     stacker_count: int = 1,
-) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:
     """Stackers are not skill-tree rewards. Abilities/amplifiers reference them by id."""
     _ensure_lists(spec)
     stacker = deepcopy(stacker)
@@ -748,7 +748,7 @@ def add_animation(
     animation: Dict[str, Any],
     *,
     bind_ability: Optional[Any] = None,
-) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:
     _ensure_lists(spec)
     animation = deepcopy(animation)
     animation.pop("_cloned_from", None)
@@ -823,7 +823,7 @@ def clone_stacker(source_id: str, *, new_id: str, name: Optional[str] = None) ->
     return row
 
 
-ABILITY_CLONE_DROP = ("level", "profession", "upgrades", "file", "_cloned_from", "_file")
+    ABILITY_CLONE_DROP = ("level", "profession", "upgrades", "file", "_cloned_from", "_file")
 
 
 def _iter_ability_files():
@@ -910,7 +910,7 @@ def clone_ability(
     new_id: Optional[str] = None,
     name: Optional[str] = None,
     keep_image: bool = False,
-) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:
     """Copy vanilla/workshop ability JSON and retarget id + skill (Geomancy string ids)."""
     ab = load_vanilla_ability(source_id)
     display = name or str(ab.get("name") or source_id)
@@ -960,7 +960,7 @@ def grant_existing(
     unlock_level: int,
     milestone_id: Optional[str] = None,
     innate: bool = False,
-) -> Dict[str, Any]:
+    ) -> Dict[str, Any]:
     _ensure_lists(spec)
     if kind == "passive":
         require_paid_passive_level(None if innate else unlock_level, innate=innate, what=f"Passive {reward_id}")
@@ -1150,18 +1150,18 @@ def tree_rows(spec: Dict[str, Any]) -> List[Dict[str, Any]]:
         if rewards and isinstance(rewards[0], dict) and rewards[0]:
             kind, rid = next(iter(rewards[0].items()))
         rows.append({"level": level, "id": m.get("id"), "name": m.get("name"), "kind": kind, "reward": rid})
-    for lv in stat_point_levels(spec):
-        rows.append({"level": lv, "id": f"stat_{lv}", "name": "+1 statistic", "kind": "stat", "reward": ""})
-    def _lvl(row: Dict[str, Any]) -> tuple:
-        lv = row["level"]
-        if lv == "innate":
-            return (-1, 0, row["name"] or "")
+        for lv in stat_point_levels(spec):
+            rows.append({"level": lv, "id": f"stat_{lv}", "name": "+1 statistic", "kind": "stat", "reward": ""})
+def _lvl(row: Dict[str, Any]) -> tuple:
+    lv = row["level"]
+    if lv == "innate":
+        return (-1, 0, row["name"] or "")
         if lv is None:
             return (10_000, 0, row["name"] or "")
-        kind_rank = 0 if row.get("kind") == "stat" else 1
-        return (int(lv), kind_rank, row["name"] or "")
-    rows.sort(key=_lvl)
-    return rows
+            kind_rank = 0 if row.get("kind") == "stat" else 1
+            return (int(lv), kind_rank, row["name"] or "")
+            rows.sort(key=_lvl)
+            return rows
 
 
 def _dump(obj: Any) -> str:
@@ -1367,7 +1367,7 @@ def load_mod_folder(folder: Path) -> Dict[str, Any]:
     return spec
     
     def load_mod_folder(folder: Path) -> Dict[str, Any]:
-    folder = Path(folder)
+        folder = Path(folder)
     if not folder.is_dir():
         raise FileNotFoundError(f"Mod folder not found: {folder}")
 
