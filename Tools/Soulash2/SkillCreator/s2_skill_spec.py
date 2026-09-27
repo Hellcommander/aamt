@@ -1294,7 +1294,6 @@ _DISK_LIST_KEYS = (
     "production_actions",
 )
 
-
 def load_mod_folder(folder: Path) -> Dict[str, Any]:
     folder = Path(folder)
     if not folder.is_dir():
