@@ -44,6 +44,22 @@ DEFAULT_NEGATIVE = (
     "music, singing, speech, lyrics, low quality, muffled, distortion, silence, hiss"
 )
 
+# Pack ToS: use library clips as DNA (mix/transform). Do not ship raw/near copies.
+# Unique mode blends several refs, mutates that mix, then SA3 with high init noise;
+# copy_corr is the "altered enough" bar (must stay under the cap after retries).
+UNIQUE_STRENGTH_CAP = 0.28
+UNIQUE_MIN_K = 10
+UNIQUE_MAX_CORR = 0.22
+# Extra SA3 retries with escalating noise when the first pass stays too close.
+UNIQUE_CORR_RETRIES = 3
+UNIQUE_NOISE_BUMP = 0.18
+# How hard unique mode mutates the reference mix *before* SA3 sees it (0–1).
+UNIQUE_DNA_MUTATE = float(os.environ.get("AAMT_AUDIO_DNA_MUTATE", "0.72"))
+
+
+def _env_flag(name: str, default: str = "1") -> bool:
+    return os.environ.get(name, default).strip().lower() not in ("0", "false", "no", "off", "")
+
 
 def _lib(library: Optional[Path] = None, index_dir: Optional[Path] = None) -> AudioLibrary:
     return AudioLibrary(library=library, index_dir=index_dir)
@@ -125,11 +141,23 @@ def generate_audio(
     example: Optional[Path] = None,
     library: Optional[Path] = None,
     engine: str = "auto",
+    unique: Optional[bool] = None,
 ) -> Path:
     """Retrieve library DNA, generate a new clip, write WAV.
 
     strength 0 = text-only SA3; 1 = stay close to retrieved references.
+    unique (default on) caps strength, mixes several refs, skips filename
+    style prompts and envelope matching, and refuses a library-mix fallback
+    so shipped clips are not raw or near copies of D:\\assets\\audio packs.
     """
+    if unique is None:
+        unique = _env_flag("AAMT_AUDIO_UNIQUE", "1")
+    if unique and engine == "library":
+        raise RuntimeError("unique mode refuses engine=library (would ship a pack mix)")
+    if unique:
+        strength = min(float(strength), UNIQUE_STRENGTH_CAP)
+        k = max(int(k), UNIQUE_MIN_K)
+
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
 
@@ -144,15 +172,39 @@ def generate_audio(
             hits = lib.search_audio(wav, sr, k=k, archetype=archetype)
         elif lib.records:
             hits = lib.search_text(prompt, k=k, archetype=archetype, tags=tags)
+            # Unique mode must use pack DNA. Archetype/tag filters can wipe the
+            # index; widen the search rather than falling through to text-only.
+            if unique and not hits:
+                hits = lib.search_text(prompt, k=k, archetype=archetype)
+            if unique and not hits:
+                hits = lib.search_text(prompt, k=k)
+        if unique and not no_refs and not hits:
+            raise RuntimeError(
+                "unique mode needs pack DNA hits (ToS: modify/mix/transform); "
+                "search returned nothing"
+            )
         if hits:
             mix, mix_sr, used_ids = lib.mix_references(hits, max_seconds=max(duration, 0.5), sr=48000)
+            # Unique: scramble the mix so SA3 never conditions on a near-raw pack clip.
+            if unique and UNIQUE_DNA_MUTATE > 0:
+                mix = _mutate_reference_dna(
+                    mix,
+                    mix_sr,
+                    amount=UNIQUE_DNA_MUTATE,
+                    seed=seed if seed is not None else abs(hash(prompt)) % (2**31),
+                )
+                print(f"[audio] mutated reference DNA amount={UNIQUE_DNA_MUTATE:.2f}")
             init_audio = (mix_sr, mix)
             print("[audio] refs:")
             for hit in hits:
                 print(f"    {hit.score:6.3f}  {hit.via:14}  {hit.record.label()}")
 
-    conditioned = _condition_prompt(prompt, hits, archetype=archetype)
-    init_noise = 1.0 - 0.7 * float(np.clip(strength, 0.0, 1.0))
+    conditioned = _condition_prompt(prompt, hits, archetype=archetype, unique=unique)
+    # Unique stays noisier so the DiT rewrites spectral shape instead of echoing DNA.
+    noise_keep = 0.45 if unique else 0.70
+    init_noise = 1.0 - noise_keep * float(np.clip(strength, 0.0, 1.0))
+    if unique:
+        init_noise = max(init_noise, 0.78)
     if init_audio is None or strength <= 0:
         init_audio = None
         init_noise = 1.0
@@ -160,26 +212,64 @@ def generate_audio(
     arr: Optional[np.ndarray] = None
     sr = 48000
     engine_used = "library-mix"
+    copy_corr = 0.0
     if engine != "library":
         try:
             import aamt_stable_audio_backend as backend
 
-            result = backend.maybe_generate(
-                engine=engine,
-                model_name=model_name,
-                prompt=conditioned,
-                duration=float(duration),
-                seed=seed if seed is not None else backend.seed_from_text(conditioned),
-                init_audio=init_audio,
-                init_noise_level=init_noise,
-            )
+            def _sa3(noise: float, run_seed: Optional[int]) -> Optional[Tuple[np.ndarray, int]]:
+                return backend.maybe_generate(
+                    engine=engine,
+                    model_name=model_name,
+                    prompt=conditioned,
+                    duration=float(duration),
+                    seed=run_seed if run_seed is not None else backend.seed_from_text(conditioned),
+                    init_audio=init_audio,
+                    init_noise_level=noise,
+                    steps=backend.unique_steps() if unique else None,
+                    negative_prompt=backend.unique_negative() if unique else None,
+                )
+
+            base_seed = seed if seed is not None else None
+            result = _sa3(init_noise, base_seed)
             if result is not None:
                 arr, sr = result
                 engine_used = "stable-audio"
+                if unique and init_audio is not None:
+                    # Compare against the *unmutated* search mix when available via used refs;
+                    # init_audio is already mutated, so corr vs that understates pack leakage.
+                    copy_corr = _copy_corr(arr, init_audio[1])
+                    attempt = 0
+                    while copy_corr > UNIQUE_MAX_CORR and attempt < UNIQUE_CORR_RETRIES:
+                        attempt += 1
+                        retry_noise = min(1.0, init_noise + UNIQUE_NOISE_BUMP * attempt)
+                        retry_seed = (
+                            (base_seed + 7919 * attempt) if base_seed is not None else None
+                        )
+                        print(
+                            f"[audio] copy-corr {copy_corr:.3f} > {UNIQUE_MAX_CORR:.2f}; "
+                            f"retry {attempt}/{UNIQUE_CORR_RETRIES} noise={retry_noise:.2f}",
+                            flush=True,
+                        )
+                        retry = _sa3(retry_noise, retry_seed)
+                        if retry is None:
+                            break
+                        arr2, sr2 = retry
+                        corr2 = _copy_corr(arr2, init_audio[1])
+                        if corr2 < copy_corr:
+                            arr, sr = arr2, sr2
+                            copy_corr = corr2
+                            init_noise = retry_noise
         except Exception as exc:
+            if unique or engine == "stable-audio":
+                raise RuntimeError(
+                    f"Stable Audio 3 failed ({exc}); refusing library-mix"
+                ) from exc
             print(f"[audio] SA3 failed ({exc}); using library mix")
 
     if arr is None:
+        if unique or engine == "stable-audio":
+            raise RuntimeError("Stable Audio 3 produced nothing; refusing library-mix")
         if init_audio is None:
             raise RuntimeError(
                 "audio stage has nothing to generate from — ingest the library "
@@ -189,7 +279,17 @@ def generate_audio(
         arr = _fit_duration(arr, sr, duration)
         engine_used = "library-mix"
 
-    arr = _postprocess(arr, reference=init_audio[1] if init_audio else None)
+    # Unique never envelope-matches pack DNA; apply a second DSP morph after SA3.
+    if unique:
+        arr = _unique_post_morph(
+            arr,
+            sr,
+            seed=seed if seed is not None else abs(hash(conditioned)) % (2**31),
+        )
+        arr = _postprocess(arr, reference=None)
+    else:
+        ref = init_audio[1] if init_audio else None
+        arr = _postprocess(arr, reference=ref)
     _write_wav(output, arr, sr)
 
     meta = {
@@ -199,6 +299,8 @@ def generate_audio(
         "strength": strength,
         "init_noise_level": init_noise,
         "engine": engine_used,
+        "unique": bool(unique),
+        "copy_corr": copy_corr,
         "archetype": archetype,
         "references": [
             {
@@ -248,7 +350,13 @@ def blend_assets(
     return output
 
 
-def _condition_prompt(prompt: str, hits: Sequence[RetrievalHit], *, archetype: str = "") -> str:
+def _condition_prompt(
+    prompt: str,
+    hits: Sequence[RetrievalHit],
+    *,
+    archetype: str = "",
+    unique: bool = False,
+) -> str:
     bits = ["high quality game sound effect"]
     if archetype:
         bits.append(f"{archetype} sound")
@@ -256,9 +364,9 @@ def _condition_prompt(prompt: str, hits: Sequence[RetrievalHit], *, archetype: s
     if hits:
         tags: List[str] = []
         for hit in hits[:3]:
-            tags.extend(hit.record.tags[:6])
+            if not unique:
+                tags.extend(hit.record.tags[:6])
             tags.extend(hit.record.archetypes)
-        # unique, preserve order
         seen = set()
         extra = []
         for t in tags:
@@ -268,10 +376,159 @@ def _condition_prompt(prompt: str, hits: Sequence[RetrievalHit], *, archetype: s
             extra.append(t)
         if extra:
             bits.append("timbre of " + ", ".join(extra[:12]))
-        top = hits[0].record
-        bits.append(f"in the style of {top.name} from {_pack_hint(top.pack)}")
+        if not unique:
+            top = hits[0].record
+            bits.append(f"in the style of {top.name} from {_pack_hint(top.pack)}")
+    if unique:
+        bits.append(
+            "heavily redesigned original synthesized game sfx, "
+            "transformed timbre and envelope, not a commercial pack preview, "
+            "not a lightly edited sample"
+        )
+        if archetype == "bodily":
+            bits.append(
+                "abstracted bodily gas / waste event for a game, "
+                "new character and pitch contour, tasteful not crude comedy sting"
+            )
     bits.append("clean, punchy, game-ready, no music vocals, stereo")
     return ", ".join(b for b in bits if b)
+
+
+def _mutate_reference_dna(
+    arr: np.ndarray,
+    sr: int,
+    *,
+    amount: float = 0.72,
+    seed: int = 0,
+) -> np.ndarray:
+    """Scramble pack-mix DNA before SA3 so init_audio is already non-shippable.
+
+    amount 0 = identity; 1 = aggressive pitch/time/EQ/waveshape/noise. This is
+    the licensed modify/mix step — the model then rewrites further.
+    """
+    rng = np.random.default_rng(int(seed) & 0x7FFFFFFF)
+    x = np.asarray(arr, dtype=np.float32)
+    if x.ndim == 1:
+        x = x.reshape(-1, 1)
+    a = float(np.clip(amount, 0.0, 1.0))
+    if a < 1e-3 or x.size == 0:
+        return x
+
+    # Pitch via resample (semitones ±).
+    semis = float(rng.uniform(-5.5, 5.5) * a)
+    rate = float(2.0 ** (semis / 12.0))
+    n = x.shape[0]
+    new_n = max(16, int(round(n / rate)))
+    t_old = np.linspace(0.0, 1.0, n, dtype=np.float64)
+    t_new = np.linspace(0.0, 1.0, new_n, dtype=np.float64)
+    pitched = np.stack(
+        [np.interp(t_new, t_old, x[:, c]).astype(np.float32) for c in range(x.shape[1])],
+        axis=1,
+    )
+
+    # Time pad/crop back to original length (also warps envelope).
+    if pitched.shape[0] >= n:
+        start = int(rng.integers(0, max(1, pitched.shape[0] - n + 1)))
+        y = pitched[start : start + n]
+    else:
+        y = np.pad(pitched, ((0, n - pitched.shape[0]), (0, 0)))
+
+    # Spectral tilt: gentle 1st-order shelf via cumulative EMA.
+    tilt = float(rng.uniform(-0.55, 0.55) * a)
+    alpha = float(np.clip(0.08 + 0.35 * abs(tilt), 0.05, 0.45))
+    for c in range(y.shape[1]):
+        z = y[:, c].copy()
+        acc = 0.0
+        out = np.empty_like(z)
+        for i, s in enumerate(z):
+            acc = alpha * s + (1.0 - alpha) * acc
+            out[i] = s + tilt * (s - acc)
+        y[:, c] = out
+
+    # Soft waveshape for harmonic character change.
+    drive = 1.0 + 1.8 * a * float(rng.uniform(0.4, 1.0))
+    y = np.tanh(y * drive).astype(np.float32)
+
+    # Reverse a random middle slice and crossfade it back (structure break).
+    if a > 0.35 and n > sr // 4:
+        w = int(rng.integers(n // 8, max(n // 8 + 1, n // 3)))
+        i0 = int(rng.integers(0, max(1, n - w)))
+        frag = y[i0 : i0 + w][::-1].copy()
+        fade = np.linspace(0.0, 1.0, w, dtype=np.float32).reshape(-1, 1)
+        mix = 0.35 + 0.45 * a
+        y[i0 : i0 + w] = y[i0 : i0 + w] * (1.0 - mix * fade) + frag * (mix * fade)
+
+    # Seeded noise bed so SA3 cannot cling to silence gaps in the pack mix.
+    noise = rng.normal(0.0, 0.012 * a, size=y.shape).astype(np.float32)
+    y = y + noise
+
+    peak = float(np.max(np.abs(y)))
+    if peak > 1e-8:
+        y = (y / peak) * 0.95
+    return y
+
+
+def _unique_post_morph(arr: np.ndarray, sr: int, *, seed: int = 0) -> np.ndarray:
+    """Second-pass DSP after SA3 — final distance from pack DNA without envelope match."""
+    rng = np.random.default_rng((int(seed) ^ 0xA5A5) & 0x7FFFFFFF)
+    x = np.asarray(arr, dtype=np.float32)
+    if x.ndim == 1:
+        x = x.reshape(-1, 1)
+    n = x.shape[0]
+    if n < 64:
+        return x
+
+    # Micro pitch (±1.5 st) so even a stubborn SA3 pass drifts.
+    semis = float(rng.uniform(-1.5, 1.5))
+    rate = float(2.0 ** (semis / 12.0))
+    new_n = max(16, int(round(n / rate)))
+    t_old = np.linspace(0.0, 1.0, n, dtype=np.float64)
+    t_new = np.linspace(0.0, 1.0, new_n, dtype=np.float64)
+    y = np.stack(
+        [np.interp(t_new, t_old, x[:, c]).astype(np.float32) for c in range(x.shape[1])],
+        axis=1,
+    )
+    if y.shape[0] >= n:
+        y = y[:n]
+    else:
+        y = np.pad(y, ((0, n - y.shape[0]), (0, 0)))
+
+    # One-pole highpass (kill shared rumble fingerprint).
+    hp = float(rng.uniform(0.02, 0.08))
+    for c in range(y.shape[1]):
+        z = y[:, c]
+        out = np.empty_like(z)
+        prev_x = prev_y = 0.0
+        for i, s in enumerate(z):
+            prev_y = hp * (prev_y + s - prev_x)
+            prev_x = float(s)
+            out[i] = prev_y
+        y[:, c] = out
+
+    # Soft bit of odd harmonic.
+    y = (y + 0.18 * np.tanh(y * 2.4)).astype(np.float32)
+    return y
+
+
+def _copy_corr(generated: np.ndarray, reference: np.ndarray) -> float:
+    """Absolute cosine similarity of downsampled mono clips (0 = distinct)."""
+
+    def _mono(x: np.ndarray) -> np.ndarray:
+        y = np.asarray(x, dtype=np.float32)
+        if y.ndim > 1:
+            y = y.mean(axis=1)
+        if y.size > 24000:
+            y = y[:: max(1, y.size // 12000)]
+        y = y - float(y.mean())
+        n = float(np.linalg.norm(y) + 1e-8)
+        return y / n
+
+    a = _mono(generated)
+    b = _mono(reference)
+    n = min(a.size, b.size)
+    if n < 64:
+        return 0.0
+    return float(np.abs(np.dot(a[:n], b[:n])))
 
 
 def _pack_hint(pack: str) -> str:
@@ -402,6 +659,11 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_g.add_argument("--no-refs", action="store_true")
     p_g.add_argument("--example", default="")
     p_g.add_argument("--engine", default="auto", choices=("auto", "stable-audio", "library"))
+    p_g.add_argument(
+        "--close-copy",
+        action="store_true",
+        help="Opt out of unique mode (do not use for shipped Starfield mods)",
+    )
 
     p_b = sub.add_parser("blend", help="Mix two catalogued assets")
     p_b.add_argument("--a", required=True, help="Asset id")
@@ -467,6 +729,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             no_refs=bool(args.no_refs),
             example=Path(args.example) if args.example else None,
             engine=args.engine,
+            unique=not bool(args.close_copy),
         )
         return 0
 

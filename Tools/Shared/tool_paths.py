@@ -312,21 +312,136 @@ def hf_home() -> Path:
     return p or Path(r"D:\hf-cache")
 
 
-def trellis_root() -> Path:
+def trellis1_root() -> Path:
     """
-    TRELLIS.2 install (IgorAherne StableProjectorz Windows fork).
+    TRELLIS 1 Windows fork: https://github.com/IgorAherne/trellis-stable-projectorz
 
-    The upstream microsoft/TRELLIS.2 repo is Linux-only and wants 24 GB VRAM;
-    this fork runs the same 4B weights on 8-11 GB Windows cards.
+    float16 pipeline + int32 FlexiCubes (https://github.com/IgorAherne/flexicubes-stable-projectorz)
+    so jetx/TRELLIS-image-large fits on 8 GB. Launch with --precision half.
     """
-    p = get_path("TrellisRoot", env=("AAMT_TRELLIS_ROOT",), default=r"D:\trellis2")
+    p = get_path("Trellis1Root", env=("AAMT_TRELLIS1_ROOT",), default=r"D:\trellis")
+    return p or Path(r"D:\trellis")
+
+
+def trellis2_root() -> Path:
+    """
+    TRELLIS.2 Windows install (IgorAherne/TRELLIS.2-stableprojectorz).
+
+    Upstream https://github.com/microsoft/TRELLIS.2 is Linux + 24 GB and more
+    recent. This fork is the Windows + RAM-offload vehicle (low_vram keeps
+    weights in system memory). It lags microsoft; do not treat it as upstream.
+    """
+    p = get_path("Trellis2Root", env=("AAMT_TRELLIS2_ROOT",), default=r"D:\trellis2")
     return p or Path(r"D:\trellis2")
 
 
+def _trellis_code_root(root: Path) -> Path:
+    nested = root / "code"
+    if (nested / "api_spz" / "main_api.py").is_file():
+        return nested
+    return root
+
+
+def _trellis_api_script(root: Path) -> Optional[Path]:
+    script = _trellis_code_root(root) / "api_spz" / "main_api.py"
+    return script if script.is_file() else None
+
+
+def _looks_like_trellis1(root: Path) -> bool:
+    if not root.is_dir():
+        return False
+    code = _trellis_code_root(root)
+    if (code / "o-voxel").is_dir():
+        return False
+    return bool(_trellis_api_script(root) or (code / "trellis" / "pipelines").is_dir())
+
+
+def _looks_like_trellis2(root: Path) -> bool:
+    if not root.is_dir():
+        return False
+    code = _trellis_code_root(root)
+    return (code / "o-voxel").is_dir() or (root / "code" / "trellis2_init_done.txt").is_file()
+
+
+def trellis_variant() -> str:
+    """
+    Active mesh backend: trellis2 (recent 4B, Windows RAM-offload) | trellis1 (8GB fp16).
+
+    auto: installed trellis2 first (this machine already has D:\\trellis2), else trellis1.
+    """
+    raw = (get_setting("TrellisVariant", env=("AAMT_TRELLIS_VARIANT",), default="auto") or "auto")
+    raw = str(raw).strip().lower()
+    aliases = {
+        "trellis1": "trellis1",
+        "trellis-1": "trellis1",
+        "spz": "trellis1",
+        "image-large": "trellis1",
+        "trellis2": "trellis2",
+        "trellis-2": "trellis2",
+        "trellis.2": "trellis2",
+        "4b": "trellis2",
+    }
+    if raw in aliases:
+        return aliases[raw]
+    if _looks_like_trellis2(trellis2_root()):
+        return "trellis2"
+    if _looks_like_trellis1(trellis1_root()):
+        return "trellis1"
+    return "trellis2"
+
+
+def trellis_root() -> Path:
+    """Install root for the active TRELLIS variant."""
+    override = None
+    for name in ("AAMT_TRELLIS_ROOT",):
+        raw = (os.environ.get(name) or "").strip().strip('"')
+        if raw:
+            override = Path(_expand(raw))
+            break
+    if override is None:
+        ini_val = _ini_get("TrellisRoot")
+        if ini_val:
+            override = Path(ini_val)
+    if override is not None:
+        return override
+    return trellis1_root() if trellis_variant() == "trellis1" else trellis2_root()
+
+
+def trellis_precision() -> str:
+    """half = float16. Default for both backends on this 8-11 GB card."""
+    raw = (get_setting("TrellisPrecision", env=("AAMT_TRELLIS_PRECISION",), default="half") or "half")
+    raw = str(raw).strip().lower()
+    if raw in ("full", "float32", "fp32"):
+        return "full"
+    return "half"
+
+
 def trellis_launcher() -> Optional[Path]:
-    """The .bat that starts the TRELLIS API server (StableProjectorz mode)."""
-    bat = trellis_root() / "run-stableprojectorz" / "run-stableprojectorz.bat"
-    return bat if bat.is_file() else None
+    """Windows .bat for the StableProjectorz one-click layout."""
+    root = trellis_root()
+    for rel in (
+        Path("run-stableprojectorz") / "run-stableprojectorz.bat",
+        Path("run-stableprojectorz.bat"),
+    ):
+        bat = root / rel
+        if bat.is_file():
+            return bat
+    return None
+
+
+def trellis_api_script() -> Optional[Path]:
+    return _trellis_api_script(trellis_root())
+
+
+def trellis_python() -> Optional[Path]:
+    code = _trellis_code_root(trellis_root())
+    for candidate in (
+        code / "venv" / "Scripts" / "python.exe",
+        trellis_root() / "tools" / "python" / "python.exe",
+    ):
+        if candidate.is_file():
+            return candidate
+    return None
 
 
 def trellis_port() -> int:
@@ -335,6 +450,39 @@ def trellis_port() -> int:
         return int(raw)
     except ValueError:
         return 7960
+
+
+def trellis_backends() -> list:
+    """Selectable mesh backends. Installs stay outside git."""
+    active = trellis_variant()
+    return [
+        {
+            "id": "trellis2",
+            "name": "TRELLIS.2-4B (Windows RAM-offload)",
+            "vram": "8-11GB via low_vram CPU offload + fp16; upstream microsoft wants 24GB Linux",
+            "root": str(trellis2_root()),
+            "installed": _looks_like_trellis2(trellis2_root()),
+            "active": active == "trellis2",
+            "outdated_vs_upstream": True,
+            "windows": True,
+            "ram_offload": True,
+            "repo": "https://github.com/IgorAherne/TRELLIS.2-stableprojectorz",
+            "upstream": "https://github.com/microsoft/TRELLIS.2",
+        },
+        {
+            "id": "trellis1",
+            "name": "TRELLIS-image-large (fp16 + int32 FlexiCubes)",
+            "vram": "8GB half-precision (float16 pipeline, int32 FlexiCubes)",
+            "root": str(trellis1_root()),
+            "installed": _looks_like_trellis1(trellis1_root()),
+            "active": active == "trellis1",
+            "outdated_vs_upstream": False,
+            "windows": True,
+            "ram_offload": True,
+            "repo": "https://github.com/IgorAherne/trellis-stable-projectorz",
+            "flexicubes": "https://github.com/IgorAherne/flexicubes-stable-projectorz",
+        },
+    ]
 
 
 def pixelorama_exe() -> Optional[Path]:
@@ -463,7 +611,7 @@ if __name__ == "__main__":
     print(f"OutputDir: {output_dir()}")
     print(f"Transcendence: {transcendence_root()}")
     print(f"HfHome: {hf_home()}")
-    print(f"TrellisRoot: {trellis_root()} (launcher={trellis_launcher()}, port={trellis_port()})")
+    print(f"TrellisRoot: {trellis_root()} variant={trellis_variant()} precision={trellis_precision()} launcher={trellis_launcher()} port={trellis_port()}")
     print(f"MaterialMaker: {material_maker_exe()}")
     print(f"Pixelorama: {pixelorama_exe()}")
     print(f"Ucupaint: {ucupaint_addon_dir()}")

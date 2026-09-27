@@ -20,6 +20,8 @@ sealed class MainForm : Form
 {
     const string AssistantUrl = "http://127.0.0.1:47821";
     const string OllamaUrl = "http://127.0.0.1:11434";
+    const string SglangUrl = "http://127.0.0.1:30000";
+    const string VllmUrl = "http://127.0.0.1:8000";
     const string UnityEditor = @"E:\tools\Unity_Editor\6000.0.77f1\Editor\Unity.exe";
 
     readonly string _labRoot;
@@ -29,6 +31,10 @@ sealed class MainForm : Form
     Label _statusGate = null!;
     Label _statusServe = null!;
     Label _statusOllama = null!;
+    Label _llmLoaded = null!;
+    ComboBox _llmModel = null!;
+    Button _btnVllm = null!;
+    Button _btnSglang = null!;
     TextBox _prompt = null!;
     TextBox _log = null!;
     ComboBox _mode = null!;
@@ -37,9 +43,12 @@ sealed class MainForm : Form
     CheckBox _scenarioStress = null!;
     Button _btnServe = null!;
     Process? _serveProc;
+    Process? _vllmProc;
+    Process? _sglangProc;
     System.Windows.Forms.Timer _poll = null!;
     bool _busy;
     bool _loadingProjects;
+    bool _loadingModels;
 
     public MainForm()
     {
@@ -48,13 +57,17 @@ sealed class MainForm : Form
 
         Text = "Qud Lab";
         Width = 980;
-        Height = 720;
+        Height = 860;
         StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(860, 620);
+        MinimumSize = new Size(860, 740);
         Font = new Font("Segoe UI", 9.5f);
 
         BuildUi();
-        FormClosing += (_, _) => StopServe(quiet: true);
+        FormClosing += (_, _) =>
+        {
+            StopServe(quiet: true);
+            // Leave GPU/frontend running if the user started them; they take minutes to reload.
+        };
         Shown += async (_, _) =>
         {
             Append("Lab root: " + _labRoot);
@@ -77,7 +90,7 @@ sealed class MainForm : Form
         };
         _statusGate = MkStatus(12, 10, "Gate: …");
         _statusServe = MkStatus(12, 34, "Serve :47821: …");
-        _statusOllama = MkStatus(12, 58, "Ollama :11434: …");
+        _statusOllama = MkStatus(12, 58, "LLM: …");
         status.Controls.AddRange(new Control[] { _statusGate, _statusServe, _statusOllama });
 
         var tools = new FlowLayoutPanel
@@ -123,7 +136,6 @@ sealed class MainForm : Form
                 Process.Start("explorer.exe", proj);
         }));
         openers.Controls.Add(MkBtn("Lab folder", () => Process.Start("explorer.exe", _labRoot)));
-        openers.Controls.Add(MkBtn("Ollama models", async () => await RunCliAsync("ollama", "models")));
         openers.Controls.Add(MkBtn("Type conflicts", async () => await ShowConflictsAsync()));
 
         var projectRow = new Panel
@@ -188,9 +200,71 @@ sealed class MainForm : Form
         scenarioRow.Controls.Add(_scenario);
         scenarioRow.Controls.Add(_scenarioStress);
 
+        var llmBox = new GroupBox
+        {
+            Text = "GPU model slot (vLLM in WSL; restart to switch weights)",
+            Dock = DockStyle.Top,
+            Height = 118,
+            Padding = new Padding(10)
+        };
+        var modelLabel = new Label { Text = "Model:", AutoSize = true, Location = new Point(14, 32) };
+        _llmModel = new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDown,
+            Location = new Point(70, 28),
+            Width = 520,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        ReloadModelCombo();
+        _llmModel.SelectedIndexChanged += (_, _) =>
+        {
+            if (!_loadingModels)
+                LlmModels.SaveLast(SelectedModel());
+        };
+        _btnVllm = MkBtn("Start GPU", async () => await ToggleVllmAsync());
+        _btnSglang = MkBtn("Start frontend", async () => await ToggleSglangAsync());
+        var llmBtns = new FlowLayoutPanel
+        {
+            Location = new Point(600, 24),
+            Size = new Size(360, 72),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            WrapContents = true
+        };
+        llmBtns.Controls.Add(_btnVllm);
+        llmBtns.Controls.Add(MkBtn("Swap model", async () => await SwapVllmAsync(restartFrontend: true)));
+        llmBtns.Controls.Add(MkBtn("Escalate ctx", async () => await EscalateContextAsync()));
+        llmBtns.Controls.Add(_btnSglang);
+        llmBtns.Controls.Add(MkBtn("Rescan cache", () =>
+        {
+            ReloadModelCombo();
+            Append("Model list: presets + HF cache (incl. D:\\hf-cache).");
+        }));
+        llmBtns.Controls.Add(MkBtn("CLI help", () =>
+        {
+            Append("CLI: qudlab vllm list | status | stop | swap --model org/name [--frontend]");
+            Append("CLI: qudlab vllm shelve | escalate [--task …] | unshelve");
+            Append("Bat:  Swap-Vllm.bat list | status | swap org/name [--frontend]");
+        }));
+        _llmLoaded = new Label
+        {
+            AutoSize = true,
+            Location = new Point(14, 78),
+            Text = "Loaded: (query /v1/models after Start GPU / Swap)"
+        };
+        llmBox.Controls.Add(modelLabel);
+        llmBox.Controls.Add(_llmModel);
+        llmBox.Controls.Add(llmBtns);
+        llmBox.Controls.Add(_llmLoaded);
+        llmBox.Height = 128;
+        llmBox.Resize += (_, _) =>
+        {
+            _llmModel.Width = Math.Max(280, llmBox.ClientSize.Width - 450);
+            llmBtns.Left = Math.Max(360, llmBox.ClientSize.Width - 370);
+        };
+
         var aiBox = new GroupBox
         {
-            Text = "Local Ollama agent (Cursor-like)",
+            Text = "Local agent (uses whichever backend is up: vLLM, SGLang frontend, or Ollama)",
             Dock = DockStyle.Top,
             Height = 168,
             Padding = new Padding(10)
@@ -246,6 +320,7 @@ sealed class MainForm : Form
 
         Controls.Add(_log);
         Controls.Add(aiBox);
+        Controls.Add(llmBox);
         Controls.Add(scenarioRow);
         Controls.Add(projectRow);
         Controls.Add(openers);
@@ -335,36 +410,10 @@ sealed class MainForm : Form
         _statusServe.ForeColor = serveUp ? Color.DarkGreen : Color.DarkOrange;
         _btnServe.Text = serveOwned ? "Stop serve" : "Start serve";
 
-        var ollamaUp = await PingAsync(OllamaUrl + "/api/tags");
-        string modelNote = "";
-        if (ollamaUp)
-        {
-            try
-            {
-                var body = await _http.GetStringAsync(OllamaUrl + "/api/tags");
-                using var doc = JsonDocument.Parse(body);
-                var names = new List<string>();
-                if (doc.RootElement.TryGetProperty("models", out var models))
-                {
-                    foreach (var m in models.EnumerateArray())
-                    {
-                        if (m.TryGetProperty("name", out var n))
-                        {
-                            var s = n.GetString();
-                            if (!string.IsNullOrEmpty(s)) names.Add(s);
-                        }
-                    }
-                }
-                var prefer = new[] { "qwen3:8b", "deepseek-r1:7b", "deepseek-r1:14b" };
-                var hit = prefer.FirstOrDefault(p => names.Any(n => n.Equals(p, StringComparison.OrdinalIgnoreCase)));
-                modelNote = hit is not null ? " · prefer " + hit : (names.Count > 0 ? " · " + names.Count + " models" : " · no models");
-            }
-            catch { /* ignore */ }
-        }
-        _statusOllama.Text = ollamaUp
-            ? "Ollama :11434: UP" + modelNote
-            : "Ollama :11434: down — start ollama serve";
-        _statusOllama.ForeColor = ollamaUp ? Color.DarkGreen : Color.DarkOrange;
+        var (llmUp, llmLabel) = await ReadLlmStatusAsync(serveUp);
+        _statusOllama.Text = llmLabel;
+        _statusOllama.ForeColor = llmUp ? Color.DarkGreen : Color.DarkOrange;
+        await RefreshLlmSlotAsync();
     }
 
     async Task ToggleServeAsync()
@@ -463,7 +512,7 @@ sealed class MainForm : Form
                 throw new InvalidOperationException("Could not start serve.");
         }
 
-        Append($"AI {mode}… (local model may take several minutes)");
+        Append($"AI {mode}… (vLLM/SGLang/Ollama may take several minutes)");
         var body = JsonSerializer.Serialize(new
         {
             prompt,
@@ -566,6 +615,40 @@ sealed class MainForm : Form
             throw new InvalidOperationException("Build failed.");
     }
 
+    async Task<(bool up, string label)> ReadLlmStatusAsync(bool serveUp)
+    {
+        if (serveUp)
+        {
+            try
+            {
+                var body = await _http.GetStringAsync(AssistantUrl + "/ai/status");
+                using var doc = JsonDocument.Parse(body);
+                var root = doc.RootElement;
+                var available = root.TryGetProperty("available", out var av) && av.GetBoolean()
+                    || root.TryGetProperty("vllm", out var vl) && vl.GetBoolean()
+                    || root.TryGetProperty("sglang", out var sg) && sg.GetBoolean()
+                    || root.TryGetProperty("ollama", out var ol) && ol.GetBoolean();
+                var backend = root.TryGetProperty("backend", out var b) ? b.GetString() ?? "llm" : "llm";
+                var model = root.TryGetProperty("resolvedModel", out var rm) ? rm.GetString()
+                    : root.TryGetProperty("defaultModel", out var dm) ? dm.GetString() : null;
+                var url = root.TryGetProperty("baseUrl", out var u) ? u.GetString() : "";
+                if (available)
+                    return (true, backend + " UP" + (string.IsNullOrEmpty(model) ? "" : " · " + model) + (string.IsNullOrEmpty(url) ? "" : " · " + url));
+                var hint = root.TryGetProperty("hint", out var h) ? h.GetString() : null;
+                return (false, backend + " down — " + (hint ?? "qudlab vllm serve --model Qwen/Qwen2.5-3B-Instruct"));
+            }
+            catch { /* fall through to direct pings */ }
+        }
+
+        if (await PingAsync(VllmUrl + "/v1/models") || await PingAsync(VllmUrl + "/health"))
+            return (true, "vLLM :8000 UP (start serve to bind the agent)");
+        if (await PingAsync(SglangUrl + "/v1/models") || await PingAsync(SglangUrl + "/health"))
+            return (true, "SGLang :30000 UP (start serve to bind the agent)");
+        if (await PingAsync(OllamaUrl + "/api/tags"))
+            return (true, "Ollama :11434 UP (start serve to bind the agent)");
+        return (false, "LLM down — qudlab vllm serve --model Qwen/Qwen2.5-3B-Instruct");
+    }
+
     async Task<bool> PingJsonAsync(string url)
     {
         try
@@ -594,6 +677,344 @@ sealed class MainForm : Form
             return;
         }
         _log.AppendText(line + Environment.NewLine);
+    }
+
+    string SelectedModel()
+    {
+        var t = _llmModel.Text?.Trim();
+        if (!string.IsNullOrWhiteSpace(t))
+            return t;
+        return _llmModel.SelectedItem?.ToString() ?? LlmModels.Presets[0];
+    }
+
+    void ReloadModelCombo()
+    {
+        _loadingModels = true;
+        try
+        {
+            var keep = _llmModel.Text?.Trim();
+            if (string.IsNullOrWhiteSpace(keep))
+                keep = LlmModels.LoadLast();
+            _llmModel.Items.Clear();
+            foreach (var m in LlmModels.Catalog())
+                _llmModel.Items.Add(m);
+            var idx = -1;
+            for (var i = 0; i < _llmModel.Items.Count; i++)
+            {
+                if (string.Equals(_llmModel.Items[i]?.ToString(), keep, StringComparison.OrdinalIgnoreCase))
+                {
+                    idx = i;
+                    break;
+                }
+            }
+            if (idx >= 0)
+                _llmModel.SelectedIndex = idx;
+            else
+            {
+                _llmModel.Text = keep;
+            }
+        }
+        finally
+        {
+            _loadingModels = false;
+        }
+    }
+
+    async Task RefreshLlmSlotAsync()
+    {
+        var vllmUp = await PingAsync(VllmUrl + "/v1/models") || await PingAsync(VllmUrl + "/health");
+        var sglUp = await PingAsync(SglangUrl + "/v1/models") || await PingAsync(SglangUrl + "/health");
+        var loaded = await ReadOpenAiModelsAsync(VllmUrl);
+        if (loaded.Count == 0 && sglUp)
+            loaded = await ReadOpenAiModelsAsync(SglangUrl);
+        var ownedGpu = _vllmProc is { HasExited: false };
+        var ownedFe = _sglangProc is { HasExited: false };
+        _btnVllm.Text = !vllmUp && !ownedGpu
+            ? "Start GPU"
+            : (loaded.Count > 0 && !loaded.Any(m => string.Equals(m, SelectedModel(), StringComparison.OrdinalIgnoreCase))
+                ? "Switch GPU"
+                : "Stop GPU");
+        _btnSglang.Text = sglUp || ownedFe ? "Stop frontend" : "Start frontend";
+        var loadedText = loaded.Count > 0 ? string.Join(", ", loaded) : "(none)";
+        _llmLoaded.Text = vllmUp
+            ? "Loaded on :8000: " + loadedText + (sglUp ? "  · frontend :30000 UP" : "  · frontend down")
+            : sglUp
+                ? "Frontend :30000 UP, vLLM :8000 down — start GPU"
+                : "GPU down — pick a Hugging Face id and click Start GPU (11GB: 3B FP16 or 7B AWQ)";
+        _llmLoaded.ForeColor = vllmUp ? Color.DarkGreen : Color.DarkOrange;
+    }
+
+    async Task<List<string>> ReadOpenAiModelsAsync(string baseUrl)
+    {
+        var list = new List<string>();
+        try
+        {
+            using var res = await _http.GetAsync(baseUrl.TrimEnd('/') + "/v1/models");
+            if (!res.IsSuccessStatusCode)
+                return list;
+            using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+            if (!doc.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
+                return list;
+            foreach (var m in data.EnumerateArray())
+            {
+                if (m.TryGetProperty("id", out var id))
+                {
+                    var s = id.GetString();
+                    if (!string.IsNullOrWhiteSpace(s))
+                        list.Add(s);
+                }
+            }
+        }
+        catch { /* down */ }
+        return list;
+    }
+
+    async Task EscalateContextAsync()
+    {
+        var script = Path.Combine(_labRoot, "scripts", "Escalate-VllmContext.ps1");
+        if (!File.Exists(script))
+            throw new InvalidOperationException("Missing " + script);
+        var task = _prompt.Text?.Trim() ?? "";
+        Append("Escalating context: shelve chat-index -> high-ctx model -> unshelve next turn…");
+        var args = "-NoProfile -ExecutionPolicy Bypass -File " + Quote(script);
+        if (!string.IsNullOrWhiteSpace(task))
+            args += " -Task " + Quote(task.Length > 500 ? task[..500] : task);
+        var high = LlmModels.Presets.FirstOrDefault(p => p.Contains("Coder-7B", StringComparison.OrdinalIgnoreCase))
+                   ?? "Qwen/Qwen2.5-Coder-7B-Instruct-AWQ";
+        args += " -ToModel " + Quote(high);
+        var psi = new ProcessStartInfo
+        {
+            FileName = "powershell",
+            Arguments = args,
+            WorkingDirectory = _labRoot,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start escalate");
+        var stdout = await p.StandardOutput.ReadToEndAsync();
+        var stderr = await p.StandardError.ReadToEndAsync();
+        await p.WaitForExitAsync();
+        foreach (var line in (stdout + "\n" + stderr).Split('\n'))
+        {
+            var t = line.TrimEnd('\r');
+            if (!string.IsNullOrWhiteSpace(t))
+                Append("[escalate] " + t);
+        }
+        try
+        {
+            _llmModel.Text = high;
+            LlmModels.SaveLast(high);
+        }
+        catch { /* ignore */ }
+        _vllmProc = null;
+        _sglangProc = null;
+        await RefreshStatusAsync();
+        Append("Send the next Agent message — proxy will inject SHELVED CONTEXT.");
+    }
+
+    async Task SwapVllmAsync(bool restartFrontend)
+    {
+        var model = SelectedModel();
+        if (string.IsNullOrWhiteSpace(model) || model.Contains(' ', StringComparison.Ordinal))
+            throw new InvalidOperationException("Pick a Hugging Face id (org/name).");
+        LlmModels.SaveLast(model);
+
+        var script = Path.Combine(_labRoot, "scripts", "Swap-VllmModel.ps1");
+        if (!File.Exists(script))
+            throw new InvalidOperationException("Missing " + script);
+
+        Append("Swapping GPU model → " + model + (restartFrontend ? " (+ restart :30000)" : "") + "…");
+        var args = "-NoProfile -ExecutionPolicy Bypass -File " + Quote(script)
+                   + " swap -Model " + Quote(model)
+                   + (restartFrontend ? " -RestartFrontend" : "");
+        var psi = new ProcessStartInfo
+        {
+            FileName = "powershell",
+            Arguments = args,
+            WorkingDirectory = _labRoot,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start swap");
+        var stdout = await p.StandardOutput.ReadToEndAsync();
+        var stderr = await p.StandardError.ReadToEndAsync();
+        await p.WaitForExitAsync();
+        foreach (var line in (stdout + "\n" + stderr).Split('\n'))
+        {
+            var t = line.TrimEnd('\r');
+            if (!string.IsNullOrWhiteSpace(t))
+                Append("[swap] " + t);
+        }
+        if (p.ExitCode != 0)
+            Append("Swap exit code " + p.ExitCode);
+        _vllmProc = null;
+        _sglangProc = null;
+        await RefreshStatusAsync();
+    }
+
+    async Task ToggleVllmAsync()
+    {
+        var model = SelectedModel();
+        if (string.IsNullOrWhiteSpace(model) || model.Contains(' '))
+            throw new InvalidOperationException("Pick a Hugging Face id (org/name).");
+        LlmModels.SaveLast(model);
+
+        var vllmUp = await PingAsync(VllmUrl + "/v1/models") || _vllmProc is { HasExited: false };
+        if (vllmUp)
+        {
+            var loaded = await ReadOpenAiModelsAsync(VllmUrl);
+            var same = loaded.Any(m => string.Equals(m, model, StringComparison.OrdinalIgnoreCase));
+            if (!same)
+            {
+                // Different model selected while GPU is up → swap path.
+                await SwapVllmAsync(restartFrontend: true);
+                return;
+            }
+            StopVllm();
+            Append("Stopping vLLM…");
+            for (var i = 0; i < 24 && (await PingAsync(VllmUrl + "/health") || await PingAsync(VllmUrl + "/v1/models")); i++)
+                await Task.Delay(250);
+            await RefreshStatusAsync();
+            return;
+        }
+
+        EnsureCliBuilt();
+        var script = Path.Combine(_labRoot, "scripts", "Serve-Vllm.ps1");
+        if (!File.Exists(script))
+            throw new InvalidOperationException("Missing " + script);
+
+        Append("Starting vLLM with " + model + " (first load can take several minutes)…");
+        _vllmProc = StartOwned("vLLM", "powershell",
+            "-NoProfile -ExecutionPolicy Bypass -File " + Quote(script) + " -Model " + Quote(model) + " -Port 8000");
+        for (var i = 0; i < 80; i++)
+        {
+            await Task.Delay(500);
+            if (await PingAsync(VllmUrl + "/v1/models"))
+            {
+                Append("vLLM is up: http://127.0.0.1:8000/v1  model=" + model);
+                break;
+            }
+            if (_vllmProc is { HasExited: true })
+            {
+                Append("vLLM process exited while starting. Check the log / WSL.");
+                break;
+            }
+        }
+        await RefreshStatusAsync();
+    }
+
+    async Task ToggleSglangAsync()
+    {
+        if (_sglangProc is { HasExited: false } || await PingAsync(SglangUrl + "/v1/models"))
+        {
+            StopSglang();
+            Append("Stopping SGLang frontend…");
+            await Task.Delay(400);
+            await RefreshStatusAsync();
+            return;
+        }
+
+        var script = Path.Combine(_labRoot, "scripts", "Serve-Sglang.ps1");
+        if (!File.Exists(script))
+            throw new InvalidOperationException("Missing " + script);
+        Append("Starting SGLang frontend :30000 -> vLLM :8000 …");
+        _sglangProc = StartOwned("SGLang", "powershell",
+            "-NoProfile -ExecutionPolicy Bypass -File " + Quote(script) + " -Remote -RemoteUrl http://127.0.0.1:8000/v1 -Port 30000");
+        for (var i = 0; i < 20; i++)
+        {
+            await Task.Delay(250);
+            if (await PingAsync(SglangUrl + "/v1/models") || await PingAsync(SglangUrl + "/health"))
+            {
+                Append("Frontend is up: http://127.0.0.1:30000/v1");
+                break;
+            }
+            if (_sglangProc is { HasExited: true })
+            {
+                Append("Frontend process exited. Red PowerShell errors used to come from UTF-8 dashes in Serve-Sglang.ps1 — that script is ASCII now.");
+                break;
+            }
+        }
+        await RefreshStatusAsync();
+    }
+
+    Process StartOwned(string name, string fileName, string arguments)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = fileName,
+            Arguments = arguments,
+            WorkingDirectory = _labRoot,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+        var p = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        p.OutputDataReceived += (_, e) => { if (e.Data is not null) BeginInvoke(() => Append("[" + name + "] " + e.Data)); };
+        p.ErrorDataReceived += (_, e) => { if (e.Data is not null) BeginInvoke(() => Append("[" + name + "] " + e.Data)); };
+        p.Exited += (_, _) => BeginInvoke(async () =>
+        {
+            Append(name + " process exited.");
+            await RefreshStatusAsync();
+        });
+        if (!p.Start())
+            throw new InvalidOperationException("Failed to start " + name);
+        p.BeginOutputReadLine();
+        p.BeginErrorReadLine();
+        return p;
+    }
+
+    void StopVllm()
+    {
+        try
+        {
+            if (_vllmProc is { HasExited: false })
+            {
+                _vllmProc.Kill(entireProcessTree: true);
+                _vllmProc.WaitForExit(4000);
+            }
+        }
+        catch (Exception ex) { Append("Stop GPU: " + ex.Message); }
+        finally
+        {
+            _vllmProc?.Dispose();
+            _vllmProc = null;
+        }
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "wsl",
+                Arguments = "-d Ubuntu -u arendeth -- bash -lc \"pkill -f vllm || true\"",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using var p = Process.Start(psi);
+            p?.WaitForExit(4000);
+        }
+        catch { /* WSL may already be down */ }
+    }
+
+    void StopSglang()
+    {
+        try
+        {
+            if (_sglangProc is { HasExited: false })
+            {
+                _sglangProc.Kill(entireProcessTree: true);
+                _sglangProc.WaitForExit(3000);
+            }
+        }
+        catch (Exception ex) { Append("Stop frontend: " + ex.Message); }
+        finally
+        {
+            _sglangProc?.Dispose();
+            _sglangProc = null;
+        }
     }
 
     static string Quote(string s) =>

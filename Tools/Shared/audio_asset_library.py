@@ -57,6 +57,10 @@ ARCHETYPE_RULES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("voice", ("voices", "zombie", "book")),
     ("impact", ("rocks", "glass", "boom", "whoosh", "smash", "rip", "swords")),
     ("organic", ("flesh", "blood", "slimy", "dragon", "crow", "horse", "footstep", "wood", "wings")),
+    # Bodily waste / gas DNA (e.g. Dark Fantasy Studio Farts!). Reference-only:
+    # unique SA3 must transform these for SFMAG crapping / accident SFX — never ship
+    # pack WAVs or near copies into Data/Sound.
+    ("bodily", ("fart", "farts", "flatulen", "bowel", "gas release", "poop", "toilet", "defecat")),
     ("horror", ("agony", "horror", "ghostly", "madness", "hostile")),
     ("water", ("water", "ice", "mud")),
     ("fire", ("fire",)),
@@ -105,6 +109,22 @@ def infer_archetypes(*parts: str) -> List[str]:
 
 def infer_tags(pack: str, inner: str) -> List[str]:
     tags = _tokenize(_pack_stem(pack)) + _tokenize(inner)
+    blob = f"{pack} {inner}".lower()
+    # Semantic aliases so retrieval finds DNA without naming pack files in prompts.
+    if any(n in blob for n in ("fart", "flatulen", "bowel gas")):
+        tags.extend(
+            [
+                "bodily",
+                "gas",
+                "flatulence",
+                "waste",
+                "organic",
+                "accident",
+                "crapping",
+                "mess",
+                "sfmag",
+            ]
+        )
     # Keep order, drop junk
     skip = {"wav", "mp3", "ogg", "flac", "stereo", "mono", "48k", "44k", "24bit", "16bit"}
     out: List[str] = []

@@ -18,5 +18,9 @@ if not exist "%CLI%" (
 
 dotnet "%CLI%" %*
 set EXIT=%ERRORLEVEL%
-if %EXIT% neq 0 if "%~1"=="" pause
+if %EXIT% neq 0 (
+  echo.
+  echo qudlab exited with error %EXIT%.
+  pause
+)
 endlocal & exit /b %EXIT%

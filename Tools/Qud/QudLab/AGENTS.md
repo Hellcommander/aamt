@@ -14,27 +14,27 @@
 6. Unity editor: `E:\tools\Unity_Editor\6000.0.77f1`.
 7. ThreadingAPI `ThreadActionLog`: enable **Options → Mod: ThreadingAPI → Multithreaded action logging**, or set `THREADINGAPI_ACTION_LOG=1` → `%LOCALAPPDATA%\QudLab\cache\threading-actions.ndjson`.
 
-## Phase 5 — Local Ollama agent (Cursor-like)
+## Phase 5 — Local LLM agent (vLLM + optional SGLang frontend)
 
 **Desktop:** double-click `QudLab.bat` (Start serve + Ask / Scan all / Fix / Sim+Ask).
 
-Start [Ollama](https://github.com/ollama/ollama) on `:11434`, then `qudlab serve`. Unity prompt box + **Ask / Scan all / Fix / Sim+Ask** call `POST /ai/run`. The model gets tools: `scan_project` (every Workspace/src file), `grep`, `read_file`, `search`/`lookup_type`, `compile`, `simulate`, `write_file`.
+GPU inference runs in **WSL vLLM** (`http://127.0.0.1:8000/v1`). SGLang does **not** merge with vLLM and does **not** take `sglang serve --remote` as an upstream flag. Qud Lab’s `qudlab sglang serve --remote` is a **Windows OpenAI frontend** on `:30000` that forwards to vLLM (real `sglang_router --backend openai` if installed, otherwise the bundled proxy). Cursor / CortexIDE / LM Studio can point at `:30000`; `QUDLAB_LLM_BACKEND=auto` prefers vLLM `:8000` directly.
 
 ```powershell
 cd "D:\games\Ai assisted toolkit\Tools\Qud\QudLab"
 .\QudLab.bat
 # or CLI:
 .\qudlab-cli.bat serve
-# other terminal: ollama serve
-# ollama pull qwen3:8b            # tools, fits 11GB
-# ollama pull deepseek-r1:7b      # already typical
-# ollama pull deepseek-r1:14b     # optional CPU spillover
-.\qudlab-cli.bat ollama scan "find bugs in the workspace"
-.\qudlab-cli.bat ollama fix "make it compile"
-.\qudlab-cli.bat ollama analyze "why does EndTurn stall"
+# other terminal — GPU backend:
+.\qudlab-cli.bat vllm serve --model Qwen/Qwen2.5-Coder-7B-Instruct-AWQ
+# optional Windows frontend for Cursor / LM Studio:
+.\qudlab-cli.bat sglang serve --remote
+.\qudlab-cli.bat ai scan "find bugs in the workspace"
+.\qudlab-cli.bat ai fix "make it compile"
+.\qudlab-cli.bat ai analyze "why does EndTurn stall"
 ```
 
-Prefer **`qwen3:8b`** for tool calling. **`deepseek-r1:7b`** fits 11GB VRAM (packed scan fallback). **`deepseek-r1:14b`** is optional with CPU spillover. Env: `OLLAMA_HOST`, `QUDLAB_OLLAMA_MODEL`.
+11 GB 2080 Ti (+~2 GB Cursor): **Qwen2.5-Coder-7B-Instruct-AWQ**, `--max-model-len 65536`, `--gpu-memory-utilization 0.72`, `--swap-space 24` (KV spill to RAM). WSL2 vLLM defaults to `VLLM_USE_V2_MODEL_RUNNER=0` (avoids `UVA is not available`) and needs WSL `gcc` for Triton JIT. Ollama remains a fallback (`qwen3:8b` tools / `deepseek-r1:7b`). Env: `QUDLAB_LLM_BACKEND`, `QUDLAB_VLLM_URL`, `QUDLAB_SGLANG_URL`, `OLLAMA_HOST`, `VLLM_MAX_MODEL_LEN`, `VLLM_SWAP_SPACE`, `VLLM_GPU_UTIL`.
 
 ## Phase 6 — Real mod IDE + live debug loop
 

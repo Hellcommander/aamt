@@ -71,6 +71,7 @@ int RunMigrate(string[] a)
     string? reportPath = null;
     var managedDir = defaultManaged;
     var skipSync = false;
+    var compact = false;
 
     for (var i = 0; i < a.Length; i++)
     {
@@ -108,6 +109,9 @@ int RunMigrate(string[] a)
             case "--include-workshop":
                 paths.Add(SteamInstall.WorkshopContentDirOrFallback);
                 break;
+            case "--compact":
+                compact = true;
+                break;
             default:
                 IsolatedBootstrap.RejectUnknown(a[i]);
                 break;
@@ -120,15 +124,26 @@ int RunMigrate(string[] a)
     opts.Paths = paths.Count > 0 ? paths : new List<string> { modsRoot };
     reportPath ??= Path.Combine(toolsRoot, "reports", $"ApiMigration_{DateTime.Now:yyyyMMdd_HHmmss}.md");
 
-    Console.WriteLine("Scan roots:");
-    foreach (var p in opts.Paths) Console.WriteLine($"  {p}");
-
-    var report = MigrationRunner.Run(opts, Console.WriteLine, (done, total) =>
+    if (!compact)
     {
+        Console.WriteLine("Scan roots:");
+        foreach (var p in opts.Paths) Console.WriteLine($"  {p}");
+    }
+
+    var report = MigrationRunner.Run(opts, compact ? (_ => { }) : Console.WriteLine, (done, total) =>
+    {
+        if (compact) return;
         if (done == 1 || done % 25 == 0 || done == total)
             Console.WriteLine($"Scanning {done}/{total}...");
     });
     ReportWriter.WriteMarkdown(report, reportPath);
+
+    if (compact)
+    {
+        Console.WriteLine(ReportWriter.ToCompactAgentSummary(report));
+        Console.WriteLine("report_md=" + reportPath);
+        return 0;
+    }
 
     Console.WriteLine();
     Console.WriteLine("=== Summary ===");
@@ -923,9 +938,11 @@ static void PrintUsage()
         Usage:
           ApiMigrator.Cli migrate [--path <dir> [<dir>...]] [--mod <name>] [--apply] [--no-backup]
                                    [--report <file>] [--dump <file>] [--rules <file>]
-                                   [--include-workshop]
+                                   [--include-workshop] [--compact]
               Scans for obsolete API usage and applies curated auto-fixes.
               Dry-run by default; pass --apply to write changes (with .bak backups).
+              --compact prints a short agent digest (auto-fixes + remaining hits) instead of
+              a verbose scan log — use this for local LLMs that cannot run AI suggest tools.
               Never writes under game StreamingAssets / Managed — mods and Workshop only.
               Repeat or space-separate --path values (one --path may list several dirs).
               Manifest Dependency / LoadAfter keys are remapped from workshop folder ids and

@@ -145,7 +145,7 @@ namespace QudLab.Unity
             if (fileTreeText != null)
                 fileTreeText.text = "File tree\n— start qudlab serve";
             if (codePaneText != null)
-                codePaneText.text = "// Ask / Scan / Fix / Sim+Ask uses local Ollama\n// start qudlab serve + ollama serve";
+                codePaneText.text = "// Ask / Scan / Fix / Sim+Ask uses vLLM (:8000) or SGLang frontend (:30000)\n// qudlab serve + qudlab vllm serve --model Qwen/Qwen2.5-3B-Instruct\n// optional: qudlab sglang serve --remote";
             if (typeBrowserText != null)
                 typeBrowserText.text = "Type browser\n— start qudlab serve";
             Refresh();
@@ -434,15 +434,19 @@ namespace QudLab.Unity
             {
                 if (!ok || string.IsNullOrEmpty(body))
                 {
-                    AppendLog("Ollama agent offline — start `qudlab serve` then Ollama (github.com/ollama/ollama).");
+                    AppendLog("LLM agent offline — start `qudlab serve` then `qudlab vllm serve --model Qwen/Qwen2.5-3B-Instruct`.");
                     return;
                 }
 
-                var reachable = body.IndexOf("\"ollama\":true", StringComparison.OrdinalIgnoreCase) >= 0;
+                var reachable = body.IndexOf("\"available\":true", StringComparison.OrdinalIgnoreCase) >= 0
+                    || body.IndexOf("\"vllm\":true", StringComparison.OrdinalIgnoreCase) >= 0
+                    || body.IndexOf("\"sglang\":true", StringComparison.OrdinalIgnoreCase) >= 0
+                    || body.IndexOf("\"ollama\":true", StringComparison.OrdinalIgnoreCase) >= 0;
+                var backend = ExtractJsonString(body, "backend") ?? "llm";
                 var model = ExtractJsonString(body, "resolvedModel") ?? ExtractJsonString(body, "defaultModel");
                 AppendLog(reachable
-                    ? "Ollama OK" + (string.IsNullOrEmpty(model) ? "" : " model=" + model)
-                    : "Ollama down at :11434 — start ollama serve / pull qwen3:8b");
+                    ? backend + " OK" + (string.IsNullOrEmpty(model) ? "" : " model=" + model)
+                    : backend + " down — qudlab vllm serve --model Qwen/Qwen2.5-3B-Instruct");
             }, 8);
 
             Refresh();

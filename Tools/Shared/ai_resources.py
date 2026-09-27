@@ -20,7 +20,7 @@ From code:
 Stages and who owns them:
 
   image     Stable Diffusion 3.5    concept art, reference shots, detail overlays
-  mesh      TRELLIS.2-4B            single image -> textured mesh with real UVs
+  mesh      TRELLIS.2-4B FP16      RAM-offload image -> textured mesh (11 GB)
   material  Material Maker          seamless, tileable, exact PBR base maps
   pixels    Pixelorama              pixel-art .pxo inspect/export + visible GUI
   layering  Ucupaint (Blender)      composite + mask the above onto a mesh's UVs
@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
@@ -107,16 +108,39 @@ def _mesh_status() -> Dict[str, Any]:
 
     url = _safe(lambda: tr.detect_server(verbose=False))
     root = _safe(tr._root)
+    variant = "trellis2"
+    precision = "half"
+    backends = []
+    try:
+        from tool_paths import trellis_variant, trellis_precision, trellis_backends
+
+        variant = trellis_variant()
+        precision = trellis_precision()
+        backends = trellis_backends()
+    except Exception:
+        pass
+    names = {
+        "trellis2": "TRELLIS.2-4B FP16 (RAM offload)",
+        "trellis1": "TRELLIS-image-large (fp16)",
+    }
     return {
         "stage": "mesh",
-        "name": "TRELLIS.2-4B",
+        "name": names.get(variant, "TRELLIS"),
+        "variant": variant,
+        "precision": precision,
         "ready": bool(url),
         "endpoint": url,
         "installed": bool(root and Path(root).is_dir()),
         "kind": "http-server",
         "gpu": True,
+        "ram_offload": True,
         "busy": _safe(tr.server_busy, False),
         "start": "Shared\\trellis_http_client.py --start",
+        "options": backends,
+        "caveat": (
+            "11 GB 2080 Ti: float16 + CPU/RAM offload only. "
+            "Do not load this into vLLM/SGLang. Default voxel tier is 512."
+        ),
     }
 
 
@@ -346,7 +370,7 @@ def make_image(prompt: str, output: Path, **kwargs: Any) -> Path:
 
 
 def make_mesh(image: Path, output: Path, **kwargs: Any) -> Path:
-    """Image -> textured GLB via TRELLIS.2. Takes the shared GPU lock internally.
+    """Image -> textured GLB via TRELLIS.2 FP16 + RAM offload (or TRELLIS 1).
 
     Stops TRELLIS after the job unless AAMT_TRELLIS_KEEP_SERVER=1.
     """

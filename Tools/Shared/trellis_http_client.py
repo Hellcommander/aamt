@@ -1,20 +1,13 @@
 #!/usr/bin/env python3
-"""HTTP client for the local TRELLIS.2 image-to-3D server.
+"""HTTP client for the local TRELLIS image-to-3D server.
 
-Companion to sd_http_client.py: SD makes the reference image, this turns it
-into a textured mesh. Any AAMT game toolset can call generate_mesh() to get a
-GLB with real UVs, then bake/retarget it for its own engine.
+TRELLIS.2-4B FP16 on an 11 GB 2080 Ti only works with RAM offload:
+weights live in system RAM (~30-50 GB), active DiT/O-Voxel stages swap onto
+the GPU. vLLM / SGLang cannot do that for this architecture.
 
-Server is the IgorAherne StableProjectorz fork of microsoft/TRELLIS.2 (the
-upstream repo is Linux-only and wants 24 GB; the fork runs the same 4B weights
-on this 11 GB 2080 Ti). Start it with start_server() or its own .bat.
-
-  python trellis_http_client.py --detect-only
-  python trellis_http_client.py --image ref.png --output mesh.glb
-  python trellis_http_client.py --start
-
-Every generation takes the shared GPU lock (Common\\gpu_hub.py) because SD3.5,
-Ollama and TRELLIS together will exhaust VRAM.
+Default backend is the Windows StableProjectorz install at D:\\trellis2
+(low_vram + --precision half). TRELLIS 1 (trellis-stable-projectorz) is the
+lighter 8 GB fp16+int32 FlexiCubes option.
 """
 
 from __future__ import annotations
@@ -54,6 +47,24 @@ def _port() -> int:
         return int(trellis_port())
     except Exception:
         return 7960
+
+
+def _variant() -> str:
+    try:
+        from tool_paths import trellis_variant
+
+        return trellis_variant()
+    except Exception:
+        return "trellis2"
+
+
+def _precision() -> str:
+    try:
+        from tool_paths import trellis_precision
+
+        return trellis_precision()
+    except Exception:
+        return "half"
 
 
 def _root() -> Path:
@@ -151,11 +162,21 @@ def start_server(wait_seconds: float = STARTUP_TIMEOUT, log_path: Optional[Path]
         env["HF_HOME"] = str(hf_home())
     except Exception:
         pass
+    env.setdefault(
+        "PYTORCH_CUDA_ALLOC_CONF",
+        "expandable_segments:True,garbage_collection_threshold:0.65,max_split_size_mb:128",
+    )
+    env.setdefault("CUDA_MODULE_LOADING", "LAZY")
 
-    print(f"[TRELLIS] starting server (log: {log_path})...", file=sys.stderr)
+    precision = _precision()
+    extra = ["--precision", precision]
+    print(
+        f"[TRELLIS] starting {_variant()} precision={precision} RAM-offload (log: {log_path})...",
+        file=sys.stderr,
+    )
     with open(log_path, "w", encoding="utf-8") as log:
         proc = subprocess.Popen(
-            ["cmd", "/c", str(bat)],
+            ["cmd", "/c", str(bat)] + extra,
             cwd=str(bat.parent),
             stdout=log,
             stderr=subprocess.STDOUT,
@@ -320,16 +341,29 @@ def generate_mesh(
                 "trellis_http_client.py --start (default port 7960)."
             )
 
-        fields = {
-            "seed": str(seed),
-            "guidance_scale": str(guidance_scale),
-            "num_inference_steps": str(steps),
-            "resolution": str(resolution),
-            "mesh_simplify": str(mesh_simplify),
-            "apply_texture": "true" if apply_texture else "false",
-            "texture_size": str(texture_size),
-            "output_format": "glb",
-        }
+        if _variant() == "trellis1":
+            ratio = mesh_simplify if isinstance(mesh_simplify, float) and mesh_simplify <= 1 else 0.95
+            fields = {
+                "seed": str(seed),
+                "ss_guidance_strength": str(guidance_scale),
+                "ss_sampling_steps": str(steps),
+                "slat_guidance_strength": "3.0",
+                "slat_sampling_steps": str(steps),
+                "mesh_simplify_ratio": str(ratio),
+                "texture_size": str(texture_size),
+                "output_format": "glb",
+            }
+        else:
+            fields = {
+                "seed": str(seed),
+                "guidance_scale": str(guidance_scale),
+                "num_inference_steps": str(steps),
+                "resolution": str(resolution),
+                "mesh_simplify": str(int(mesh_simplify) if mesh_simplify > 1 else 50),
+                "apply_texture": "true" if apply_texture else "false",
+                "texture_size": str(texture_size),
+                "output_format": "glb",
+            }
         body, content_type = _multipart(fields, image_path)
 
         started = time.monotonic()
@@ -415,7 +449,18 @@ def main() -> int:
     parser.add_argument("--start", action="store_true", help="start the server and exit")
     parser.add_argument("--stop", action="store_true", help="stop the server and exit")
     parser.add_argument("--status", action="store_true")
+    parser.add_argument(
+        "--precision",
+        choices=["half", "full", "float16", "float32"],
+        default=None,
+        help="TRELLIS.2: float16 + RAM offload (default). float32 needs ~24 GB.",
+    )
+    parser.add_argument("--variant", choices=["auto", "trellis1", "trellis2"], default=None)
     args = parser.parse_args()
+    if args.variant:
+        os.environ["AAMT_TRELLIS_VARIANT"] = args.variant
+    if args.precision:
+        os.environ["AAMT_TRELLIS_PRECISION"] = args.precision
 
     try:
         if args.detect_only:

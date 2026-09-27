@@ -52,7 +52,7 @@ Soulash 2 skill icons: `Tools\Soulash2\SkillCreator` — `generate-icons --id <i
 
 | Stage | Module | Port / kind |
 |---|---|---|
-| mesh | `trellis_http_client.py` | :7960 — stops after each job unless `AAMT_TRELLIS_KEEP_SERVER=1` |
+| mesh | `trellis_http_client.py` | :7960 FP16 + RAM offload; `--precision half`; stops after each job unless `AAMT_TRELLIS_KEEP_SERVER=1` |
 | material | `material_maker_client.py` | CLI |
 | pixels | `pixelorama_client.py` | Godot CLI + visible GUI; Magi-Tech: `Tools\Starbound\produce_pixelorama_sheets.py` |
 | layering | `ucupaint_support.py` / `ucupaint_bake.py` | Blender add-on; bake real maps onto mesh UVs |

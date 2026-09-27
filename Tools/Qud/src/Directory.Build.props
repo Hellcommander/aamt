@@ -1,9 +1,12 @@
 <Project>
-  <!-- ApiMigrator tools are Windows x64 only (not AnyCPU / Prefer32Bit). -->
+  <!-- ApiMigrator is Windows x64 only. Keep output under bin\$(Configuration)\ so
+       Launch-ApiMigrator.bat and scripts\ApiMigrator.Isolated.ps1 keep working. -->
   <PropertyGroup>
+    <Platforms>x64</Platforms>
+    <Configurations>Debug;Release</Configurations>
     <PlatformTarget>x64</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
-    <Platforms>x64</Platforms>
+    <AppendPlatformToOutputPath>false</AppendPlatformToOutputPath>
     <!-- Concurrent PS1 / CLI / GUI runs often have a previous output DLL still mapped. -->
     <CopyRetryCount>30</CopyRetryCount>
     <CopyRetryDelayMilliseconds>500</CopyRetryDelayMilliseconds>

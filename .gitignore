@@ -189,3 +189,10 @@ Tools/Qud/QudLab/UnityProject/UserSettings/
 .idea/
 *.sublime-project
 *.sublime-workspace
+/.cortexide
+/Tools/Qud/.cortexide
+Tools/Qud/QudLab/Dhf-cache/hub/models--Qwen--Qwen2.5-3B-Instruct/.no_exist/aa8e72537993ba99e69dfaafa59ed015b17504d1/special_tokens_map.json
+/Tools/Qud/QudLab/Dhf-cache
+Tools/Qud/.voidrules
+Tools/Qud/canvases/cortexide-docs-canvas.canvas.tsx
+.voidrules

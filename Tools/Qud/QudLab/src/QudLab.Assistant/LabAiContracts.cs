@@ -1,7 +1,7 @@
 namespace QudLab.Assistant;
 
 /// <summary>
-/// Local Ollama agent (Cursor-like tools) hosted by <c>qudlab serve</c>.
+/// Local vLLM/SGLang/Ollama agent (Cursor-like tools) hosted by <c>qudlab serve</c>.
 /// </summary>
 public interface ILabAiService
 {
@@ -44,7 +44,12 @@ public sealed class AiToolTrace
 
 public sealed class AiStatusResult
 {
+    public bool Available { get; set; }
+    /// <summary>True when the active backend is Ollama and reachable. Kept for Unity/GUI clients.</summary>
     public bool Ollama { get; set; }
+    public bool Sglang { get; set; }
+    public bool Vllm { get; set; }
+    public string Backend { get; set; } = "";
     public string BaseUrl { get; set; } = "";
     public string DefaultModel { get; set; } = "";
     public string? ResolvedModel { get; set; }

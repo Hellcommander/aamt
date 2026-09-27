@@ -41,12 +41,16 @@ public sealed class OllamaOptions
     }
 }
 
-public sealed class OllamaClient
+public sealed class OllamaClient : ILlmClient
 {
     readonly HttpClient _http;
     readonly OllamaOptions _options;
 
     public OllamaOptions Options => _options;
+    public string Backend => "ollama";
+    public string BaseUrl => _options.BaseUrl;
+    public string DefaultModel => _options.DefaultModel;
+    public int MaxContextChars => _options.MaxContextChars;
 
     public OllamaClient(OllamaOptions? options = null, HttpClient? http = null)
     {

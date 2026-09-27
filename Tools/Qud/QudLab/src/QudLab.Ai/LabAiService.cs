@@ -9,12 +9,13 @@ using QudLab.Core.Logs;
 namespace QudLab.Ai;
 
 /// <summary>
-/// Cursor-style local agent: Ollama <c>/api/chat</c> + tools (search, scan, compile, simulate, write).
-/// Models without native tool_calls fall back to a packed scan + <c>/api/generate</c>.
+/// Cursor-style local agent: vLLM / SGLang OpenAI <c>/v1/chat/completions</c> or Ollama <c>/api/chat</c>
+/// plus tools (search, scan, compile, simulate, write). Models without native tool_calls
+/// fall back to a packed scan + generate.
 /// </summary>
 public sealed class LabAiService : ILabAiService
 {
-    readonly OllamaClient _ollama;
+    readonly ILlmClient _llm;
     readonly Func<IntelligenceCache?> _cache;
     readonly Func<QudInstallInfo?> _install;
     readonly Func<string?, string?> _read;
@@ -24,7 +25,7 @@ public sealed class LabAiService : ILabAiService
     readonly AiContextBuilder _ctx = new();
 
     public LabAiService(
-        OllamaClient ollama,
+        ILlmClient llm,
         Func<IntelligenceCache?> cache,
         Func<QudInstallInfo?> install,
         Func<string?, string?> read,
@@ -32,7 +33,7 @@ public sealed class LabAiService : ILabAiService
         string labRoot,
         ActiveProjectManager? projectManager = null)
     {
-        _ollama = ollama;
+        _llm = llm;
         _cache = cache;
         _install = install;
         _read = read;
@@ -43,25 +44,40 @@ public sealed class LabAiService : ILabAiService
 
     public async Task<AiStatusResult> StatusAsync(CancellationToken ct = default)
     {
-        var ok = await _ollama.IsAvailableAsync(ct);
-        var models = ok ? (await _ollama.ListModelsAsync(ct)).ToList() : new List<string>();
+        var ok = await _llm.IsAvailableAsync(ct);
+        var models = ok ? (await _llm.ListModelsAsync(ct)).ToList() : new List<string>();
         string? resolved = null;
         if (ok)
         {
-            var (m, err) = await _ollama.ResolveModelAsync(null, ct);
+            var (m, err) = await _llm.ResolveModelAsync(null, ct);
             resolved = err is null ? m : null;
         }
 
+        var backend = _llm.Backend;
+        var vllm = string.Equals(backend, "vllm", StringComparison.OrdinalIgnoreCase);
+        var sglang = string.Equals(backend, "sglang", StringComparison.OrdinalIgnoreCase);
+        var ollama = string.Equals(backend, "ollama", StringComparison.OrdinalIgnoreCase);
+        string hint;
+        if (ok)
+            hint = "POST /ai/run { prompt, mode: ask|scan|fix|analyze }";
+        else if (vllm)
+            hint = "Start vLLM: qudlab vllm serve --model " + _llm.DefaultModel + "  (" + _llm.BaseUrl + ")";
+        else if (sglang || string.Equals(LlmClientFactory.PreferredBackend(), "sglang", StringComparison.OrdinalIgnoreCase))
+            hint = "Start SGLang frontend: qudlab sglang serve --remote  (vLLM on :8000)  (" + _llm.BaseUrl + ")";
+        else
+            hint = "Start vLLM (`qudlab vllm serve --model Qwen/Qwen2.5-3B-Instruct`), then optional `qudlab sglang serve --remote`, or Ollama.";
         return new AiStatusResult
         {
-            Ollama = ok,
-            BaseUrl = _ollama.Options.BaseUrl,
-            DefaultModel = _ollama.Options.DefaultModel,
+            Available = ok,
+            Ollama = ok && ollama,
+            Sglang = ok && sglang,
+            Vllm = ok && vllm,
+            Backend = backend,
+            BaseUrl = _llm.BaseUrl,
+            DefaultModel = _llm.DefaultModel,
             ResolvedModel = resolved,
             Models = models,
-            Hint = ok
-                ? "POST /ai/run { prompt, mode: ask|scan|fix|analyze }"
-                : "Start Ollama (https://github.com/ollama/ollama) so http://127.0.0.1:11434/api/tags responds."
+            Hint = hint
         };
     }
 
@@ -75,13 +91,12 @@ public sealed class LabAiService : ILabAiService
             : request.Prompt.Trim();
         var maxRounds = request.MaxRounds <= 0 ? 10 : Math.Clamp(request.MaxRounds, 1, 16);
 
-        if (!await _ollama.IsAvailableAsync(ct))
+        if (!await _llm.IsAvailableAsync(ct))
         {
-            return Fail(mode, "Ollama not reachable at " + _ollama.Options.BaseUrl +
-                              " — install/start from https://github.com/ollama/ollama");
+            return Fail(mode, _llm.Backend + " not reachable at " + _llm.BaseUrl + BackendStartHint(_llm.Backend, _llm.DefaultModel));
         }
 
-        var (model, modelErr) = await _ollama.ResolveModelAsync(request.Model, ct);
+        var (model, modelErr) = await _llm.ResolveModelAsync(request.Model, ct);
         if (modelErr is not null)
             return Fail(mode, modelErr);
 
@@ -176,7 +191,7 @@ public sealed class LabAiService : ILabAiService
 
         for (var round = 0; round < maxRounds; round++)
         {
-            var msg = await _ollama.ChatAsync(messages, model, specs, ct);
+            var msg = await _llm.ChatAsync(messages, model, specs, ct);
             var calls = msg.ToolCalls is { Count: > 0 }
                 ? msg.ToolCalls
                 : ParseTextToolCalls(msg.Content);
@@ -208,6 +223,7 @@ public sealed class LabAiService : ILabAiService
                     {
                         Role = "tool",
                         ToolName = name,
+                        ToolCallId = call.Id,
                         Content = OllamaClient.Truncate(result, 8000)
                     });
                 }
@@ -254,26 +270,23 @@ public sealed class LabAiService : ILabAiService
                    + "\n\n--- compile ---\n" + compileOut,
             hits,
             pack,
-            maxChars: _ollama.Options.MaxContextChars);
+            maxChars: _llm.MaxContextChars);
 
-        return await _ollama.GenerateAsync(packed, model, system: pack, json: false, ct);
+        return await _llm.GenerateAsync(packed, model, system: pack, json: false, ct);
     }
 
     string BuildSystem(string mode, bool apply)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("You are the Qud Lab local coding agent running through Ollama.");
-        sb.AppendLine("You have the same job as Cursor here: inspect the real game types and the user's mod, then answer or fix.");
-        sb.AppendLine("Use tools. Do not guess XRL type/event names — call search or lookup_type.");
-        sb.AppendLine("For MODERROR / type conflicts: call mod_errors FIRST (reads build_log.txt), then list_mods, set_project to the conflicting mod, grep/read_file, fix via write_file.");
-        sb.AppendLine("For runtime/turn bugs: call game_logs (player/threading), then simulate(scenario=lag-diagnose). Crowded-zone / city water / Yd pipe lag → crowd-load or yd-load (stress = ThreadingAPI offload of LiquidVolume + HydraulicPowerTransmission TurnTick). New Game stuck on Starting game → worldgen-getzone (stress = skip GetZoneEvent).");
-        sb.AppendLine("For event-pool bloat / duplicate MinEvent IDs: call event_pools (scan=true after mod changes). Check modPooled count and idConflicts.");
-        sb.AppendLine("Active project may be Workspace/src OR a LocalLow/Workshop mod — list_files/scan_project/compile use that root. Hot-switch via set_project without restarting serve.");
-        sb.AppendLine("scan_project reads every active-project file. grep searches them. compile checks them. simulate reproduces turn bugs, chargen, or GetZone (scenario=worldgen-getzone).");
-        sb.AppendLine("Never invent XRL names. Never request texture bytes. ThreadingAPI is a separate WIP mod.");
-        sb.AppendLine("When fixing, write COMPLETE files via write_file (not unified diffs), then compile.");
+        sb.AppendLine("You are the Qud Lab local coding agent on a SMALL GPU model (" + _llm.Backend + " @ " + _llm.BaseUrl + ").");
+        sb.AppendLine("No big AI toolset (no Task/subagents/ollama-suggest/scan_project dumps). Programmatic tools only.");
+        sb.AppendLine("Mod-fix loop: list_mods → set_project (LocalLow/Workshop) → api_migrate → compile → grep/read only listed paths → write_file → compile.");
+        sb.AppendLine("api_migrate is ApiMigrator (deterministic). Dry-run first; apply=true only in fix mode. Never invent XRL names — search/lookup_type.");
+        sb.AppendLine("For MODERROR type conflicts: mod_errors FIRST, then set_project, api_migrate, compile.");
+        sb.AppendLine("For runtime/turn bugs: game_logs then simulate (analyze mode). Avoid scan_project.");
+        sb.AppendLine("When fixing, write COMPLETE files via write_file, then compile. PreferXML → Harmony → override only if required.");
         if (!apply)
-            sb.AppendLine("Writes are disabled this turn — propose edits in fenced FILE: path blocks.");
+            sb.AppendLine("Writes are disabled this turn — propose edits in fenced FILE: path blocks; api_migrate apply is blocked.");
         var extra = PromptPacks.Load(_labRoot, mode) ?? PromptPacks.Load(_labRoot, "agent");
         if (!string.IsNullOrWhiteSpace(extra))
         {
@@ -288,9 +301,9 @@ public sealed class LabAiService : ILabAiService
         mode switch
         {
             "scan" =>
-                "If the prompt mentions MODERROR/type conflicts, call mod_errors + list_mods first. Then set_project to the right mod, scan_project, compile, grep/search. Report every issue with evidence.\n\n" + prompt,
+                "set_project if needed, then api_migrate (dry-run) + compile + mod_errors. Do NOT scan_project. Report compact evidence.\n\n" + prompt,
             "fix" =>
-                "If the prompt mentions MODERROR/type conflicts, call mod_errors + list_mods, set_project to the conflicting mod, remove/rename duplicate types, write_file, compile. Otherwise scan+compile the active project and fix.\n\n" + prompt,
+                "set_project to the LocalLow/Workshop mod, api_migrate apply=true for safe rewrites, compile, fix remaining hits with write_file, compile again. No scan_project.\n\n" + prompt,
             "analyze" =>
                 "Call game_logs + mod_errors. If Starting game / ResolveCell / GetZone hang, simulate scenario=worldgen-getzone (and --stress for the skip-GetZoneEvent path). Crowded map / city water lag / Yd Freehold pipes → simulate scenario=crowd-load or yd-load (stress = ThreadingAPI offload). Read sim_timeline, then explain the failure and what code to change.\n\n" + prompt,
             _ => prompt
@@ -299,10 +312,10 @@ public sealed class LabAiService : ILabAiService
     static string DefaultPrompt(string mode) =>
         mode switch
         {
-            "scan" => "Find compile errors, wrong XRL types, Harmony mistakes, and logic bugs in this workspace.",
-            "fix" => "Fix MODERROR type conflicts and compile errors. Use mod_errors, list_mods, set_project on the real mod folders.",
+            "scan" => "api_migrate + compile the active LocalLow mod; list remaining obsolete hits and CS errors.",
+            "fix" => "api_migrate apply + compile; fix remaining hits on the real LocalLow/Workshop mod folders.",
             "analyze" => "Run or read the last restricted simulation and explain what went wrong in the mod code.",
-            _ => "Help with this Caves of Qud mod. Use tools to inspect types and files before answering."
+            _ => "Help with this Caves of Qud mod using api_migrate + compile + grep (no whole-mod dumps)."
         };
 
     static string NormalizeMode(string? mode)
@@ -406,6 +419,13 @@ public sealed class LabAiService : ILabAiService
             : OllamaClient.Truncate(args.GetRawText(), 240);
 
     static string Preview(string s) => OllamaClient.Truncate(s.Replace("\r\n", "\n"), 400);
+
+    static string BackendStartHint(string backend, string model) =>
+        string.Equals(backend, "vllm", StringComparison.OrdinalIgnoreCase)
+            ? " — start: qudlab vllm serve --model " + model
+            : string.Equals(backend, "sglang", StringComparison.OrdinalIgnoreCase)
+                ? " — start: qudlab sglang serve --remote  (vLLM on :8000)"
+                : " — start Ollama, or: qudlab vllm serve --model Qwen/Qwen2.5-3B-Instruct";
 
     static AiAgentResult Fail(
         string mode,

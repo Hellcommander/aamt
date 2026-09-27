@@ -69,6 +69,15 @@ DEFAULT_OFFLOAD_AE = os.environ.get("AAMT_STABLE_AUDIO_OFFLOAD_AE", "0").strip()
 	"yes",
 	"on",
 )
+# Unique mode (shipped mod SFX): more denoise steps + harder negative so SA3
+# rewrites pack DNA instead of echoing it. Override with env if needed.
+UNIQUE_STEPS = int(os.environ.get("AAMT_STABLE_AUDIO_UNIQUE_STEPS", "36"))
+UNIQUE_NEGATIVE = os.environ.get(
+	"AAMT_STABLE_AUDIO_UNIQUE_NEGATIVE",
+	"music, singing, speech, lyrics, low quality, muffled, distortion, silence, "
+	"hiss, commercial sample pack preview, lightly edited stock sfx, "
+	"unchanged reference recording, identical fart sound, comedy sting loop",
+)
 
 _MODEL = None
 _MODEL_ID: Optional[str] = None
@@ -424,6 +433,16 @@ def _to_init_audio(audio, sample_rate: int):
     return int(sample_rate), wav
 
 
+def unique_steps() -> int:
+	"""Denoise steps for unique/ToS-safe generation (more rewrite room)."""
+	return max(8, int(UNIQUE_STEPS))
+
+
+def unique_negative() -> str:
+	"""Harder negative prompt so SA3 does not echo pack previews."""
+	return str(UNIQUE_NEGATIVE)
+
+
 def generate_array(
     prompt: str,
     *,
@@ -448,8 +467,8 @@ def generate_array(
     kwargs: Dict[str, Any] = {
         "prompt": prompt,
         "duration": duration,
-        # Lower peak VRAM on the AE decode step (hybrid default).
-        "chunked_decode": True,
+        # Chunked decode only when AE is in RAM. Full CUDA should keep VRAM busy.
+        "chunked_decode": bool(DEFAULT_OFFLOAD_AE or _MODEL_MODE == "hybrid"),
     }
     if seed is not None:
         kwargs["seed"] = int(seed)
@@ -571,6 +590,7 @@ def maybe_generate(
     init_audio: Optional[Tuple[int, Any]] = None,
     init_noise_level: float = 1.0,
     steps: Optional[int] = None,
+    negative_prompt: Optional[str] = None,
 ) -> Optional[Tuple["np.ndarray", int]]:
     """
     Try Stable Audio 3. Returns (array, sample_rate) or None to signal procedural fallback.
@@ -580,15 +600,18 @@ def maybe_generate(
     if not is_available():
         return None
     try:
-        return generate_array(
-            prompt,
-            duration=duration,
-            seed=seed,
-            model_name=model_name,
-            init_audio=init_audio,
-            init_noise_level=init_noise_level,
-            steps=steps,
-        )
+        kwargs: Dict[str, Any] = {
+            "prompt": prompt,
+            "duration": duration,
+            "seed": seed,
+            "model_name": model_name,
+            "init_audio": init_audio,
+            "init_noise_level": init_noise_level,
+            "steps": steps,
+        }
+        if negative_prompt:
+            kwargs["negative_prompt"] = negative_prompt
+        return generate_array(**kwargs)
     except Exception as e:
         global _LAST_ERROR
         _LAST_ERROR = str(e)

@@ -69,22 +69,23 @@ Unity (`E:\tools\Unity_Editor\6000.0.77f1`):
 
 - Compile → `POST /compile` (no Roslyn in-process)
 - Simulate → Phase **4b** Managed `LoadFrom` + reflection ticks when host ready; else Phase **4a** `POST /simulate`
-- **Ask / Scan all / Fix / Sim+Ask** → `POST /ai/run` (Ollama tools: `list_mods`, `set_project`, `game_logs`, `event_pools`, scan, compile, simulate)
+- **Ask / Scan all / Fix / Sim+Ask** → `POST /ai/run` (vLLM / SGLang / Ollama tools: `list_mods`, `set_project`, `game_logs`, `event_pools`, scan, compile, simulate)
 - **Mod picker** (◀ mod / mod ▶) + **Conflicts** + **Scenario** + **stress** in Unity shell
 - Never copies game DLLs into `UnityProject/`; ThreadingAPI is not bundled
 
-## Ollama (https://github.com/ollama/ollama)
+## Local LLM (vLLM backend, optional SGLang frontend)
+
+GPU inference is **vLLM in WSL** (`http://127.0.0.1:8000/v1`). `qudlab sglang serve --remote` is a Windows OpenAI frontend on `:30000` that forwards to vLLM — they do not merge into one runtime. Upstream SGLang has no `--remote` flag; Qud Lab uses `sglang_router --backend openai` when installed, else `scripts/openai-proxy.py`.
 
 ```powershell
-# start ollama serve, then:
-dotnet … QudLab.Cli.dll ollama models
-dotnet … QudLab.Cli.dll ollama ask "How does IPart WantEvent work? look up the type"
-dotnet … QudLab.Cli.dll ollama scan "find bugs across all workspace files"
-dotnet … QudLab.Cli.dll ollama fix "make Workspace/src compile"
-dotnet … QudLab.Cli.dll ollama analyze "why does the turn loop stall"
+dotnet … QudLab.Cli.dll vllm serve --model Qwen/Qwen2.5-3B-Instruct
+dotnet … QudLab.Cli.dll sglang serve --remote
+dotnet … QudLab.Cli.dll ai models
+dotnet … QudLab.Cli.dll ai ask "How does IPart WantEvent work? look up the type"
+dotnet … QudLab.Cli.dll ai scan "find bugs across all workspace files"
 ```
 
-The agent calls tools (`list_mods`, `set_project`, `game_logs`, `event_pools`, `mod_errors`, `scan_project`, `grep`, `lookup_type`, `compile`, `simulate`, `write_file`) instead of guessing. 2080 Ti (11GB): `qwen3:8b`, `deepseek-r1:7b`, optional `deepseek-r1:14b` with CPU spillover. Prompt packs: `docs/prompts/agent.md`, `scan.md`, `fix.md`, `analyze.md`.
+Ollama remains a fallback (`ollama serve` then `qudlab ollama ask …`). The agent calls tools (`list_mods`, `set_project`, `game_logs`, `event_pools`, `mod_errors`, `scan_project`, `grep`, `lookup_type`, `compile`, `simulate`, `write_file`) instead of guessing. 2080 Ti (11GB): vLLM `Qwen/Qwen2.5-3B-Instruct`, or Ollama `qwen3:8b` / `deepseek-r1:7b`. Prompt packs: `docs/prompts/agent.md`, `scan.md`, `fix.md`, `analyze.md`.
 
 ## Not included
 

@@ -49,7 +49,9 @@ Do not create a lowercase `qudlab.bat` next to `QudLab.bat` — on Windows those
 ```powershell
 .\QudLab.bat
 .\qudlab-cli.bat serve
-.\qudlab-cli.bat ollama scan "find bugs"
+.\qudlab-cli.bat vllm serve --model Qwen/Qwen2.5-Coder-7B-Instruct-AWQ
+.\qudlab-cli.bat sglang serve --remote
+.\qudlab-cli.bat ai scan "find bugs"
 ```
 
 ## Quick start (CLI — works without Unity)
@@ -104,14 +106,14 @@ Env override: `QUDLAB_QUD_PATH`.
 - `POST /simulate` — restricted debug sim; `GET /simulate/scenarios` — lag/turn repro catalog
 - `POST /simulation/ingest` — Unity Phase 4b timeline → cache
 - `GET /simulation/timeline`, `/simulation/logs`
-- `GET /ai/status`, `/ai/models` — Ollama reachability (`http://127.0.0.1:11434`)
+- `GET /ai/status`, `/ai/models` — vLLM / SGLang / Ollama reachability
 - `POST /ai/run` — Cursor-like local agent (`mode`: ask|scan|fix|analyze). Tools: scan every workspace file, grep, compile, simulate, write_file
 - `POST /ai/ask`, `/ai/scan`, `/ai/fix`, `/ai/analyze` — same agent, mode implied
 
-Cache auto-rebuilds when missing/stale. Cursor and Ollama share the same localhost cache.
+Cache auto-rebuilds when missing/stale. Cursor and the local LLM share the same localhost cache.
 Unity may LoadFrom install Managed for a restricted object-host spike; it never copies those DLLs into the project.
 
-Suggested Ollama models for 11GB 2080 Ti: **`qwen3:8b`** (tools), **`deepseek-r1:7b`** (VRAM-safe reasoning), **`deepseek-r1:14b`** (CPU spillover). See https://github.com/ollama/ollama — env `OLLAMA_HOST`, `QUDLAB_OLLAMA_MODEL`.
+GPU path (preferred): **vLLM in WSL** on `:8000`, optional **SGLang frontend** on `:30000` (`qudlab sglang serve --remote`). They do not merge into one runtime. 11 GB 2080 Ti (+~2 GB Cursor): **Qwen2.5-Coder-7B-Instruct-AWQ** at 64k with `--swap-space` for KV→RAM (or dense 3B FP16 if you need lower VRAM). WSL2 serve sets `VLLM_USE_V2_MODEL_RUNNER=0` so `UVA is not available` does not crash EngineCore. Ollama remains a fallback (`qwen3:8b`, `deepseek-r1:7b`). Env: `QUDLAB_LLM_BACKEND`, `QUDLAB_VLLM_URL`, `QUDLAB_SGLANG_URL`, `OLLAMA_HOST`, `VLLM_MAX_MODEL_LEN`, `VLLM_SWAP_SPACE`, `VLLM_GPU_UTIL`.
 
 ## Safety
 

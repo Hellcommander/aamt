@@ -57,6 +57,17 @@ StableAudioDir = E:\tools\stable-audio
 AudioLibraryDir = D:\assets\audio
 AudioIndexDir = D:\assets\audio\_aamt_index
 
+[Trellis]
+# trellis2 = TRELLIS.2-4B Windows RAM-offload (lags microsoft/TRELLIS.2)
+# trellis1 = TRELLIS-image-large fp16 + int32 FlexiCubes (8 GB)
+# auto = prefer an installed trellis2, else trellis1
+TrellisVariant = auto
+Trellis1Root = D:\trellis
+Trellis2Root = D:\trellis2
+TrellisPort = 7960
+# half/float16 is the 11 GB 2080 Ti option (CPU/RAM offload). full = ~24 GB.
+TrellisPrecision = half
+
 # ---------------------------------------------------------------------------
 # Legacy flat style (still supported — same keys without sections):
 # ---------------------------------------------------------------------------

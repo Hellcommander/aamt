@@ -1244,69 +1244,229 @@ def write_mod(spec: Dict[str, Any], dest: Optional[Path] = None) -> Path:
     return root
 
 
+def _read_json_file(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return None
+
+
+def _as_row_list(raw: Any) -> List[Any]:
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return [x for x in raw if isinstance(x, dict)]
+    if isinstance(raw, dict):
+        if "id" in raw or "name" in raw:
+            return [raw]
+        return [v for v in raw.values() if isinstance(v, dict)]
+    return []
+
+
+def _load_json_dir(folder: Path, *, role: Optional[str] = None) -> List[Dict[str, Any]]:
+    if not folder.is_dir():
+        return []
+    loaded: List[Dict[str, Any]] = []
+    for p in sorted(folder.glob("*.json")):
+        row = _read_json_file(p)
+        if not isinstance(row, dict):
+            continue
+        row["_file"] = p.name
+        if role == "entity":
+            row["_role"] = detect_role(row)
+        loaded.append(row)
+    return loaded
+
+
+_DISK_LIST_KEYS = (
+    "abilities",
+    "passives",
+    "amplifiers",
+    "milestones",
+    "stackers",
+    "animations",
+    "entities",
+    "buildings",
+    "loot_exclude",
+    "races",
+    "control_actions",
+    "character_tags",
+    "production_actions",
+)
+
+
 def load_mod_folder(folder: Path) -> Dict[str, Any]:
+    """Assemble a studio spec from a Geomancy-layout mod folder (live JSON, not skill.json)."""
     folder = Path(folder)
-    spec_path = folder / "skill.json"
-    if spec_path.is_file():
-        return load_spec(spec_path)
-    mod = json.loads((folder / "mod.json").read_text(encoding="utf-8")) if (folder / "mod.json").is_file() else {}
-    skills = json.loads((folder / "skills.json").read_text(encoding="utf-8")) if (folder / "skills.json").is_file() else []
-    skill = skills[0] if skills else {"id": folder.name, "name": folder.name}
-    spec = new_spec(skill.get("id") or folder.name, skill.get("name") or folder.name, mod_id=folder.name)
+    if not folder.exists():
+        raise FileNotFoundError(f"Mod path does not exist: {folder}")
+    mod = _read_json_file(folder / "mod.json")
+    if not isinstance(mod, dict):
+        mod = {}
+    skills = _read_json_file(folder / "skills.json")
+    if not isinstance(skills, list):
+        skills = []
+    skill = skills[0] if skills and isinstance(skills[0], dict) else None
+    if not skill:
+        skill = {"id": folder.name, "name": folder.name}
+    spec = new_spec(
+        str(skill.get("id") or folder.name),
+        str(skill.get("name") or folder.name),
+        mod_id=folder.name,
+        prefix=False,
+    )
+    spec["id"] = folder.name
+    spec["mod_id"] = folder.name
     spec["mod"] = mod or spec["mod"]
     spec["skill"] = skill
     spec["skill_id"] = skill.get("id") or folder.name
-    if (folder / "passives.json").is_file():
-        spec["passives"] = json.loads((folder / "passives.json").read_text(encoding="utf-8"))
+
+    spec["passives"] = _as_row_list(_read_json_file(folder / "passives.json"))
     amp_path = folder / "ability_amplifiers.json"
     if not amp_path.is_file():
         amp_path = folder / "amplifiers.json"
-    if amp_path.is_file():
-        spec["amplifiers"] = json.loads(amp_path.read_text(encoding="utf-8-sig"))
-    if (folder / "ability_stackers.json").is_file():
-        spec["stackers"] = json.loads((folder / "ability_stackers.json").read_text(encoding="utf-8"))
-    abdir = folder / "abilities"
-    if abdir.is_dir():
-        spec["abilities"] = [
-            json.loads(p.read_text(encoding="utf-8")) for p in sorted(abdir.glob("*.json"))
-        ]
+    spec["amplifiers"] = _as_row_list(_read_json_file(amp_path))
+    spec["stackers"] = _as_row_list(_read_json_file(folder / "ability_stackers.json"))
+    spec["abilities"] = _load_json_dir(folder / "abilities")
+    miles: List[Dict[str, Any]] = []
     mdir = folder / "milestones"
-    miles = []
     if mdir.is_dir():
         for p in sorted(mdir.rglob("*.json")):
             if "translations" in p.parts:
                 continue
-            row = json.loads(p.read_text(encoding="utf-8"))
+            row = _read_json_file(p)
+            if not isinstance(row, dict):
+                continue
             row["file"] = p.name
             miles.append(row)
     spec["milestones"] = miles
-    edir = folder / "entities"
-    if edir.is_dir():
-        loaded = []
-        for p in sorted(edir.glob("*.json")):
-            row = json.loads(p.read_text(encoding="utf-8"))
-            if isinstance(row, dict):
-                row["_file"] = p.name
-                row["_role"] = detect_role(row)
-                loaded.append(row)
-        spec["entities"] = loaded
-    adir = folder / "animations"
-    if adir.is_dir():
-        spec["animations"] = [
-            json.loads(p.read_text(encoding="utf-8")) for p in sorted(adir.glob("*.json"))
-        ]
-    if (folder / "assets.json").is_file():
-        spec["assets"] = json.loads((folder / "assets.json").read_text(encoding="utf-8"))
-    if (folder / "loot_exclude.json").is_file():
-        spec["loot_exclude"] = json.loads((folder / "loot_exclude.json").read_text(encoding="utf-8"))
-    bdir = folder / "buildings"
-    if bdir.is_dir():
-        loaded_b = []
-        for p in sorted(bdir.glob("*.json")):
-            row = json.loads(p.read_text(encoding="utf-8"))
-            if isinstance(row, dict):
-                row["_file"] = p.name
-                loaded_b.append(row)
-        spec["buildings"] = loaded_b
+    spec["entities"] = _load_json_dir(folder / "entities", role="entity")
+    spec["animations"] = _load_json_dir(folder / "animations")
+    assets = _read_json_file(folder / "assets.json")
+    if assets is not None:
+        spec["assets"] = assets
+    loot = _read_json_file(folder / "loot_exclude.json")
+    if loot is not None:
+        spec["loot_exclude"] = loot if isinstance(loot, list) else _as_row_list(loot)
+    spec["buildings"] = _load_json_dir(folder / "buildings")
     load_character_into_spec(spec, folder)
+
+    studio = _read_json_file(folder / "skill.json")
+    if isinstance(studio, dict):
+        for key in _DISK_LIST_KEYS:
+            if spec.get(key):
+                continue
+            extra = studio.get(key)
+            if not extra:
+                continue
+            spec[key] = extra if isinstance(extra, list) else _as_row_list(extra)
+        if not spec.get("assets") and studio.get("assets") is not None:
+            spec["assets"] = studio["assets"]
+        if not skills and isinstance(studio.get("skill"), dict):
+            spec["skill"] = studio["skill"]
+            spec["skill_id"] = studio.get("skill_id") or spec["skill"].get("id") or spec["skill_id"]
+    _ensure_lists(spec)
     return spec
+    
+    def load_mod_folder(folder: Path) -> Dict[str, Any]:
+    folder = Path(folder)
+    if not folder.is_dir():
+        raise FileNotFoundError(f"Mod folder not found: {folder}")
+
+    # Read mod.json / skills.json
+    mod_meta = {}
+    skills = []
+    if (folder / "mod.json").is_file():
+        mod_meta = json.loads((folder / "mod.json").read_text(encoding="utf-8-sig"))
+    if (folder / "skills.json").is_file():
+        skills = json.loads((folder / "skills.json").read_text(encoding="utf-8-sig"))
+
+    # Base spec: keep ids as-is (no prefix rewrite)
+    skill_row = skills[0] if skills and isinstance(skills[0], dict) else {}
+    sid = str(skill_row.get("id") or folder.name)
+    name = skill_row.get("name") or sid
+
+    spec = new_spec(sid, name, mod_id=mod_meta.get("id") or sid, prefix=False)
+
+    # Clear lists; we will assemble from disk
+    for key in (
+        "abilities", "passives", "amplifiers", "milestones",
+        "stackers", "animations", "entities", "buildings",
+        "loot_exclude", "races", "control_actions",
+        "character_tags", "production_actions"
+    ):
+        spec[key] = []
+
+    # Abilities/*.json
+    abil_dir = folder / "abilities"
+    if abil_dir.is_dir():
+        for path in sorted(abil_dir.glob("*.json")):
+            try:
+                row = json.loads(path.read_text(encoding="utf-8-sig"))
+                if isinstance(row, dict):
+                    spec["abilities"].append(row)
+            except Exception:
+                pass
+
+    # Passives.json
+    p = folder / "passives.json"
+    if p.is_file():
+        try:
+            rows = json.loads(p.read_text(encoding="utf-8-sig"))
+            if isinstance(rows, dict):
+                rows = [rows]
+            spec["passives"].extend(r for r in rows if isinstance(r, dict))
+        except Exception:
+            pass
+
+    # Amplifiers
+    a = folder / "ability_amplifiers.json"
+    if not a.is_file():
+        a = folder / "amplifiers.json"
+    if a.is_file():
+        try:
+            rows = json.loads(a.read_text(encoding="utf-8-sig"))
+            if isinstance(rows, dict):
+                rows = [rows]
+            spec["amplifiers"].extend(r for r in rows if isinstance(r, dict))
+        except Exception:
+            pass
+
+    # Stackers
+    s = folder / "ability_stackers.json"
+    if s.is_file():
+        try:
+            rows = json.loads(s.read_text(encoding="utf-8-sig"))
+            if isinstance(rows, dict):
+                rows = [rows]
+            spec["stackers"].extend(r for r in rows if isinstance(r, dict))
+        except Exception:
+            pass
+
+    # Milestones/**/*.json
+    miles_root = folder / "milestones"
+    if miles_root.is_dir():
+        for path in sorted(miles_root.rglob("*.json")):
+            if "translations" in path.parts:
+                continue
+            try:
+                row = json.loads(path.read_text(encoding="utf-8-sig"))
+                if isinstance(row, dict):
+                    spec["milestones"].append(row)
+            except Exception:
+                pass
+
+    # Animations/*.json
+    anim_dir = folder / "animations"
+    if anim_dir.is_dir():
+        for path in sorted(anim_dir.glob("*.json")):
+            try:
+                row = json.loads(path.read_text(encoding="utf-8-sig"))
+                if isinstance(row, dict):
+                    spec["animations"].append(row)
+            except Exception:
+                pass
+
+    _ensure_lists(spec)
+    return spec
+

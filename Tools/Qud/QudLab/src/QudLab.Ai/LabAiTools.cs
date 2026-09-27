@@ -77,8 +77,14 @@ public sealed class LabAiTools
             Fn("grep", "Search all active-project .cs/.xml files for a string.",
                 Props(("q", "string", "Substring to find")),
                 "q"),
-            Fn("scan_project", "Read EVERY active-project file plus last compile diagnostics and sim timeline.",
+            Fn("scan_project", "EXPENSIVE: dumps every active-project file. Avoid on small local models — prefer api_migrate + grep + compile.",
                 Props()),
+            Fn("api_migrate", "Programmatic ApiMigrator (no AI). Dry-run or apply obsolete-API rewrites on LocalLow/Workshop mod. Returns a compact hit list — use this instead of reading whole mods or ollama-suggest.",
+                Props(
+                    ("mod", "string", "Mod folder name / id filter"),
+                    ("path", "string", "Absolute mod folder (defaults to active project or LocalLow Mods)"),
+                    ("apply", "boolean", "Write safe auto-fixes (default false = dry-run)"),
+                    ("no_backup", "boolean", "Skip .bak when apply=true"))),
             Fn("compile", "Roslyn-compile the active project against the live Qud install. Returns diagnostics.",
                 Props()),
             Fn("simulate", "Run the restricted debug simulator (not a playable game). scenario=chargen walks character generation. scenario=worldgen-getzone walks bootGame ResolveCell/GetZone (bug = IndexOf hang; stress = skip GetZoneEvent). scenario=crowd-load is an oversized map + many NPCs + simulated player. Default path is turn/energy/event bugs.",
@@ -131,6 +137,7 @@ public sealed class LabAiTools
                 "read_file" => ReadFile(Str(args, "path") ?? Str(args, "file")),
                 "grep" => Grep(Str(args, "q") ?? Str(args, "query")),
                 "scan_project" or "scan" => ScanProject(),
+                "api_migrate" or "migrate" or "obsolete" => ApiMigrate(args),
                 "compile" => Compile(out compiledTouched),
                 "simulate" or "sim" => Simulate(args),
                 "sim_timeline" or "timeline" => Timeline(),
@@ -438,6 +445,111 @@ public sealed class LabAiTools
         }
 
         return sb.ToString();
+    }
+
+    string ApiMigrate(JsonElement args)
+    {
+        var apply = Bool(args, "apply") ?? false;
+        if (apply && !_allowWrite)
+            return "api_migrate apply blocked — writes disabled this turn; call again with apply=false or enable fix mode";
+
+        var path = Str(args, "path");
+        var mod = Str(args, "mod") ?? Str(args, "q");
+        var noBackup = Bool(args, "no_backup") ?? Bool(args, "nobackup") ?? false;
+
+        var cache = _cache();
+        var active = cache?.Project.RootPath;
+        if (string.IsNullOrWhiteSpace(path))
+            path = active;
+        if (string.IsNullOrWhiteSpace(path) && string.IsNullOrWhiteSpace(mod))
+            path = QudModPaths.LocalModsRoot();
+
+        var toolsRoot = FindApiMigratorToolsRoot();
+        if (toolsRoot is null)
+            return "ApiMigrator tools root not found (expected Tools/Qud next to QudLab)";
+
+        var cliProj = Path.Combine(toolsRoot, "src", "ApiMigrator.Cli", "ApiMigrator.Cli.csproj");
+        if (!File.Exists(cliProj))
+            return "missing " + cliProj;
+
+        var reportDir = Path.Combine(toolsRoot, "reports");
+        Directory.CreateDirectory(reportDir);
+        var report = Path.Combine(reportDir, "ApiMigration_agent_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".md");
+
+        var argList = new List<string>
+        {
+            "run", "--project", cliProj, "-c", "Release", "--",
+            "migrate", "--compact", "--report", report
+        };
+        if (!string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+        {
+            argList.Add("--path");
+            argList.Add(Path.GetFullPath(path));
+        }
+        if (!string.IsNullOrWhiteSpace(mod))
+        {
+            argList.Add("--mod");
+            argList.Add(mod);
+        }
+        if (apply)
+            argList.Add("--apply");
+        if (noBackup)
+            argList.Add("--no-backup");
+
+        var (code, stdout, stderr) = RunDotnet(argList, toolsRoot, timeoutMs: 300_000);
+        if (code != 0 && string.IsNullOrWhiteSpace(stdout))
+            return "api_migrate failed exit=" + code + "\n" + OllamaClient.Truncate(stderr, 2000);
+
+        var body = string.IsNullOrWhiteSpace(stdout) ? stderr : stdout;
+        return OllamaClient.Truncate(body.Trim(), 7000);
+    }
+
+    static string? FindApiMigratorToolsRoot()
+    {
+        // QudLab lives at Tools/Qud/QudLab — ApiMigrator at Tools/Qud.
+        var probe = AppContext.BaseDirectory;
+        for (var i = 0; i < 8 && !string.IsNullOrEmpty(probe); i++)
+        {
+            var cli = Path.Combine(probe, "src", "ApiMigrator.Cli", "ApiMigrator.Cli.csproj");
+            if (File.Exists(cli))
+                return probe;
+            var sibling = Path.Combine(probe, "..", "src", "ApiMigrator.Cli", "ApiMigrator.Cli.csproj");
+            if (File.Exists(Path.GetFullPath(sibling)))
+                return Path.GetFullPath(Path.Combine(probe, ".."));
+            probe = Directory.GetParent(probe)?.FullName;
+        }
+
+        var fallback = @"D:\games\Ai assisted toolkit\Tools\Qud";
+        return File.Exists(Path.Combine(fallback, "src", "ApiMigrator.Cli", "ApiMigrator.Cli.csproj"))
+            ? fallback
+            : null;
+    }
+
+    static (int ExitCode, string StdOut, string StdErr) RunDotnet(List<string> args, string cwd, int timeoutMs)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "dotnet",
+            WorkingDirectory = cwd,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+        foreach (var a in args)
+            psi.ArgumentList.Add(a);
+
+        using var p = System.Diagnostics.Process.Start(psi)
+            ?? throw new InvalidOperationException("failed to start dotnet");
+        var stdoutTask = p.StandardOutput.ReadToEndAsync();
+        var stderrTask = p.StandardError.ReadToEndAsync();
+        if (!p.WaitForExit(timeoutMs))
+        {
+            try { p.Kill(entireProcessTree: true); } catch { /* ignore */ }
+            return (-1, "", "api_migrate timed out after " + timeoutMs + "ms");
+        }
+
+        return (p.ExitCode, stdoutTask.GetAwaiter().GetResult(), stderrTask.GetAwaiter().GetResult());
     }
 
     string Compile(out bool touched)

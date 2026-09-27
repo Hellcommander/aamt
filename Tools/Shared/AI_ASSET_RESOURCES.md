@@ -7,7 +7,7 @@ others are weak.
 | Stage | Resource | Kind | Owns |
 |---|---|---|---|
 | `image` | Stable Diffusion 3.5 | HTTP :1338 | concept art, reference shots, detail overlays |
-| `mesh` | TRELLIS.2-4B | HTTP :7960 | one image → textured mesh with real UVs |
+| `mesh` | TRELLIS.2-4B FP16 | HTTP :7960 | one image → textured mesh; RAM-offload on 11 GB |
 | `material` | Material Maker | CLI | seamless tileable PBR base maps |
 | `pixels` | Pixelorama | CLI + visible GUI | pixel-art .pxo inspect/export; `see` screenshots the editor |
 | `layering` | Ucupaint | Blender add-on | compositing/masking onto a mesh's UVs |
@@ -103,9 +103,21 @@ python Shared\sd_http_client.py --detect-only
 
 ### TRELLIS.2 (`trellis_http_client.py`)
 
-Upstream `microsoft/TRELLIS.2` is Linux-only and wants 24 GB. We run the
-IgorAherne StableProjectorz Windows fork at `D:\trellis2`, which executes the
-same 4B weights on 8-11 GB.
+[microsoft/TRELLIS.2](https://github.com/microsoft/TRELLIS.2) is Linux + **24 GB**.
+On this 11 GB 2080 Ti (64 GB RAM) the 4B model only runs as **FP16 with CPU/RAM
+offload**: weights stay in system RAM (~30–50 GB), active DiT / O-Voxel stages
+swap onto the GPU. Expect slow inference and VRAM spikes near 10–11 GB. Use
+voxel tier **512** here. Do **not** load this into vLLM or SGLang.
+
+Two Windows backends (`TrellisVariant` / `AAMT_TRELLIS_VARIANT`):
+
+| Option | What | VRAM |
+|---|---|---|
+| `trellis2` (default if `D:\trellis2` exists) | [IgorAherne/TRELLIS.2-stableprojectorz](https://github.com/IgorAherne/TRELLIS.2-stableprojectorz) — Windows fork of TRELLIS.2, **lags microsoft**. `low_vram` + `--precision half`. Gradio **Precision = float16**. | 8–11 GB + RAM offload |
+| `trellis1` | [IgorAherne/trellis-stable-projectorz](https://github.com/IgorAherne/trellis-stable-projectorz) + [int32 FlexiCubes](https://github.com/IgorAherne/flexicubes-stable-projectorz) — `pipeline.to(float16)`. Lighter 1.2B. | 8 GB half-precision |
+
+`TrellisPrecision=half` (default) is the GUI/API float16 option. `full` is the
+24 GB path.
 
 **Idle shutdown (required on this card).** `generate_mesh()` stops the TRELLIS
 server when the GLB is written, unless `AAMT_TRELLIS_KEEP_SERVER=1`. Multi-job
@@ -117,7 +129,7 @@ Output is a GLB with `POSITION`, `NORMAL`, `TEXCOORD_0` and PBR textures. The
 UVs are the important part — they're what later baking and skinning bind to.
 Treat the baked textures as a starting point, not a final material.
 
-Resolution is a voxel tier: `512` (safe here, ~35-45 s), `1024`, `1536`.
+Resolution is a voxel tier: `512` (safe here), `1024`, `1536`.
 `mesh_simplify` is a decimation target in thousands of faces.
 
 Weights live in the shared HF cache (`tool_paths.hf_home()`, `D:\hf-cache`) via
@@ -182,16 +194,34 @@ and power-of-two dimensions.
 ### Audio (`audio_pipeline.py`, `audio_asset_library.py`)
 
 The audio stage does **not** invent SFX from a blank prompt when you already
-own the timbre. It turns `D:\assets\audio` (77 purchased zip packs, ~7k clips)
-into a queryable conditioning space, then generates a *new* clip that inherits
-that spectral DNA.
+own the timbre. It turns `D:\assets\audio` (purchased zip packs, including
+Noise Alchemy / Dark Fantasy Studio) into a queryable conditioning space, then
+generates a *new* clip that inherits that spectral DNA.
+
+**ToS / unique mode (default on):** pack WAVs are **reference DNA only**. Never
+copy, resample, trim, or lightly edit them into a game `Data/Sound` tree.
+`generate_audio(..., unique=True)` (AAMT default) mixes several hits, **mutates
+that mix** (pitch / time / EQ / waveshape / reverse-slice / noise), runs Stable
+Audio 3 with high `init_noise` + harder negatives + extra steps, retries when
+`copy_corr` stays above the bar, then applies a second DSP morph. Library-mix
+fallback is refused in unique mode. Override mutate strength with
+`AAMT_AUDIO_DNA_MUTATE` (default `0.72`); SA3 unique steps/negative via
+`AAMT_STABLE_AUDIO_UNIQUE_STEPS` / `AAMT_STABLE_AUDIO_UNIQUE_NEGATIVE`.
+
+**SFMAG crapping / accident SFX:** use archetype `bodily` (indexes
+`Dark Fantasy Studio- Farts!.zip` and related tags: `fart`, `gas`, `waste`,
+`crapping`, `mess`). Prompt the *event*, not a pack filename — e.g.
+`"short muffled fabric-buffered gas release, adult MAG accident"` with
+`archetype="bodily"`.
 
 ```powershell
 python Shared\audio_pipeline.py status
 python Shared\audio_pipeline.py ingest --fast          # tags + spectral (all packs)
+python Shared\audio_pipeline.py ingest --fast --pack Farts   # new bodily pack only
 python Shared\audio_pipeline.py ingest                 # also CLAP + Whisper on vocals
-python Shared\audio_pipeline.py search --query "crunchy sci-fi UI click" --archetype ui
+python Shared\audio_pipeline.py search --query "muffled gas release waste" --archetype bodily
 python Shared\audio_pipeline.py generate --prompt "short plasma vent burst" --out vent.wav --archetype laser
+python Shared\audio_pipeline.py generate --prompt "short muffled MAG accident gas release" --out mess.wav --archetype bodily
 ```
 
 From Python:
@@ -199,27 +229,36 @@ From Python:
 ```python
 from ai_resources import make_audio
 make_audio("short metallic hatch slam", Path("hatch.wav"), archetype="ship", strength=0.7)
+make_audio(
+    "short muffled fabric-buffered gas release, adult incontinence accident",
+    Path("sfmag_mess_gas.wav"),
+    archetype="bodily",
+    duration=1.4,
+)
 ```
 
 | Fact | Value |
 |---|---|
 | Library | `D:\assets\audio` (`AudioLibraryDir` / `AAMT_AUDIO_LIBRARY_DIR`) |
 | Index | `D:\assets\audio\_aamt_index` |
-| Generator | Stable Audio 3 (`aamt_stable_audio_backend.py`), GPU-locked |
+| Generator | Stable Audio 3 (`aamt_stable_audio_backend.py` under `E:\tools\stable-audio`), GPU-locked |
 | Retrieval | tag MiniLM + spectral fingerprint; optional CLAP (`laion/clap-htsat-unfused`, CPU) |
-| Conditioning | mix top-k refs → SA3 `init_audio` (`strength` 0=text-only, 1=stay on refs) |
-| Fallback | if SA3 is down, writes a duration-fit mix of the retrieved clips |
-| Archetypes | laser, ui, alien, mech, ship, magic, ambience, voice, impact, organic, horror, water, fire |
+| Conditioning | mix top-k refs → (unique: mutate DNA) → SA3 `init_audio` (`strength` 0=text-only, 1=stay on refs; unique caps ~0.28) |
+| Unique bar | `copy_corr` ≤ ~0.22 after retries; refuse library-mix |
+| Fallback | only when unique is off and SA3 is down: duration-fit mix of retrieved clips |
+| Archetypes | laser, ui, alien, mech, ship, magic, ambience, voice, impact, organic, **bodily**, horror, water, fire |
 
 **Agent rules**
 
 1. `ensure("audio")` then `make_audio(...)` or `audio_pipeline.py generate`. Do not
    hallucinate a new SFX pack or download random web sounds.
-2. Ingest once (`--fast` is enough to search). Resume is incremental.
+2. Ingest once (`--fast` is enough to search). Resume is incremental; re-run
+   `--pack Farts` after adding that zip.
 3. Pass `archetype` / `tags` when you know the family (Starfield ship hatch →
-   `ship`, UI beep → `ui`, spell → `magic`).
+   `ship`, UI beep → `ui`, spell → `magic`, SFMAG mess gas → `bodily`).
 4. SA3 takes the GPU lock. Do not generate audio while SD/TRELLIS is rendering.
-5. `doomnoisealchemy.zip` / `downsweeps.zip` may be skipped if Python cannot
+5. Never ship pack files or near copies. Unique mode is mandatory for Starfield mods.
+6. `doomnoisealchemy.zip` / `downsweeps.zip` may be skipped if Python cannot
    open them as zip; the rest of the library still indexes.
 
 ## Adding a consumer
@@ -239,7 +278,7 @@ All resolved by `tool_paths.py` (env var → `TranscendenceTools.ini` → defaul
 | Function | Default |
 |---|---|
 | `hf_home()` | `D:\hf-cache` |
-| `trellis_root()` / `trellis_port()` | `D:\trellis2` / `7960` |
+| `trellis_root()` / `trellis_port()` / `trellis_variant()` / `trellis_precision()` | `D:\trellis2` / `7960` / `auto` / `half` |
 | `material_maker_exe()` | `D:\tools\Texture_Making_tools\material_maker_1_7_windows\material_maker.exe` |
 | `ucupaint_addon_dir()` | newest Blender under `%APPDATA%` |
 | `texconv_exe()` | `D:\decompilers\DirectXTex\texconv.exe` |

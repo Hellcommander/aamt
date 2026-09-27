@@ -1,0 +1,7 @@
+At D:\games\Ai assisted toolkit\Tools\Qud\QudLab\scripts\Serve-Sglang.ps1:90 char:32
++     $modelArg = @("--model-name", $Model)
++                                ~~~~~~~~~~
+The string is missing the terminator: ".
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : TerminatorExpectedAtEndOfString
+ 

@@ -45,7 +45,9 @@ static class Program
                 "simulate" or "sim" => await CmdSim(args, overridePath),
                 "simhost" => CmdSimHost(args, overridePath),
                 "template" => CmdTemplate(args),
-                "ollama" => await CmdOllama(args),
+                "ollama" or "ai" => await CmdOllama(args),
+                "sglang" or "sgl" => await CmdSglang(args),
+                "vllm" => await CmdVllm(args),
                 "project" or "mod" => CmdProject(args),
                 "logs" => CmdLogs(args),
                 "events" => CmdEvents(args, overridePath),
@@ -203,8 +205,9 @@ static class Program
 
         var projectManager = CreateProjectManager();
 
+        var llm = await LlmClientFactory.CreateAsync(GetOption(args, "--backend"));
         var ai = new LabAiService(
-            new OllamaClient(),
+            llm,
             () => _cache ?? CacheIO.Load(),
             () => _host.Install ?? _host.Startup(path).Install,
             projectManager.ReadFile,
@@ -231,7 +234,13 @@ static class Program
         var workshop = QudModPaths.WorkshopModsRoot(_host.Install?.RootPath);
         if (workshop is not null)
             Console.WriteLine($"Workshop mods: {workshop}");
-        Console.WriteLine("Ollama agent: POST /ai/run  (ask|scan|fix|analyze) — https://github.com/ollama/ollama");
+        Console.WriteLine($"{llm.Backend} agent: POST /ai/run  (ask|scan|fix|analyze) — {llm.BaseUrl}");
+        if (string.Equals(llm.Backend, "vllm", StringComparison.OrdinalIgnoreCase))
+            Console.WriteLine("  Hugging Face slot: qudlab vllm serve --model org/name   (or D:\\tools\\vllm\\vllm-serve.bat)");
+        else if (string.Equals(llm.Backend, "sglang", StringComparison.OrdinalIgnoreCase))
+            Console.WriteLine("  SGLang frontend: qudlab sglang serve --remote   (vLLM on :8000)");
+        else
+            Console.WriteLine("  Prefer vLLM: qudlab vllm serve --model Qwen/Qwen2.5-3B-Instruct");
         Console.WriteLine("Hot-switch mod: POST /project/set {\"query\":\"Broodmother\"}  or  qudlab project set \"Blink\"");
         Console.WriteLine("Live logs: GET /logs/game?kind=threading&tail=100");
         Console.WriteLine("Press Ctrl+C to stop.");
@@ -568,19 +577,259 @@ static class Program
         return 0;
     }
 
-    static async Task<int> CmdOllama(string[] args)
+    static async Task<int> CmdVllm(string[] args)
+    {
+        var sub = args.ElementAtOrDefault(1)?.ToLowerInvariant();
+        return sub switch
+        {
+            "serve" or "launch" or "start" => CmdVllmServe(args),
+            "list" or "ls" or "models-cache" => CmdVllmSwap("list", args),
+            "status" or "loaded" => CmdVllmSwap("status", args),
+            "stop" => CmdVllmSwap("stop", args),
+            "swap" or "switch" or "use" => CmdVllmSwap("swap", args),
+            "shelve" => CmdVllmShelve(args, escalate: false),
+            "escalate" => CmdVllmShelve(args, escalate: true),
+            "unshelve" => CmdVllmUnshelve(args),
+            _ => await CmdOllama(args, forceBackend: "vllm")
+        };
+    }
+
+    static int CmdVllmShelve(string[] args, bool escalate)
+    {
+        var labRoot = FindLabRoot();
+        var script = Path.Combine(labRoot, "scripts", "Escalate-VllmContext.ps1");
+        if (!File.Exists(script))
+        {
+            Console.Error.WriteLine("Missing " + script);
+            return 1;
+        }
+
+        var task = GetOption(args, "--task") ?? string.Join(" ", args.Skip(2).Where(a => !a.StartsWith('-')));
+        var model = GetOption(args, "--model") ?? GetOption(args, "--to");
+        var psArgs = "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\"";
+        if (!string.IsNullOrWhiteSpace(task))
+            psArgs += " -Task \"" + task.Replace("\"", "\\\"") + "\"";
+        if (!string.IsNullOrWhiteSpace(model))
+            psArgs += " -ToModel \"" + model + "\"";
+        if (!escalate)
+            psArgs += " -ShelveOnly";
+        if (HasFlag(args, "--no-frontend"))
+            psArgs += " -NoFrontend";
+        if (HasFlag(args, "--no-swap"))
+            psArgs += " -NoSwap";
+
+        Console.WriteLine(escalate
+            ? "Escalating: shelve context -> high-ctx model -> unshelve on next turn"
+            : "Shelving context only (no GPU swap)");
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "powershell",
+            Arguments = psArgs,
+            WorkingDirectory = labRoot,
+            UseShellExecute = false
+        };
+        var proc = System.Diagnostics.Process.Start(psi);
+        proc?.WaitForExit();
+        return proc?.ExitCode ?? 1;
+    }
+
+    static int CmdVllmUnshelve(string[] args)
+    {
+        var labRoot = FindLabRoot();
+        var cli = Path.Combine(labRoot, "scripts", "escalate_cli.py");
+        if (!File.Exists(cli))
+        {
+            Console.Error.WriteLine("Missing " + cli);
+            return 1;
+        }
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "python",
+            Arguments = "\"" + cli + "\" unshelve",
+            WorkingDirectory = labRoot,
+            UseShellExecute = false
+        };
+        var proc = System.Diagnostics.Process.Start(psi);
+        proc?.WaitForExit();
+        return proc?.ExitCode ?? 1;
+    }
+
+    static int CmdVllmSwap(string action, string[] args)
+    {
+        var labRoot = FindLabRoot();
+        var script = Path.Combine(labRoot, "scripts", "Swap-VllmModel.ps1");
+        if (!File.Exists(script))
+        {
+            Console.Error.WriteLine("Missing " + script);
+            return 1;
+        }
+
+        var psArgs = "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\" " + action;
+        if (action == "swap")
+        {
+            var model = GetOption(args, "--model") ?? GetOption(args, "--model-path")
+                        ?? args.Skip(2).FirstOrDefault(a => !a.StartsWith('-'));
+            if (string.IsNullOrWhiteSpace(model))
+            {
+                Console.Error.WriteLine("Usage: qudlab vllm swap --model org/name [--frontend]");
+                Console.Error.WriteLine("       qudlab vllm list | status | stop");
+                return 2;
+            }
+            psArgs += " -Model \"" + model + "\"";
+            if (HasFlag(args, "--frontend") || HasFlag(args, "--restart-frontend"))
+                psArgs += " -RestartFrontend";
+            var port = GetInt(args, "--port", 0);
+            if (port > 0)
+                psArgs += " -Port " + port;
+        }
+
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "powershell",
+            Arguments = psArgs,
+            WorkingDirectory = labRoot,
+            UseShellExecute = false
+        };
+        var proc = System.Diagnostics.Process.Start(psi);
+        proc?.WaitForExit();
+        return proc?.ExitCode ?? 1;
+    }
+
+    static int CmdVllmServe(string[] args)
+    {
+        var labRoot = FindLabRoot();
+        var script = Path.Combine(labRoot, "scripts", "Serve-Vllm.ps1");
+        if (!File.Exists(script))
+        {
+            Console.Error.WriteLine("Missing " + script);
+            return 1;
+        }
+
+        var model = GetOption(args, "--model") ?? GetOption(args, "--model-path")
+                    ?? Environment.GetEnvironmentVariable("QUDLAB_VLLM_MODEL")
+                    ?? Environment.GetEnvironmentVariable("QUDLAB_HF_MODEL")
+                    ?? "Qwen/Qwen2.5-Coder-7B-Instruct-AWQ";
+        var port = GetInt(args, "--port", 8000);
+        var extra = GetOption(args, "--extra") ?? "";
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "powershell",
+            Arguments = "-NoProfile -ExecutionPolicy Bypass -File \"" + script + "\" -Model \"" + model
+                        + "\" -Port " + port
+                        + (string.IsNullOrWhiteSpace(extra) ? "" : " -ExtraArgs \"" + extra + "\""),
+            WorkingDirectory = labRoot,
+            UseShellExecute = false
+        };
+        Console.WriteLine("Launching vLLM 0.29 with Hugging Face model: " + model);
+        Console.WriteLine("OpenAI API: http://127.0.0.1:" + port + "/v1  (Qud Lab auto-picks this over SGLang/Ollama)");
+        Console.WriteLine("Swap later: qudlab vllm swap --model org/name [--frontend]");
+        var proc = System.Diagnostics.Process.Start(psi);
+        proc?.WaitForExit();
+        return proc?.ExitCode ?? 1;
+    }
+
+    static async Task<int> CmdSglang(string[] args)
+    {
+        var sub = args.ElementAtOrDefault(1)?.ToLowerInvariant();
+        if (sub is "serve" or "launch" or "start" or "frontend")
+            return CmdSglangServe(args);
+        return await CmdOllama(args, forceBackend: "sglang");
+    }
+
+    static int CmdSglangServe(string[] args)
+    {
+        var labRoot = FindLabRoot();
+        var script = Path.Combine(labRoot, "scripts", "Serve-Sglang.ps1");
+        if (!File.Exists(script))
+        {
+            Console.Error.WriteLine("Missing " + script);
+            return 1;
+        }
+
+        var model = GetOption(args, "--model") ?? GetOption(args, "--model-path")
+                    ?? Environment.GetEnvironmentVariable("QUDLAB_SGLANG_MODEL")
+                    ?? Environment.GetEnvironmentVariable("QUDLAB_HF_MODEL")
+                    ?? "Qwen/Qwen2.5-3B-Instruct";
+        var port = GetInt(args, "--port", 30000);
+        var extra = GetOption(args, "--extra") ?? "";
+        var local = HasFlag(args, "--local");
+        var remoteUrl = ParseRemoteUrl(args)
+                        ?? Environment.GetEnvironmentVariable("QUDLAB_VLLM_URL")
+                        ?? Environment.GetEnvironmentVariable("VLLM_URL")
+                        ?? "http://127.0.0.1:8000/v1";
+        if (!remoteUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !remoteUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            remoteUrl = "http://" + remoteUrl;
+        if (!remoteUrl.Contains("/v1", StringComparison.OrdinalIgnoreCase))
+            remoteUrl = remoteUrl.TrimEnd('/') + "/v1";
+
+        var psArgs = "-NoProfile -ExecutionPolicy Bypass -File \"" + script
+                     + "\" -Model \"" + model + "\" -Port " + port
+                     + (string.IsNullOrWhiteSpace(extra) ? "" : " -ExtraArgs \"" + extra + "\"");
+        if (local)
+            psArgs += " -Local";
+        else
+        {
+            psArgs += " -Remote -RemoteUrl \"" + remoteUrl + "\"";
+            if (HasFlag(args, "--router"))
+                psArgs += " -Router";
+        }
+
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "powershell",
+            Arguments = psArgs,
+            WorkingDirectory = labRoot,
+            UseShellExecute = false
+        };
+        if (local)
+        {
+            Console.WriteLine("Launching local SGLang engine: " + model);
+            Console.WriteLine("OpenAI API: http://127.0.0.1:" + port + "/v1");
+        }
+        else
+        {
+            Console.WriteLine("SGLang frontend (Windows) -> vLLM backend " + remoteUrl);
+            Console.WriteLine("Frontend OpenAI API: http://127.0.0.1:" + port + "/v1");
+            Console.WriteLine("Cursor / CortexIDE / LM Studio / QUDLAB_SGLANG_URL point here.");
+            Console.WriteLine("vLLM must already be up: qudlab vllm serve --model Qwen/Qwen2.5-3B-Instruct");
+        }
+        var proc = System.Diagnostics.Process.Start(psi);
+        proc?.WaitForExit();
+        return proc?.ExitCode ?? 1;
+    }
+
+    static string? ParseRemoteUrl(string[] args)
+    {
+        var named = GetOption(args, "--remote-url");
+        if (!string.IsNullOrWhiteSpace(named))
+            return named;
+        for (var i = 0; i < args.Length; i++)
+        {
+            if (!args[i].Equals("--remote", StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (i + 1 < args.Length && !args[i + 1].StartsWith('-'))
+                return args[i + 1];
+            return "http://127.0.0.1:8000/v1";
+        }
+        return null;
+    }
+
+    static async Task<int> CmdOllama(string[] args, string? forceBackend = null)
     {
         EnsureCacheFresh(null, args);
-        var client = new OllamaClient();
+        var backend = forceBackend ?? GetOption(args, "--backend");
+        var client = await LlmClientFactory.CreateAsync(backend);
         var sub = args.ElementAtOrDefault(1)?.ToLowerInvariant();
         if (sub is "models" or "list")
         {
             if (!await client.IsAvailableAsync())
             {
-                Console.Error.WriteLine("Ollama not reachable at " + client.Options.BaseUrl);
-                Console.Error.WriteLine("Install/start: https://github.com/ollama/ollama");
+                Console.Error.WriteLine(client.Backend + " not reachable at " + client.BaseUrl);
+                Console.Error.WriteLine(LlmStartHint(client.Backend, client.DefaultModel));
                 return 1;
             }
+            Console.Error.WriteLine("backend=" + client.Backend + " url=" + client.BaseUrl);
             foreach (var m in await client.ListModelsAsync())
                 Console.WriteLine(m);
             return 0;
@@ -627,18 +876,19 @@ static class Program
         if (string.IsNullOrWhiteSpace(prompt) && mode == "ask" && sub is not "scan" and not "fix" and not "analyze" and not "audit" and not "repair" and not "debug" and not "sim")
         {
             Console.Error.WriteLine("Usage:");
-            Console.Error.WriteLine("  qudlab ollama models");
-            Console.Error.WriteLine("  qudlab ollama ask [--model M] <prompt>");
-            Console.Error.WriteLine("  qudlab ollama scan [prompt]     # read every Workspace/src file + compile");
-            Console.Error.WriteLine("  qudlab ollama fix [--no-apply] [prompt]");
-            Console.Error.WriteLine("  qudlab ollama analyze [--turns N] [--blueprint Name] [prompt]");
+            Console.Error.WriteLine("  qudlab ai models [--backend vllm|sglang|ollama]");
+            Console.Error.WriteLine("  qudlab ai ask [--model M] [--backend vllm] <prompt>");
+            Console.Error.WriteLine("  qudlab vllm serve --model Qwen/Qwen2.5-3B-Instruct");
+            Console.Error.WriteLine("  qudlab sglang serve --remote");
+            Console.Error.WriteLine("  qudlab sglang scan [prompt]");
+            Console.Error.WriteLine("  qudlab ollama ask …   # same agent; auto-picks vLLM then SGLang then Ollama");
             return 1;
         }
 
         if (!await client.IsAvailableAsync())
         {
-            Console.Error.WriteLine("Ollama not reachable at " + client.Options.BaseUrl);
-            Console.Error.WriteLine("https://github.com/ollama/ollama");
+            Console.Error.WriteLine(client.Backend + " not reachable at " + client.BaseUrl);
+            Console.Error.WriteLine(LlmStartHint(client.Backend, client.DefaultModel));
             return 1;
         }
 
@@ -708,7 +958,8 @@ static class Program
     }
 
     static bool IsOllamaFlag(string a) =>
-        a is "--task" or "--model" or "--rounds" or "--turns" or "--blueprint" or "--project" or "--path" or "--port";
+        a is "--task" or "--model" or "--rounds" or "--turns" or "--blueprint" or "--project" or "--path" or "--port"
+            or "--backend" or "--model-path" or "--extra";
 
     static string TruncateCli(string s, int max) =>
         string.IsNullOrEmpty(s) ? "" : (s.Length <= max ? s : s[..max] + "…");
@@ -989,17 +1240,38 @@ static class Program
                        [--npcs N] [--map WxH] [--yd] [--no-water] [--no-pipes]
               simhost [--port N]             External SimHost TCP :47822 (crash isolation)
               template part|mutation|harmony Name [--target T] [--write]
-              ollama models
-              ollama ask [--model M] <prompt>
-              ollama scan [prompt]            Read every active-project file + compile
-              ollama fix [--no-apply] [prompt]
-              ollama analyze [--turns N] [--blueprint Name] [prompt]
+              ai|ollama|sglang|vllm models [--backend vllm|sglang|ollama]
+              ai|ollama|sglang|vllm ask [--model HF_OR_TAG] [--backend vllm] <prompt>
+              ai|ollama|sglang|vllm scan [prompt]
+              ai|ollama|sglang|vllm fix [--no-apply] [prompt]
+              ai|ollama|sglang|vllm analyze [--turns N] [--blueprint Name] [prompt]
+              vllm serve [--model org/name] [--port 8000] [--extra "…"]
+                                             Launch vLLM 0.29 in WSL (GPU OpenAI API :8000)
+              vllm list|status|stop
+              vllm swap --model org/name [--frontend]
+                                             Stop current weights and load another HF id (11GB: one at a time)
+                                             --frontend also restarts :30000 proxy with the new model-name
+              vllm shelve [--task TEXT]        Park chat-index/task to disk (no GPU swap)
+              vllm escalate [--task TEXT] [--model HIGH] [--no-frontend]
+                                             Shelve -> swap to 64k Coder-7B-AWQ -> next turn unshelves
+              vllm unshelve                    Print / consume pending shelved context
+              sglang serve [--remote [URL]] [--port 30000] [--model NAME]
+                                             Windows OpenAI frontend to vLLM :8000 (default)
+              sglang serve --local --model org/name [--port 30000]
+                                             Local SGLang GPU engine (not recommended on Turing)
 
-            Env: QUDLAB_QUD_PATH, QUDLAB_PROJECT, OLLAMA_HOST, QUDLAB_OLLAMA_MODEL
+            Env: QUDLAB_QUD_PATH, QUDLAB_PROJECT, QUDLAB_LLM_BACKEND (auto|vllm|sglang|sglang-vllm|ollama),
+                 QUDLAB_VLLM_URL, QUDLAB_VLLM_MODEL, QUDLAB_SGLANG_URL, QUDLAB_SGLANG_MODEL,
+                 QUDLAB_HF_MODEL, HF_TOKEN, OLLAMA_HOST, QUDLAB_OLLAMA_MODEL
 
             Phase 6 workflow:
               1) qudlab setup && qudlab serve
-              2) start Ollama  e.g. ollama pull qwen3:8b
+              2) qudlab vllm serve --model Qwen/Qwen2.5-Coder-7B-Instruct-AWQ
+                 # or Swap-Vllm.bat swap Qwen/Qwen2.5-3B-Instruct --frontend
+                 # GUI: QudLab.bat → pick model → Swap model
+              2b) qudlab sglang serve --remote
+                 # Windows :30000 -> vLLM :8000 (Cursor / LM Studio / QUDLAB_SGLANG_URL)
+                 # auto prefers vLLM :8000 directly, then SGLang :30000, then Ollama
               3) POST /project/set {"query":"Broodmother"}  or  qudlab project set \"Blink\"
               4) Unity/GUI mod picker — hot switch without restart
               5) GET /logs/game?kind=threading  after in-game repro (ThreadingAPI action log)
@@ -1020,6 +1292,13 @@ static class Program
 
     static bool HasFlag(string[] args, string name) =>
         args.Any(a => a.Equals(name, StringComparison.OrdinalIgnoreCase));
+
+    static string LlmStartHint(string backend, string model) =>
+        backend.Equals("vllm", StringComparison.OrdinalIgnoreCase)
+            ? "Start: qudlab vllm serve --model " + model
+            : backend.Equals("sglang", StringComparison.OrdinalIgnoreCase)
+                ? "Start: qudlab sglang serve --remote  (vLLM backend on :8000)"
+                : "Start Ollama, or: qudlab vllm serve --model Qwen/Qwen2.5-3B-Instruct";
 
     static string[] GetAllOptions(string[] args, string name)
     {

@@ -14,7 +14,7 @@ using QudLab.Simulator;
 namespace QudLab.Assistant;
 
 /// <summary>
-/// Local multi-client mod-assistant HTTP API (Cursor, Ollama, VS Code, Windsurf).
+/// Local multi-client mod-assistant HTTP API (Cursor, SGLang, Ollama, VS Code, Windsurf).
 /// </summary>
 public sealed class ModAssistantServer : IModAssistantHost
 {
@@ -129,7 +129,7 @@ public sealed class ModAssistantServer : IModAssistantHost
                             "/genotypes", "/subtypes", "/catalogs",
                             "/ai/status", "/ai/models", "/ai/run", "/ai/ask", "/ai/scan", "/ai/fix", "/ai/analyze"
                         },
-                        note = "ThreadingAPI is a separate WIP mod — not part of this service. POST /ai/run is the Cursor-like Ollama agent."
+                        note = "ThreadingAPI is a separate WIP mod — not part of this service. POST /ai/run is the Cursor-like local agent (SGLang Hugging Face models or Ollama)."
                     };
                     break;
                 case "/health":
@@ -772,7 +772,7 @@ public sealed class ModAssistantServer : IModAssistantHost
                     if (_ai is null)
                     {
                         status = 503;
-                        payload = new { error = "Ollama agent not wired — restart qudlab serve" };
+                        payload = new { error = "LLM agent not wired — restart qudlab serve" };
                     }
                     else
                     {
@@ -783,12 +783,22 @@ public sealed class ModAssistantServer : IModAssistantHost
                     if (_ai is null)
                     {
                         status = 503;
-                        payload = new { error = "Ollama agent not wired — restart qudlab serve" };
+                        payload = new { error = "LLM agent not wired — restart qudlab serve" };
                     }
                     else
                     {
                         var st = _ai.StatusAsync().GetAwaiter().GetResult();
-                        payload = new { ollama = st.Ollama, models = st.Models, resolved = st.ResolvedModel, baseUrl = st.BaseUrl };
+                        payload = new
+                        {
+                            available = st.Available,
+                            backend = st.Backend,
+                            ollama = st.Ollama,
+                            sglang = st.Sglang,
+                            vllm = st.Vllm,
+                            models = st.Models,
+                            resolved = st.ResolvedModel,
+                            baseUrl = st.BaseUrl
+                        };
                     }
                     break;
                 case "/ai/run":
@@ -818,7 +828,7 @@ public sealed class ModAssistantServer : IModAssistantHost
         if (_ai is null)
         {
             status = 503;
-            payload = new { error = "Ollama agent not wired — restart qudlab serve" };
+            payload = new { error = "LLM agent not wired — restart qudlab serve" };
             return;
         }
 

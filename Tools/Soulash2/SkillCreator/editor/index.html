@@ -125,6 +125,7 @@
         <input id="loadPath" placeholder="D:\...\Output\Soulash2\acid_magic\skill.json" style="min-width:100%" />
       </label>
       <div class="row">
+        <button id="btnBrowse">Browse…</button>
         <button id="btnLoadPath">Load path</button>
         <label style="flex-direction:row;align-items:center;gap:6px;color:var(--muted);font-size:0.75rem">
           <input type="checkbox" id="loadForce" /> Force re-import
@@ -970,7 +971,8 @@
           body: JSON.stringify({ path, force: !!force }),
         });
         spec = data.spec;
-        log((data.note || "Loaded") + " → " + data.path);
+        const counts = data.counts ? ` [${Object.entries(data.counts).map(([k,v]) => k + ":" + v).join(", ")}]` : "";
+        log((data.note || "Loaded") + " → " + data.path + counts);
         await refresh();
       } catch (err) {
         log("Load failed: " + (err && err.message ? err.message : err));
@@ -1137,6 +1139,20 @@
     };
     $("btnLoad").onclick = async () => {
       await loadProject($("projects").value, $("loadForce").checked);
+    };
+    $("btnBrowse").onclick = async () => {
+      try {
+        const data = await api("/api/pick-folder", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: "{}",
+        });
+        if (data.cancelled || !data.path) { log("Browse cancelled"); return; }
+        $("loadPath").value = data.path;
+        await loadProject(data.path, $("loadForce").checked);
+      } catch (err) {
+        log("Browse failed: " + (err && err.message ? err.message : err));
+      }
     };
     $("btnLoadPath").onclick = async () => {
       await loadProject($("loadPath").value.trim(), $("loadForce").checked);

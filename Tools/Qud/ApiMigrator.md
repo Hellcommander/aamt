@@ -189,10 +189,11 @@ All ApiMigrator app hosts (CLI, GUI, tests) are built for **x64** only (`Platfor
 
 ### Rebuilding in Visual Studio
 
-Open `ApiMigrator.sln` in Visual Studio 2022 with the **.NET desktop development** workload,
-select **Release | x64**, then choose **Build → Rebuild Solution**. The solution contains the GUI,
-CLI, Core library, and Core tests; the GUI output is written beneath
-`src\ApiMigratorGui\bin\Release\net8.0-windows\win-x64`.
+Open `ApiMigrator.sln` in **Visual Studio 2026** (18) with the **.NET desktop development**
+workload — not Visual Studio 2022. Select **Release | x64** (or **Release | Any CPU**, which
+maps to the same x64 projects), then choose **Build → Rebuild Solution**. Projects are x64-only
+and are selected to build for every solution configuration, so Rebuild no longer skips them.
+The GUI output is written beneath `src\ApiMigratorGui\bin\Release\net8.0-windows\win-x64`.
 
 ### GUI tabs
 
@@ -711,7 +712,7 @@ earlier in the same file.
 
 ```
   README.md / ApiMigrator.md       - this file / migrator details
-  ApiMigrator.sln                   - Visual Studio rebuild solution (GUI / CLI / Core / tests)
+  ApiMigrator.sln                   - Visual Studio 2026 rebuild solution (GUI / CLI / Core / tests)
   Launch-Gui.bat                    - menu of all Qud GUIs
   Launch-ApiMigrator.bat            - Obsolete-API Migrator GUI
   Switch-Api.bat                    - pin dump+rules to public / lang / live (or --list)

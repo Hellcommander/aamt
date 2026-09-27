@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -77,6 +78,36 @@ from s2_validate import format_issues, validate_spec
 
 EDITOR_DIR = _HERE / "editor"
 _STATE: Dict[str, Any] = {"spec_path": None}
+_PICK_LOCK = threading.Lock()
+
+
+def _spec_counts(spec: Dict[str, Any]) -> Dict[str, int]:
+    return {
+        "abilities": len(spec.get("abilities") or []),
+        "passives": len(spec.get("passives") or []),
+        "amplifiers": len(spec.get("amplifiers") or []),
+        "milestones": len(spec.get("milestones") or []),
+        "stackers": len(spec.get("stackers") or []),
+        "animations": len(spec.get("animations") or []),
+    }
+
+
+def _pick_mod_folder() -> Optional[str]:
+    import tkinter as tk
+    from tkinter import filedialog
+
+    with _PICK_LOCK:
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            root.attributes("-topmost", True)
+        except Exception:
+            pass
+        try:
+            folder = filedialog.askdirectory(parent=root, title="Select Mod Folder")
+        finally:
+            root.destroy()
+        return folder or None
 
 
 def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: Any) -> None:
@@ -187,6 +218,8 @@ def _load_into_studio(raw_path: str, *, force_import: bool = False) -> Dict[str,
     path = Path(str(raw_path).strip().strip('"'))
     if not path.exists():
         raise FileNotFoundError(f"Path not found: {path}")
+
+    # FILE: skill.json → load as-is
     if path.is_file():
         if path.name != "skill.json":
             raise ValueError("File load expects skill.json (or pass a mod folder)")
@@ -196,45 +229,36 @@ def _load_into_studio(raw_path: str, *, force_import: bool = False) -> Dict[str,
             save_spec(spec, dest)
             path = dest
         _STATE["spec_path"] = str(path.resolve())
-        return {"path": str(path), "spec": spec, "imported": False}
-
-    folder = path
-    guess_id = folder.name
-    if (folder / "skills.json").is_file():
-        try:
-            skills = json.loads((folder / "skills.json").read_text(encoding="utf-8"))
-            if skills and isinstance(skills[0], dict) and skills[0].get("id"):
-                guess_id = str(skills[0]["id"])
-        except Exception:
-            pass
-    staging_skill = staging_dir({"id": guess_id}) / "skill.json"
-    if (
-        staging_skill.is_file()
-        and not force_import
-        and folder.resolve() != staging_skill.parent.resolve()
-    ):
-        spec = load_spec(staging_skill)
-        _STATE["spec_path"] = str(staging_skill.resolve())
         return {
-            "path": str(staging_skill),
+            "path": str(path),
             "spec": spec,
             "imported": False,
-            "note": f"Opened existing staging copy (use force to re-import from {folder})",
+            "counts": _spec_counts(spec),
         }
 
-    if (folder / "skill.json").is_file():
-        spec = load_spec(folder / "skill.json")
-    else:
-        spec = load_mod_folder(folder)
-    dest = staging_dir(spec) / "skill.json"
-    save_spec(spec, dest)
-    _STATE["spec_path"] = str(dest.resolve())
-    return {
-        "path": str(dest),
-        "spec": spec,
-        "imported": folder.resolve() != dest.parent.resolve(),
-        "note": f"Loaded into staging {dest}",
-    }
+    # DIRECTORY: ALWAYS assemble full mod folder
+    if path.is_dir():
+        spec = load_mod_folder(path)
+
+        dest = staging_dir(spec) / "skill.json"
+        save_spec(spec, dest)
+
+        _STATE["spec_path"] = str(dest.resolve())
+        counts = _spec_counts(spec)
+
+        return {
+            "path": str(dest),
+            "spec": spec,
+            "imported": True,
+            "counts": counts,
+            "note": (
+                f"Loaded into staging {dest} ({counts['abilities']} abilities, "
+                f"{counts['amplifiers']} amplifiers, {counts['milestones']} milestones, "
+                f"{counts['stackers']} stackers, {counts['animations']} animations)"
+            ),
+        }
+
+    raise ValueError("Path is neither a skill.json nor a mod folder")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -276,7 +300,27 @@ class Handler(BaseHTTPRequestHandler):
                     "projects": _projects(),
                 },
             )
-            return
+          return
+            if path == "/api/mod-content":
+    try:
+        spec = load_spec(_current())
+        _json_response(
+            self,
+            200,
+            {
+                "skill": spec.get("skill"),
+                "abilities": spec.get("abilities"),
+                "passives": spec.get("passives"),
+                "amplifiers": spec.get("amplifiers"),
+                "milestones": spec.get("milestones"),
+                "stackers": spec.get("stackers"),
+                "animations": spec.get("animations"),
+            },
+        )
+    except Exception as exc:
+        _json_response(self, 400, {"error": str(exc)})
+    return
+
         if path == "/api/spec":
             try:
                 sp = _current()
@@ -419,6 +463,18 @@ class Handler(BaseHTTPRequestHandler):
             sp = save_spec(spec)
             _STATE["spec_path"] = str(sp.resolve())
             _json_response(self, 200, {"path": str(sp), "spec": spec})
+            return
+
+        if path == "/api/pick-folder":
+            try:
+                folder = _pick_mod_folder()
+            except Exception as exc:
+                _json_response(self, 400, {"error": str(exc)})
+                return
+            if not folder:
+                _json_response(self, 200, {"cancelled": True})
+                return
+            _json_response(self, 200, {"path": folder})
             return
 
         if path == "/api/load":

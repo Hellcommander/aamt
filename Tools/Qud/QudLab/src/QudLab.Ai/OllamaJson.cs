@@ -39,10 +39,13 @@ public sealed class OllamaChatMessage
     public string? Thinking { get; set; }
     public List<OllamaToolCall>? ToolCalls { get; set; }
     public string? ToolName { get; set; }
+    /// <summary>OpenAI/SGLang tool result pairing (<c>tool_call_id</c>).</summary>
+    public string? ToolCallId { get; set; }
 }
 
 public sealed class OllamaToolCall
 {
+    public string? Id { get; set; }
     public OllamaToolFunction? Function { get; set; }
 }
 
