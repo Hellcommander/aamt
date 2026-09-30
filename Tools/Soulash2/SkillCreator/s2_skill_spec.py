@@ -984,6 +984,35 @@ def _reward_of(m: Dict[str, Any]) -> tuple:
     return "", ""
 
 
+def _milestone_level(m: Dict[str, Any]) -> int:
+    if m.get("innate"):
+        return 0
+    try:
+        return int((m.get("requirements") or {}).get("skill") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _check_prereqs(spec: Dict[str, Any], milestone_id: str, prereqs: List[str], level: int) -> None:
+    by_id = {str(m.get("id")): m for m in spec.get("milestones") or []}
+    for pid in prereqs:
+        if pid not in by_id:
+            raise ValueError(f"Unknown prerequisite milestone id: {pid}")
+        plv = _milestone_level(by_id[pid])
+        if plv > level:
+            raise ValueError(f"Prerequisite {pid} unlocks at level {plv}, after this milestone (level {level})")
+    stack = list(prereqs)
+    seen: set = set()
+    while stack:
+        cur = stack.pop()
+        if cur == milestone_id:
+            raise ValueError(f"Prerequisites would create a cycle through {milestone_id}")
+        if cur in seen or cur not in by_id:
+            continue
+        seen.add(cur)
+        stack.extend((by_id[cur].get("requirements") or {}).get("milestones") or [])
+
+
 def move_milestone(
     spec: Dict[str, Any],
     milestone_id: str,
@@ -1010,6 +1039,7 @@ def move_milestone(
     keep = list((m.get("requirements") or {}).get("milestones") or []) if prereqs is None else [str(p) for p in prereqs]
     if milestone_id in keep:
         raise ValueError("A milestone cannot require itself")
+    _check_prereqs(spec, milestone_id, keep, level)
     m.pop("innate", None)
     m["requirements"] = {"milestones": keep, "skill": level}
     m["file"] = f"{level}_{slug}.json"
@@ -1233,7 +1263,8 @@ def tree_rows(spec: Dict[str, Any]) -> List[Dict[str, Any]]:
         kind, rid = "", ""
         if rewards and isinstance(rewards[0], dict) and rewards[0]:
             kind, rid = next(iter(rewards[0].items()))
-        rows.append({"level": level, "id": m.get("id"), "name": m.get("name"), "kind": kind, "reward": rid})
+        prereqs = list((m.get("requirements") or {}).get("milestones") or [])
+        rows.append({"level": level, "id": m.get("id"), "name": m.get("name"), "kind": kind, "reward": rid, "prereqs": prereqs})
     for lv in stat_point_levels(spec):
         rows.append({"level": lv, "id": f"stat_{lv}", "name": "+1 statistic", "kind": "stat", "reward": ""})
 
@@ -1337,6 +1368,16 @@ def _read_json_file(path: Path) -> Any:
         return None
 
 
+def _read_json_strict(path: Path) -> Any:
+    """Like _read_json_file, but a file that exists and fails to parse raises instead of loading as empty."""
+    if not path.is_file():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8-sig"))
+    except ValueError as exc:
+        raise ValueError(f"Invalid JSON in {path}: {exc}") from exc
+
+
 def _as_row_list(raw: Any) -> List[Any]:
     if raw is None:
         return []
@@ -1354,7 +1395,7 @@ def _load_json_dir(folder: Path, *, role: Optional[str] = None) -> List[Dict[str
         return []
     loaded: List[Dict[str, Any]] = []
     for p in sorted(folder.glob("*.json")):
-        row = _read_json_file(p)
+        row = _read_json_strict(p)
         if not isinstance(row, dict):
             continue
         row["_file"] = p.name
@@ -1387,7 +1428,7 @@ def load_mod_folder(folder: Path) -> Dict[str, Any]:
     mod = _read_json_file(folder / "mod.json")
     if not isinstance(mod, dict):
         mod = {}
-    skills = _read_json_file(folder / "skills.json")
+    skills = _read_json_strict(folder / "skills.json")
     if not isinstance(skills, list):
         skills = []
     skill = skills[0] if skills and isinstance(skills[0], dict) else None
@@ -1405,12 +1446,12 @@ def load_mod_folder(folder: Path) -> Dict[str, Any]:
     spec["skill"] = skill
     spec["skill_id"] = skill.get("id") or folder.name
 
-    spec["passives"] = _as_row_list(_read_json_file(folder / "passives.json"))
+    spec["passives"] = _as_row_list(_read_json_strict(folder / "passives.json"))
     amp_path = folder / "ability_amplifiers.json"
     if not amp_path.is_file():
         amp_path = folder / "amplifiers.json"
-    spec["amplifiers"] = _as_row_list(_read_json_file(amp_path))
-    spec["stackers"] = _as_row_list(_read_json_file(folder / "ability_stackers.json"))
+    spec["amplifiers"] = _as_row_list(_read_json_strict(amp_path))
+    spec["stackers"] = _as_row_list(_read_json_strict(folder / "ability_stackers.json"))
     spec["abilities"] = _load_json_dir(folder / "abilities")
     miles: List[Dict[str, Any]] = []
     mdir = folder / "milestones"
@@ -1418,7 +1459,7 @@ def load_mod_folder(folder: Path) -> Dict[str, Any]:
         for p in sorted(mdir.rglob("*.json")):
             if "translations" in p.parts:
                 continue
-            row = _read_json_file(p)
+            row = _read_json_strict(p)
             if not isinstance(row, dict):
                 continue
             row["file"] = p.name
