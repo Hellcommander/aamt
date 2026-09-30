@@ -63,15 +63,18 @@ from s2_skill_spec import (
     add_passive,
     add_stacker,
     apply_skill_update,
+    assign_to_milestone,
     bind_ability_entity,
     clone_ability,
     grant_existing,
     load_mod_folder,
     load_spec,
+    move_milestone,
     new_spec,
     save_spec,
     search_abilities,
     tree_rows,
+    unassign_milestone,
     write_mod,
 )
 from s2_validate import format_issues, validate_spec
@@ -885,7 +888,33 @@ class Handler(BaseHTTPRequestHandler):
                 )
             _json_response(self, 200, {"payload": race, "name_files": blobs, "tag": tag, "control_action": action})
             return
-
+        
+        if path == "/api/milestone":
+            spec = load_spec(_current())
+            action = body.get("action")
+            try:
+                if action == "assign":
+                    assign_to_milestone(
+                        spec, body["kind"], body["reward_id"],
+                        body.get("level"), innate=bool(body.get("innate")),
+                    )
+                elif action == "move":
+                    move_milestone(
+                        spec, body["id"], body.get("level"),
+                        innate=bool(body.get("innate")), prereqs=body.get("prereqs"),
+                    )
+                elif action == "unassign":
+                    unassign_milestone(spec, body["id"])
+                else:
+                    _json_response(self, 400, {"error": f"Unknown action {action}"})
+                    return
+            except (ValueError, KeyError) as exc:
+                _json_response(self, 400, {"error": str(exc).strip("'\"")})
+                return
+            save_spec(spec, _current())
+            _json_response(self, 200, {"ok": True, "spec": spec, "tree": tree_rows(spec)})
+            return
+            
         if path == "/api/validate":
             spec = body.get("spec") or load_spec(_current())
             issues = validate_spec(spec)

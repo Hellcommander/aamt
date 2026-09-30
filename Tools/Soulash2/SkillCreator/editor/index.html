@@ -92,6 +92,9 @@
     th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
     .hidden { display: none; }
     h2 { font-size: 1rem; margin: 0 0 10px; color: var(--accent); }
+    .tree-item.clickable { cursor: pointer; }
+    .tree-item.clickable:hover, .tree-item.picked { background: #243038; }
+    .ent-card { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 6px 10px; margin: 6px 0; }
   </style>
 </head>
 <body>
@@ -137,6 +140,7 @@
       <section id="tab-tree">
         <h2>Skill tree by unlock level</h2>
         <p class="hint">A level can grant both a milestone and +1 statistic. Stats are listed on the same row as the unlock, not instead of it.</p>
+		<div id="milestoneEditor"></div>
         <div id="tree"></div>
       </section>
       <section id="tab-skill" class="hidden">
@@ -533,7 +537,7 @@
     let spec = null;
     let abilityExtras = {};
     let stackerExtras = {};
-
+    let selMile = null;
     function log(msg) { $("log").textContent = typeof msg === "string" ? msg : JSON.stringify(msg, null, 2); }
 
     const LAST = {
@@ -783,7 +787,8 @@
         const kind = m.kind || "";
         const rid = m.reward || "";
         const lvl = m.level === "innate" ? "inn" : (m.level ?? "?");
-        return `<div class="tree-item"><strong>L${lvl}</strong><span class="kind-${kind}">${kind || "stat"}</span><span>${m.name || ""} ${rid ? `<code>${rid}</code>` : ""}</span></div>`;
+        const clickable = m.id && kind && kind !== "stat";
+        return `<div class="tree-item${clickable ? " clickable" : ""}${selMile === m.id ? " picked" : ""}" ${clickable ? `data-mid="${esc(m.id)}"` : ""}><strong>L${lvl}</strong><span class="kind-${kind}">${kind || "stat"}</span><span>${m.name || ""} ${rid ? `<code>${rid}</code>` : ""}</span></div>`;
       }).join("") || "<p>No unlocks yet.</p>";
       const stackers = (spec && spec.stackers) || [];
       if (stackers.length) {
@@ -809,6 +814,15 @@
       renderRaces();
       renderBuildings();
       renderSkill();
+      $("tree").querySelectorAll(".tree-item[data-mid]").forEach(row => {
+        row.onclick = () => {
+          selMile = row.dataset.mid;
+          $("tree").querySelectorAll(".picked").forEach(x => x.classList.remove("picked"));
+          row.classList.add("picked");
+          renderMilestoneEditor();
+        };
+      });
+      renderMilestoneEditor();
       const bind = $("addStBind");
       if (bind) {
         const cur = bind.value;
@@ -921,7 +935,79 @@
       preview.style.display = "block";
       preview.textContent = JSON.stringify(entity, null, 2);
     }
+    async function msPost(body, note) {
+      try {
+        const data = await api("/api/milestone", {
+          method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body)
+        });
+        spec = data.spec;
+        log(note || "Milestone updated");
+        renderTree();
+      } catch (err) {
+        log("Milestone edit failed: " + (err && err.message ? err.message : err));
+      }
+    }
 
+    function renderMilestoneEditor() {
+      const el = $("milestoneEditor");
+      if (!el) return;
+      if (!spec) { el.innerHTML = ""; return; }
+      const m = selMile ? (spec.milestones || []).find(x => x.id === selMile) : null;
+      if (!m) selMile = null;
+      let html = "";
+      if (m) {
+        const req = m.requirements || {};
+        html += `<div class="ent-card"><strong>${esc(m.name || m.id)}</strong> <code>${esc(m.id)}</code>
+          <div class="row">
+            <label>Unlock level <input id="msLevel" type="number" min="0" max="50" value="${m.innate ? "" : esc(req.skill ?? "")}" /></label>
+            <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="msInnate" ${m.innate ? "checked" : ""} /> Innate</label>
+            <label>Prerequisite milestone ids <input id="msPre" style="min-width:260px" value="${esc((req.milestones || []).join(", "))}" /></label>
+          </div>
+          <div class="row">
+            <button class="primary" id="msApply">Apply</button>
+            <button id="msRemove">Remove from tree (keep reward)</button>
+            <button id="msClose">Close</button>
+          </div></div>`;
+      }
+      const granted = new Set();
+      for (const ms of spec.milestones || [])
+        for (const r of ms.rewards || [])
+          for (const [k, v] of Object.entries(r)) granted.add(k + ":" + v);
+      const loose = [];
+      for (const [kind, bucket] of [["ability", "abilities"], ["passive", "passives"], ["amplifier", "amplifiers"]])
+        for (const row of spec[bucket] || []) if (!granted.has(kind + ":" + row.id)) loose.push({ kind, row });
+      if (loose.length) {
+        html += `<h2 style="margin-top:12px;">Not on the tree</h2>` + loose.map(({ kind, row }) =>
+          `<div class="ent-card"><span class="kind-${kind}">${kind}</span> <strong>${esc(row.name || row.id)}</strong> <code>${esc(row.id)}</code>
+            <input type="number" min="0" max="50" placeholder="level" style="width:80px" />
+            <button type="button" data-assign data-kind="${kind}" data-id="${esc(row.id)}">Assign</button>
+            <button type="button" data-innate data-kind="${kind}" data-id="${esc(row.id)}">Innate</button></div>`
+        ).join("");
+      }
+      el.innerHTML = html;
+
+      if (m) {
+        $("msApply").onclick = () => {
+          const innate = $("msInnate").checked;
+          const lv = $("msLevel").value;
+          if (!innate && lv === "") { log("Enter a level or tick Innate"); return; }
+          msPost({ action: "move", id: m.id, level: innate ? null : Number(lv), innate, prereqs: splitCsv($("msPre").value) }, "Updated " + m.id);
+        };
+        $("msRemove").onclick = () => { const id = m.id; selMile = null; msPost({ action: "unassign", id }, "Removed milestone " + id); };
+        $("msClose").onclick = () => { selMile = null; renderTree(); };
+      }
+      el.querySelectorAll("button[data-assign]").forEach(btn => {
+        btn.onclick = () => {
+          const lv = btn.parentElement.querySelector("input").value;
+          if (lv === "") { log("Enter a level first"); return; }
+          msPost({ action: "assign", kind: btn.dataset.kind, reward_id: btn.dataset.id, level: Number(lv) }, "Assigned " + btn.dataset.id + " to L" + lv);
+        };
+      });
+      el.querySelectorAll("button[data-innate]").forEach(btn => {
+        btn.onclick = () => msPost({ action: "assign", kind: btn.dataset.kind, reward_id: btn.dataset.id, innate: true }, "Made " + btn.dataset.id + " innate");
+      });
+    }
+	
     function renderEntities() {
       const ents = (spec && spec.entities) || [];
       $("entList").innerHTML = ents.map(e => {

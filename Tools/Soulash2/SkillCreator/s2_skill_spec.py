@@ -688,7 +688,7 @@ def _milestone_grants(mile: Dict[str, Any], kind: str, reward_id: str) -> bool:
     return False
 
 
-    _KIND_BUCKET = {
+_KIND_BUCKET = {
     "ability": ("abilities", "Ability"),
     "passive": ("passives", "Passive"),
     "amplifier": ("amplifiers", "Amplifier"),
@@ -823,7 +823,7 @@ def clone_stacker(source_id: str, *, new_id: str, name: Optional[str] = None) ->
     return row
 
 
-    ABILITY_CLONE_DROP = ("level", "profession", "upgrades", "file", "_cloned_from", "_file")
+ABILITY_CLONE_DROP = ("level", "profession", "upgrades", "file", "_cloned_from", "_file")
 
 
 def _iter_ability_files():
@@ -974,6 +974,90 @@ def grant_existing(
         reward_id=reward_id,
         innate=innate,
     )
+
+
+def _reward_of(m: Dict[str, Any]) -> tuple:
+    for r in m.get("rewards") or []:
+        if isinstance(r, dict) and r:
+            k, v = next(iter(r.items()))
+            return k, str(v)
+    return "", ""
+
+
+def move_milestone(
+    spec: Dict[str, Any],
+    milestone_id: str,
+    level: Optional[int] = None,
+    *,
+    innate: bool = False,
+    prereqs: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Change a milestone's unlock level, make it innate, and/or set prerequisite milestones."""
+    _ensure_lists(spec)
+    m = find_row(spec["milestones"], milestone_id, what="Milestone")
+    kind, rid = _reward_of(m)
+    slug = slug_name(m.get("name") or milestone_id)
+    if innate:
+        m["innate"] = True
+        m["requirements"] = {}
+        m["file"] = f"innate_{slug}.json"
+        return m
+    if level is None:
+        raise ValueError("A level is required unless the milestone is innate")
+    level = int(level)
+    if kind == "passive":
+        require_paid_passive_level(level, what=f"Passive {rid}")
+    keep = list((m.get("requirements") or {}).get("milestones") or []) if prereqs is None else [str(p) for p in prereqs]
+    if milestone_id in keep:
+        raise ValueError("A milestone cannot require itself")
+    m.pop("innate", None)
+    m["requirements"] = {"milestones": keep, "skill": level}
+    m["file"] = f"{level}_{slug}.json"
+    return m
+
+
+def assign_to_milestone(
+    spec: Dict[str, Any],
+    kind: str,
+    reward_id: str,
+    level: Optional[int] = None,
+    *,
+    innate: bool = False,
+) -> Dict[str, Any]:
+    """Put an existing ability/passive/amplifier on the tree (moves its milestone if it has one)."""
+    _ensure_lists(spec)
+    if kind not in _KIND_BUCKET:
+        raise ValueError(f"kind must be one of {sorted(_KIND_BUCKET)}, got {kind!r}")
+    bucket, label = _KIND_BUCKET[kind]
+    row = find_row(spec[bucket], reward_id, what=label)
+    existing = next(
+        (m for m in spec["milestones"] if m.get("id") == reward_id or _milestone_grants(m, kind, reward_id)),
+        None,
+    )
+    if existing:
+        return move_milestone(spec, existing["id"], level, innate=innate)
+    return grant_existing(
+        spec,
+        kind=kind,
+        reward_id=reward_id,
+        name=row.get("name") or reward_id,
+        unlock_level=int(level or 0),
+        milestone_id=reward_id,
+        innate=innate,
+    )
+
+
+def unassign_milestone(spec: Dict[str, Any], milestone_id: str) -> None:
+    """Remove the milestone but keep the ability/passive/amplifier itself."""
+    _ensure_lists(spec)
+    before = len(spec["milestones"])
+    spec["milestones"] = [m for m in spec["milestones"] if m.get("id") != milestone_id]
+    if len(spec["milestones"]) == before:
+        raise KeyError(f"Milestone not found: {milestone_id}")
+    for m in spec["milestones"]:  # drop dangling prerequisites
+        req = m.get("requirements") or {}
+        if milestone_id in (req.get("milestones") or []):
+            req["milestones"] = [p for p in req["milestones"] if p != milestone_id]
 
 
 def add_loot_exclude(spec: Dict[str, Any], entity_id: str) -> None:
@@ -1150,18 +1234,20 @@ def tree_rows(spec: Dict[str, Any]) -> List[Dict[str, Any]]:
         if rewards and isinstance(rewards[0], dict) and rewards[0]:
             kind, rid = next(iter(rewards[0].items()))
         rows.append({"level": level, "id": m.get("id"), "name": m.get("name"), "kind": kind, "reward": rid})
-        for lv in stat_point_levels(spec):
-            rows.append({"level": lv, "id": f"stat_{lv}", "name": "+1 statistic", "kind": "stat", "reward": ""})
-def _lvl(row: Dict[str, Any]) -> tuple:
-    lv = row["level"]
-    if lv == "innate":
-        return (-1, 0, row["name"] or "")
+    for lv in stat_point_levels(spec):
+        rows.append({"level": lv, "id": f"stat_{lv}", "name": "+1 statistic", "kind": "stat", "reward": ""})
+
+    def _lvl(row: Dict[str, Any]) -> tuple:
+        lv = row["level"]
+        if lv == "innate":
+            return (-1, 0, row["name"] or "")
         if lv is None:
             return (10_000, 0, row["name"] or "")
-            kind_rank = 0 if row.get("kind") == "stat" else 1
-            return (int(lv), kind_rank, row["name"] or "")
-            rows.sort(key=_lvl)
-            return rows
+        kind_rank = 0 if row.get("kind") == "stat" else 1
+        return (int(lv), kind_rank, row["name"] or "")
+
+    rows.sort(key=_lvl)
+    return rows
 
 
 def _dump(obj: Any) -> str:
@@ -1363,108 +1449,6 @@ def load_mod_folder(folder: Path) -> Dict[str, Any]:
         if not skills and isinstance(studio.get("skill"), dict):
             spec["skill"] = studio["skill"]
             spec["skill_id"] = studio.get("skill_id") or spec["skill"].get("id") or spec["skill_id"]
-    _ensure_lists(spec)
-    return spec
-    
-    def load_mod_folder(folder: Path) -> Dict[str, Any]:
-        folder = Path(folder)
-    if not folder.is_dir():
-        raise FileNotFoundError(f"Mod folder not found: {folder}")
-
-    # Read mod.json / skills.json
-    mod_meta = {}
-    skills = []
-    if (folder / "mod.json").is_file():
-        mod_meta = json.loads((folder / "mod.json").read_text(encoding="utf-8-sig"))
-    if (folder / "skills.json").is_file():
-        skills = json.loads((folder / "skills.json").read_text(encoding="utf-8-sig"))
-
-    # Base spec: keep ids as-is (no prefix rewrite)
-    skill_row = skills[0] if skills and isinstance(skills[0], dict) else {}
-    sid = str(skill_row.get("id") or folder.name)
-    name = skill_row.get("name") or sid
-
-    spec = new_spec(sid, name, mod_id=mod_meta.get("id") or sid, prefix=False)
-
-    # Clear lists; we will assemble from disk
-    for key in (
-        "abilities", "passives", "amplifiers", "milestones",
-        "stackers", "animations", "entities", "buildings",
-        "loot_exclude", "races", "control_actions",
-        "character_tags", "production_actions"
-    ):
-        spec[key] = []
-
-    # Abilities/*.json
-    abil_dir = folder / "abilities"
-    if abil_dir.is_dir():
-        for path in sorted(abil_dir.glob("*.json")):
-            try:
-                row = json.loads(path.read_text(encoding="utf-8-sig"))
-                if isinstance(row, dict):
-                    spec["abilities"].append(row)
-            except Exception:
-                pass
-
-    # Passives.json
-    p = folder / "passives.json"
-    if p.is_file():
-        try:
-            rows = json.loads(p.read_text(encoding="utf-8-sig"))
-            if isinstance(rows, dict):
-                rows = [rows]
-            spec["passives"].extend(r for r in rows if isinstance(r, dict))
-        except Exception:
-            pass
-
-    # Amplifiers
-    a = folder / "ability_amplifiers.json"
-    if not a.is_file():
-        a = folder / "amplifiers.json"
-    if a.is_file():
-        try:
-            rows = json.loads(a.read_text(encoding="utf-8-sig"))
-            if isinstance(rows, dict):
-                rows = [rows]
-            spec["amplifiers"].extend(r for r in rows if isinstance(r, dict))
-        except Exception:
-            pass
-
-    # Stackers
-    s = folder / "ability_stackers.json"
-    if s.is_file():
-        try:
-            rows = json.loads(s.read_text(encoding="utf-8-sig"))
-            if isinstance(rows, dict):
-                rows = [rows]
-            spec["stackers"].extend(r for r in rows if isinstance(r, dict))
-        except Exception:
-            pass
-
-    # Milestones/**/*.json
-    miles_root = folder / "milestones"
-    if miles_root.is_dir():
-        for path in sorted(miles_root.rglob("*.json")):
-            if "translations" in path.parts:
-                continue
-            try:
-                row = json.loads(path.read_text(encoding="utf-8-sig"))
-                if isinstance(row, dict):
-                    spec["milestones"].append(row)
-            except Exception:
-                pass
-
-    # Animations/*.json
-    anim_dir = folder / "animations"
-    if anim_dir.is_dir():
-        for path in sorted(anim_dir.glob("*.json")):
-            try:
-                row = json.loads(path.read_text(encoding="utf-8-sig"))
-                if isinstance(row, dict):
-                    spec["animations"].append(row)
-            except Exception:
-                pass
-
     _ensure_lists(spec)
     return spec
 
