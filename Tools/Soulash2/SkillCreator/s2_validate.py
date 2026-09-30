@@ -251,6 +251,51 @@ def _index_effects() -> Dict[Tuple[str, str], Dict[str, Any]]:
     return out
 
 
+def _prereq_issues(spec: Dict[str, Any], issues: List[Issue]) -> None:
+    by_id = {str(m.get("id")): m for m in spec.get("milestones") or []}
+
+    def level(m: Dict[str, Any]) -> int:
+        if m.get("innate"):
+            return 0
+        try:
+            return int((m.get("requirements") or {}).get("skill") or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    graph: Dict[str, List[str]] = {}
+    for mid, m in by_id.items():
+        pre = (m.get("requirements") or {}).get("milestones") or []
+        graph[mid] = [str(p) for p in pre if str(p) in by_id]
+        for p in pre:
+            p = str(p)
+            if p == mid:
+                issues.append(Issue("error", "Milestone lists itself as a prerequisite", mid))
+            elif p not in by_id:
+                issues.append(Issue("error", f"Unknown prerequisite milestone {p}", mid))
+            elif level(by_id[p]) > level(m):
+                issues.append(
+                    Issue("warn", f"Prerequisite {p} unlocks at level {level(by_id[p])}, after this milestone ({level(m)})", mid)
+                )
+    state: Dict[str, int] = {}
+    for start in graph:
+        if state.get(start):
+            continue
+        stack = [(start, iter(graph[start]))]
+        state[start] = 1
+        while stack:
+            node, it = stack[-1]
+            nxt = next(it, None)
+            if nxt is None:
+                state[node] = 2
+                stack.pop()
+            elif state.get(nxt) == 1:
+                if nxt != node:
+                    issues.append(Issue("error", f"Prerequisite cycle through {nxt}", node))
+            elif not state.get(nxt):
+                state[nxt] = 1
+                stack.append((nxt, iter(graph[nxt])))
+
+
 def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
     issues: List[Issue] = []
     catalog = _index_effects()
@@ -685,6 +730,8 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
                             m.get("id") or "",
                         )
                     )
+
+    _prereq_issues(spec, issues)
 
     if combat:
         pas_map = {p.get("id"): p for p in spec.get("passives") or []}
