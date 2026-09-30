@@ -211,7 +211,11 @@ def _projects() -> list:
             )
             seen.add(child.name)
 
-    _scan_mod_root(mods_dir(), "live")
+    try:
+        live = mods_dir()
+    except FileNotFoundError:
+        live = None
+    _scan_mod_root(live, "live")
     _scan_mod_root(workshop_root(), "workshop")
 
     return items

@@ -963,8 +963,15 @@
           <div class="row">
             <label>Unlock level <input id="msLevel" type="number" min="0" max="50" value="${m.innate ? "" : esc(req.skill ?? "")}" /></label>
             <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="msInnate" ${m.innate ? "checked" : ""} /> Innate</label>
-            <label>Prerequisite milestone ids <input id="msPre" style="min-width:260px" value="${esc((req.milestones || []).join(", "))}" /></label>
           </div>
+          <div>Requires (must be unlocked first)</div>
+          <div id="msPre" style="max-height:180px;overflow:auto;border:1px solid var(--line);padding:4px 8px;margin:4px 0;">${
+            (spec.milestones || []).filter(o => o.id !== m.id)
+              .map(o => ({ o, lv: o.innate ? 0 : Number((o.requirements || {}).skill || 0) }))
+              .sort((x, y) => x.lv - y.lv || String(x.o.name || "").localeCompare(String(y.o.name || "")))
+              .map(({ o, lv }) => `<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" value="${esc(o.id)}" data-lv="${lv}" ${(req.milestones || []).includes(o.id) ? "checked" : ""} /> L${o.innate ? "inn" : lv} ${esc(o.name || o.id)} <code>${esc(o.id)}</code></label>`)
+              .join("") || "<em>No other milestones</em>"
+          }</div>
           <div class="row">
             <button class="primary" id="msApply">Apply</button>
             <button id="msRemove">Remove from tree (keep reward)</button>
@@ -989,11 +996,22 @@
       el.innerHTML = html;
 
       if (m) {
+        const syncPre = () => {
+          const lv = $("msInnate").checked ? 0 : Number($("msLevel").value || 0);
+          $("msPre").querySelectorAll("input").forEach(x => {
+            const tooHigh = Number(x.dataset.lv) > lv;
+            x.disabled = tooHigh && !x.checked;
+            x.parentElement.style.opacity = tooHigh ? "0.45" : "";
+          });
+        };
+        $("msLevel").oninput = syncPre;
+        $("msInnate").onchange = syncPre;
+        syncPre();
         $("msApply").onclick = () => {
           const innate = $("msInnate").checked;
           const lv = $("msLevel").value;
           if (!innate && lv === "") { log("Enter a level or tick Innate"); return; }
-          msPost({ action: "move", id: m.id, level: innate ? null : Number(lv), innate, prereqs: splitCsv($("msPre").value) }, "Updated " + m.id);
+          msPost({ action: "move", id: m.id, level: innate ? null : Number(lv), innate, prereqs: [...$("msPre").querySelectorAll("input:checked")].map(x => x.value) }, "Updated " + m.id);
         };
         $("msRemove").onclick = () => { const id = m.id; selMile = null; msPost({ action: "unassign", id }, "Removed milestone " + id); };
         $("msClose").onclick = () => { selMile = null; renderTree(); };
