@@ -784,12 +784,13 @@
 
     function renderTree() {
       const rows = treeRowsFromSpec(spec);
+      const mileNames = Object.fromEntries(((spec && spec.milestones) || []).map(x => [x.id, x.name || x.id]));
       $("tree").innerHTML = rows.map(m => {
         const kind = m.kind || "";
         const rid = m.reward || "";
         const lvl = m.level === "innate" ? "inn" : (m.level ?? "?");
         const clickable = m.id && kind && kind !== "stat";
-        return `<div class="tree-item${clickable ? " clickable" : ""}${selMile === m.id ? " picked" : ""}" ${clickable ? `data-mid="${esc(m.id)}"` : ""}><strong>L${lvl}</strong><span class="kind-${kind}">${kind || "stat"}</span><span>${m.name || ""} ${rid ? `<code>${rid}</code>` : ""}${(m.prereqs || []).length ? ` <small style="color:var(--muted)">&larr; ${esc(m.prereqs.join(", "))}</small>` : ""}</span></div>`;
+        return `<div class="tree-item${clickable ? " clickable" : ""}${selMile === m.id ? " picked" : ""}" ${clickable ? `data-mid="${esc(m.id)}"` : ""}><strong>L${lvl}</strong><span class="kind-${kind}">${kind || "stat"}</span><span>${m.name || ""} ${rid ? `<code>${rid}</code>` : ""}${(m.prereqs || []).length ? ` <small style="color:var(--muted)">requires: ${esc(m.prereqs.map(p => mileNames[p] || p).join(", "))}</small>` : ""}</span></div>`;
       }).join("") || "<p>No unlocks yet.</p>";
       const stackers = (spec && spec.stackers) || [];
       if (stackers.length) {
