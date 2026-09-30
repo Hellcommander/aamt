@@ -1311,7 +1311,7 @@ def write_mod(spec: Dict[str, Any], dest: Optional[Path] = None) -> Path:
         _dump([{k: v for k, v in s.items() if not str(k).startswith("_")} for s in spec.get("stackers") or []]),
         encoding="utf-8",
     )
-    miles = root / "milestones" / skill_id
+    miles = root / "milestones" / (spec.get("milestone_dir") or skill_id)
     miles.mkdir(parents=True, exist_ok=True)
     written_miles = set()
     for m in spec.get("milestones") or []:
@@ -1465,6 +1465,9 @@ def load_mod_folder(folder: Path) -> Dict[str, Any]:
             row["file"] = p.name
             miles.append(row)
     spec["milestones"] = miles
+    subdirs = {p.parent.name for p in mdir.rglob("*.json") if p.parent != mdir and "translations" not in p.parts} if mdir.is_dir() else set()
+    if len(subdirs) == 1:
+        spec["milestone_dir"] = subdirs.pop()
     spec["entities"] = _load_json_dir(folder / "entities", role="entity")
     spec["animations"] = _load_json_dir(folder / "animations")
     assets = _read_json_file(folder / "assets.json")

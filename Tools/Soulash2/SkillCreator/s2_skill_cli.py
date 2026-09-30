@@ -307,6 +307,8 @@ def cmd_rename_id(args: argparse.Namespace) -> int:
         print(f"Already {new}")
         return 0
     n = retarget_owned_ids(spec, old, new)
+    if spec.get("milestone_dir") == old:
+        spec.pop("milestone_dir")
     old_dir = path.parent
     new_dir = output_root() / new
     if old_dir.resolve() != new_dir.resolve():
