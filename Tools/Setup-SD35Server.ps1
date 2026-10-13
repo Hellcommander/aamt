@@ -139,176 +139,64 @@ if (Test-Path $requirementsFile) {
     }
 }
 
-# Step 3: Download model weights from Hugging Face
-if (-not $SkipModelDownload) {
+# Step 3: Download SD3.5 Medium model using Hugging Face CLI
 Write-Host ""
-Write-Host "Step 3: Downloading SD3.5 Medium model from Hugging Face..." -ForegroundColor Cyan
-Write-Host "  Using Diffusers library (automatic download and caching)..." -ForegroundColor Gray
-    Write-Host "  NOTE: This model requires Hugging Face authentication" -ForegroundColor Yellow
-    Write-Host "  1. Visit: https://huggingface.co/stabilityai/stable-diffusion-3.5-medium" -ForegroundColor Gray
-    Write-Host "  2. Accept the license agreement" -ForegroundColor Gray
-    $loginCmd = if ($hfCliCmd) { if ($hfCliCmd -eq "hf") { "hf auth login" } else { "huggingface-cli login" } } else { "python -m huggingface_hub login" }
-    Write-Host "  3. Log in: $loginCmd" -ForegroundColor Gray
-    Write-Host "  This may take a while (model is ~10GB)..." -ForegroundColor Gray
-    Write-Host ""
-    
-    $modelsPath = Join-Path $repoPath "models"
-    if (-not (Test-Path $modelsPath)) {
-        New-Item -ItemType Directory -Path $modelsPath -Force | Out-Null
-    }
-    
-    # Use Diffusers download script (simpler, automatic caching)
-    $downloadScript = Join-Path $repoPath "download_model.py"
-    if (Test-Path $downloadScript) {
-        Write-Host "  Using Diffusers download script..." -ForegroundColor Gray
-        Write-Host "  (Make sure you're logged in: huggingface-cli login)" -ForegroundColor Yellow
-        & $pythonCmd $downloadScript
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "  [OK] Model downloaded successfully via Diffusers" -ForegroundColor Green
-            exit 0
-        } else {
-            Write-Host "  [ERROR] Download failed. Please authenticate first:" -ForegroundColor Red
-            Write-Host "    1. Run: huggingface-cli login" -ForegroundColor Yellow
-            Write-Host "    2. Re-run this script" -ForegroundColor Yellow
-            exit 1
-        }
-    }
-    
-    # Fallback: Check if already downloaded (manual download)
-    $modelFile = Join-Path $modelsPath "sd3.5_medium.safetensors"
-    if (Test-Path $modelFile) {
-        Write-Host "  [INFO] Model file already exists, skipping download" -ForegroundColor Green
-        Write-Host "    File: $modelFile" -ForegroundColor Gray
-        Write-Host "    Size: $([math]::Round((Get-Item $modelFile).Length / 1GB, 2)) GB" -ForegroundColor Gray
-    } else {
-        # Try using Hugging Face CLI first (faster)
-        if ($hfCliAvailable) {
-            Write-Host "  Using Hugging Face CLI for faster download..." -ForegroundColor Gray
-            $loginCmd = if ($hfCliCmd -eq "hf") { "hf auth login" } else { "huggingface-cli login" }
-            Write-Host "  (Make sure you're logged in: $loginCmd)" -ForegroundColor Yellow
-            
-            try {
-                # Download main model
-                if ($hfCliCmd -eq "hf") {
-                    & hf download stabilityai/stable-diffusion-3.5-medium sd3.5_medium.safetensors --local-dir $modelsPath 2>&1 | Out-Host
-                } else {
-                    & huggingface-cli download stabilityai/stable-diffusion-3.5-medium sd3.5_medium.safetensors --local-dir $modelsPath 2>&1 | Out-Host
-                }
-                if ($LASTEXITCODE -eq 0 -and (Test-Path $modelFile)) {
-                    Write-Host "    [OK] Main model downloaded" -ForegroundColor Green
-                } else {
-                    throw "CLI download failed or file not found"
-                }
-                
-                # Download text encoders
-                Write-Host "  Downloading text encoders..." -ForegroundColor Gray
-                if ($hfCliCmd -eq "hf") {
-                    & hf download stabilityai/stable-diffusion-3.5-medium text_encoders/clip_g.safetensors --local-dir $modelsPath 2>&1 | Out-Host
-                    & hf download stabilityai/stable-diffusion-3.5-medium text_encoders/clip_l.safetensors --local-dir $modelsPath 2>&1 | Out-Host
-                    & hf download stabilityai/stable-diffusion-3.5-medium text_encoders/t5xxl_fp16.safetensors --local-dir $modelsPath 2>&1 | Out-Host
-                } else {
-                    & huggingface-cli download stabilityai/stable-diffusion-3.5-medium text_encoders/clip_g.safetensors --local-dir $modelsPath 2>&1 | Out-Host
-                    & huggingface-cli download stabilityai/stable-diffusion-3.5-medium text_encoders/clip_l.safetensors --local-dir $modelsPath 2>&1 | Out-Host
-                    & huggingface-cli download stabilityai/stable-diffusion-3.5-medium text_encoders/t5xxl_fp16.safetensors --local-dir $modelsPath 2>&1 | Out-Host
-                }
-                
-                if (Test-Path $modelFile) {
-                    Write-Host "  [OK] Model downloaded successfully via CLI" -ForegroundColor Green
-                } else {
-                    throw "Model file not found after download"
-                }
-            } catch {
-                Write-Host "  [WARN] CLI download failed: $_" -ForegroundColor Yellow
-                Write-Host "  Trying Python method..." -ForegroundColor Yellow
-                $usePythonDownload = $true
-            }
-        } else {
-            $usePythonDownload = $true
-        }
-        
-        # Fallback to Python if CLI not available or failed
-        if ($usePythonDownload) {
-            Write-Host "  Using Python huggingface_hub..." -ForegroundColor Gray
-            Write-Host "  (Make sure you're logged in: huggingface-cli login)" -ForegroundColor Yellow
-            
-            $downloadScript = @"
-import os
-from huggingface_hub import hf_hub_download, login
-import sys
+Write-Host "Step 3: SD3.5 Medium Model Download" -ForegroundColor Cyan
+Write-Host "------------------------------------------------------------" -ForegroundColor Cyan
+Write-Host "Before continuing, make sure you have:" -ForegroundColor Yellow
+Write-Host "  1. Installed Hugging Face CLI (hf or huggingface-cli)" -ForegroundColor Gray
+Write-Host "  2. Logged in locally using: hf auth login" -ForegroundColor Gray
+Write-Host "  3. Accepted the SD3.5 Medium license on HuggingFace" -ForegroundColor Gray
+Write-Host ""
+Write-Host "Press ENTER to continue..." -ForegroundColor Yellow
+$null = Read-Host
 
-models_dir = r"$modelsPath"
-model_id = "stabilityai/stable-diffusion-3.5-medium"
-
-print("Downloading SD3.5 Medium model...")
-print("NOTE: If you get a 401 error, you need to:")
-print("  1. Accept the license at https://huggingface.co/stabilityai/stable-diffusion-3.5-medium")
-        print("  2. Run: hf auth login  (or: python -m huggingface_hub login)")
-print()
-
-try:
-    # Download main model
-    model_file = hf_hub_download(
-        repo_id=model_id,
-        filename="sd3.5_medium.safetensors",
-        local_dir=models_dir
-    )
-    print(f"Downloaded: {model_file}")
-    
-    # Download text encoders
-    print("Downloading text encoders...")
-    hf_hub_download(
-        repo_id=model_id,
-        filename="text_encoders/clip_g.safetensors",
-        local_dir=models_dir
-    )
-    hf_hub_download(
-        repo_id=model_id,
-        filename="text_encoders/clip_l.safetensors",
-        local_dir=models_dir
-    )
-    hf_hub_download(
-        repo_id=model_id,
-        filename="text_encoders/t5xxl_fp16.safetensors",
-        local_dir=models_dir
-    )
-    
-    print("All downloads complete!")
-except Exception as e:
-    if "401" in str(e) or "gated" in str(e).lower() or "restricted" in str(e).lower():
-        print("ERROR: Authentication required!", file=sys.stderr)
-        print("Please:", file=sys.stderr)
-        print("  1. Visit https://huggingface.co/stabilityai/stable-diffusion-3.5-medium", file=sys.stderr)
-        print("  2. Accept the license agreement", file=sys.stderr)
-        print("  3. Run: huggingface-cli login", file=sys.stderr)
-    else:
-        print(f"Error: {e}", file=sys.stderr)
-    sys.exit(1)
-"@
-            
-            $downloadScriptPath = Join-Path $env:TEMP "download_sd35.py"
-            $downloadScript | Out-File -FilePath $downloadScriptPath -Encoding UTF8
-            
-            Write-Host "  Running download script (this may take 10-30 minutes for ~10GB)..." -ForegroundColor Gray
-            & $pythonCmd $downloadScriptPath
-            if ($LASTEXITCODE -eq 0 -and (Test-Path $modelFile)) {
-                Write-Host "  [OK] Model downloaded successfully" -ForegroundColor Green
-            } else {
-                Write-Host "  [ERROR] Model download failed!" -ForegroundColor Red
-                Write-Host "  Please:" -ForegroundColor Yellow
-                Write-Host "    1. Visit: https://huggingface.co/stabilityai/stable-diffusion-3.5-medium" -ForegroundColor Cyan
-                Write-Host "    2. Accept the license agreement" -ForegroundColor Cyan
-                $loginCmd = if ($hfCliCmd) { if ($hfCliCmd -eq "hf") { "hf auth login" } else { "huggingface-cli login" } } else { "python -m huggingface_hub login" }
-                Write-Host "    3. Run: $loginCmd" -ForegroundColor Cyan
-                Write-Host "    4. Re-run this script or download manually to: $modelsPath" -ForegroundColor Cyan
-            }
-            
-            Remove-Item $downloadScriptPath -ErrorAction SilentlyContinue
-        }
-    }
-} else {
-    Write-Host ""
-    Write-Host "Step 3: Skipping model download (use -SkipModelDownload:`$false to download)" -ForegroundColor Gray
+# Ensure model directory exists
+$modelsPath = Join-Path $repoPath "models"
+if (-not (Test-Path $modelsPath)) {
+    New-Item -ItemType Directory -Path $modelsPath -Force | Out-Null
 }
+
+# Detect Hugging Face CLI
+$hfCliCmd = $null
+if (Get-Command hf -ErrorAction SilentlyContinue) {
+    $hfCliCmd = "hf"
+} elseif (Get-Command huggingface-cli -ErrorAction SilentlyContinue) {
+    $hfCliCmd = "huggingface-cli"
+} else {
+    Write-Host "  [ERROR] Hugging Face CLI not installed." -ForegroundColor Red
+    Write-Host "  Install it with:" -ForegroundColor Yellow
+    Write-Host "    pip install hf-cli" -ForegroundColor Gray
+    Write-Host "    or: pip install huggingface_hub" -ForegroundColor Gray
+    exit 1
+}
+
+Write-Host ""
+Write-Host "Using Hugging Face CLI: $hfCliCmd" -ForegroundColor Gray
+Write-Host "Downloading SD3.5 Medium model files..." -ForegroundColor Cyan
+
+# Correct filenames from the SD3.5 Medium repo
+$files = @(
+    "sd3.5-medium.safetensors",
+    "sd3.5-medium-vae.safetensors",
+    "text_encoder_1.safetensors",
+    "text_encoder_2.safetensors"
+)
+
+foreach ($file in $files) {
+    Write-Host "  Downloading: $file" -ForegroundColor Gray
+    & $hfCliCmd download stabilityai/stable-diffusion-3.5-medium $file --local-dir $modelsPath
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  [ERROR] Failed to download: $file" -ForegroundColor Red
+        Write-Host "  Make sure you ran: hf auth login" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
+Write-Host ""
+Write-Host "  [OK] SD3.5 Medium model downloaded successfully." -ForegroundColor Green
+Write-Host "  Model directory: $modelsPath" -ForegroundColor Gray
 
 # Step 4: Create API server wrapper
 Write-Host ""
