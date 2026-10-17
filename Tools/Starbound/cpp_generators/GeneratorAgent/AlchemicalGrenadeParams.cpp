@@ -24,7 +24,7 @@ GrenadeType parseGrenadeType(const std::string& str) {
     if (lower == "stun" || lower == "concussion") return GrenadeType::STUN;
     if (lower == "custom") return GrenadeType::CUSTOM;
     
-    Log::warn("Unknown grenade type: {}, defaulting to FIRE", str);
+    Log::warn("AlchemicalGrenade", "Unknown grenade type: {}, defaulting to FIRE", str);
     return GrenadeType::FIRE;
 }
 
@@ -39,7 +39,7 @@ CasingMaterial parseCasingMaterial(const std::string& str) {
     if (lower == "organic" || lower == "wood") return CasingMaterial::ORGANIC;
     if (lower == "custom") return CasingMaterial::CUSTOM;
     
-    Log::warn("Unknown casing material: {}, defaulting to GLASS", str);
+    Log::warn("AlchemicalGrenade", "Unknown casing material: {}, defaulting to GLASS", str);
     return CasingMaterial::GLASS;
 }
 
@@ -58,7 +58,7 @@ ParticleType parseParticleType(const std::string& str) {
     if (lower == "stun_wave" || lower == "stun") return ParticleType::STUN_WAVE;
     if (lower == "custom") return ParticleType::CUSTOM;
     
-    Log::warn("Unknown particle type: {}, defaulting to EMBER", str);
+    Log::warn("AlchemicalGrenade", "Unknown particle type: {}, defaulting to EMBER", str);
     return ParticleType::EMBER;
 }
 
@@ -72,7 +72,7 @@ ExplosionType parseExplosionType(const std::string& str) {
     if (lower == "proximity" || lower == "near") return ExplosionType::PROXIMITY;
     if (lower == "custom") return ExplosionType::CUSTOM;
     
-    Log::warn("Unknown explosion type: {}, defaulting to BURST", str);
+    Log::warn("AlchemicalGrenade", "Unknown explosion type: {}, defaulting to BURST", str);
     return ExplosionType::BURST;
 }
 
@@ -88,7 +88,7 @@ ResidueType parseResidueType(const std::string& str) {
     if (lower == "frost_patch" || lower == "frost") return ResidueType::FROST_PATCH;
     if (lower == "custom") return ResidueType::CUSTOM;
     
-    Log::warn("Unknown residue type: {}, defaulting to NONE", str);
+    Log::warn("AlchemicalGrenade", "Unknown residue type: {}, defaulting to NONE", str);
     return ResidueType::NONE;
 }
 
@@ -108,7 +108,7 @@ SoundEffect parseSoundEffect(const std::string& str) {
     if (lower == "stun_thud" || lower == "thud") return SoundEffect::STUN_THUD;
     if (lower == "custom") return SoundEffect::CUSTOM;
     
-    Log::warn("Unknown sound effect: {}, defaulting to GRENADE_EXPLODE", str);
+    Log::warn("AlchemicalGrenade", "Unknown sound effect: {}, defaulting to GRENADE_EXPLODE", str);
     return SoundEffect::GRENADE_EXPLODE;
 }
 
@@ -123,7 +123,7 @@ BackgroundShape parseBackgroundShape(const std::string& str) {
     if (lower == "none" || lower == "transparent") return BackgroundShape::NONE;
     if (lower == "custom") return BackgroundShape::CUSTOM;
     
-    Log::warn("Unknown background shape: {}, defaulting to CIRCLE", str);
+    Log::warn("AlchemicalGrenade", "Unknown background shape: {}, defaulting to CIRCLE", str);
     return BackgroundShape::CIRCLE;
 }
 
@@ -523,7 +523,7 @@ AlchemicalGrenadeParams fromJson(const nlohmann::json& json) {
         }
         
     } catch (const std::exception& e) {
-        Log::error("Error parsing alchemical grenade JSON: {}", e.what());
+        Log::error("AlchemicalGrenade", "Error parsing alchemical grenade JSON: {}", e.what());
         // Return default parameters on error
         params.id = "error_loading";
         params.grenadeType = GrenadeType::FIRE;
@@ -740,7 +740,7 @@ UIItemParams fromJson(const nlohmann::json& json) {
         }
         
     } catch (const std::exception& e) {
-        Log::error("Error parsing UI item JSON: {}", e.what());
+        Log::error("AlchemicalGrenade", "Error parsing UI item JSON: {}", e.what());
         // Return default parameters on error
         params.iconSize = 48;
         params.borderColor = {1.0f, 1.0f, 1.0f, 0.8f};

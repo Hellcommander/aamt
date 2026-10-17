@@ -11,8 +11,8 @@ namespace TextureAssets {
 using TextureHandle = uint32_t;
 using MipmapHandle = uint32_t;
 
-// Forward declaration for UDIM structure
-struct UDIMLayout;
+// Placeholder for UDIM layout data (defined before use: std::optional needs a complete type)
+struct UDIMLayout {};
 
 enum class TextureType { Noise, Mask, PBR, Atlas, TrimSheet };
 
@@ -77,13 +77,10 @@ struct CompressionParams {
 };
 
 struct TextureAssetBundle {
-    TextureHandle texture;
-    MipmapHandle mipmaps;
+    TextureHandle texture = 0;
+    MipmapHandle mipmaps = 0;
     std::optional<UDIMLayout> udim;
 };
-
-// Placeholder for UDIM layout data
-struct UDIMLayout {};
 
 } // namespace TextureAssets
 } // namespace MagiTech

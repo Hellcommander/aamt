@@ -1,8 +1,10 @@
 #pragma once
+#include <atomic>
 #include <future>
 #include <optional>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "ShaderAssetTypes.hpp"
 
 namespace MagiTech {
@@ -29,7 +31,8 @@ inline uint64_t hashCombine(uint64_t h1, uint64_t h2) {
 
 class ShaderAssetFactory {
     ConcurrentLRUCache<uint64_t, ShaderAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
+    std::atomic<size_t> m_activeCount{0};
     bool m_initialized = false;
 
 public:
@@ -48,6 +51,9 @@ public:
         m_pool.stop();
         m_initialized = false;
     }
+
+    /** Number of generation jobs queued or running right now. */
+    size_t getActiveCount() const { return m_activeCount.load(); }
 
     std::future<ShaderAssetBundle> generateAsync(
         const ShaderParams& sp,

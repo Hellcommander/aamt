@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iomanip>
 #include <random>
+#include <set>
 #include <algorithm>
 #include <fstream>
 #include <future>
@@ -210,7 +211,9 @@ Color Color::soft() const {
 // ColorGradient implementation
 void ColorGradient::addStop(float position, const Color& color) {
     stops.emplace_back(position, color);
-    std::sort(stops.begin(), stops.end());
+    // Keep stops ordered by position (stable so equal positions keep insertion order).
+    std::stable_sort(stops.begin(), stops.end(),
+                     [](const auto& a, const auto& b) { return a.first < b.first; });
 }
 
 void ColorGradient::removeStop(size_t index) {

@@ -2,6 +2,7 @@
 #include <future>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "FrostNovaTypes.hpp"
 
 namespace MagiTech {
@@ -62,7 +63,7 @@ public:
 
 private:
     ConcurrentLRUCache<uint64_t, FrostNovaAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
 };
 

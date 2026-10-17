@@ -131,10 +131,13 @@ public:
     static void setRoughness(MaterialHandle material, float value);
     static void setEmissive(MaterialHandle material, const glm::vec3& color, float intensity);
     static void setNormalStrength(MaterialHandle material, float strength);
-    
-private:
-    static MaterialHandle createMaterialFromTextures(const MechParams& p, TextureHandle albedo, TextureHandle normal, 
+
+    // PBR material that references the generated texture maps (0 = no map)
+    static MaterialHandle createMaterialFromTextures(const MechParams& p, TextureHandle albedo, TextureHandle normal,
                                                    TextureHandle roughness, TextureHandle metallic, TextureHandle emissive);
+
+    // Hull material for segmented (snake/worm) mechs, including its skin texture
+    static MaterialHandle buildSegmentedMaterial(const SegmentedMechParams& p);
 };
 
 // Physics generator for collision and rigid bodies

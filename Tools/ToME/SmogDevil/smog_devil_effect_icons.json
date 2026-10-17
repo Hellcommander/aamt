@@ -1,0 +1,89 @@
+[
+ {
+  "short_name": "SMOG_ARMOR_MELT",
+  "name": "Melted Armor",
+  "subject": "cracked steel breastplate melting and dripping green acid"
+ },
+ {
+  "short_name": "SMOG_REFINED_FOCUS",
+  "name": "Refined Focus",
+  "subject": "faceted violet gem focus set in a brass ring, glowing"
+ },
+ {
+  "short_name": "SMOG_TRAJECTORY",
+  "name": "Smog Trajectory",
+  "subject": "brass gear with a curved teal arrow of steam arcing around it"
+ },
+ {
+  "short_name": "SMOG_STAFF_LEECH",
+  "name": "Steam Leech Lens",
+  "subject": "brass lens with a red blood drop at its center wrapped in steam"
+ },
+ {
+  "short_name": "SMOG_VEIL_FROM_BEAM",
+  "name": "Smog Cover",
+  "subject": "hooded eye half hidden behind a grey smog cloud"
+ },
+ {
+  "short_name": "PRESSURIZED_SORCERY",
+  "name": "Pressurized Sorcery",
+  "subject": "brass pressure gauge with a violet arcane rune on its dial"
+ },
+ {
+  "short_name": "SMOG_BLOOD_TAX",
+  "name": "Blood Tax",
+  "subject": "crimson blood drop chained to a brass weight"
+ },
+ {
+  "short_name": "SMOG_VENT_ESCAPE",
+  "name": "Vent Escape",
+  "subject": "winged boot propelled by a jet of white steam"
+ },
+ {
+  "short_name": "SMOG_FIRST_VENT",
+  "name": "First Vent",
+  "subject": "brass valve wheel opening with a dagger crossed behind it and a puff of smog"
+ },
+ {
+  "short_name": "SMOG_RUST_HEX",
+  "name": "Rust Hex",
+  "subject": "iron shield covered in spreading orange rust with a glowing hex sigil"
+ },
+ {
+  "short_name": "SMOG_OVERCLOCKED_SOUL",
+  "name": "Overclocked Soul",
+  "subject": "glowing heart of brass gears radiating teal violet and crimson light"
+ },
+ {
+  "short_name": "SMOG_RELIEF_VALVE",
+  "name": "Relief Valve",
+  "subject": "brass relief valve releasing steam that forms a round shield bubble"
+ },
+ {
+  "short_name": "SMOG_PIPE_ATTUNED",
+  "name": "Pipe Attunement",
+  "subject": "curved aether pipe glowing blue-violet with a faint footprint of steam"
+ },
+ {
+  "short_name": "SMOG_FOCAL_MARK",
+  "name": "Focal Burn",
+  "subject": "targeting crosshair seen through a brass lens with a burning red center"
+ },
+ {
+  "short_name": "STEAM_STAFF_OVERDRIVE",
+  "name": "Steam Staff Overdrive",
+  "subject": "steam-staff head with red-hot gauge needle and steam jets erupting"
+ },
+ {
+  "short_name": "SMOG_HOMUNCULUS",
+  "name": "smog homunculus",
+  "subdir": "npc",
+  "subject": "small hunched homunculus made of living green smog with a tiny glowing brass boiler in its chest, clawed hands, glowing violet eyes"
+ },
+ {
+  "short_name": "SMOG_GRAND_HOMUNCULUS",
+  "name": "grand smog homunculus",
+  "subdir": "npc",
+  "subject": "huge hulking giant made of churning green-grey smog clouds around a large glowing brass boiler heart, pipes on its shoulders, glowing violet eyes"
+ }
+]

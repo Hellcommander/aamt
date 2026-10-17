@@ -6,13 +6,49 @@
 #include <memory>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include "vendor/xxhash/xxhash.h"
 
 namespace MagiTech {
 namespace MechAssets {
 
+// Field-wise hashing helpers (structs contain strings/containers, so they must
+// never be hashed as raw memory).
+namespace HashDetail {
+    template <typename T>
+    inline void pod(XXH64_state_t& s, const T& v) noexcept { XXH64_update(&s, &v, sizeof(T)); }
+    inline void str(XXH64_state_t& s, const std::string& v) noexcept {
+        const uint64_t n = v.size();
+        XXH64_update(&s, &n, sizeof(n));
+        XXH64_update(&s, v.data(), v.size());
+    }
+    template <typename T>
+    inline void vec(XXH64_state_t& s, const std::vector<T>& v) noexcept {
+        const uint64_t n = v.size();
+        XXH64_update(&s, &n, sizeof(n));
+        if (!v.empty()) XXH64_update(&s, v.data(), v.size() * sizeof(T));
+    }
+    // Hash an unordered map independently of its iteration order.
+    template <typename V>
+    inline void map(XXH64_state_t& s, const std::unordered_map<std::string, V>& m) noexcept {
+        uint64_t combined = 0;
+        for (const auto& [k, val] : m) {
+            XXH64_state_t e;
+            XXH64_reset(&e, 0);
+            str(e, k);
+            pod(e, val);
+            combined ^= XXH64_digest(&e);
+        }
+        const uint64_t n = m.size();
+        pod(s, n);
+        pod(s, combined);
+    }
+}
+
 // GPU Handle Types for OpenStarbound Integration
+using MeshHandle = uint32_t;
 using MechHandle = uint32_t;
 using ModuleHandle = uint32_t;
 using SkeletonHandle = uint32_t;
@@ -74,14 +110,22 @@ struct ModuleDefinition {
     uint64_t hashKey() const noexcept {
         XXH64_state_t hash_state;
         XXH64_reset(&hash_state, 0);
-        XXH64_update(&hash_state, this, sizeof(ModuleDefinition) - (4*sizeof(std::string)) - sizeof(std::vector<std::string>) - sizeof(std::vector<float>));
-        XXH64_update(&hash_state, id.c_str(), id.length());
-        XXH64_update(&hash_state, meshPath.c_str(), meshPath.length());
-        XXH64_update(&hash_state, attachBone.c_str(), attachBone.length());
+        HashDetail::str(hash_state, id);
+        HashDetail::pod(hash_state, type);
+        HashDetail::str(hash_state, meshPath);
+        HashDetail::str(hash_state, attachBone);
+        HashDetail::pod(hash_state, attachOffset);
+        HashDetail::pod(hash_state, attachRotation);
+        HashDetail::pod(hash_state, mass);
+        HashDetail::pod(hash_state, weldToParent);
         for(const auto& child : childModules) {
-            XXH64_update(&hash_state, child.c_str(), child.length());
+            HashDetail::str(hash_state, child);
         }
-        XXH64_update(&hash_state, lodScreenSizes.data(), lodScreenSizes.size() * sizeof(float));
+        HashDetail::pod(hash_state, colliderType);
+        HashDetail::pod(hash_state, colliderSize);
+        HashDetail::pod(hash_state, generateCollision);
+        HashDetail::pod(hash_state, enableLOD);
+        HashDetail::vec(hash_state, lodScreenSizes);
         return XXH64_digest(&hash_state);
     }
 };
@@ -103,21 +147,15 @@ struct MorphProfile {
     uint64_t hashKey() const noexcept {
         XXH64_state_t hash_state;
         XXH64_reset(&hash_state, 0);
-        XXH64_update(&hash_state, this, sizeof(MorphProfile) - (2*sizeof(std::string)) - sizeof(std::vector<float>) - (3*sizeof(std::unordered_map<std::string, glm::vec3>)) - sizeof(std::unordered_map<std::string, float>));
-        XXH64_update(&hash_state, name.c_str(), name.length());
-        for(const auto& transform : moduleTransforms) {
-            XXH64_update(&hash_state, transform.first.c_str(), transform.first.length());
-            XXH64_update(&hash_state, &transform.second, sizeof(glm::vec3));
-        }
-        for(const auto& scale : moduleScales) {
-            XXH64_update(&hash_state, scale.first.c_str(), scale.first.length());
-            XXH64_update(&hash_state, &scale.second, sizeof(glm::vec3));
-        }
-        for(const auto& opacity : moduleOpacities) {
-            XXH64_update(&hash_state, opacity.first.c_str(), opacity.first.length());
-            XXH64_update(&hash_state, &opacity.second, sizeof(float));
-        }
-        XXH64_update(&hash_state, customCurve.data(), customCurve.size() * sizeof(float));
+        HashDetail::str(hash_state, name);
+        HashDetail::pod(hash_state, fromForm);
+        HashDetail::pod(hash_state, toForm);
+        HashDetail::pod(hash_state, duration);
+        HashDetail::pod(hash_state, curveType);
+        HashDetail::vec(hash_state, customCurve);
+        HashDetail::map(hash_state, moduleTransforms);
+        HashDetail::map(hash_state, moduleScales);
+        HashDetail::map(hash_state, moduleOpacities);
         return XXH64_digest(&hash_state);
     }
 };
@@ -137,8 +175,15 @@ struct JointConstraint {
     uint64_t hashKey() const noexcept {
         XXH64_state_t hash_state;
         XXH64_reset(&hash_state, 0);
-        XXH64_update(&hash_state, this, sizeof(JointConstraint) - sizeof(std::string));
-        XXH64_update(&hash_state, jointName.c_str(), jointName.length());
+        HashDetail::str(hash_state, jointName);
+        HashDetail::pod(hash_state, type);
+        HashDetail::pod(hash_state, axis);
+        HashDetail::pod(hash_state, limits);
+        HashDetail::pod(hash_state, stiffness);
+        HashDetail::pod(hash_state, damping);
+        HashDetail::pod(hash_state, enableMotor);
+        HashDetail::pod(hash_state, motorTargetVelocity);
+        HashDetail::pod(hash_state, motorMaxForce);
         return XXH64_digest(&hash_state);
     }
 };
@@ -157,14 +202,16 @@ struct PhysicsRigDefinition {
     uint64_t hashKey() const noexcept {
         XXH64_state_t hash_state;
         XXH64_reset(&hash_state, 0);
-        XXH64_update(&hash_state, this, sizeof(PhysicsRigDefinition) - sizeof(std::unordered_map<std::string, float>) - sizeof(std::vector<JointConstraint>));
-        for(const auto& mass : moduleMasses) {
-            XXH64_update(&hash_state, mass.first.c_str(), mass.first.length());
-            XXH64_update(&hash_state, &mass.second, sizeof(float));
-        }
+        HashDetail::pod(hash_state, totalMass);
+        HashDetail::map(hash_state, moduleMasses);
         for(const auto& joint : joints) {
-            XXH64_update(&hash_state, &joint, sizeof(JointConstraint));
+            HashDetail::pod(hash_state, joint.hashKey());
         }
+        HashDetail::pod(hash_state, centerOfMass);
+        HashDetail::pod(hash_state, enableGravity);
+        HashDetail::pod(hash_state, enableCollision);
+        HashDetail::pod(hash_state, linearDamping);
+        HashDetail::pod(hash_state, angularDamping);
         return XXH64_digest(&hash_state);
     }
 };
@@ -182,7 +229,13 @@ struct LODDefinition {
     uint64_t hashKey() const noexcept {
         XXH64_state_t hash_state;
         XXH64_reset(&hash_state, 0);
-        XXH64_update(&hash_state, this, sizeof(LODDefinition));
+        HashDetail::pod(hash_state, quality);
+        HashDetail::pod(hash_state, screenSize);
+        HashDetail::pod(hash_state, meshDecimateRatio);
+        HashDetail::pod(hash_state, morphDetailRatio);
+        HashDetail::pod(hash_state, preserveBorders);
+        HashDetail::pod(hash_state, preserveUVSeams);
+        HashDetail::pod(hash_state, maxTriangles);
         return XXH64_digest(&hash_state);
     }
 };
@@ -202,20 +255,21 @@ struct MechDefinitionParams {
     uint64_t hashKey() const noexcept {
         XXH64_state_t hash_state;
         XXH64_reset(&hash_state, 0);
-        XXH64_update(&hash_state, this, sizeof(MechDefinitionParams) - (3*sizeof(std::string)) - (3*sizeof(std::vector<ModuleDefinition>)) - sizeof(std::vector<MorphProfile>) - sizeof(PhysicsRigDefinition) - sizeof(std::vector<LODDefinition>));
-        XXH64_update(&hash_state, name.c_str(), name.length());
-        XXH64_update(&hash_state, description.c_str(), description.length());
-        XXH64_update(&hash_state, skeletonTemplate.c_str(), skeletonTemplate.length());
-        
+        HashDetail::str(hash_state, name);
+        HashDetail::str(hash_state, description);
+        HashDetail::str(hash_state, skeletonTemplate);
+        HashDetail::pod(hash_state, enableGPUAcceleration);
+        HashDetail::pod(hash_state, enableHotReload);
+
         for(const auto& module : modules) {
-            XXH64_update(&hash_state, &module.hashKey(), sizeof(uint64_t));
+            HashDetail::pod(hash_state, module.hashKey());
         }
         for(const auto& profile : morphProfiles) {
-            XXH64_update(&hash_state, &profile.hashKey(), sizeof(uint64_t));
+            HashDetail::pod(hash_state, profile.hashKey());
         }
-        XXH64_update(&hash_state, &physicsRig.hashKey(), sizeof(uint64_t));
+        HashDetail::pod(hash_state, physicsRig.hashKey());
         for(const auto& lod : lods) {
-            XXH64_update(&hash_state, &lod.hashKey(), sizeof(uint64_t));
+            HashDetail::pod(hash_state, lod.hashKey());
         }
         return XXH64_digest(&hash_state);
     }
@@ -237,44 +291,75 @@ struct ModuleData {
     uint64_t hashKey() const noexcept {
         XXH64_state_t hash_state;
         XXH64_reset(&hash_state, 0);
-        XXH64_update(&hash_state, this, sizeof(ModuleData) - sizeof(std::string) - sizeof(std::vector<MeshHandle>) - sizeof(std::vector<MorphTargetHandle>));
-        XXH64_update(&hash_state, id.c_str(), id.length());
-        XXH64_update(&hash_state, lodMeshes.data(), lodMeshes.size() * sizeof(MeshHandle));
-        XXH64_update(&hash_state, morphTargets.data(), morphTargets.size() * sizeof(MorphTargetHandle));
+        HashDetail::pod(hash_state, handle);
+        HashDetail::str(hash_state, id);
+        HashDetail::pod(hash_state, type);
+        HashDetail::vec(hash_state, lodMeshes);
+        HashDetail::vec(hash_state, morphTargets);
+        HashDetail::pod(hash_state, physicsBody);
+        HashDetail::pod(hash_state, localTransform);
+        HashDetail::pod(hash_state, worldTransform);
+        HashDetail::pod(hash_state, isVisible);
+        HashDetail::pod(hash_state, isActive);
         return XXH64_digest(&hash_state);
     }
 };
 
 // Mech Asset Structure
 struct MechAsset {
-    MechHandle handle;
+    MechHandle handle = 0;
     std::string name;
-    SkeletonHandle skeleton;
+    SkeletonHandle skeleton = 0;
     std::vector<ModuleData> modules;
     std::vector<MorphProfile> morphProfiles;
-    PhysicsRigHandle physicsRig;
+    PhysicsRigHandle physicsRig = 0;
     std::vector<LODDefinition> lods;
-    MechPackHandle packHandle;
+    MechPackHandle packHandle = 0;
     
     // Performance tracking
     std::chrono::system_clock::time_point creationTime;
     std::atomic<uint64_t> cacheHits{0};
     std::atomic<uint64_t> cacheMisses{0};
     bool gpuAccelerated = false;
-    
+
+    MechAsset() = default;
+    MechAsset(const MechAsset& other) { *this = other; }
+    // Copies all data; the atomic counters are copied by value (used by hot reload,
+    // which replaces an asset's contents in place so existing handles stay valid).
+    MechAsset& operator=(const MechAsset& other) {
+        if (this != &other) {
+            handle = other.handle;
+            name = other.name;
+            skeleton = other.skeleton;
+            modules = other.modules;
+            morphProfiles = other.morphProfiles;
+            physicsRig = other.physicsRig;
+            lods = other.lods;
+            packHandle = other.packHandle;
+            creationTime = other.creationTime;
+            cacheHits.store(other.cacheHits.load());
+            cacheMisses.store(other.cacheMisses.load());
+            gpuAccelerated = other.gpuAccelerated;
+        }
+        return *this;
+    }
+
     uint64_t hashKey() const noexcept {
         XXH64_state_t hash_state;
         XXH64_reset(&hash_state, 0);
-        XXH64_update(&hash_state, this, sizeof(MechAsset) - (2*sizeof(std::string)) - sizeof(std::vector<ModuleData>) - sizeof(std::vector<MorphProfile>) - sizeof(std::vector<LODDefinition>) - sizeof(std::chrono::system_clock::time_point) - (2*sizeof(std::atomic<uint64_t>)) - sizeof(bool));
-        XXH64_update(&hash_state, name.c_str(), name.length());
+        HashDetail::pod(hash_state, handle);
+        HashDetail::str(hash_state, name);
+        HashDetail::pod(hash_state, skeleton);
+        HashDetail::pod(hash_state, physicsRig);
+        HashDetail::pod(hash_state, packHandle);
         for(const auto& module : modules) {
-            XXH64_update(&hash_state, &module.hashKey(), sizeof(uint64_t));
+            HashDetail::pod(hash_state, module.hashKey());
         }
         for(const auto& profile : morphProfiles) {
-            XXH64_update(&hash_state, &profile.hashKey(), sizeof(uint64_t));
+            HashDetail::pod(hash_state, profile.hashKey());
         }
         for(const auto& lod : lods) {
-            XXH64_update(&hash_state, &lod.hashKey(), sizeof(uint64_t));
+            HashDetail::pod(hash_state, lod.hashKey());
         }
         return XXH64_digest(&hash_state);
     }
@@ -296,7 +381,16 @@ struct MechInstanceState {
     uint64_t hashKey() const noexcept {
         XXH64_state_t hash_state;
         XXH64_reset(&hash_state, 0);
-        XXH64_update(&hash_state, this, sizeof(MechInstanceState));
+        HashDetail::pod(hash_state, currentForm);
+        HashDetail::pod(hash_state, targetForm);
+        HashDetail::pod(hash_state, morphProgress);
+        HashDetail::pod(hash_state, morphDuration);
+        HashDetail::pod(hash_state, isMorphing);
+        HashDetail::pod(hash_state, isActive);
+        HashDetail::pod(hash_state, position);
+        HashDetail::pod(hash_state, rotation);
+        HashDetail::pod(hash_state, velocity);
+        HashDetail::pod(hash_state, angularVelocity);
         return XXH64_digest(&hash_state);
     }
 };

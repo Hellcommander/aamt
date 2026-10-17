@@ -1,12 +1,42 @@
 #include "AnimationAssetLuaBindings.hpp"
 #include "AnimationAssetFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include <optional>
+#include "core/Log.hpp"
 #include <vector>
 
 namespace MagiTech {
 namespace AnimationAssets {
 
 static std::vector<std::pair<std::future<AnimationAssetBundle>, std::string>> pendingAssets;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<AnimationAssetFactory>& factorySlot() {
+    static std::shared_ptr<AnimationAssetFactory> f;
+    return f;
+}
+} // namespace
+
+void AnimationAssetLuaBindings::setFactory(std::shared_ptr<AnimationAssetFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<AnimationAssetFactory> AnimationAssetLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<AnimationAssetFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 void AnimationAssetLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<SkeletonParams>("SkeletonParams",
@@ -74,8 +104,10 @@ void AnimationAssetLuaBindings::bind(sol::state& lua) {
     lua.set_function("spawn_anim_asset",
         [&](const SkeletonParams& s, const AnimationClipParams& c,
             sol::optional<BlendSpaceParams> b, sol::optional<ProcLayerParams> l) {
-            auto factory = MainPlugin::instance().getAnimationAssetFactory();
-            pendingAssets.emplace_back(factory->generateAsync(s, c, b, l), c.id);
+            auto factory = AnimationAssetLuaBindings::factory();
+            std::optional<BlendSpaceParams> blend = b ? std::optional<BlendSpaceParams>(*b) : std::nullopt;
+            std::optional<ProcLayerParams> layer = l ? std::optional<ProcLayerParams>(*l) : std::nullopt;
+            pendingAssets.emplace_back(factory->generateAsync(s, c, blend, layer), c.id);
         }
     );
 }
@@ -84,10 +116,10 @@ void AnimationAssetLuaBindings::poll_assets(sol::state& lua) {
     for (auto it = pendingAssets.begin(); it != pendingAssets.end();) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             try {
-                auto b = it->first.get();
+                it->first.get();
                 lua["print"]("Animation asset ready: " + it->second);
             } catch (const std::exception& e) {
-                // log error
+                Log::error("AnimationAssets", "Animation asset {} failed: {}", it->second, e.what());
             }
             it = pendingAssets.erase(it);
         } else {

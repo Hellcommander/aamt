@@ -1,16 +1,34 @@
 #include "CentipedeMechLuaBindings.hpp"
 #include "CentipedeMechFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
 #include "core/Log.hpp"
 #include <vector>
 #include <chrono>
 #include <memory>
+#include <mutex>
+#include <stdexcept>
 
 namespace MagiTech {
 namespace CentipedeMechs {
 
 static std::vector<std::pair<std::future<MechBundle>, std::string>> pendingMechs;
-static std::unique_ptr<CentipedeMechFactory> g_mechFactory;
+static std::mutex pendingMechsMutex;
+
+static std::mutex factoryMutex;
+static std::shared_ptr<CentipedeMechFactory> g_mechFactory;
+
+void CentipedeMechLuaBindings::setFactory(std::shared_ptr<CentipedeMechFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex);
+    g_mechFactory = std::move(factory);
+}
+
+std::shared_ptr<CentipedeMechFactory> CentipedeMechLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex);
+    if (!g_mechFactory) {
+        g_mechFactory = std::make_shared<CentipedeMechFactory>();
+        g_mechFactory->initialize(4); // 4 threads for generation
+    }
+    return g_mechFactory;
+}
 
 // Validation functions for parameters
 bool validateMechParams(const MechParams& params) {
@@ -19,15 +37,15 @@ bool validateMechParams(const MechParams& params) {
         return false;
     }
     if (params.segmentCount < 3 || params.segmentCount > 20) {
-        Log::error("MechParams: segmentCount must be between 3 and 20, got {}", params.segmentCount);
+        Log::error("CentipedeMech", "MechParams: segmentCount must be between 3 and 20, got {}", params.segmentCount);
         return false;
     }
     if (params.segmentLength <= 0.0f || params.segmentLength > 5.0f) {
-        Log::error("MechParams: segmentLength must be between 0.1 and 5.0, got {}", params.segmentLength);
+        Log::error("CentipedeMech", "MechParams: segmentLength must be between 0.1 and 5.0, got {}", params.segmentLength);
         return false;
     }
     if (params.segmentRadius <= 0.0f || params.segmentRadius > 2.0f) {
-        Log::error("MechParams: segmentRadius must be between 0.1 and 2.0, got {}", params.segmentRadius);
+        Log::error("CentipedeMech", "MechParams: segmentRadius must be between 0.1 and 2.0, got {}", params.segmentRadius);
         return false;
     }
     return true;
@@ -35,19 +53,19 @@ bool validateMechParams(const MechParams& params) {
 
 bool validateLegParams(const LegParams& params) {
     if (params.legsPerSegment < 1 || params.legsPerSegment > 8) {
-        Log::error("LegParams: legsPerSegment must be between 1 and 8, got {}", params.legsPerSegment);
+        Log::error("CentipedeMech", "LegParams: legsPerSegment must be between 1 and 8, got {}", params.legsPerSegment);
         return false;
     }
     if (params.upperLegLength <= 0.0f || params.upperLegLength > 3.0f) {
-        Log::error("LegParams: upperLegLength must be between 0.1 and 3.0, got {}", params.upperLegLength);
+        Log::error("CentipedeMech", "LegParams: upperLegLength must be between 0.1 and 3.0, got {}", params.upperLegLength);
         return false;
     }
     if (params.lowerLegLength <= 0.0f || params.lowerLegLength > 3.0f) {
-        Log::error("LegParams: lowerLegLength must be between 0.1 and 3.0, got {}", params.lowerLegLength);
+        Log::error("CentipedeMech", "LegParams: lowerLegLength must be between 0.1 and 3.0, got {}", params.lowerLegLength);
         return false;
     }
     if (params.jointRadius <= 0.0f || params.jointRadius > 1.0f) {
-        Log::error("LegParams: jointRadius must be between 0.05 and 1.0, got {}", params.jointRadius);
+        Log::error("CentipedeMech", "LegParams: jointRadius must be between 0.05 and 1.0, got {}", params.jointRadius);
         return false;
     }
     if (params.footType.empty()) {
@@ -59,19 +77,19 @@ bool validateLegParams(const LegParams& params) {
 
 bool validateCockpitParams(const CockpitParams& params) {
     if (params.width <= 0.0f || params.width > 5.0f) {
-        Log::error("CockpitParams: width must be between 0.5 and 5.0, got {}", params.width);
+        Log::error("CentipedeMech", "CockpitParams: width must be between 0.5 and 5.0, got {}", params.width);
         return false;
     }
     if (params.height <= 0.0f || params.height > 3.0f) {
-        Log::error("CockpitParams: height must be between 0.5 and 3.0, got {}", params.height);
+        Log::error("CentipedeMech", "CockpitParams: height must be between 0.5 and 3.0, got {}", params.height);
         return false;
     }
     if (params.depth <= 0.0f || params.depth > 5.0f) {
-        Log::error("CockpitParams: depth must be between 0.5 and 5.0, got {}", params.depth);
+        Log::error("CentipedeMech", "CockpitParams: depth must be between 0.5 and 5.0, got {}", params.depth);
         return false;
     }
     if (params.displayCount < 0 || params.displayCount > 20) {
-        Log::error("CockpitParams: displayCount must be between 0 and 20, got {}", params.displayCount);
+        Log::error("CentipedeMech", "CockpitParams: displayCount must be between 0 and 20, got {}", params.displayCount);
         return false;
     }
     return true;
@@ -79,18 +97,50 @@ bool validateCockpitParams(const CockpitParams& params) {
 
 bool validateHardpointParams(const HardpointParams& params) {
     if (params.missileTubes < 0 || params.missileTubes > 20) {
-        Log::error("HardpointParams: missileTubes must be between 0 and 20, got {}", params.missileTubes);
+        Log::error("CentipedeMech", "HardpointParams: missileTubes must be between 0 and 20, got {}", params.missileTubes);
         return false;
     }
     if (params.autocannonSlots < 0 || params.autocannonSlots > 10) {
-        Log::error("HardpointParams: autocannonSlots must be between 0 and 10, got {}", params.autocannonSlots);
+        Log::error("CentipedeMech", "HardpointParams: autocannonSlots must be between 0 and 10, got {}", params.autocannonSlots);
         return false;
     }
     if (params.radarRange < 0.0f || params.radarRange > 1000.0f) {
-        Log::error("HardpointParams: radarRange must be between 0 and 1000, got {}", params.radarRange);
+        Log::error("CentipedeMech", "HardpointParams: radarRange must be between 0 and 1000, got {}", params.radarRange);
         return false;
     }
     return true;
+}
+
+// Validates all parameter groups and queues an async generation; returns the mech ID for tracking.
+static std::string spawnCentipedeMech(const MechParams& m, const LegParams& l, const CockpitParams& c, const HardpointParams& h) {
+    // Validate all parameters
+    if (!validateMechParams(m)) {
+        throw std::runtime_error("Invalid MechParams");
+    }
+    if (!validateLegParams(l)) {
+        throw std::runtime_error("Invalid LegParams");
+    }
+    if (!validateCockpitParams(c)) {
+        throw std::runtime_error("Invalid CockpitParams");
+    }
+    if (!validateHardpointParams(h)) {
+        throw std::runtime_error("Invalid HardpointParams");
+    }
+
+    Log::info("CentipedeMech", "Starting centipede mech generation: {}", m.id);
+    auto startTime = std::chrono::high_resolution_clock::now();
+
+    auto future = CentipedeMechLuaBindings::factory()->generateAsync(m, l, c, h);
+    {
+        std::lock_guard<std::mutex> lock(pendingMechsMutex);
+        pendingMechs.emplace_back(std::move(future), m.id);
+    }
+
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    Log::info("CentipedeMech", "Queued mech generation for {} (took {}ms)", m.id, duration.count());
+
+    return m.id; // Return the mech ID for tracking
 }
 
 void CentipedeMechLuaBindings::bind(sol::state& lua) {
@@ -165,43 +215,14 @@ void CentipedeMechLuaBindings::bind(sol::state& lua) {
         "hasSensors", [](const MechBundle& b) { return b.sensorArray != 0; }
     );
 
-    // Initialize the factory
-    g_mechFactory = std::make_unique<CentipedeMechFactory>();
-    g_mechFactory->initialize(4); // 4 threads for generation
+    // Initialize the factory (or pick up the one shared via setFactory)
+    factory();
 
     // Main spawn function with comprehensive validation
-    lua.set_function("spawn_centipede_mech",
-        [&](const MechParams& m, const LegParams& l, const CockpitParams& c, const HardpointParams& h) {
-            // Validate all parameters
-            if (!validateMechParams(m)) {
-                throw std::runtime_error("Invalid MechParams");
-            }
-            if (!validateLegParams(l)) {
-                throw std::runtime_error("Invalid LegParams");
-            }
-            if (!validateCockpitParams(c)) {
-                throw std::runtime_error("Invalid CockpitParams");
-            }
-            if (!validateHardpointParams(h)) {
-                throw std::runtime_error("Invalid HardpointParams");
-            }
-
-            Log::info("Starting centipede mech generation: {}", m.id);
-            auto startTime = std::chrono::high_resolution_clock::now();
-            
-            auto future = g_mechFactory->generateAsync(m, l, c, h);
-            pendingMechs.emplace_back(std::move(future), m.id);
-            
-            auto endTime = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-            Log::info("Queued mech generation for {} (took {}ms)", m.id, duration.count());
-            
-            return m.id; // Return the mech ID for tracking
-        }
-    );
+    lua.set_function("spawn_centipede_mech", &spawnCentipedeMech);
 
     // Helper functions for creating common mech configurations
-    lua.set_function("create_scout_mech", [&]() {
+    lua.set_function("create_scout_mech", []() {
         MechParams m;
         m.id = "Scout_MK_I";
         m.segmentCount = 6;
@@ -236,10 +257,10 @@ void CentipedeMechLuaBindings::bind(sol::state& lua) {
         h.enableRadarArray = true;
         h.radarRange = 200.0f;
 
-        return spawn_centipede_mech(m, l, c, h);
+        return spawnCentipedeMech(m, l, c, h);
     });
 
-    lua.set_function("create_assault_mech", [&]() {
+    lua.set_function("create_assault_mech", []() {
         MechParams m;
         m.id = "Assault_MK_I";
         m.segmentCount = 10;
@@ -274,10 +295,10 @@ void CentipedeMechLuaBindings::bind(sol::state& lua) {
         h.enableRadarArray = true;
         h.radarRange = 500.0f;
 
-        return spawn_centipede_mech(m, l, c, h);
+        return spawnCentipedeMech(m, l, c, h);
     });
 
-    lua.set_function("create_heavy_mech", [&]() {
+    lua.set_function("create_heavy_mech", []() {
         MechParams m;
         m.id = "Heavy_MK_I";
         m.segmentCount = 12;
@@ -312,20 +333,23 @@ void CentipedeMechLuaBindings::bind(sol::state& lua) {
         h.enableRadarArray = true;
         h.radarRange = 800.0f;
 
-        return spawn_centipede_mech(m, l, c, h);
+        return spawnCentipedeMech(m, l, c, h);
     });
 
     // Utility functions
-    lua.set_function("get_pending_mech_count", [&]() {
+    lua.set_function("get_pending_mech_count", []() {
+        std::lock_guard<std::mutex> lock(pendingMechsMutex);
         return pendingMechs.size();
     });
 
-    lua.set_function("clear_pending_mechs", [&]() {
+    lua.set_function("clear_pending_mechs", []() {
+        std::lock_guard<std::mutex> lock(pendingMechsMutex);
         pendingMechs.clear();
         Log::info("Cleared all pending mech generations");
     });
 
-    lua.set_function("get_mech_factory_status", [&]() {
+    lua.set_function("get_mech_factory_status", []() {
+        std::lock_guard<std::mutex> lock(factoryMutex);
         return g_mechFactory && g_mechFactory->isInitialized();
     });
 
@@ -335,45 +359,65 @@ void CentipedeMechLuaBindings::bind(sol::state& lua) {
 void CentipedeMechLuaBindings::poll_assets(sol::state& lua) {
     auto startTime = std::chrono::high_resolution_clock::now();
     int completedCount = 0;
-    
-    for (auto it = pendingMechs.begin(); it != pendingMechs.end();) {
-        if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            try {
-                auto bundle = it->first.get();
-                auto endTime = std::chrono::high_resolution_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
-                
-                Log::info("Centipede mech asset ready: {} ({} segments, {} legs, {} joints)", 
-                    it->second, 
-                    bundle.segments.size(),
-                    bundle.legs.size(),
-                    bundle.joints.size());
-                
-                // Call Lua callback if available
-                if (lua["on_mech_generated"]) {
-                    lua["on_mech_generated"](it->second, bundle);
-                }
-                
-                completedCount++;
-            } catch (const std::exception& e) {
-                Log::error("Error generating mech {}: {}", it->second, e.what());
+
+    // Take the finished futures out under the lock, then run callbacks without
+    // holding it (a Lua callback may queue another mech).
+    std::vector<std::pair<std::future<MechBundle>, std::string>> ready;
+    {
+        std::lock_guard<std::mutex> lock(pendingMechsMutex);
+        for (auto it = pendingMechs.begin(); it != pendingMechs.end();) {
+            if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                ready.push_back(std::move(*it));
+                it = pendingMechs.erase(it);
+            } else {
+                ++it;
             }
-            it = pendingMechs.erase(it);
-        } else { 
-            ++it; 
         }
     }
-    
+
+    for (auto& [future, mechId] : ready) {
+        try {
+            auto bundle = future.get();
+            auto endTime = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+
+            Log::info("CentipedeMech", "Centipede mech asset ready: {} ({} segments, {} legs, {} joints, polled in {}ms)",
+                mechId,
+                bundle.segments.size(),
+                bundle.legs.size(),
+                bundle.joints.size(),
+                duration.count());
+
+            // Call Lua callback if available
+            sol::protected_function callback = lua["on_mech_generated"];
+            if (callback.valid()) {
+                auto result = callback(mechId, bundle);
+                if (!result.valid()) {
+                    sol::error err = result;
+                    Log::error("CentipedeMech", "on_mech_generated failed for {}: {}", mechId, err.what());
+                }
+            }
+
+            completedCount++;
+        } catch (const std::exception& e) {
+            Log::error("CentipedeMech", "Error generating mech {}: {}", mechId, e.what());
+        }
+    }
+
     if (completedCount > 0) {
-        Log::info("Completed {} mech generations", completedCount);
+        Log::info("CentipedeMech", "Completed {} mech generations", completedCount);
     }
 }
 
 void CentipedeMechLuaBindings::shutdown() {
-    if (g_mechFactory) {
-        g_mechFactory->shutdown();
-        g_mechFactory.reset();
+    {
+        std::lock_guard<std::mutex> lock(factoryMutex);
+        if (g_mechFactory) {
+            g_mechFactory->shutdown();
+            g_mechFactory.reset();
+        }
     }
+    std::lock_guard<std::mutex> lock(pendingMechsMutex);
     pendingMechs.clear();
     Log::info("CentipedeMechLuaBindings shutdown complete");
 }

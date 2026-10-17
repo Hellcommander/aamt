@@ -1,6 +1,7 @@
 #pragma once
 #include <future>
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "BarbedExplosiveProjectileTypes.hpp"
 
 namespace MagiTech {
@@ -18,7 +19,7 @@ namespace ExplosionGen {
 }
 
 class BarbedExplosiveProjectileFactory {
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized = false;
 
 public:

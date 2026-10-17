@@ -17,6 +17,19 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# Launched from PowerShell 7 (pwsh), Windows PowerShell 5.1 inherits a PSModulePath that lists the
+# PowerShell 7 module folders, and built-ins such as Get-FileHash / Invoke-WebRequest then fail to
+# load. Restore the stock 5.1 module path before any cmdlet is used.
+if ($PSVersionTable.PSEdition -eq 'Desktop' -and $env:PSModulePath -match '\\PowerShell\\Modules|microsoft\.powershell_') {
+    $stock = @(
+        (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsPowerShell\Modules'),
+        (Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules'),
+        (Join-Path $PSHOME 'Modules')
+    )
+    $machine = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine') -split ';'
+    $env:PSModulePath = (($stock + $machine) | Where-Object { $_ } | Select-Object -Unique) -join ';'
+}
+
 # SD3.5 installation path (override with AAMT_SD_HOME)
 $sd35Path = "E:\tools\sd3.5\sd3.5"
 if ($env:AAMT_SD_HOME) { $sd35Path = $env:AAMT_SD_HOME }
@@ -72,6 +85,21 @@ if (Get-Command python -ErrorAction SilentlyContinue) {
     $pythonCmd = "python3"
 } else {
     Write-Host "ERROR: Python not found!" -ForegroundColor Red
+    exit 1
+}
+
+# Preflight: server.py needs a CUDA build of torch. A CPU-only wheel otherwise only fails
+# later, inside the model-load thread, while /ping keeps answering 200.
+$cudaProbe = & $pythonCmd -c "import torch,sys; sys.stdout.write('%s|%s' % (torch.__version__, torch.cuda.is_available()))" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: '$pythonCmd' cannot import torch. Install a CUDA build first:" -ForegroundColor Red
+    Write-Host "  $pythonCmd -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126" -ForegroundColor Yellow
+    exit 1
+}
+$torchVer, $cudaOk = "$cudaProbe" -split '\|'
+if ($cudaOk -ne 'True') {
+    Write-Host "ERROR: torch $torchVer on '$pythonCmd' has no CUDA support (CPU-only build)." -ForegroundColor Red
+    Write-Host "  Fix: $pythonCmd -m pip install --force-reinstall torch torchvision --index-url https://download.pytorch.org/whl/cu126" -ForegroundColor Yellow
     exit 1
 }
 

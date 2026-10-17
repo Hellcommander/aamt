@@ -166,6 +166,7 @@ void bindParticleAssetToLua(sol::state& lua) {
     lua.new_usertype<ParticleForceField>("ParticleForceField",
         sol::constructors<ParticleForceField()>(),
         "type", &ParticleForceField::type,
+        "id", &ParticleForceField::id,
         "position", &ParticleForceField::position,
         "direction", &ParticleForceField::direction,
         "strength", &ParticleForceField::strength,
@@ -177,12 +178,14 @@ void bindParticleAssetToLua(sol::state& lua) {
     lua.new_usertype<ParticleCollision>("ParticleCollision",
         sol::constructors<ParticleCollision()>(),
         "type", &ParticleCollision::type,
+        "id", &ParticleCollision::id,
         "position", &ParticleCollision::position,
         "dimensions", &ParticleCollision::dimensions,
         "normal", &ParticleCollision::normal,
         "restitution", &ParticleCollision::restitution,
         "friction", &ParticleCollision::friction,
-        "active", &ParticleCollision::active
+        "active", &ParticleCollision::active,
+        "meshPath", &ParticleCollision::meshPath
     );
 
     lua.new_usertype<ParticleTrail>("ParticleTrail",
@@ -238,6 +241,7 @@ void bindParticleAssetToLua(sol::state& lua) {
 
     lua.new_usertype<ParticleEffectInstance>("ParticleEffectInstance",
         sol::constructors<ParticleEffectInstance()>(),
+        "id", &ParticleEffectInstance::id,
         "templateName", &ParticleEffectInstance::templateName,
         "definition", &ParticleEffectInstance::definition,
         "position", &ParticleEffectInstance::position,
@@ -318,198 +322,198 @@ void bindParticleAssetToLua(sol::state& lua) {
 
     // Bind factory functions
     lua.set_function("create_particle_effect", 
-        [&](const ParticleEffectDefinition& definition) {
-            return particleFactory.generateAsync(definition).get();
+        [](const ParticleEffectDefinition& definition) {
+            return factory()->generateAsync(definition).get();
         });
 
     lua.set_function("create_particle_effect_sync", 
-        [&](const ParticleEffectDefinition& definition) {
-            return particleFactory.generate(definition);
+        [](const ParticleEffectDefinition& definition) {
+            return factory()->generate(definition);
         });
 
     lua.set_function("create_particle_instance", 
-        [&](const std::string& templateName, 
+        [](const std::string& templateName, 
             const glm::vec3& position,
             const glm::vec3& rotation,
             const glm::vec3& scale) {
-            return particleFactory.createInstance(templateName, position, rotation, scale);
+            return factory()->createInstance(templateName, position, rotation, scale);
         });
 
     lua.set_function("destroy_particle_instance", 
-        [&](const std::string& instanceId) {
-            particleFactory.destroyInstance(instanceId);
+        [](const std::string& instanceId) {
+            factory()->destroyInstance(instanceId);
         });
 
     lua.set_function("update_particle_instance", 
-        [&](const std::string& instanceId, float deltaTime) {
-            particleFactory.updateInstance(instanceId, deltaTime);
+        [](const std::string& instanceId, float deltaTime) {
+            factory()->updateInstance(instanceId, deltaTime);
         });
 
     // Bind factory management functions
     lua.set_function("register_particle_template", 
-        [&](const ParticleEffectTemplate& template) {
-            particleFactory.registerTemplate(template);
+        [](const ParticleEffectTemplate& effectTemplate) {
+            factory()->registerTemplate(effectTemplate);
         });
 
     lua.set_function("unregister_particle_template", 
-        [&](const std::string& templateName) {
-            particleFactory.unregisterTemplate(templateName);
+        [](const std::string& templateName) {
+            factory()->unregisterTemplate(templateName);
         });
 
     lua.set_function("get_particle_template", 
-        [&](const std::string& templateName) {
-            return particleFactory.getTemplate(templateName);
+        [](const std::string& templateName) {
+            return factory()->getTemplate(templateName);
         });
 
     // Bind force field management
     lua.set_function("add_global_force_field", 
-        [&](const ParticleForceField& forceField) {
-            particleFactory.addGlobalForceField(forceField);
+        [](const ParticleForceField& forceField) {
+            factory()->addGlobalForceField(forceField);
         });
 
     lua.set_function("remove_global_force_field", 
-        [&](const std::string& forceFieldId) {
-            particleFactory.removeGlobalForceField(forceFieldId);
+        [](const std::string& forceFieldId) {
+            factory()->removeGlobalForceField(forceFieldId);
         });
 
     lua.set_function("update_global_force_fields", 
-        [&](float deltaTime) {
-            particleFactory.updateGlobalForceFields(deltaTime);
+        [](float deltaTime) {
+            factory()->updateGlobalForceFields(deltaTime);
         });
 
     // Bind collision management
     lua.set_function("add_global_collision", 
-        [&](const ParticleCollision& collision) {
-            particleFactory.addGlobalCollision(collision);
+        [](const ParticleCollision& collision) {
+            factory()->addGlobalCollision(collision);
         });
 
     lua.set_function("remove_global_collision", 
-        [&](const std::string& collisionId) {
-            particleFactory.removeGlobalCollision(collisionId);
+        [](const std::string& collisionId) {
+            factory()->removeGlobalCollision(collisionId);
         });
 
     lua.set_function("update_global_collisions", 
-        [&](float deltaTime) {
-            particleFactory.updateGlobalCollisions(deltaTime);
+        [](float deltaTime) {
+            factory()->updateGlobalCollisions(deltaTime);
         });
 
     // Bind cache management
     lua.set_function("clear_particle_cache", 
-        [&]() {
-            particleFactory.clearCache();
+        []() {
+            factory()->clearCache();
         });
 
     lua.set_function("set_particle_cache_size", 
-        [&](size_t maxEntries) {
-            particleFactory.setCacheSize(maxEntries);
+        [](size_t maxEntries) {
+            factory()->setCacheSize(maxEntries);
         });
 
     lua.set_function("get_particle_cache_size", 
-        [&]() {
-            return particleFactory.getCacheSize();
+        []() {
+            return factory()->getCacheSize();
         });
 
     lua.set_function("get_particle_cache_hits", 
-        [&]() {
-            return particleFactory.getCacheHits();
+        []() {
+            return factory()->getCacheHits();
         });
 
     lua.set_function("get_particle_cache_misses", 
-        [&]() {
-            return particleFactory.getCacheMisses();
+        []() {
+            return factory()->getCacheMisses();
         });
 
     // Bind thread pool management
     lua.set_function("set_particle_max_threads", 
-        [&](int threads) {
-            particleFactory.setMaxThreads(threads);
+        [](int threads) {
+            factory()->setMaxThreads(threads);
         });
 
     lua.set_function("get_particle_max_threads", 
-        [&]() {
-            return particleFactory.getMaxThreads();
+        []() {
+            return factory()->getMaxThreads();
         });
 
     // Bind GPU acceleration
     lua.set_function("enable_particle_gpu_acceleration", 
-        [&](bool enable) {
-            particleFactory.enableGPUAcceleration(enable);
+        [](bool enable) {
+            factory()->enableGPUAcceleration(enable);
         });
 
     lua.set_function("is_particle_gpu_acceleration_enabled", 
-        [&]() {
-            return particleFactory.isGPUAccelerationEnabled();
+        []() {
+            return factory()->isGPUAccelerationEnabled();
         });
 
     // Bind quality settings
     lua.set_function("set_particle_quality", 
-        [&](ParticleQuality quality) {
-            particleFactory.setParticleQuality(quality);
+        [](ParticleQuality quality) {
+            factory()->setParticleQuality(quality);
         });
 
     lua.set_function("get_particle_quality", 
-        [&]() {
-            return particleFactory.getParticleQuality();
+        []() {
+            return factory()->getParticleQuality();
         });
 
     // Bind performance monitoring
     lua.set_function("get_particle_performance_metrics", 
-        [&]() {
-            return particleFactory.getPerformanceMetrics();
+        []() {
+            return factory()->getPerformanceMetrics();
         });
 
     lua.set_function("reset_particle_performance_metrics", 
-        [&]() {
-            particleFactory.resetPerformanceMetrics();
+        []() {
+            factory()->resetPerformanceMetrics();
         });
 
     // Bind error handling
     lua.set_function("get_particle_last_error", 
-        [&]() {
-            return particleFactory.getLastError();
+        []() {
+            return factory()->getLastError();
         });
 
     lua.set_function("clear_particle_last_error", 
-        [&]() {
-            particleFactory.clearLastError();
+        []() {
+            factory()->clearLastError();
         });
 
     // Bind generation status
     lua.set_function("is_particle_generating", 
-        [&]() {
-            return particleFactory.isGenerating();
+        []() {
+            return factory()->isGenerating();
         });
 
     lua.set_function("get_particle_generation_progress", 
-        [&]() {
-            return particleFactory.getGenerationProgress();
+        []() {
+            return factory()->getGenerationProgress();
         });
 
     // Bind memory management
     lua.set_function("get_particle_total_memory_usage", 
-        [&]() {
-            return particleFactory.getTotalMemoryUsage();
+        []() {
+            return factory()->getTotalMemoryUsage();
         });
 
     lua.set_function("set_particle_max_memory_usage", 
-        [&](size_t maxBytes) {
-            particleFactory.setMaxMemoryUsage(maxBytes);
+        [](size_t maxBytes) {
+            factory()->setMaxMemoryUsage(maxBytes);
         });
 
     lua.set_function("get_particle_max_memory_usage", 
-        [&]() {
-            return particleFactory.getMaxMemoryUsage();
+        []() {
+            return factory()->getMaxMemoryUsage();
         });
 
     // Bind utility functions
     lua.set_function("validate_particle_definition", 
-        [&](const ParticleEffectDefinition& definition) {
-            return particleFactory.validateDefinition(definition);
+        [](const ParticleEffectDefinition& definition) {
+            return factory()->validateDefinition(definition);
         });
 
     // Bind helper functions for creating common effects
     lua.set_function("create_explosion_effect", 
-        [&](const glm::vec3& position, float intensity) {
+        [](const glm::vec3& position, float intensity) {
             ParticleEffectDefinition def;
             def.name = "explosion";
             def.category = "combat";
@@ -543,11 +547,11 @@ void bindParticleAssetToLua(sol::state& lua) {
             def.render.glow = true;
             def.render.glowIntensity = 0.8f * intensity;
             
-            return particleFactory.generate(def);
+            return factory()->generate(def);
         });
 
     lua.set_function("create_fire_effect", 
-        [&](const glm::vec3& position, float intensity) {
+        [](const glm::vec3& position, float intensity) {
             ParticleEffectDefinition def;
             def.name = "fire";
             def.category = "environment";
@@ -582,11 +586,11 @@ void bindParticleAssetToLua(sol::state& lua) {
             def.render.glow = true;
             def.render.glowIntensity = 0.6f * intensity;
             
-            return particleFactory.generate(def);
+            return factory()->generate(def);
         });
 
     lua.set_function("create_magic_sparkle_effect", 
-        [&](const glm::vec3& position, float intensity) {
+        [](const glm::vec3& position, float intensity) {
             ParticleEffectDefinition def;
             def.name = "magic_sparkle";
             def.category = "magic";
@@ -618,7 +622,7 @@ void bindParticleAssetToLua(sol::state& lua) {
             def.render.glow = true;
             def.render.glowIntensity = 0.9f * intensity;
             
-            return particleFactory.generate(def);
+            return factory()->generate(def);
         });
 }
 

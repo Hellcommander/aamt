@@ -10,7 +10,7 @@ namespace Projectiles {
 
 namespace MeshGen {
     MeshHandle buildMesh(const ProjectileParams& p) {
-        Log::info("Building projectile mesh for: {}", p.id);
+        Log::info("Projectile", "Building projectile mesh for: {}", p.id);
         
         Mesh mesh;
         
@@ -74,7 +74,7 @@ namespace MeshGen {
 
 namespace TextureGen {
     TextureHandle buildTexture(const ProjectileParams& p) {
-        Log::info("Building projectile texture for: {}", p.id);
+        Log::info("Projectile", "Building projectile texture for: {}", p.id);
         
         int W = 128 << p.shapeDetail, H = W;
         std::vector<glm::u8vec4> pixels(W * H);
@@ -109,7 +109,7 @@ namespace TextureGen {
 
 namespace ShaderGen {
     ShaderHandle buildShader(const ProjectileParams& p) {
-        Log::info("Building projectile shader for: {}", p.id);
+        Log::info("Projectile", "Building projectile shader for: {}", p.id);
         
         Shader s;
         s.addStage("vertex", "projectile.vert");
@@ -133,7 +133,7 @@ namespace ShaderGen {
 
 namespace EffectsGen {
     EffectHandle buildTrail(const ProjectileParams& p) {
-        Log::info("Building projectile trail effect for: {}", p.id);
+        Log::info("Projectile", "Building projectile trail effect for: {}", p.id);
         
         if (p.trailEffect.empty()) {
             return 0; // No trail effect
@@ -151,7 +151,7 @@ namespace EffectsGen {
     }
     
     EffectHandle buildImpact(const ProjectileParams& p) {
-        Log::info("Building projectile impact effect for: {}", p.id);
+        Log::info("Projectile", "Building projectile impact effect for: {}", p.id);
         
         if (p.impactEffect.empty()) {
             return 0; // No impact effect

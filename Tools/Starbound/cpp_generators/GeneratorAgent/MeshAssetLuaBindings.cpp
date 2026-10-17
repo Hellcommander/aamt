@@ -1,12 +1,48 @@
 #include "MeshAssetLuaBindings.hpp"
 #include "MeshAssetFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include <optional>
+#include "core/Log.hpp"
 #include <vector>
 
 namespace MagiTech {
 namespace MeshAssets {
 
 static std::vector<std::pair<std::future<MeshAssetBundle>, std::string>> pendingAssets;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<MeshAssetFactory>& factorySlot() {
+    static std::shared_ptr<MeshAssetFactory> f;
+    return f;
+}
+} // namespace
+
+void MeshAssetLuaBindings::setFactory(std::shared_ptr<MeshAssetFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<MeshAssetFactory> MeshAssetLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<MeshAssetFactory>();
+        slot->initialize(128, 4);
+    }
+    return slot;
+}
+
+// sol::optional -> std::optional (the factory takes std::optional).
+template <typename T>
+static std::optional<T> toStd(const sol::optional<T>& v) {
+    return v ? std::optional<T>(*v) : std::nullopt;
+}
 
 void MeshAssetLuaBindings::bind(sol::state& lua) {
     lua.new_enum("MeshType",
@@ -88,8 +124,9 @@ void MeshAssetLuaBindings::bind(sol::state& lua) {
             sol::optional<ComputeMeshParams> cmp, sol::optional<NaniteParams> np,
             sol::optional<TessellationParams> tp, sol::optional<MLMeshParams> mlp,
             sol::optional<CollisionParams> cp) {
-            auto factory = MainPlugin::instance().getMeshAssetFactory();
-            pendingAssets.emplace_back(factory->generateAsync(m, l, p, r, cmp, np, tp, mlp, cp), m.id);
+            auto factory = MeshAssetLuaBindings::factory();
+            pendingAssets.emplace_back(factory->generateAsync(m, toStd(l), toStd(p), toStd(r), toStd(cmp),
+                toStd(np), toStd(tp), toStd(mlp), toStd(cp)), m.id);
         }
     );
 }
@@ -98,10 +135,10 @@ void MeshAssetLuaBindings::poll_assets(sol::state& lua) {
     for (auto it = pendingAssets.begin(); it != pendingAssets.end();) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             try {
-                auto b = it->first.get();
+                it->first.get();
                 lua["print"]("Mesh asset ready: " + it->second);
             } catch (const std::exception& e) {
-                // log error
+                Log::error("MeshAssets", "Mesh asset {} failed: {}", it->second, e.what());
             }
             it = pendingAssets.erase(it);
         } else {

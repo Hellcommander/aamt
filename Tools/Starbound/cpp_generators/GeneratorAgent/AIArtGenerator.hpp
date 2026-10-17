@@ -3,6 +3,7 @@
 #include "CrossbowAssetGenerator.hpp"
 #include "core/Log.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include <string>
 #include <vector>
 #include <memory>
@@ -84,7 +85,7 @@ public:
     bool isCached(const std::string& promptHash) const;
 
 private:
-    std::unique_ptr<ThreadPool> pool;
+    std::unique_ptr<GeneratorTaskPool> pool;
     std::unordered_map<std::string, ArtOutput> artCache;
     ModelConfig currentConfig;
     bool isInitialized;

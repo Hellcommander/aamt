@@ -1,6 +1,5 @@
 #include "AudioAssetLuaBindings.hpp"
 #include "AudioAssetFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
 #include <vector>
 #include <memory>
 

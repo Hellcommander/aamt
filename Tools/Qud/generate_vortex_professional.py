@@ -56,6 +56,11 @@ except ImportError:
     render_rich_particle = None
     render_rich_warning_marker = None
 
+_shared_policy_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "Shared")
+if _shared_policy_dir not in sys.path:
+    sys.path.insert(0, _shared_policy_dir)
+from sd_policy import SdUnavailable, procedural_fallback
+
 try:
     from qud_sd_client import generate_sd_draft, get_sd_api_url
     QUD_SD_AVAILABLE = True
@@ -139,6 +144,7 @@ class ProfessionalVortexGenerator:
         use_cache: bool = True,
         use_drafts: bool = True,
         quality: str = "full",
+        allow_procedural: bool = False,
     ):
         self.mod_path = Path(mod_path)
         self.textures_path = self.mod_path / "Textures"
@@ -152,7 +158,11 @@ class ProfessionalVortexGenerator:
         self.use_cache = use_cache
         self.use_drafts = use_drafts
         self.quality = quality
+        # prefer_sd=True: static UI icons must come from local SD; procedural stand-ins only
+        # when allow_procedural (--allow-procedural / AAMT_SD_STRICT=0). prefer_sd=False is the
+        # explicit procedural-only mode.
         self.prefer_sd = True
+        self.allow_procedural = allow_procedural
         self._sd_checked = False
         self._sd_available = False
 
@@ -353,7 +363,7 @@ class ProfessionalVortexGenerator:
             if self._sd_available:
                 print("  [OK] Local SD server detected — prefer SD for static UI icons")
             else:
-                print("  [INFO] No local SD server — procedural icons")
+                print("  [WARN] No local SD server detected")
         return self._sd_available
 
     def _try_sd_static_icon(
@@ -364,8 +374,14 @@ class ProfessionalVortexGenerator:
         *,
         subject: str,
     ) -> Optional[Image.Image]:
-        """Prefer local SD for static icons when the server is up; else None (caller falls back)."""
+        """Static icons come from local SD. Returns None only when procedural art is allowed
+        (prefer_sd=False, --allow-procedural or AAMT_SD_STRICT=0); otherwise raises SdUnavailable."""
+        if not self.prefer_sd:
+            return None  # explicit procedural-only mode
         if not self._sd_server_up() or generate_sd_draft is None:
+            procedural_fallback(
+                f"Vortex icon '{label}': no local SD server", allow=self.allow_procedural
+            )
             return None
         cs = design.get("colorScheme") or {}
         colors = ", ".join(
@@ -380,27 +396,32 @@ class ProfessionalVortexGenerator:
         drafts = self.mod_path / "DesignDrafts" / "sd_finals"
         drafts.mkdir(parents=True, exist_ok=True)
         out = drafts / f"{label}_sd.png"
-        try:
-            result = generate_sd_draft(
-                prompt,
-                out,
-                negative_prompt=negative,
-                width=512,
-                height=512,
-                steps=22,
-                guidance_scale=7.0,
-                lock_label=f"vortex_{label}",
-            )
-            if not result.ok or not result.output_path or not result.output_path.exists():
-                return None
-            img = Image.open(result.output_path).convert("RGBA")
-            if img.size != size:
-                img = img.resize(size, Image.LANCZOS)
-            print(f"   [SD] {label} from local Stable Diffusion")
-            return img
-        except Exception as exc:
-            print(f"   [WARN] SD icon '{label}' failed ({exc}); procedural fallback")
-            return None
+        last_err = "no output"
+        for attempt in range(3):  # bounded retry, new seed each time
+            try:
+                result = generate_sd_draft(
+                    prompt,
+                    out,
+                    negative_prompt=negative,
+                    width=512,
+                    height=512,
+                    steps=22,
+                    guidance_scale=7.0,
+                    seed=0 if attempt == 0 else 7919 * attempt,
+                    lock_label=f"vortex_{label}",
+                )
+                if result.ok and result.output_path and result.output_path.exists():
+                    img = Image.open(result.output_path).convert("RGBA")
+                    if img.size != size:
+                        img = img.resize(size, Image.LANCZOS)
+                    print(f"   [SD] {label} from local Stable Diffusion")
+                    return img
+                last_err = result.error or last_err
+            except Exception as exc:
+                last_err = str(exc)
+            print(f"   [WARN] SD icon '{label}' attempt {attempt + 1}/3 failed ({last_err})")
+        procedural_fallback(f"SD icon '{label}' failed: {last_err}", allow=self.allow_procedural)
+        return None
     
     def hex_to_rgb(self, hex_color: str) -> Tuple[int, int, int]:
         """Convert hex color to RGB tuple with caching for performance."""
@@ -1471,6 +1492,14 @@ class ProfessionalVortexGenerator:
         print("  • SD3 design drafts: optional palette hints from DesignDrafts/")
         print()
 
+        # Fail fast: static icons need SD (see _try_sd_static_icon). Raises SdUnavailable
+        # unless procedural art is explicitly allowed.
+        if self.prefer_sd and not self._sd_server_up():
+            procedural_fallback(
+                "Space-Time Vortex static icons need the local SD server (:1338)",
+                allow=self.allow_procedural,
+            )
+
         if self.quality_pipeline is not None:
             self.quality_pipeline.get_master_art_direction(call_ollama)
         
@@ -1936,8 +1965,11 @@ def main():
                        help="Export quality: fast (minimal), mechanical (validate), full (smooth+IM)")
     parser.add_argument("--reprocess-existing", action="store_true",
                        help="Re-polish PNGs in Textures/ (sharpen, validate, ImageMagick) without Ollama")
+    parser.add_argument("--allow-procedural", action="store_true",
+                       help="Explicit opt-in: use procedural icons when local SD is down/fails "
+                            "(default: fail; same as AAMT_SD_STRICT=0)")
     args = parser.parse_args()
-    
+
     mod_path = Path(args.mod_path)
     if not mod_path.exists():
         print(f"ERROR: Mod path not found: {mod_path}")
@@ -1994,6 +2026,7 @@ def main():
             use_cache=not args.no_cache,
             use_drafts=not args.no_drafts,
             quality=args.quality,
+            allow_procedural=args.allow_procedural,
         )
         generator.generate_all()
         
@@ -2005,6 +2038,9 @@ def main():
     except KeyboardInterrupt:
         print("\n\nGeneration cancelled by user.")
         return 130
+    except SdUnavailable as e:
+        print(f"\nERROR: {e}")
+        return 1
     except RuntimeError as e:
         print(f"\nERROR: {e}")
         print("\nTroubleshooting:")

@@ -1,13 +1,42 @@
 #include "MagicalItemLuaBindings.hpp"
 #include "MagicalItemFactory.hpp"
 #include "MagicalItemTypes.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <map>
 #include <future>
 #include <vector>
 
 namespace MagiTech {
 namespace MagicalItems {
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<MagicalItemFactory>& factorySlot() {
+    static std::shared_ptr<MagicalItemFactory> f;
+    return f;
+}
+} // namespace
+
+void MagicalItemLuaBindings::setFactory(std::shared_ptr<MagicalItemFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<MagicalItemFactory> MagicalItemLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<MagicalItemFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 static std::vector<std::pair<std::future<MagicalItemBundle>, std::string>> pendingItems;
 
@@ -34,7 +63,7 @@ void MagicalItemLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_item", [&](MagicalItemParams p) {
-        auto factory = MainPlugin::instance().getMagicalItemFactory();
+        auto factory = MagicalItemLuaBindings::factory();
         auto fut = factory->generateAsync(p);
         pendingItems.emplace_back(std::move(fut), p.id);
     });

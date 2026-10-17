@@ -1,4 +1,5 @@
 #include "AudioAssetFactory.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "SampleGen.hpp"
 #include "SynthGen.hpp"
 #include "EffectGen.hpp"
@@ -37,7 +38,7 @@ void AudioAssetFactory::initialize(size_t cache_size, size_t num_threads) {
     if (m_initialized) return;
     
     m_cache = OptimizedLRUCache<uint64_t, AudioBundle>(cache_size);
-    m_threadPool = std::make_unique<ThreadPool>(num_threads);
+    m_threadPool = std::make_unique<GeneratorTaskPool>(num_threads);
     m_bundlePool = ObjectPool<AudioBundle>(100);
     
     m_initialized = true;
@@ -463,7 +464,7 @@ void AudioAssetFactory::setGPUDevice(std::unique_ptr<GPUAudioInterface> device) 
 }
 
 // Configuration
-void AudioAssetFactory::setThreadPool(std::unique_ptr<ThreadPool> pool) {
+void AudioAssetFactory::setThreadPool(std::unique_ptr<GeneratorTaskPool> pool) {
     m_threadPool = std::move(pool);
 }
 

@@ -30,7 +30,7 @@ std::future<SpellstoneBundle> SpellstoneFactory::generateAsync(const SpellstoneP
         return std::async(std::launch::deferred, [existing]{ return *existing; });
     }
 
-    return m_pool.enqueue([p, this] {
+    return m_pool.enqueue([p, key, this] {
         SpellstoneBundle b;
         b.bodyMesh   = MeshGen::buildBody(p);
         b.surfaceTex = TextureGen::buildSurface(p);

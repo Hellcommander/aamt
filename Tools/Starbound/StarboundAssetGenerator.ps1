@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Unified Starbound asset generator that integrates PowerShell tools with C++ backend.
@@ -28,6 +28,14 @@
     
 .PARAMETER OutputDir
     Output directory
+
+.PARAMETER AllowProcedural
+    All sprite / icon / animation-sheet / texture art is rendered with the local Stable
+    Diffusion 3.5 server (:1338) through StarboundSdArt.psm1 and the script throws when SD
+    cannot deliver. With this switch (or AAMT_SD_STRICT=0) the legacy procedural drawing
+    (System.Drawing shapes, the C++ backend, AssetMakerAI procedural textures) may run, but
+    only as a fallback after an SD failure. -UseCppBackend is ignored without it because the
+    C++ backend only draws procedural art.
 #>
 
 param(
@@ -51,7 +59,10 @@ param(
     [string]$OutputDir = "StarboundAssets",
     
     [Parameter(Mandatory=$false)]
-    [hashtable]$Parameters = @{}
+    [hashtable]$Parameters = @{},
+
+    [Parameter(Mandatory=$false)]
+    [switch]$AllowProcedural
 )
 
 $ErrorActionPreference = "Stop"
@@ -76,6 +87,11 @@ if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
 $sharedPath = Join-Path (Split-Path -Parent $PSScriptRoot) "Shared"
 Import-Module (Join-Path $sharedPath "ToolDetection.psm1") -ErrorAction SilentlyContinue
 Import-Module (Join-Path $sharedPath "ToolsetIntegration.psm1") -ErrorAction SilentlyContinue
+
+# Stable Diffusion art (real pixels from the SD3.5 server on :1338). No procedural fallback
+# unless -AllowProcedural is passed or AAMT_SD_STRICT=0.
+Import-Module (Join-Path $PSScriptRoot "StarboundSdArt.psm1") -Force
+$script:ProceduralAllowed = $AllowProcedural.IsPresent -or ($env:AAMT_SD_STRICT -eq '0')
 
 # Initialize tools for Starbound asset generation
 $tools = Initialize-ToolsetTools `
@@ -209,7 +225,139 @@ function Test-SpriteQuality {
     }
 }
 
+# ---------------------------------------------------------------------------
+# Stable Diffusion art helpers. Every routine that used to draw a PNG procedurally
+# now delegates to Write-StarboundArt, which builds the prompt and calls New-StarboundSdArt.
+# ---------------------------------------------------------------------------
+function Get-StarboundArtSeed {
+    param([string]$Text)
+    $h = 17
+    foreach ($ch in $Text.ToCharArray()) { $h = (($h * 31) + [int]$ch) % 899981 }
+    return ($h + 1)
+}
+
+function ConvertTo-StarboundColorWord {
+    param([int]$R, [int]$G, [int]$B)
+    $max = [Math]::Max($R, [Math]::Max($G, $B))
+    $min = [Math]::Min($R, [Math]::Min($G, $B))
+    $delta = $max - $min
+    if ($max -lt 50) { return "black" }
+    if ($delta -lt 30) {
+        if ($max -gt 215) { return "white" }
+        if ($max -gt 150) { return "light gray" }
+        return "dark gray"
+    }
+    if ($max -eq $R) { $hue = 60.0 * ((($G - $B) / [double]$delta) % 6) }
+    elseif ($max -eq $G) { $hue = 60.0 * ((($B - $R) / [double]$delta) + 2) }
+    else { $hue = 60.0 * ((($R - $G) / [double]$delta) + 4) }
+    if ($hue -lt 0) { $hue += 360 }
+    $name = "red"
+    if ($hue -ge 15 -and $hue -lt 40) { $name = "orange" }
+    elseif ($hue -ge 40 -and $hue -lt 70) { $name = "yellow" }
+    elseif ($hue -ge 70 -and $hue -lt 160) { $name = "green" }
+    elseif ($hue -ge 160 -and $hue -lt 200) { $name = "cyan" }
+    elseif ($hue -ge 200 -and $hue -lt 255) { $name = "blue" }
+    elseif ($hue -ge 255 -and $hue -lt 290) { $name = "purple" }
+    elseif ($hue -ge 290 -and $hue -lt 345) { $name = "magenta" }
+    if ($max -lt 120) { return "dark $name" }
+    if ($max -gt 230 -and $delta -lt 110) { return "pale $name" }
+    return $name
+}
+
+function Get-StarboundPaletteWords {
+    # Palette: array of @(r,g,b) triples (or one flat @(r,g,b)). Returns "red, dark blue, ...".
+    param($Palette)
+    if ($null -eq $Palette) { return "" }
+    $items = @($Palette)
+    if ($items.Count -eq 0) { return "" }
+    if ($items[0] -is [ValueType] -or $items[0] -is [string]) { $items = @(, $items) }
+    $words = @()
+    foreach ($c in $items) {
+        $arr = @($c)
+        if ($arr.Count -lt 3) { continue }
+        try { $w = ConvertTo-StarboundColorWord -R ([int]$arr[0]) -G ([int]$arr[1]) -B ([int]$arr[2]) } catch { continue }
+        if ($words -notcontains $w) { $words += $w }
+    }
+    return ($words -join ", ")
+}
+
+function Write-StarboundArt {
+    <#
+    .SYNOPSIS
+    Builds an SD prompt from asset type / name / description / palette and renders the PNG
+    (single sprite, or a Frames-cell sheet) through New-StarboundSdArt. Returns $true when the
+    PNG was written; $false only when SD failed AND procedural output is allowed; throws
+    otherwise.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$AssetType,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [string]$Description = "",
+        [Parameter(Mandatory = $true)][int]$Width,
+        [Parameter(Mandatory = $true)][int]$Height,
+        [Parameter(Mandatory = $true)][string]$OutputPath,
+        [int]$Frames = 1,
+        [int]$Columns = 0,
+        [string[]]$FrameNotes = @(),
+        $Palette = $null,
+        [bool]$Transparent = $true,
+        [bool]$Pixel = $true,
+        [int]$Colors = 24,
+        [string]$SdKind = "icon"
+    )
+
+    $subject = switch ($AssetType) {
+        "ItemSprite"      { "inventory item icon of" }
+        "MechSprite"      { "mech part icon of" }
+        "Icon"            { "user interface icon of" }
+        "Sprite"          { "game object sprite of" }
+        "Projectile"      { "projectile sprite in flight of" }
+        "Particle"        { "small glowing particle effect sprite of" }
+        "Texture"         { "seamless tileable texture of" }
+        "Animation"       { "animation spritesheet frame of" }
+        "AnimationSprite" { "animation spritesheet frame of" }
+        default           { "game sprite of" }
+    }
+    $readable = (($Name -creplace '([a-z0-9])([A-Z])', '$1 $2') -replace '[_\-\.]+', ' ').Trim()
+    $desc = ($Description -replace '[\r\n\t]+', ' ' -replace '["`|]', '').Trim()
+    if ($desc.Length -gt 320) { $desc = $desc.Substring(0, 320) }
+    $parts = @("$subject $readable")
+    if ($desc) { $parts += $desc }
+    $pal = Get-StarboundPaletteWords -Palette $Palette
+    if ($pal) { $parts += "color palette: $pal" }
+    $prompt = ($parts -join ". ")
+
+    $common = @{
+        Prompt          = $prompt
+        OutputPath      = $OutputPath
+        Width           = $Width
+        Height          = $Height
+        Transparent     = $Transparent
+        Pixel           = $Pixel
+        Colors          = $Colors
+        Seed            = (Get-StarboundArtSeed "$AssetType|$Name")
+        SdKind          = $SdKind
+        AllowProcedural = $script:ProceduralAllowed
+    }
+    if ($Frames -gt 1) {
+        $notes = @($FrameNotes | ForEach-Object { ($_ -replace '["`|]', '').Trim() } | Where-Object { $_ })
+        $cols = if ($Columns -gt 0) { $Columns } else { $Frames }
+        $common['Kind'] = "sheet"
+        $common['Count'] = $Frames
+        $common['Columns'] = $cols
+        $common['Consistent'] = $true   # animation frames keep one subject (img2img from frame 1)
+        if ($notes.Count -gt 0) { $common['Variants'] = $notes }
+    } else {
+        $common['Kind'] = "sprite"
+    }
+    # Throws when SD cannot deliver unless procedural output is allowed (then returns $false).
+    return [bool](New-StarboundSdArt @common)
+}
+
 # Function to generate individual sprites (not spritesheets)
+# Art comes from Stable Diffusion (Write-StarboundArt); the System.Drawing shapes further down
+# are the -AllowProcedural fallback only.
 # Note: For spritesheets (animations), see Generate-AnimationSprite which handles per-frame scaling.
 # Individual sprite size limits (Starbound requirements):
 # - ItemSprite: 16x16 (item icons in inventory/hotbar)
@@ -321,9 +469,27 @@ function Generate-AssetSprite {
         }
     }
     
-    # Prioritize Description-based generation when Description is provided (from Ollama)
-    # Only use C++ backend if it supports Ollama-based generation, otherwise use description-enhanced procedural generation
-    $cppBackendPath = "F:\Games\OpenStarbound\mods\Magi-Tech Arcane Alchemy and Sorcery\cpp_backend"
+    # Delivered PNG size. ItemSprite/MechSprite are always delivered at their Starbound size;
+    # every other type keeps the generation size ($width x $height).
+    $outW = if ($SpriteType -eq "ItemSprite" -or $SpriteType -eq "MechSprite") { [int]$finalWidth } else { [int]$width }
+    $outH = if ($SpriteType -eq "ItemSprite" -or $SpriteType -eq "MechSprite") { [int]$finalHeight } else { [int]$height }
+
+    # Real art first: Stable Diffusion, prompted from the sprite type, name, (Ollama) description
+    # and colour palette. Throws if SD fails unless procedural output is explicitly allowed,
+    # in which case $sdOk is $false and the legacy drawing below runs.
+    $sdSpritePath = Join-Path $spriteDir "$AssetName.png"
+    Write-Host "Generating $SpriteType art with Stable Diffusion (${outW}x${outH})..." -ForegroundColor Green
+    $sdOk = Write-StarboundArt -AssetType $SpriteType -Name $AssetName -Description $Description `
+        -Width $outW -Height $outH -OutputPath $sdSpritePath -Palette $Parameters.ColorPalette
+    if ($sdOk) {
+        $fileInfo = Get-Item $sdSpritePath
+        Write-Host "✓ Sprite saved: $sdSpritePath ($([math]::Round($fileInfo.Length/1KB, 2)) KB)" -ForegroundColor Green
+    }
+
+    # Legacy fallback only (SD failed and -AllowProcedural / AAMT_SD_STRICT=0):
+    # prioritize Description-based drawing when Description is provided (from Ollama),
+    # otherwise the C++ backend.
+    $cppBackendPath ="F:\Games\OpenStarbound\mods\Magi-Tech Arcane Alchemy and Sorcery\cpp_backend"
     
     # Validate PSScriptRoot before using it
     if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
@@ -343,12 +509,14 @@ function Generate-AssetSprite {
     # If Description is provided (from Ollama), prefer description-based generation over simple C++ backend shapes
     $useDescriptionBased = $Description -and $Description.Trim().Length -gt 20  # Meaningful description from Ollama
     
-    if ($useDescriptionBased) {
-        Write-Host "Using Ollama-generated description for high-quality asset generation..." -ForegroundColor Green
+    if ($sdOk) {
+        # Stable Diffusion already wrote the PNG; only the .frames file remains.
+    } elseif ($useDescriptionBased) {
+        Write-Host "[FALLBACK] Stable Diffusion unavailable - drawing procedural sprite from the Ollama description (-AllowProcedural)..." -ForegroundColor Yellow
         Write-Host "Description: $($Description.Substring(0, [Math]::Min(100, $Description.Length)))..." -ForegroundColor Gray
-        # Fall through to description-enhanced procedural generation below
-    } elseif (Test-Path $bridgeScript -and (Test-Path $cppBackendPath)) {
-        Write-Host "Using C++ backend for sprite generation..." -ForegroundColor Green
+        # Fall through to the procedural fallback below
+    } elseif ((Test-Path $bridgeScript) -and (Test-Path $cppBackendPath)) {
+        Write-Host "[FALLBACK] Stable Diffusion unavailable - using C++ backend procedural generation (-AllowProcedural)..." -ForegroundColor Yellow
         
         $bridgeParams = @{
             BackendPath = $cppBackendPath
@@ -377,16 +545,11 @@ function Generate-AssetSprite {
         return  # Exit early if C++ backend was used
     }
     
-    # Use description-enhanced procedural generation (better than simple shapes)
-    if ($useDescriptionBased -or -not (Test-Path $bridgeScript)) {
-        # Generate sprite using Ollama description for high-quality assets
-        if ($useDescriptionBased) {
-            Write-Host "Generating high-quality sprite using Ollama description..." -ForegroundColor Green
-            Write-Host "  The description will guide colors, style, patterns, and visual characteristics" -ForegroundColor Gray
-        } else {
-            Write-Host "Generating procedural sprite..." -ForegroundColor Yellow
-        }
-        
+    # PROCEDURAL FALLBACK ONLY: runs when Stable Diffusion failed and -AllowProcedural (or
+    # AAMT_SD_STRICT=0) is set. Never runs by default.
+    if (-not $sdOk) {
+        Write-Host "Generating procedural placeholder sprite (SD fallback)..." -ForegroundColor Yellow
+
         # Create a simple procedural sprite using .NET Graphics
         Add-Type -AssemblyName System.Drawing
         
@@ -962,7 +1125,7 @@ function Generate-AssetSprite {
     # For single sprites, frameGrid.size is the sprite size, dimensions is [1, 1]
     $framesContent = @{
         frameGrid = @{
-            size = @($width, $height)  # Frame size matches sprite size for single sprites
+            size = @($outW, $outH)  # Frame size matches the delivered PNG size for single sprites
             dimensions = @(1, 1)  # Single frame, 1x1 grid
         }
         aliases = @{
@@ -1078,7 +1241,35 @@ function Generate-AnimationSprite {
         New-Item -ItemType Directory -Path $animDir -Force | Out-Null
     }
     
-    # Try to use C++ backend if available
+    # Real art first: Stable Diffusion renders one cell per frame and packs them into a single
+    # horizontal strip (frameCount columns x 1 row) at the final Starbound frame size.
+    # Throws if SD fails unless procedural output is explicitly allowed ($sdSheetOk = $false).
+    $sdSheetPath = Join-Path $animDir "$AssetName.png"
+    $motion = switch ($animationType) {
+        "SpellCast"        { "spell casting, energy gathering and growing" }
+        "DeviceActivation" { "device activating, pulsing power" }
+        "StatusEffect"     { "status effect aura, shimmering" }
+        default            { "looping effect animation" }
+    }
+    $sdFrameNotes = @()
+    for ($sdf = 0; $sdf -lt $frameCount; $sdf++) {
+        $sdProgress = if ($frameCount -gt 1) { $sdf / [double]($frameCount - 1) } else { 0.0 }
+        $sdPhase = if ($sdProgress -lt 0.25) { "start of the animation, small and faint" }
+                   elseif ($sdProgress -lt 0.5) { "building up, growing stronger" }
+                   elseif ($sdProgress -lt 0.75) { "at peak intensity, largest and brightest" }
+                   else { "fading out, dissipating" }
+        $sdFrameNotes += "frame $($sdf + 1) of ${frameCount}, $motion, $sdPhase"
+    }
+    Write-Host "Generating animation spritesheet with Stable Diffusion (${frameCount} frames of ${finalFrameWidth}x${finalFrameHeight})..." -ForegroundColor Green
+    $sdSheetOk = Write-StarboundArt -AssetType "AnimationSprite" -Name $AssetName -Description $Description `
+        -Width ([int]$finalFrameWidth) -Height ([int]$finalFrameHeight) -OutputPath $sdSheetPath `
+        -Frames $frameCount -Columns $frameCount -FrameNotes $sdFrameNotes -Palette $Parameters.ColorPalette
+    if ($sdSheetOk) {
+        Write-Host "✓ Animation spritesheet created (Stable Diffusion): $sdSheetPath" -ForegroundColor Green
+    }
+
+    # Legacy fallback only (SD failed and -AllowProcedural / AAMT_SD_STRICT=0):
+    # try the C++ backend if available, otherwise draw System.Drawing shapes.
     $cppBackendPath = "F:\Games\OpenStarbound\mods\Magi-Tech Arcane Alchemy and Sorcery\cpp_backend"
     # Use PSScriptRoot instead of MyInvocation.MyCommand.Path (already validated)
     if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
@@ -1094,9 +1285,11 @@ function Generate-AnimationSprite {
         return $false
     }
     
-    if (Test-Path $bridgeScript -and (Test-Path $cppBackendPath)) {
-        Write-Host "Using C++ backend for animation spritesheet generation..." -ForegroundColor Green
-        
+    if ($sdSheetOk) {
+        # Stable Diffusion already wrote the spritesheet; only the .animation/.frames files remain.
+    } elseif ((Test-Path $bridgeScript) -and (Test-Path $cppBackendPath)) {
+        Write-Host "[FALLBACK] Stable Diffusion unavailable - using C++ backend procedural animation (-AllowProcedural)..." -ForegroundColor Yellow
+
         $bridgeParams = @{
             BackendPath = $cppBackendPath
             GeneratorType = "Animation"
@@ -1115,8 +1308,8 @@ function Generate-AnimationSprite {
         
         & $bridgeScript @bridgeParams
     } else {
-        # Fallback: Generate procedural animation spritesheet
-        Write-Host "Generating procedural animation spritesheet..." -ForegroundColor Yellow
+        # PROCEDURAL FALLBACK ONLY (SD failed and -AllowProcedural / AAMT_SD_STRICT=0)
+        Write-Host "[FALLBACK] Stable Diffusion unavailable - drawing procedural placeholder animation spritesheet..." -ForegroundColor Yellow
         
         Add-Type -AssemblyName System.Drawing
         
@@ -1418,8 +1611,13 @@ function Generate-AnimationSprite {
     }
 }
 
-if ($UseCppBackend) {
-    Write-Host "Using C++ Backend" -ForegroundColor Green
+# The C++ backend only draws procedural art, so it is honoured only when procedural output is
+# explicitly allowed; otherwise the request is served by the Stable Diffusion path below.
+if ($UseCppBackend -and -not $script:ProceduralAllowed) {
+    Write-Host "  [WARN] -UseCppBackend ignored: the C++ backend draws procedural art. Using Stable Diffusion generators (pass -AllowProcedural to force it)." -ForegroundColor Yellow
+}
+if ($UseCppBackend -and $script:ProceduralAllowed) {
+    Write-Host "Using C++ Backend (procedural, explicitly allowed)" -ForegroundColor Yellow
     
     $bridgeScript = Join-Path $PSScriptRoot "StarboundCppBackendBridge.ps1"
     if (Test-Path $bridgeScript) {
@@ -1530,7 +1728,33 @@ if ($UseCppBackend) {
         }
         
         "Texture" {
-            # Use Transcendence AssetMakerAI for texture generation
+            # Real texture art from Stable Diffusion (opaque, full-frame, not pixel-quantized).
+            # Throws when SD fails unless -AllowProcedural / AAMT_SD_STRICT=0, in which case the
+            # legacy Transcendence AssetMakerAI procedural texture path below runs instead.
+            $texSize = if ($Parameters.Size) { [int]$Parameters.Size } else { 256 }
+            $texExportDir = Join-Path $OutputDir "StarboundExport"
+            if (-not (Test-Path $texExportDir)) {
+                New-Item -ItemType Directory -Path $texExportDir -Force | Out-Null
+            }
+            $texPath = Join-Path $texExportDir "$AssetName.png"
+            Write-Host "Generating texture '$AssetName' with Stable Diffusion (${texSize}x${texSize})..." -ForegroundColor Green
+            $texOk = Write-StarboundArt -AssetType "Texture" -Name $AssetName -Description $Description `
+                -Width $texSize -Height $texSize -OutputPath $texPath -Palette $Parameters.ColorPalette `
+                -Transparent $false -Pixel $false -SdKind "texture"
+            if ($texOk) {
+                $texFrames = @{
+                    frameGrid = @{
+                        size = @($texSize, $texSize)
+                        dimensions = @(1, 1)
+                    }
+                    aliases = @{
+                        default = @(0)
+                    }
+                }
+                $texFrames | ConvertTo-Json -Depth 10 | Set-Content -Path (Join-Path $texExportDir "$AssetName.frames") -Encoding UTF8
+                Write-Host "✓ Starbound format exported (Stable Diffusion): $texPath" -ForegroundColor Green
+            } else {
+            # PROCEDURAL FALLBACK ONLY: Transcendence AssetMakerAI procedural texture
             $toolsDir = Split-Path -Parent $PSScriptRoot
             $textureScript = Join-Path $toolsDir "Transcendence\AssetMakerAI.ps1"
             if (Test-Path $textureScript) {
@@ -1609,6 +1833,7 @@ if ($UseCppBackend) {
             } else {
                 Write-Host "Texture script not found" -ForegroundColor Yellow
             }
+            }
         }
         
         "Animation" {
@@ -1635,7 +1860,8 @@ if ($UseCppBackend) {
                     if ($Parameters.FrameSize) { $animParams['FrameSize'] = $Parameters.FrameSize }
                     if ($Parameters.AnimationCycle) { $animParams['AnimationCycle'] = $Parameters.AnimationCycle }
                 }
-                
+                if ($AllowProcedural) { $animParams['AllowProcedural'] = $true }
+
                 & $animationScript @animParams
             } else {
                 Write-Host "StarboundAnimationGenerator not found" -ForegroundColor Yellow
@@ -1775,7 +2001,8 @@ if ($UseCppBackend) {
                     $animParams['FrameSize'] = @($Parameters.FrameWidth, $Parameters.FrameHeight)
                 }
                 if ($Parameters.AnimationCycle) { $animParams['AnimationCycle'] = $Parameters.AnimationCycle }
-                
+                if ($AllowProcedural) { $animParams['AllowProcedural'] = $true }
+
                 & $animationScript @animParams
             } else {
                 # Fallback to existing function

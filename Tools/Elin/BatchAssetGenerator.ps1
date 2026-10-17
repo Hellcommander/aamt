@@ -34,7 +34,10 @@ param(
     
     [switch]$GenerateSpritesheets,
     
-    [string]$Systems = "all"
+    [string]$Systems = "all",
+
+    # Accept procedural placeholder art when local Stable Diffusion is down (default: assets fail)
+    [switch]$AllowProcedural
 )
 
 $ErrorActionPreference = "Stop"
@@ -87,6 +90,9 @@ $params = @{
 
 if ($GenerateSpritesheets) {
     $params.GenerateSpritesheets = $true
+}
+if ($AllowProcedural) {
+    $params.AllowProcedural = $true
 }
 
 # Execute generator

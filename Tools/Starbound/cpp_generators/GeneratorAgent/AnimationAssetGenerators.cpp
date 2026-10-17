@@ -4,7 +4,7 @@
 namespace MagiTech {
 namespace AnimationAssets {
 
-#define LOG_GEN(Asset, Id) Log::info("Building Animation Asset {}: {}", #Asset, Id)
+#define LOG_GEN(Asset, Id) Log::info("Animation", "Building Animation Asset {}: {}", #Asset, Id)
 
 namespace SkeletonGen {
     SkeletonHandle buildSkeleton(const SkeletonParams& p) {

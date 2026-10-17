@@ -2,6 +2,7 @@
 #include <future>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "BlackholeProjectileTypes.hpp"
 
 namespace MagiTech {
@@ -65,7 +66,7 @@ public:
 
 private:
     ConcurrentLRUCache<uint64_t, BlackholeAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
 };
 

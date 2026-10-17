@@ -91,8 +91,6 @@ secrets/
 .env
 .env.*
 !.env.example
-HfTokenProfiles.local.ps1
-HfTokenProfiles.local.json
 *.local.ps1
 *.local.json
 **/hf-home/token

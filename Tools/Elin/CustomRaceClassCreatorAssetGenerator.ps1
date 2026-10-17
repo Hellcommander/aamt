@@ -77,10 +77,25 @@ param(
     
     [switch]$UseBundlesAsReference,
     
-    [string]$UnityPath = ""
+    [string]$UnityPath = "",
+
+    # Accept procedural (PIL) placeholder art when local Stable Diffusion is down or fails.
+    # Default: abort. (AAMT_SD_STRICT=0 in the environment does the same.)
+    [switch]$AllowProcedural
 )
 
 $ErrorActionPreference = "Stop"
+
+# SD policy: procedural placeholder art is never a silent fallback.
+$sdStrict = (-not $AllowProcedural) -and ($env:AAMT_SD_STRICT -ne '0')
+if (-not $sdStrict) { $PSDefaultParameterValues['Invoke-ElinAssetImage:AllowProcedural'] = $true }
+function Assert-ProceduralAllowed {
+    param([Parameter(Mandatory)][string]$What)
+    if ($sdStrict) {
+        throw "$What. Refusing procedural placeholder art - start the SD server (:1338) and retry, or pass -AllowProcedural / set AAMT_SD_STRICT=0."
+    }
+    Write-Host "  [Warn] $What; using procedural placeholder (explicitly allowed)" -ForegroundColor Yellow
+}
 
 # Import unified tool detection and integration
 $sharedPath = Join-Path (Split-Path $PSScriptRoot -Parent) "Shared"
@@ -2040,7 +2055,10 @@ function Generate-IconAsset {
                 Write-Host "  [OK] Icon via local AI/procedural pipeline" -ForegroundColor Green
                 return $true
             }
-            Write-Host "  [Info] Local AI path missed; trying legacy fallbacks..." -ForegroundColor Gray
+            Assert-ProceduralAllowed "Local SD icon art failed for $([System.IO.Path]::GetFileName($OutputPath))"
+            Write-Host "  [Info] Local AI path missed; trying legacy procedural fallbacks (explicitly allowed)..." -ForegroundColor Gray
+        } else {
+            Assert-ProceduralAllowed "Invoke-ElinAssetImage unavailable (ElinAssetRender.psm1 not loaded)"
         }
 
         # Use Elin spell asset generator if available
@@ -2107,6 +2125,7 @@ print("OK")
         return $false
     }
     catch {
+        if ($_.Exception.Message -like '*Refusing procedural placeholder*') { throw }
         Write-Host "  [Error] Icon generation failed: $_" -ForegroundColor Red
         return $false
     }
@@ -2161,7 +2180,10 @@ function Generate-TextureAsset {
                 }
                 return $true
             }
-            Write-Host "  [Info] Local AI texture path missed; trying inline PIL..." -ForegroundColor Gray
+            Assert-ProceduralAllowed "Local SD texture art failed for $([System.IO.Path]::GetFileName($OutputPath))"
+            Write-Host "  [Info] Local AI texture path missed; trying inline PIL (explicitly allowed)..." -ForegroundColor Gray
+        } else {
+            Assert-ProceduralAllowed "Invoke-ElinAssetImage unavailable (ElinAssetRender.psm1 not loaded)"
         }
         
         # Get colors from spec or use system defaults
@@ -2346,6 +2368,7 @@ print("OK")
         return $false
     }
     catch {
+        if ($_.Exception.Message -like '*Refusing procedural placeholder*') { throw }
         Write-Host "  [Error] Texture generation failed: $_" -ForegroundColor Red
         return $false
     }

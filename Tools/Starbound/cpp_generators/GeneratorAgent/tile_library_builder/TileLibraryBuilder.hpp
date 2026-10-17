@@ -2,12 +2,14 @@
 
 #include <nlohmann/json.hpp>
 #include <filesystem>
+#include <random>
 #include <set>
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include <glm/glm.hpp>
-#include "vendor/xxhash/xxhash.h"
+
+namespace MagiTech {
 
 namespace fs = std::filesystem;
 
@@ -22,7 +24,8 @@ struct TileAsset {
 
 struct TileVariant {
     std::string baseId;
-    glm::vec4 tintColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    std::string category;
+    glm::vec4 tintColor = {1.0f, 1.0f, 1.0f, 1.0f}; // RGBA
     float noiseIntensity = 0.0f;
     float rotation = 0.0f;
     bool mirrored = false;
@@ -54,20 +57,22 @@ public:
     void generateVariants(int variantCount);
     void packAtlases(const fs::path& outDir);
     void writeMetadata(const fs::path& outDir);
-    
+
     // Utility methods
     void scanDirectory(const fs::path& dirPath);
     void categorizeAssets();
     void generateAtlasVariants(const std::string& category, int variantCount);
-    
+
     // Getters
     const std::vector<TileAsset>& getValidatedAssets() const { return m_validated_assets; }
     const std::vector<AtlasMetadata>& getAtlases() const { return m_atlases; }
-    
+    const std::vector<TileVariant>& getVariants() const { return m_variants; }
+
     // Configuration
     void setTileSize(const glm::ivec2& size) { m_tileSize = size; }
     void setAtlasSize(const glm::ivec2& size) { m_atlasSize = size; }
     void setAllowedLicenses(const std::set<std::string>& licenses) { m_allowedLicenses = licenses; }
+    const std::set<std::string>& getAllowedLicenses() const { return m_allowedLicenses; }
 
 private:
     // Asset management
@@ -75,17 +80,20 @@ private:
     std::vector<TileAsset> m_validated_assets;
     std::vector<TileVariant> m_variants;
     std::vector<AtlasMetadata> m_atlases;
-    
+
     // Configuration
     glm::ivec2 m_tileSize = {64, 64};
     glm::ivec2 m_atlasSize = {512, 256};
     std::set<std::string> m_allowedLicenses = {"CC0", "CC-BY", "MIT"};
-    
+
     // Internal methods
     bool isValidImageFile(const fs::path& path) const;
     std::string extractLicenseFromFile(const fs::path& path) const;
-    void applyVariantEffects(const TileAsset& base, const TileVariant& variant, 
+    void applyVariantEffects(const TileAsset& base, const TileVariant& variant,
                            const fs::path& outputPath);
-    bool packAtlas(const std::string& category, const std::vector<TileAsset>& tiles);
+    void appendVariants(const TileAsset& asset, int variantCount, std::mt19937& gen);
+    bool packAtlas(const std::string& atlasName, const std::vector<TileAsset>& tiles);
     void writeAtlasJson(const AtlasMetadata& atlas, const fs::path& outDir);
 };
+
+} // namespace MagiTech

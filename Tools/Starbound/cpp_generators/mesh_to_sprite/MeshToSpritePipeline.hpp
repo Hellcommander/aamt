@@ -5,16 +5,14 @@
 #include <unordered_map>
 #include <string>
 #include <functional>
+#include <atomic>
+#include <cstdint>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <chrono>
 
-// Graphics API headers (simplified for cross-platform)
-#ifdef _WIN32
-#include <d3d11.h>
-#elif defined(__linux__) || defined(__APPLE__)
-#include <GL/gl.h>
-#endif
+// Rendering is done by the built-in software rasterizer (no GPU API headers needed);
+// the OpenGL / DirectX11 / Vulkan backend choices map onto it.
 
 namespace MagiTech {
 namespace Animation {
@@ -260,15 +258,23 @@ private:
     };
 
     struct RenderContext {
-        void* device;
-        void* context;
-        void* framebuffer;
-        void* color_texture;
-        void* depth_texture;
-        void* render_target_view;
-        void* depth_stencil_view;
-        uint32_t viewport_width;
-        uint32_t viewport_height;
+        void* device = nullptr;              // GPU handles (unused by the software rasterizer)
+        void* context = nullptr;
+        void* framebuffer = nullptr;
+        void* color_texture = nullptr;
+        void* depth_texture = nullptr;
+        void* render_target_view = nullptr;
+        void* depth_stencil_view = nullptr;
+        uint32_t viewport_width = 0;
+        uint32_t viewport_height = 0;
+        std::vector<uint8_t> color_buffer;   // RGBA8, top-left origin
+        std::vector<float> depth_buffer;     // NDC depth, smaller is closer
+    };
+
+    struct TextureData {
+        int width = 0;
+        int height = 0;
+        std::vector<uint8_t> pixels;         // RGBA8
     };
 
     // Core state
@@ -282,6 +288,12 @@ private:
     std::unordered_map<std::string, AnimationClip> animation_clips_;
     std::unordered_map<std::string, std::string> material_overrides_;
     std::vector<DirectionalCapture> directional_captures_;
+    std::unordered_map<std::string, TextureData> texture_cache_;   // material override textures
+    bool normal_mapping_enabled_ = false;
+    bool ambient_occlusion_enabled_ = false;
+    std::string custom_vertex_shader_;
+    std::string custom_fragment_shader_;
+    std::vector<std::pair<std::string, std::string>> post_process_effects_;
 
     // Camera and lighting state
     CameraConfig current_camera_;
@@ -305,9 +317,16 @@ private:
     bool load_mesh_gltf(const std::string& filename);
 
     // Animation loading
-    bool load_animation_bvh(const std::string& filename);
-    bool load_animation_fbx(const std::string& filename);
-    bool load_animation_gltf(const std::string& filename);
+    bool load_animation_bvh(const std::string& filename, const std::string& animation_name);
+    bool load_animation_fbx(const std::string& filename, const std::string& animation_name);
+    bool load_animation_gltf(const std::string& filename, const std::string& animation_name);
+
+    // Software rasterizer helpers
+    const TextureData* get_material_texture(const std::string& material_name);
+    void apply_post_process();
+
+    // Capture `capture_config.animation_name`'s clip, writing outputs under `output_name`
+    bool capture_animation_as(const AnimationCapture& capture_config, const std::string& output_name);
 
     // Rendering pipeline
     void setup_render_target();
@@ -362,6 +381,14 @@ private:
 
 // Utility functions for common use cases
 namespace MeshToSpriteUtils {
+    using CameraConfig = MeshToSpritePipeline::CameraConfig;
+    using CameraType = MeshToSpritePipeline::CameraType;
+    using LightingConfig = MeshToSpritePipeline::LightingConfig;
+    using LightingMode = MeshToSpritePipeline::LightingMode;
+    using DirectionalCapture = MeshToSpritePipeline::DirectionalCapture;
+    using AnimationCapture = MeshToSpritePipeline::AnimationCapture;
+    using AnimationDefinition = MeshToSpritePipeline::AnimationDefinition;
+
     // Preset camera configurations
     CameraConfig CreateIsometricCamera(float distance = 5.0f);
     CameraConfig CreateTopDownCamera(float distance = 10.0f);

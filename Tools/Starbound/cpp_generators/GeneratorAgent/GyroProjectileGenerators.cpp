@@ -10,53 +10,68 @@
 #include "core/utils/TemplateEngine.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/transform.hpp>
+#include <map>
 #include <random>
+#include <type_traits>
 
 namespace MagiTech {
 namespace GyroProjectiles {
 
-#define LOG_GYRO_GEN(Action, Id) Log::info("GyroGen - {}: {}", #Action, Id)
+#define LOG_GYRO_GEN(Action, Id) Log::info("GyroProjectile", "GyroGen - {}: {}", #Action, Id)
+
+namespace {
+    // Field-wise hashing (raw struct bytes would include padding and heap pointers).
+    struct Hasher {
+        XXH64_state_t state;
+        Hasher() { XXH64_reset(&state, 0); }
+        template <typename T>
+        Hasher& pod(const T& v) {
+            static_assert(std::is_trivially_copyable_v<T>);
+            XXH64_update(&state, &v, sizeof(T));
+            return *this;
+        }
+        Hasher& str(const std::string& v) {
+            pod(static_cast<uint64_t>(v.size()));
+            XXH64_update(&state, v.data(), v.size());
+            return *this;
+        }
+        uint64_t digest() { return XXH64_digest(&state); }
+    };
+}
 
 // Hash function implementations
 uint64_t GyroParams::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(GyroParams) - sizeof(std::string));
-    XXH64_update(&s, id.c_str(), id.length());
-    return XXH64_digest(&s);
+    return Hasher().str(id).pod(shape).pod(radius).pod(thickness).pod(hollow).pod(dynamicTess).digest();
 }
 
-uint64_t FlightParams::hashKey() const { 
-    return XXH64(this, sizeof(FlightParams), 0); 
+uint64_t FlightParams::hashKey() const {
+    return Hasher().pod(initialSpeed).pod(spinRateRPM).pod(precessionRateDeg).pod(stabilityFactor)
+                   .pod(gravityEnabled).pod(gravityScale).digest();
 }
 
-uint64_t TrailParams::hashKey() const { 
-    return XXH64(this, sizeof(TrailParams), 0); 
+uint64_t TrailParams::hashKey() const {
+    return Hasher().pod(enableTrail).pod(type).pod(length).pod(width).pod(headColor).pod(tailColor)
+                   .pod(uvScrollSpeed).digest();
 }
 
 uint64_t VFXParams::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(VFXParams) - 2 * sizeof(std::string));
-    XXH64_update(&s, shaderTemplate.c_str(), shaderTemplate.length());
-    for (const auto& d : defines) { 
-        XXH64_update(&s, d.c_str(), d.length()); 
-    }
-    return XXH64_digest(&s);
+    Hasher h;
+    h.str(shaderTemplate).pod(static_cast<uint64_t>(defines.size()));
+    for (const auto& d : defines) h.str(d);
+    return h.pod(glowIntensity).pod(flickerSpeed).pod(flickerMode).digest();
 }
 
-uint64_t ParticleParams::hashKey() const { 
-    return XXH64(this, sizeof(ParticleParams), 0); 
+uint64_t ParticleParams::hashKey() const {
+    return Hasher().pod(enableParticles).pod(style).pod(count).pod(spawnRate).pod(lifeTime)
+                   .pod(velocityMin).pod(velocityMax).digest();
 }
 
 uint64_t AudioParams::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(AudioParams) - 2 * sizeof(std::string));
-    XXH64_update(&s, humFile.c_str(), humFile.length());
-    XXH64_update(&s, impactFile.c_str(), impactFile.length());
-    return XXH64_digest(&s);
+    return Hasher().pod(playOnLaunch).str(humFile).str(impactFile).pod(volume).pod(pitchVariance).digest();
 }
 
-uint64_t CollisionParams::hashKey() const { 
-    return XXH64(this, sizeof(CollisionParams), 0); 
+uint64_t CollisionParams::hashKey() const {
+    return Hasher().pod(enableCollider).pod(meshCollider).pod(radius).pod(triggerOnly).pod(enableCCD).digest();
 }
 
 // ============================================================================
@@ -82,17 +97,19 @@ namespace MeshGen {
                 }
                 break;
                 
-            case GyroShape::Ring:
+            case GyroShape::Ring: {
                 // Always hollow ring
                 auto ring = Primitives::createTorus(g.radius, g.thickness, 32, 8);
                 gyroMesh.append(ring);
                 break;
-                
-            case GyroShape::Spindle:
+            }
+
+            case GyroShape::Spindle: {
                 // Capsule shape for spindle
                 auto spindle = Primitives::createCapsule(g.radius, g.radius * 2.0f, 16);
                 gyroMesh.append(spindle);
                 break;
+            }
                 
             case GyroShape::CustomMesh:
                 // Load custom mesh from file

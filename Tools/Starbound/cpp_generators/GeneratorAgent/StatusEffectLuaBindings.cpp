@@ -1,23 +1,45 @@
 #include "StatusEffectLuaBindings.hpp"
 #include "StatusEffectFactory.hpp"
-#include "StatusEffectParams.hpp"
+#include "StatusEffectTypes.hpp" // ParamUtils (defined in StatusEffectParams.cpp)
 #include "core/Log.hpp"
 #include <vector>
 #include <memory>
+#include <mutex>
 
 namespace MagiTech {
 namespace StatusEffects {
 
-static std::unique_ptr<StatusEffectFactory> g_factory;
+// Factory used by the bindings (injectable via setFactory, created lazily otherwise).
+static std::shared_ptr<StatusEffectFactory> g_factory;
+static std::mutex g_factoryMutex;
 
-// Initialize the factory if not already done
-static StatusEffectFactory* getFactory() {
+// std::map members are exposed as plain Lua tables (copy in / copy out):
+// sol2's associative container usertype does not compile with this sol2
+// version (usertype_container.hpp next_associative calls iter::end()).
+template <typename T>
+static auto metadataProperty() {
+    return sol::property(
+        [](const T& p) { return sol::as_table(p.metadata); },
+        [](T& p, const sol::table& t) {
+            p.metadata.clear();
+            for (const auto& [k, v] : t) {
+                p.metadata[k.as<std::string>()] = v.as<std::string>();
+            }
+        });
+}
+void StatusEffectLuaBindings::setFactory(std::shared_ptr<StatusEffectFactory> factory) {
+    std::lock_guard<std::mutex> lock(g_factoryMutex);
+    g_factory = std::move(factory);
+}
+
+std::shared_ptr<StatusEffectFactory> StatusEffectLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(g_factoryMutex);
     if (!g_factory) {
-        g_factory = std::make_unique<StatusEffectFactory>();
+        g_factory = std::make_shared<StatusEffectFactory>();
         g_factory->initialize(1000, 4); // 1000 cache entries, 4 threads
         Log::info("StatusEffectFactory initialized");
     }
-    return g_factory.get();
+    return g_factory;
 }
 
 void StatusEffectLuaBindings::bind(sol::state& lua) {
@@ -65,7 +87,7 @@ void StatusEffectLuaBindings::bind(sol::state& lua) {
         "blurStrength", &StatusEffectParams::blurStrength,
         "description", &StatusEffectParams::description,
         "tags", &StatusEffectParams::tags,
-        "metadata", &StatusEffectParams::metadata,
+        "metadata", metadataProperty<StatusEffectParams>(),
         "enableCaching", &StatusEffectParams::enableCaching,
         "enableHotReload", &StatusEffectParams::enableHotReload,
         "enableParallelProcessing", &StatusEffectParams::enableParallelProcessing,
@@ -113,7 +135,7 @@ void StatusEffectLuaBindings::bind(sol::state& lua) {
         "uiName", &UIParams::uiName,
         "description", &UIParams::description,
         "tags", &UIParams::tags,
-        "metadata", &UIParams::metadata,
+        "metadata", metadataProperty<UIParams>(),
         // Add utility methods
         "validate", [](const UIParams& p) -> bool {
             return p.iconSize > 0 && p.iconSize <= 512;
@@ -150,27 +172,27 @@ void StatusEffectLuaBindings::bind(sol::state& lua) {
     lua.set_function("spawn_status_effect",
         [&](const StatusEffectParams& s, const UIParams& u) -> EffectBundle {
             try {
-                auto factory = getFactory();
+                auto factory = StatusEffectLuaBindings::factory();
                 
                 // Validate parameters
                 if (!s.validate()) {
-                    Log::error("Invalid status effect parameters for: {}", s.id);
+                    Log::error("StatusEffect", "Invalid status effect parameters for: {}", s.id);
                     return EffectBundle{}; // Return empty bundle
                 }
                 
                 if (!u.validate()) {
-                    Log::error("Invalid UI parameters for effect: {}", s.id);
+                    Log::error("StatusEffect", "Invalid UI parameters for effect: {}", s.id);
                     return EffectBundle{}; // Return empty bundle
                 }
                 
-                Log::info("Generating status effect: {}", s.id);
+                Log::info("StatusEffect", "Generating status effect: {}", s.id);
                 auto bundle = factory->generateSync(s, u);
                 
-                Log::info("Status effect generated successfully: {} ({} assets)", 
+                Log::info("StatusEffect", "Status effect generated successfully: {} ({} assets)", 
                          s.id, bundle.getAssetCount());
                 return bundle;
             } catch (const std::exception& e) {
-                Log::error("Error generating status effect {}: {}", s.id, e.what());
+                Log::error("StatusEffect", "Error generating status effect {}: {}", s.id, e.what());
                 return EffectBundle{}; // Return empty bundle on error
             }
         }
@@ -180,24 +202,24 @@ void StatusEffectLuaBindings::bind(sol::state& lua) {
     lua.set_function("spawn_status_effect_async",
         [&](const StatusEffectParams& s, const UIParams& u) -> bool {
             try {
-                auto factory = getFactory();
+                auto factory = StatusEffectLuaBindings::factory();
                 
                 if (!s.validate()) {
-                    Log::error("Invalid status effect parameters for: {}", s.id);
+                    Log::error("StatusEffect", "Invalid status effect parameters for: {}", s.id);
                     return false;
                 }
                 
                 if (!u.validate()) {
-                    Log::error("Invalid UI parameters for effect: {}", s.id);
+                    Log::error("StatusEffect", "Invalid UI parameters for effect: {}", s.id);
                     return false;
                 }
                 
                 auto fut = factory->generateAsync(s, u);
                 // Store future for later retrieval
-                Log::info("Queued async status effect generation: {}", s.id);
+                Log::info("StatusEffect", "Queued async status effect generation: {}", s.id);
                 return true;
             } catch (const std::exception& e) {
-                Log::error("Error queuing status effect {}: {}", s.id, e.what());
+                Log::error("StatusEffect", "Error queuing status effect {}: {}", s.id, e.what());
                 return false;
             }
         }
@@ -450,7 +472,7 @@ void StatusEffectLuaBindings::bind(sol::state& lua) {
     });
 
     // Parameter validation and utility functions
-    lua.set_function("validate_status_effect_params", [](const StatusEffectParams& p) -> sol::table {
+    lua.set_function("validate_status_effect_params", [&lua](const StatusEffectParams& p) -> sol::table {
         sol::table result = lua.create_table();
         
         bool isValid = true;
@@ -522,7 +544,7 @@ void StatusEffectLuaBindings::bind(sol::state& lua) {
         return result;
     });
 
-    lua.set_function("validate_ui_params", [](const UIParams& p) -> sol::table {
+    lua.set_function("validate_ui_params", [&lua](const UIParams& p) -> sol::table {
         sol::table result = lua.create_table();
         
         bool isValid = true;
@@ -603,14 +625,14 @@ void StatusEffectLuaBindings::bind(sol::state& lua) {
     lua.set_function("initialize_status_effect_factory", [](size_t cache_size, size_t num_threads) -> bool {
         try {
             if (!g_factory) {
-                g_factory = std::make_unique<StatusEffectFactory>();
+                g_factory = std::make_shared<StatusEffectFactory>();
             }
             g_factory->initialize(cache_size, num_threads);
-            Log::info("StatusEffectFactory initialized with cache_size={}, threads={}", 
+            Log::info("StatusEffect", "StatusEffectFactory initialized with cache_size={}, threads={}", 
                      cache_size, num_threads);
             return true;
         } catch (const std::exception& e) {
-            Log::error("Error initializing StatusEffectFactory: {}", e.what());
+            Log::error("StatusEffect", "Error initializing StatusEffectFactory: {}", e.what());
             return false;
         }
     });
@@ -623,7 +645,7 @@ void StatusEffectLuaBindings::bind(sol::state& lua) {
     });
 
     // Cache management
-    lua.set_function("get_status_effect_cache_stats", []() -> sol::table {
+    lua.set_function("get_status_effect_cache_stats", [&lua]() -> sol::table {
         sol::table stats = lua.create_table();
         if (g_factory) {
             stats["initialized"] = true;

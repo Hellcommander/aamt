@@ -11,8 +11,6 @@ secrets/
 *token*.env
 *key.txt
 **/sd key.txt
-HfTokenProfiles.local.ps1
-HfTokenProfiles.local.json
 *.local.ps1
 *.local.json
 **/hf-home/token

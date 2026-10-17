@@ -1,7 +1,6 @@
 #include "SegmentedWeaponLuaBindings.hpp"
 #include "SegmentedWeaponFactory.hpp"
 #include "SegmentedWeaponTypes.hpp"
-#include "SegmentedWeaponParams.hpp"
 #include "core/Log.hpp"
 #include <vector>
 #include <fstream>
@@ -11,6 +10,21 @@ namespace MagiTech {
 namespace SegmentedWeapons {
 
 static std::vector<std::pair<std::future<AssetBundle>, std::string>> pendingWeapons;
+
+// std::map members are exposed as plain Lua tables (copy in / copy out): sol2's
+// associative container usertype does not compile with the vendored sol2
+// (usertype_container.hpp next_associative calls iter::end()).
+template <typename T>
+static auto metadataProperty() {
+    return sol::property(
+        [](const T& p) { return sol::as_table(p.metadata); },
+        [](T& p, const sol::table& t) {
+            p.metadata.clear();
+            for (const auto& [k, v] : t) {
+                p.metadata[k.as<std::string>()] = v.as<std::string>();
+            }
+        });
+}
 
 void SegmentedWeaponLuaBindings::bind(sol::state& lua) {
     // Bind enums
@@ -116,7 +130,7 @@ void SegmentedWeaponLuaBindings::bindParameterStructs(sol::state& lua) {
         // Metadata
         "description", &SegmentedWeaponParams::description,
         "tags", &SegmentedWeaponParams::tags,
-        "metadata", &SegmentedWeaponParams::metadata,
+        "metadata", metadataProperty<SegmentedWeaponParams>(),
         
         // Performance settings
         "enableCaching", &SegmentedWeaponParams::enableCaching,
@@ -160,7 +174,7 @@ void SegmentedWeaponLuaBindings::bindParameterStructs(sol::state& lua) {
         "physicsName", &PhysicsParams::physicsName,
         "description", &PhysicsParams::description,
         "tags", &PhysicsParams::tags,
-        "metadata", &PhysicsParams::metadata,
+        "metadata", metadataProperty<PhysicsParams>(),
         
         // Methods
         "hashKey", &PhysicsParams::hashKey
@@ -179,7 +193,7 @@ void SegmentedWeaponLuaBindings::bindFactoryFunctions(sol::state& lua) {
     // Bind spawn functions
     lua.set_function("spawn_segmented_weapon",
         [&](const SegmentedWeaponParams& w, const PhysicsParams& p) {
-            Log::info("Lua request to spawn segmented weapon: {}", w.id);
+            Log::info("SegmentedWeapon", "Lua request to spawn segmented weapon: {}", w.id);
             auto bundle = g_weaponFactory.generateSync(w, p);
             return bundle;
         }
@@ -187,7 +201,7 @@ void SegmentedWeaponLuaBindings::bindFactoryFunctions(sol::state& lua) {
 
     lua.set_function("spawn_segmented_weapon_async",
         [&](const SegmentedWeaponParams& w, const PhysicsParams& p, sol::function cb) {
-            Log::info("Lua async request to spawn segmented weapon: {}", w.id);
+            Log::info("SegmentedWeapon", "Lua async request to spawn segmented weapon: {}", w.id);
             auto fut = g_weaponFactory.generateAsync(w, p);
             pendingWeapons.emplace_back(std::move(fut), w.id);
         }
@@ -207,7 +221,7 @@ void SegmentedWeaponLuaBindings::bindFactoryFunctions(sol::state& lua) {
                 
                 return results;
             } catch (const std::exception& e) {
-                Log::error("Error generating weapon batch: {}", e.what());
+                Log::error("SegmentedWeapon", "Error generating weapon batch: {}", e.what());
                 return std::vector<AssetBundle>{};
             }
         }
@@ -243,7 +257,7 @@ void SegmentedWeaponLuaBindings::bindUtilityFunctions(sol::state& lua) {
             }
             return false;
         } catch (const std::exception& e) {
-            Log::error("Error saving weapon params: {}", e.what());
+            Log::error("SegmentedWeapon", "Error saving weapon params: {}", e.what());
             return false;
         }
     });
@@ -261,7 +275,7 @@ void SegmentedWeaponLuaBindings::bindUtilityFunctions(sol::state& lua) {
             auto json = nlohmann::json::parse(buffer.str());
             return ParamUtils::fromJson(json);
         } catch (const std::exception& e) {
-            Log::error("Error loading weapon params: {}", e.what());
+            Log::error("SegmentedWeapon", "Error loading weapon params: {}", e.what());
             return SegmentedWeaponParams{};
         }
     });
@@ -276,7 +290,7 @@ void SegmentedWeaponLuaBindings::bindUtilityFunctions(sol::state& lua) {
             }
             return false;
         } catch (const std::exception& e) {
-            Log::error("Error saving physics params: {}", e.what());
+            Log::error("SegmentedWeapon", "Error saving physics params: {}", e.what());
             return false;
         }
     });
@@ -292,9 +306,9 @@ void SegmentedWeaponLuaBindings::bindUtilityFunctions(sol::state& lua) {
             buffer << file.rdbuf();
             
             auto json = nlohmann::json::parse(buffer.str());
-            return ParamUtils::fromJson(json);
+            return ParamUtils::physicsFromJson(json);
         } catch (const std::exception& e) {
-            Log::error("Error loading physics params: {}", e.what());
+            Log::error("SegmentedWeapon", "Error loading physics params: {}", e.what());
             return PhysicsParams{};
         }
     });

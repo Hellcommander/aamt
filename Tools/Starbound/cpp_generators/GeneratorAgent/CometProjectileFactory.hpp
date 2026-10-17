@@ -4,6 +4,7 @@
 #include <string>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "CometProjectileTypes.hpp"
 
 namespace MagiTech {
@@ -439,7 +440,7 @@ private:
     }
 
     ConcurrentLRUCache<uint64_t, CometAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
     mutable PerformanceMetrics m_performanceMetrics;
 };

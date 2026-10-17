@@ -1,10 +1,39 @@
 #include "GeometryAssetLuaBindings.hpp"
 #include "GeometryAssetFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <vector>
 
 namespace MagiTech {
 namespace Geometry {
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<GeometryAssetFactory>& factorySlot() {
+    static std::shared_ptr<GeometryAssetFactory> f;
+    return f;
+}
+} // namespace
+
+void GeometryAssetLuaBindings::setFactory(std::shared_ptr<GeometryAssetFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<GeometryAssetFactory> GeometryAssetLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<GeometryAssetFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 static std::vector<std::pair<std::future<GeometryBundle>, std::string>> pendingGeometry;
 
@@ -46,7 +75,7 @@ void GeometryAssetLuaBindings::bind(sol::state& lua) {
                 else if (type == GeometryType::Surface) requests.push_back(req.as<SurfaceParams>());
                 else if (type == GeometryType::Boolean) requests.push_back(req.as<BooleanParams>());
             }
-            auto factory = MainPlugin::instance().getGeometryAssetFactory();
+            auto factory = GeometryAssetLuaBindings::factory();
             pendingGeometry.emplace_back(factory->generateAsync(requests, lp), "GeometryAsset");
         }
     );

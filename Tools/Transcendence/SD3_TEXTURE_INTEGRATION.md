@@ -110,8 +110,8 @@ python space_whale_quality_asset_generator.py --use-sd3 --sd3-variations 5
 ## Requirements
 
 ### Stable Diffusion 3 Server
-- **Server**: `stable-diffusion-api-server` (OpenAI-compatible API)
-- **Default URL**: `http://localhost:1337`
+- **Server**: AAMT SD3.5 server (`Tools\Shared\sd35_server.py`, OpenAI-style API)
+- **Default URL**: `http://localhost:1338`
 - **Model**: SD3 Medium (recommended)
 - **Auto-start**: Script can auto-start server if `Start-StableDiffusionServer.ps1` exists
 

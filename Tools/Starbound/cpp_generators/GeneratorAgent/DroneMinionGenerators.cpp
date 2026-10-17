@@ -10,7 +10,7 @@
 namespace MagiTech {
 namespace DroneMinions {
 
-#define LOG_GEN(Asset, Id) Log::info("Building Drone Minion {}: {}", #Asset, Id)
+#define LOG_GEN(Asset, Id) Log::info("DroneMinion", "Building Drone Minion {}: {}", #Asset, Id)
 
 namespace MeshGen {
     MeshHandle buildDroneBody(const DroneMinionParams& p) {

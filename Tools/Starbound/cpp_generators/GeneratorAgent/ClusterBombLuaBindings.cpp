@@ -1,10 +1,39 @@
 #include "ClusterBombLuaBindings.hpp"
 #include "ClusterBombFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <vector>
 
 namespace MagiTech {
 namespace ClusterBombs {
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<ClusterBombFactory>& factorySlot() {
+    static std::shared_ptr<ClusterBombFactory> f;
+    return f;
+}
+} // namespace
+
+void ClusterBombLuaBindings::setFactory(std::shared_ptr<ClusterBombFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<ClusterBombFactory> ClusterBombLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<ClusterBombFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 static std::vector<std::pair<std::future<BombAssetBundle>, std::string>> pendingBombs;
 
@@ -42,14 +71,14 @@ void ClusterBombLuaBindings::bind(sol::state& lua) {
 
     lua.set_function("spawn_cluster_bomb",
         [&](const ClusterBombParams& p) {
-            auto factory = MainPlugin::instance().getClusterBombFactory();
+            auto factory = ClusterBombLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("spawn_cluster_bomb_async",
         [&](const ClusterBombParams& p) {
-            auto factory = MainPlugin::instance().getClusterBombFactory();
+            auto factory = ClusterBombLuaBindings::factory();
             pendingBombs.emplace_back(factory->generateAsync(p), p.id);
         }
     );

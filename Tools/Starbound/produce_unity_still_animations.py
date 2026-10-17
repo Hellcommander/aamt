@@ -18,6 +18,7 @@ import urllib.request
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import numpy as np
 from PIL import Image
 
 _TOOLS = Path(__file__).resolve().parent
@@ -34,7 +35,11 @@ NEGATIVE = (
 )
 LAUNCH_CMD = Path(r"E:\tools\sd3.5\sd3.5\_sd_detached_launch.cmd")
 START_SD_PS1 = Path(__file__).resolve().parent.parent / "Start-StableDiffusionServer.ps1"
-PYTHON_CUDA = Path(r"E:\tools\miniconda3\python.exe")
+# miniconda3 was removed; system Python 3.14 carries torch+cu126.
+PYTHON_CUDA = next(
+    (p for p in (Path(r"D:\Python\Python314\python.exe"), Path(r"E:\tools\miniconda3\python.exe")) if p.exists()),
+    Path(sys.executable),
+)
 SERVER_PY = Path(r"E:\tools\sd3.5\sd3.5\server.py")
 PROMPT_MAX_TOKENS = 240  # under SD_MAX_SEQ_LEN=256 when T5 is loaded
 
@@ -113,12 +118,19 @@ JOBS: List[Dict[str, str]] = [
         "theme": "flame lord grenade bomb",
         "look": "dark spherical bomb, green glowing seams, short nozzle, molten tech",
     },
-    {"id": "grenade_15", "batch": "grenade", "theme": "empty reagent vial", "look": "clear glass vial", "alias": "reagent_vial"},
-    {"id": "grenade_16", "batch": "grenade", "theme": "fire reagent vial", "look": "red-orange filled glass vial", "alias": "reagent_fireessence"},
-    {"id": "grenade_17", "batch": "grenade", "theme": "ice reagent vial", "look": "blue ice crystal vial", "alias": "reagent_icecrystal"},
-    {"id": "grenade_18", "batch": "grenade", "theme": "poison reagent vial", "look": "green poison vial", "alias": "reagent_poisoncloud"},
-    {"id": "grenade_19", "batch": "grenade", "theme": "oil reagent vial", "look": "dark oil powder vial", "alias": "reagent_oilpowder"},
-    {"id": "grenade_20", "batch": "grenade", "theme": "catalyst reagent vial", "look": "sparkling catalyst vial", "alias": "reagent_catalyst"},
+    # Packed grenade_15..23 stills are shifted against these ids; still= picks the matching picture.
+    {"id": "grenade_15", "batch": "grenade", "theme": "empty reagent vial", "look": "clear glass vial", "alias": "reagent_vial",
+     "still": "assets/magitech/unity_sheets/grenade/grenade_16.png"},
+    {"id": "grenade_16", "batch": "grenade", "theme": "fire reagent vial", "look": "red-orange filled glass vial", "alias": "reagent_fireessence",
+     "still": "assets/magitech/unity_sheets/grenade/grenade_17.png"},
+    {"id": "grenade_17", "batch": "grenade", "theme": "ice reagent vial", "look": "blue ice crystal vial", "alias": "reagent_icecrystal",
+     "still": "assets/magitech/unity_sheets/grenade/grenade_18.png"},
+    {"id": "grenade_18", "batch": "grenade", "theme": "poison reagent vial", "look": "green poison vial", "alias": "reagent_poisoncloud",
+     "still": "assets/magitech/unity_sheets/grenade/grenade_19.png"},
+    {"id": "grenade_19", "batch": "grenade", "theme": "oil reagent vial", "look": "dark oil powder vial", "alias": "reagent_oilpowder",
+     "still": "assets/magitech/unity_sheets/grenade/grenade_22.png"},
+    {"id": "grenade_20", "batch": "grenade", "theme": "catalyst reagent vial", "look": "sparkling catalyst vial", "alias": "reagent_catalyst",
+     "still": "assets/magitech/unity_sheets/grenade/grenade_23.png"},
     {
         "id": "magitechbasicwand",
         "batch": "weapon",
@@ -130,6 +142,8 @@ JOBS: List[Dict[str, str]] = [
         "batch": "weapon",
         "theme": "magitech staff",
         "look": "dark wooden staff, leather grip, blue crystal head, gold fittings",
+        # Packed magitechbasicstaff.png holds two staves side by side; tall_03 is the single staff.
+        "still": "assets/magitech/unity_sheets/weapon/weapon_tall_03.png",
     },
     {
         "id": "magitechbasicorb",
@@ -143,15 +157,20 @@ JOBS: List[Dict[str, str]] = [
         "theme": "magitech arcane device",
         "look": "handheld multi-pronged arcane device, warm metal, glowing core",
     },
-    {"id": "deviceworkbench", "batch": "station", "theme": "device workbench", "look": "magitech crafting workbench"},
+    {"id": "deviceworkbench", "batch": "station", "theme": "device workbench", "look": "magitech crafting workbench",
+     "still": "assets/magitech/unity_sheets/station/station_03.png"},
     {"id": "magitechspellcraftingstation", "batch": "station", "theme": "spell crafting station", "look": "crystal spell crafting station"},
     {"id": "spellstone_fire", "batch": "spellstone", "theme": "fire spellstone", "look": "fire crystal spellstone"},
     {"id": "spellstone_ice", "batch": "spellstone", "theme": "ice spellstone", "look": "ice crystal spellstone"},
     {"id": "spellstone_electric", "batch": "spellstone", "theme": "lightning spellstone", "look": "lightning crystal spellstone"},
     {"id": "spellstone_core_common", "batch": "spellstone", "theme": "common spellstone core", "look": "common arcane spellstone"},
-    {"id": "mana_crystal", "batch": "ingredient", "theme": "mana crystal", "look": "blue mana crystal"},
-    {"id": "fire_ruby", "batch": "ingredient", "theme": "fire ruby", "look": "red fire ruby gem", "alias": "fire_essence"},
-    {"id": "magitech_berserker_core", "batch": "minion", "theme": "berserker minion core", "look": "berserker core relic"},
+    # Packed ingredient/minion stills are mislabeled too (mana_crystal.png is ore, berserker is noise).
+    {"id": "mana_crystal", "batch": "ingredient", "theme": "mana crystal", "look": "blue mana crystal",
+     "still": "assets/magitech/unity_sheets/ingredient/focus_crystal.png"},
+    {"id": "fire_ruby", "batch": "ingredient", "theme": "fire ruby", "look": "red fire ruby gem", "alias": "fire_essence",
+     "still": "assets/magitech/unity_sheets/ingredient/ice_crystal.png"},
+    {"id": "magitech_berserker_core", "batch": "minion", "theme": "berserker minion core", "look": "berserker core relic",
+     "still": "assets/magitech/unity_sheets/minion/minion_10.png"},
 ]
 
 INSTALL_FOLDERS = {
@@ -207,11 +226,15 @@ def ensure_sd(wait_sec: int = 300) -> None:
     print("[..] SD down or idle-stopped — starting server (T5 + threaded ping)")
     os.environ["SD_IDLE_SHUTDOWN_SEC"] = "0"
     os.environ["SD_OFFLOAD"] = "gpu"
-    os.environ["SD_SKIP_T5"] = "0"
-    os.environ["SD_ALLOW_T5_RAM"] = "1"
+    # Caller may force CLIP-only (SD_SKIP_T5=1): T5 RAM offload crashed mid-batch on the 2080 Ti.
+    os.environ.setdefault("SD_SKIP_T5", "0")
+    os.environ.setdefault("SD_ALLOW_T5_RAM", "1")
     os.environ["SD_MAX_SEQ_LEN"] = "256"
     os.environ["SD_HEADROOM_GB"] = "0"
     if START_SD_PS1.is_file():
+        # Hidden console, not DETACHED_PROCESS: with no console at all the script's
+        # Write-Host / python child died silently and SD never came up.
+        log_dir = SERVER_PY.parent if SERVER_PY.parent.is_dir() else _TOOLS / "Logs"
         subprocess.Popen(
             [
                 "powershell.exe",
@@ -220,15 +243,15 @@ def ensure_sd(wait_sec: int = 300) -> None:
                 "Bypass",
                 "-File",
                 str(START_SD_PS1),
-                "-Force",
                 "-WaitSec",
                 "30",
                 "-NoStatusGui",
             ],
             creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-            | getattr(subprocess, "DETACHED_PROCESS", 0),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            | getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            stdin=subprocess.DEVNULL,
+            stdout=open(log_dir / "sd_server.out.log", "ab"),
+            stderr=open(log_dir / "sd_server.err.log", "ab"),
         )
     elif LAUNCH_CMD.exists():
         subprocess.Popen(
@@ -296,6 +319,43 @@ def resolve_still(mod: Path, job: Dict[str, str]) -> Optional[Path]:
         if p.is_file():
             return p
     return None
+
+
+def key_background(im: Image.Image, tol: float = 22.0, soft: float = 2.0) -> Image.Image:
+    """Clear the flat SD backdrop. SD returns opaque frames; Starbound needs alpha.
+
+    Flood-fills from the border through pixels near the median border colour, so
+    dark metal inside the silhouette survives a black backdrop. Alpha ramps from
+    tol to tol*soft for a soft edge.
+    """
+    rgba = np.asarray(im.convert("RGBA")).astype(np.float32)
+    rgb = rgba[..., :3]
+    bg = np.median(np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]]), axis=0)
+    dist = np.sqrt(((rgb - bg) ** 2).sum(-1))
+    cand = dist < tol * soft
+    region = np.zeros(cand.shape, bool)
+    region[[0, -1], :] = cand[[0, -1], :]
+    region[:, [0, -1]] |= cand[:, [0, -1]]
+    while True:
+        grown = region.copy()
+        grown[1:] |= region[:-1]
+        grown[:-1] |= region[1:]
+        grown[:, 1:] |= region[:, :-1]
+        grown[:, :-1] |= region[:, 1:]
+        grown &= cand
+        if np.array_equal(grown, region):
+            break
+        region = grown
+    ramp = np.clip((dist - tol) / (tol * (soft - 1)), 0.0, 1.0)
+    rgba[..., 3] *= np.where(region, ramp, 1.0)
+    return Image.fromarray(rgba.round().astype(np.uint8), "RGBA")
+
+
+def tile_frame(src: Path, tile: int) -> Path:
+    """Key the full-size SD frame and write its <name>_<tile>.png sprite."""
+    tile_path = src.with_name(f"{src.stem}_{tile}.png")
+    key_background(Image.open(src)).resize((tile, tile), Image.Resampling.LANCZOS).save(tile_path)
+    return tile_path
 
 
 def pack_strip(frames: List[Path], dest: Path, tile: int) -> None:
@@ -404,7 +464,8 @@ def install(mod: Path, asset_id: str, out: Path) -> None:
         f"{asset_id}_sheet.png",
         f"{asset_id}_sheet.frames",
         f"{asset_id}.animation",
-        f"{asset_id}.frames",
+        # {asset_id}.frames is not copied: the old 8-frame grids with list
+        # aliases broke 1-frame object/item sprites at load.
     ):
         src = out / name
         if src.exists():
@@ -457,7 +518,14 @@ def produce_one(mod: Path, job: Dict[str, str], tile: int, skip_existing: bool) 
         return True
     out.mkdir(parents=True, exist_ok=True)
     (out / "Source").mkdir(parents=True, exist_ok=True)
-    shutil.copy2(still, out / "Source" / "reference.png")
+    ref_img = Image.open(still).convert("RGBA")
+    side = max(ref_img.size)
+    if ref_img.width != ref_img.height:
+        # SD stretches to 512x512; a stretched 32x64 staff came back as two staves.
+        square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+        square.paste(ref_img, ((side - ref_img.width) // 2, (side - ref_img.height) // 2))
+        ref_img = square
+    ref_img.save(out / "Source" / "reference.png")
     try:
         ref_disp = still.relative_to(mod)
     except ValueError:
@@ -477,7 +545,7 @@ def produce_one(mod: Path, job: Dict[str, str], tile: int, skip_existing: bool) 
                     prompt_for(job["theme"], pose, job.get("look") or ""),
                     dest,
                     negative=NEGATIVE,
-                    reference=still,
+                    reference=out / "Source" / "reference.png",
                     strength=float(strength),
                     width=512,
                     height=512,
@@ -490,16 +558,30 @@ def produce_one(mod: Path, job: Dict[str, str], tile: int, skip_existing: bool) 
                     raise
                 print(f"    [warn] SD connection lost ({exc}); restarting server...")
                 ensure_sd(wait_sec=300)
-        tile_path = frame_dir / f"{name}_{tile}.png"
-        im = Image.open(dest).convert("RGBA").resize((tile, tile), Image.Resampling.LANCZOS)
-        im.save(tile_path)
-        paths.append(tile_path)
+        paths.append(tile_frame(dest, tile))
+    finish(mod, asset_id, out, paths, tile)
+    return True
+
+
+def finish(mod: Path, asset_id: str, out: Path, paths: List[Path], tile: int) -> None:
     # Inventory icon = idle keyframe (not a mislabeled Unity still).
     shutil.copy2(paths[0], out / f"{asset_id}.png")
-    pack_strip(paths, sheet, tile)
+    pack_strip(paths, out / f"{asset_id}_sheet.png", tile)
     write_animation(out / f"{asset_id}.animation", f"{asset_id}_sheet.png", ["weapon"])
     install(mod, asset_id, out)
     print(f"  [OK] {asset_id}")
+
+
+def rekey_one(mod: Path, job: Dict[str, str], tile: int) -> bool:
+    """Rebuild sheet + install from existing full-size frames (no SD)."""
+    asset_id = job.get("alias") or job["id"]
+    out = mod / GEN / asset_id
+    frames = [out / "Source" / "frames" / f"{name}.png" for name, _, _ in KEYFRAMES]
+    missing = [f.name for f in frames if not f.is_file()]
+    if missing:
+        print(f"  [SKIP] {asset_id} missing frames: {', '.join(missing)}")
+        return False
+    finish(mod, asset_id, out, [tile_frame(f, tile) for f in frames], tile)
     return True
 
 
@@ -511,6 +593,11 @@ def main() -> int:
     ap.add_argument("--ids", default="", help="Comma asset ids (alias or packed id)")
     ap.add_argument("--skip-existing", action="store_true")
     ap.add_argument("--no-start-sd", action="store_true")
+    ap.add_argument(
+        "--rekey-only",
+        action="store_true",
+        help="No SD: re-key backgrounds from existing Source/frames, repack, reinstall",
+    )
     ap.add_argument(
         "--backend",
         choices=("sd", "pixelorama"),
@@ -536,6 +623,10 @@ def main() -> int:
         jobs = [j for j in JOBS if j["id"] in want or j.get("alias") in want]
     if args.limit:
         jobs = jobs[: args.limit]
+    if args.rekey_only:
+        ok = sum(rekey_one(mod, job, args.tile) for job in jobs)
+        print(f"[DONE] rekeyed={ok}/{len(jobs)}")
+        return 0 if ok == len(jobs) else 1
     # Idle shutdown turns SD off on purpose — always restart unless explicitly disabled.
     if args.no_start_sd:
         if not ping(timeout=10.0):

@@ -1,4 +1,5 @@
 #include "IconAssetFactory.hpp"
+#include "GeneratorConcurrency.hpp"
 #include <stdexcept>
 
 namespace MagiTech {
@@ -8,7 +9,7 @@ void IconAssetFactory::initialize(size_t cache_size, size_t num_threads) {
     if (m_initialized) return;
     m_cache.set_capacity(cache_size);
     m_atlasCache.set_capacity(cache_size / 4); // Atlases are larger, so smaller cache
-    m_pool = std::make_unique<MultithreadBusPlugin>(num_threads);
+    m_pool = std::make_unique<GeneratorTaskPool>(num_threads);
     m_initialized = true;
 }
 

@@ -77,7 +77,7 @@ python Shared\sd_http_client.py --detect-only
 | Port | `1338` (`aamt-1338.2`) |
 | Generate | `POST /v1/images/generations` (alias `/generate`) |
 | Health | `GET /ping` → `{status, loaded, token_ok, img2img}` |
-| Token | `hf_token_switch` profile `"media"` → stored name `SD3.5 Token` |
+| Auth | the machine's existing `hf auth login` (`hf_token_switch.use_media_token()` only confirms it) |
 | Weights | `stabilityai/stable-diffusion-3.5-medium` (gated; local cache first) |
 | Default | `SD_SKIP_T5=1` (CLIP-only; **77 tokens**). Longer prompts: `SD_SKIP_T5=0` + `SD_ALLOW_T5_RAM=1` + `SD_MAX_SEQ_LEN=256` (T5 on CPU/RAM). |
 | Idle | `SD_IDLE_SHUTDOWN_SEC=180`. Batch jobs: `AAMT_SD_KEEP_SERVER=1` |

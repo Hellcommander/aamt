@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-Local Stable Diffusion backend for Elin assets (optional, with procedural fallback).
+Local Stable Diffusion backend for Elin assets.
 
-The Elin generators (generate_asset_image.py) render everything procedurally from
-Ollama-authored specs. That is reliable and offline, but the local SD3.5 server
-produces far richer icons/sprites/textures with no cloud cost and no censorship.
+The local SD3.5 server (:1338) is the source of Elin icons/sprites/textures. This
+module renders the asset from the spec, converts it to the shape Elin/Unity expects
+(RGBA cut-out sprites, RGB tileable textures), and returns it.
 
-This module bridges the two: when an SD server is reachable it renders the asset
-from the spec, converts it to the shape Elin/Unity expects (RGBA cut-out sprites,
-RGB tileable textures), and returns it. On ANY failure - server down, timeout,
-bad cut-out, failed QA - the caller transparently falls back to the existing
-procedural pipeline, so behaviour is never worse than before.
+Policy (see Shared/sd_policy.py): procedural placeholder art is NOT a silent
+fallback. The entry points return None ONLY when SD is explicitly switched off
+(ELIN_SD=off). On any other problem - server down, timeout, bad cut-out - they
+raise SdUnavailable; the caller (generate_asset_image.py) retries with a new seed
+and then decides via sd_policy.procedural_fallback().
 
 Enable/disable and tune entirely via env (so the PowerShell orchestrators need no
 changes):
-    ELIN_SD            auto|on|off   use SD if server up / require it / never (default auto)
+    ELIN_SD            auto|on|off   use SD / require it / explicit procedural (default auto)
     ELIN_SD_API_URL    explicit server URL (else auto-detect)
     ELIN_SD_QUALITY    draft|standard|high|ultra   sampling budget (default standard)
     ELIN_SD_STEPS      override sampling steps
@@ -53,6 +53,12 @@ except Exception:
     detect_server = None  # type: ignore
     generate_image = None  # type: ignore
 
+from sd_policy import SdUnavailable  # noqa: E402  (Shared dir is on sys.path above)
+
+
+class SdServerUnreachable(SdUnavailable):
+    """SD server / client could not be reached at all (retrying with a new seed is pointless)."""
+
 # Sampling budgets. Icons downscale from a larger render so even 32px sprites get
 # real detail; textures stay VRAM/time friendly by default.
 _QUALITY = {
@@ -72,6 +78,20 @@ _server_probed = False
 
 def _mode() -> str:
     return (os.environ.get("ELIN_SD", "auto") or "auto").strip().lower()
+
+
+def sd_mode_off() -> bool:
+    """True only when procedural art was explicitly requested (ELIN_SD=off / --sd off)."""
+    return _mode() == "off"
+
+
+def _require_sd() -> bool:
+    """False if SD is explicitly off; raises SdServerUnreachable if SD can't be used."""
+    if sd_mode_off():
+        return False
+    if not (_PIL_OK and _SD_OK and generate_image):
+        raise SdServerUnreachable("Shared sd_http_client or Pillow not importable")
+    return True
 
 
 def sd_enabled() -> bool:
@@ -230,13 +250,14 @@ def _coverage(rgba: "Image.Image") -> float:
 
 
 # ---------------------------------------------------------------------------
-# Public entry points (return None to signal "fall back to procedural").
+# Public entry points. None = SD explicitly off (ELIN_SD=off); any SD problem raises
+# SdUnavailable so the caller can retry / apply sd_policy (never a silent fallback).
 # ---------------------------------------------------------------------------
 
-def _render(prompt: str, negative: str, gen: int, seed: int) -> Optional["Image.Image"]:
+def _render(prompt: str, negative: str, gen: int, seed: int) -> "Image.Image":
     api = _resolve_server()
     if not api and _mode() != "on":
-        return None
+        raise SdServerUnreachable("SD server not reachable (expected aamt-1338 on :1338)")
     q = _quality()
     tmp = Path(tempfile.gettempdir()) / f"elin_sd_{abs(seed) % 10_000_000}_{gen}.png"
     try:
@@ -253,55 +274,57 @@ def _render(prompt: str, negative: str, gen: int, seed: int) -> Optional["Image.
                 seed=seed,
             )
         if not tmp.exists():
-            return None
+            raise SdUnavailable("SD returned no image file")
         img = Image.open(tmp).convert("RGB")
         try:
             tmp.unlink()
         except OSError:
             pass
         return img
+    except SdUnavailable:
+        raise
     except Exception as exc:
-        print(f"  [SD] render failed; using procedural: {exc}", file=sys.stderr)
-        return None
+        raise SdUnavailable(f"SD render failed: {exc}") from exc
 
 
 def generate_icon_sd(size: int, spec: Dict[str, Any], asset_type: str = "icon",
                      seed: int = 0) -> Optional["Image.Image"]:
-    """SD icon/sprite as an RGBA cut-out at `size`, or None to fall back."""
-    if not sd_enabled():
+    """SD icon/sprite as an RGBA cut-out at `size`.
+
+    Returns None only when SD is explicitly off; raises SdUnavailable otherwise.
+    """
+    if not _require_sd():
         return None
     gen = _gen_size(size)
     prompt, negative = build_prompt(asset_type, spec)
     rgb = _render(prompt, negative, gen, (abs(hash(prompt)) % 100000) + seed + 1)
-    if rgb is None:
-        return None
     try:
         rgba = _cutout_alpha(rgb)
         cov = _coverage(rgba)
-        # Implausible cut-out (empty or full frame) -> let procedural handle it.
+        # Implausible cut-out (empty or full frame) -> caller retries with a new seed.
         if cov < 0.06 or cov > 0.97:
-            print(f"  [SD] icon cut-out coverage {cov:.0%} implausible; procedural fallback",
-                  file=sys.stderr)
-            return None
+            raise SdUnavailable(f"SD icon cut-out coverage {cov:.0%} implausible")
         if rgba.size != (size, size):
             rgba = rgba.resize((size, size), Image.Resampling.LANCZOS)
         rgba = ImageEnhance.Sharpness(rgba).enhance(1.1)
         rgba = ImageEnhance.Contrast(rgba).enhance(1.05)
         return rgba
+    except SdUnavailable:
+        raise
     except Exception as exc:
-        print(f"  [SD] icon post-process failed; procedural fallback: {exc}", file=sys.stderr)
-        return None
+        raise SdUnavailable(f"SD icon post-process failed: {exc}") from exc
 
 
 def generate_texture_sd(size: int, spec: Dict[str, Any], seed: int = 0) -> Optional["Image.Image"]:
-    """SD tileable RGB texture at `size`, or None to fall back."""
-    if not sd_enabled():
+    """SD tileable RGB texture at `size`.
+
+    Returns None only when SD is explicitly off; raises SdUnavailable otherwise.
+    """
+    if not _require_sd():
         return None
     gen = _gen_size(size)
     prompt, negative = build_prompt("texture", spec)
     rgb = _render(prompt, negative, gen, (abs(hash(prompt)) % 100000) + seed + 7)
-    if rgb is None:
-        return None
     try:
         if rgb.size != (size, size):
             rgb = rgb.resize((size, size), Image.Resampling.LANCZOS)
@@ -309,5 +332,4 @@ def generate_texture_sd(size: int, spec: Dict[str, Any], seed: int = 0) -> Optio
         rgb = ImageEnhance.Contrast(rgb).enhance(1.04)
         return rgb
     except Exception as exc:
-        print(f"  [SD] texture post-process failed; procedural fallback: {exc}", file=sys.stderr)
-        return None
+        raise SdUnavailable(f"SD texture post-process failed: {exc}") from exc

@@ -6,33 +6,33 @@ namespace VortexSpells {
 
 namespace MeshGen {
     MeshHandle buildVortexMesh(const VortexSpellParams& p) {
-        Log::info("Building vortex mesh for: {}", p.id);
+        Log::info("VortexSpell", "Building vortex mesh for: {}", p.id);
         return 1;
     }
     MeshHandle buildWindRibbons(const VortexSpellParams& p) {
-        Log::info("Building wind ribbons for: {}", p.id);
+        Log::info("VortexSpell", "Building wind ribbons for: {}", p.id);
         return 2;
     }
 }
 namespace ParticleGen {
     ParticleHandle buildDustCloud(const VortexSpellParams& p) {
-        Log::info("Building dust cloud particles for: {}", p.id);
+        Log::info("VortexSpell", "Building dust cloud particles for: {}", p.id);
         return 1;
     }
     ParticleHandle buildDebris(const VortexSpellParams& p) {
-        Log::info("Building debris particles for: {}", p.id);
+        Log::info("VortexSpell", "Building debris particles for: {}", p.id);
         return 2;
     }
 }
 namespace ShaderGen {
     ShaderHandle buildVortexShader(const VortexSpellParams& p) {
-        Log::info("Building vortex shader for: {}", p.id);
+        Log::info("VortexSpell", "Building vortex shader for: {}", p.id);
         return 1;
     }
 }
 namespace DecalGen {
     DecalHandle buildGroundCracks(const VortexSpellParams& p) {
-        Log::info("Building ground crack decals for: {}", p.id);
+        Log::info("VortexSpell", "Building ground crack decals for: {}", p.id);
         return 1;
     }
 }

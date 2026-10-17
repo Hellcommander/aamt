@@ -1,4 +1,5 @@
 #include "AIArtGenerator.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "CrossbowAssetGenerator.hpp"
 #include "core/Log.hpp"
 #include <filesystem>
@@ -14,7 +15,7 @@ namespace AIArt {
 std::unique_ptr<AIArtGenerator> g_aiArtGenerator;
 
 AIArtGenerator::AIArtGenerator() : isInitialized(false) {
-    pool = std::make_unique<ThreadPool>(4);
+    pool = std::make_unique<GeneratorTaskPool>(4);
 }
 
 AIArtGenerator::~AIArtGenerator() = default;
@@ -25,7 +26,7 @@ bool AIArtGenerator::initialize(const ModelConfig& config) {
         
         // Initialize AI model (placeholder - would integrate with actual AI backend)
         if (!loadModel(config)) {
-            Log::error("Failed to load AI model: {}", config.modelPath);
+            Log::error("AIArt", "Failed to load AI model: {}", config.modelPath);
             return false;
         }
         
@@ -33,7 +34,7 @@ bool AIArtGenerator::initialize(const ModelConfig& config) {
         Log::info("AI Art Generator initialized successfully");
         return true;
     } catch (const std::exception& e) {
-        Log::error("Failed to initialize AI Art Generator: {}", e.what());
+        Log::error("AIArt", "Failed to initialize AI Art Generator: {}", e.what());
         return false;
     }
 }
@@ -85,7 +86,7 @@ AIArtGenerator::ArtOutput AIArtGenerator::generateSprite(const ArtPrompt& prompt
         // Check cache first
         if (isCached(promptHash)) {
             output = artCache[promptHash];
-            Log::info("Retrieved cached art for prompt: {}", prompt.description);
+            Log::info("AIArt", "Retrieved cached art for prompt: {}", prompt.description);
             return output;
         }
         
@@ -156,12 +157,12 @@ AIArtGenerator::ArtOutput AIArtGenerator::generateSprite(const ArtPrompt& prompt
         // Cache the result
         artCache[promptHash] = output;
         
-        Log::info("Generated AI art: {}", prompt.description);
+        Log::info("AIArt", "Generated AI art: {}", prompt.description);
         return output;
         
     } catch (const std::exception& e) {
         output.errorMessage = e.what();
-        Log::error("Failed to generate sprite: {}", e.what());
+        Log::error("AIArt", "Failed to generate sprite: {}", e.what());
         return output;
     }
 }
@@ -325,7 +326,7 @@ bool AIArtGenerator::postProcessSprite(const std::string& inputPath, const std::
         std::filesystem::copy_file(inputPath, outputPath, std::filesystem::copy_options::overwrite_existing);
         return true;
     } catch (const std::exception& e) {
-        Log::error("Failed to post-process sprite: {}", e.what());
+        Log::error("AIArt", "Failed to post-process sprite: {}", e.what());
         return false;
     }
 }
@@ -359,7 +360,7 @@ bool AIArtGenerator::createIcon(const std::string& spritePath, const std::string
         std::filesystem::copy_file(spritePath, iconPath, std::filesystem::copy_options::overwrite_existing);
         return true;
     } catch (const std::exception& e) {
-        Log::error("Failed to create icon: {}", e.what());
+        Log::error("AIArt", "Failed to create icon: {}", e.what());
         return false;
     }
 }
@@ -380,17 +381,17 @@ bool AIArtGenerator::isCached(const std::string& promptHash) const {
 bool AIArtGenerator::loadModel(const ModelConfig& config) {
     // This would load the actual AI model
     // For now, just log the attempt
-    Log::info("Loading AI model: {}", config.modelPath);
-    Log::info("Using LoRA: {}", config.loraPath);
-    Log::info("Style tokens: {}", config.styleTokens);
+    Log::info("AIArt", "Loading AI model: {}", config.modelPath);
+    Log::info("AIArt", "Using LoRA: {}", config.loraPath);
+    Log::info("AIArt", "Style tokens: {}", config.styleTokens);
     return true;
 }
 
 bool AIArtGenerator::generateImage(const ArtPrompt& prompt, const std::string& outputPath) {
     // This would call the actual AI model
     // For now, create a placeholder image
-    Log::info("Generating image for prompt: {}", prompt.description);
-    Log::info("Output path: {}", outputPath);
+    Log::info("AIArt", "Generating image for prompt: {}", prompt.description);
+    Log::info("AIArt", "Output path: {}", outputPath);
     
     // Create a simple placeholder file
     std::ofstream file(outputPath, std::ios::binary);
@@ -469,7 +470,7 @@ bool AIArtGenerator::createDirectory(const std::string& path) {
         std::filesystem::create_directories(path);
         return true;
     } catch (const std::exception& e) {
-        Log::error("Failed to create directory {}: {}", path, e.what());
+        Log::error("AIArt", "Failed to create directory {}: {}", path, e.what());
         return false;
     }
 }

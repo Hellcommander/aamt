@@ -1,13 +1,42 @@
 #include "SpellstoneLuaBindings.hpp"
 #include "SpellstoneFactory.hpp"
 #include "SpellstoneTypes.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <map>
 #include <future>
 #include <vector>
 
 namespace MagiTech {
 namespace Spellstones {
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<SpellstoneFactory>& factorySlot() {
+    static std::shared_ptr<SpellstoneFactory> f;
+    return f;
+}
+} // namespace
+
+void SpellstoneLuaBindings::setFactory(std::shared_ptr<SpellstoneFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<SpellstoneFactory> SpellstoneLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<SpellstoneFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 static std::vector<std::pair<std::future<SpellstoneBundle>, std::string>> pendingSpellstones;
 
@@ -31,7 +60,7 @@ void SpellstoneLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_spellstone", [&](SpellstoneParams p) {
-        auto factory = MainPlugin::instance().getSpellstoneFactory();
+        auto factory = SpellstoneLuaBindings::factory();
         auto fut = factory->generateAsync(p);
         pendingSpellstones.emplace_back(std::move(fut), p.id);
     });

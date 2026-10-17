@@ -3,7 +3,8 @@
     Local-AI (SD) + procedural image render helper for Elin generators.
 
 .DESCRIPTION
-    Calls generate_asset_image.py (elin_sd auto/fallback) and writes Unity .meta
+    Calls generate_asset_image.py (SD required; procedural only via -Sd off or
+    -AllowProcedural / AAMT_SD_STRICT=0) and writes Unity .meta
     via Shared/UnityAssetExport.psm1. Also wraps Shared/pbr_skin_generator.py.
 #>
 
@@ -65,7 +66,10 @@ function Invoke-ElinAssetImage {
         [ValidateSet("auto", "on", "off")]
         [string]$Sd = "auto",
         [ValidateSet("", "default", "sprite", "gui", "normal")]
-        [string]$MetaKind = "sprite"
+        [string]$MetaKind = "sprite",
+        # Accept a procedural placeholder if SD is down / fails QA (default: abort -> $false).
+        # AAMT_SD_STRICT=0 in the environment has the same effect.
+        [switch]$AllowProcedural
     )
 
     $pyScript = Join-Path $script:ElinDir "generate_asset_image.py"
@@ -96,10 +100,12 @@ function Invoke-ElinAssetImage {
             Write-ElinTempJson -Object $obj -Path $tempSpec
         }
 
-        $run = Invoke-ElinPython -PythonExe $pythonCmd.Source -Args @(
+        $pyArgs = @(
             $pyScript, "--spec", $tempSpec, "--output", $OutputPath,
             "--type", $AssetType, "--size", "$Size", "--sd", $Sd
         )
+        if ($AllowProcedural) { $pyArgs += "--allow-procedural" }
+        $run = Invoke-ElinPython -PythonExe $pythonCmd.Source -Args $pyArgs
         if ($run.Output) { $run.Output | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray } }
         if ($run.Code -ne 0 -or -not (Test-Path $OutputPath)) { return $false }
 

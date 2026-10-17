@@ -33,6 +33,11 @@ if (Get-Command Initialize-ToolsetTools -ErrorAction SilentlyContinue) {
 }
 
 # Stable Diffusion integration
+# Strict SD mode (default ON; set AAMT_SD_STRICT=0 to allow procedural placeholders).
+# In strict mode any SD problem aborts the run instead of falling through to the
+# procedural generator, which draws concentric-circle placeholder tiles.
+$sdStrict = ($env:AAMT_SD_STRICT -ne '0')
+
 $sdModule = Join-Path $sharedPath "StableDiffusionIntegration.psm1"
 $script:SDAvailable  = $false
 $script:SDImportError = $null
@@ -88,6 +93,7 @@ if ($shouldGenerateDraft -and $script:SDAvailable) {
         $sdConnected = Test-StableDiffusionConnection -Verbose
         if (-not $sdConnected) {
             Write-Host "  [ERROR] SD server not reachable; start manually if needed" -ForegroundColor Red
+            if ($sdStrict) { throw "SD3.5 server not reachable (strict mode): aborting before the procedural fallback." }
         }
 
         if ($sdConnected) {
@@ -130,16 +136,18 @@ if ($shouldGenerateDraft -and $script:SDAvailable) {
                             -Steps 28 `
                             -GuidanceScale 7.0 `
                             -EnhanceWithOllama:$true `
-                            -AutoStartServer:$false | Out-Null
+                            -AutoStartServer:$true | Out-Null
 
                         if (Test-Path $draftPath) {
                             Write-Host "    [OK] $($asset.File)" -ForegroundColor Green
                         } else {
                             Write-Host "    [WARN] Draft not created: $($asset.File)" -ForegroundColor Yellow
+                            if ($sdStrict) { throw "SD draft not created: $($asset.File)" }
                         }
                     }
                 } catch {
                     Write-Host "    [WARN] SD draft failed: $_" -ForegroundColor Yellow
+                    if ($sdStrict) { throw }
                 }
             }
 
@@ -149,6 +157,7 @@ if ($shouldGenerateDraft -and $script:SDAvailable) {
             if (Test-Path $thumbDraftPath) { $sdDraftThumb = $thumbDraftPath }
         } else {
             Write-Host "  [WARN] SD server not available (Python will use procedural fallback)" -ForegroundColor Yellow
+            if ($sdStrict) { throw "SD3.5 server not available (strict mode)." }
         }
     }
     Write-Host ""
@@ -159,6 +168,7 @@ if ($shouldGenerateDraft -and $script:SDAvailable) {
     }
     Write-Host "       Python will use procedural fallback." -ForegroundColor Gray
     Write-Host ""
+    if ($sdStrict) { throw "StableDiffusionIntegration.psm1 not loaded (strict mode): $($script:SDImportError)" }
 }
 
 # Build Python args

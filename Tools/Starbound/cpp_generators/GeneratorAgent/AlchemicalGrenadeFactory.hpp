@@ -4,6 +4,7 @@
 #include <string>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "AlchemicalGrenadeTypes.hpp"
 
 namespace MagiTech {
@@ -459,7 +460,7 @@ public:
     }
 
     double getCacheHitRate() const {
-        return m_cache.hit_rate();
+        return m_cache.getHitRate();
     }
 
     void setCacheCapacity(size_t capacity) {
@@ -634,7 +635,7 @@ private:
     }
 
     ConcurrentLRUCache<uint64_t, GrenadeAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
     mutable PerformanceMetrics m_performanceMetrics;
 };

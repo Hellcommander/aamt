@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Generate Starbound assets using Ollama AI for creative descriptions and parameters.
@@ -41,7 +41,12 @@
     
 .PARAMETER GenerateMultiple
     Generate multiple variations
-    
+
+.PARAMETER AllowProcedural
+    Final art is Stable Diffusion art (StarboundAssetGenerator.ps1 -> StarboundSdArt.psm1) and the
+    run fails when SD cannot deliver. With -AllowProcedural (or AAMT_SD_STRICT=0) the downstream
+    generators may fall back to their old procedural drawing after an SD failure.
+
 .EXAMPLE
     .\StarboundOllamaAssetGenerator.ps1 -AssetType Particle -AssetName "magicportal" -Prompt "purple swirling magical energy"
     
@@ -107,10 +112,17 @@ param(
     [switch]$GenerateDesignDraft,  # Generate design draft/concept art first (improves final asset quality) - enabled by default
     
     [Parameter(Mandatory=$false)]
-    [double]$DesignDraftImageStrength = 0.0  # Image strength for design draft (0.0 = text-to-image, higher = use reference)
+    [double]$DesignDraftImageStrength = 0.0,  # Image strength for design draft (0.0 = text-to-image, higher = use reference)
+
+    [Parameter(Mandatory=$false)]
+    [switch]$AllowProcedural  # Permit the downstream generators' procedural drawing as a fallback after an SD failure
 )
 
 $ErrorActionPreference = "Stop"
+
+# Art policy: the final pixels come from Stable Diffusion (via StarboundAssetGenerator.ps1 ->
+# StarboundSdArt.psm1). Procedural drawing is only permitted when explicitly requested.
+$script:ProceduralAllowed = $AllowProcedural.IsPresent -or ($env:AAMT_SD_STRICT -eq '0')
 
 # Validate MyInvocation.MyCommand.Path is not null before using it
 $scriptPath = $MyInvocation.MyCommand.Path
@@ -1132,6 +1144,7 @@ CRITICAL: Each form must look like the SAME mech that has physically transformed
                 Prompt = "$cohesionPrompt`n`nMECHFORM: $($form.displayName) - $($form.description). This is a MECHFORM (actual form used in mechset, not a reference form). Players build mechsets, which contain mechforms. This mechform is based on reference form ${form.id}Form.json (template/inspiration) but ALTERED to match this mechset's structural consistency. The icon must show the same structural elements (armor plates, joints, core components) as other mechforms in this mechset, reconfigured for this form's role. It should be immediately recognizable as the same mech, just transformed."
                 OutputDir = $variantIconDir
             }
+            if ($AllowProcedural) { $iconParams['AllowProcedural'] = $true }
             & "$PSScriptRoot\StarboundOllamaAssetGenerator.ps1" @iconParams | Out-Null
         }
         
@@ -1184,6 +1197,7 @@ CRITICAL: Each form must look like the SAME mech that has physically transformed
                     GPUTarget = "high-end"
                 }
             }
+            if ($AllowProcedural) { $animParams['AllowProcedural'] = $true }
             & "$PSScriptRoot\StarboundOllamaAssetGenerator.ps1" @animParams | Out-Null
         }
         
@@ -1242,6 +1256,7 @@ CRITICAL: Each form must look like the SAME mech that has physically transformed
                 Prompt = "$cohesionPrompt`n`nMECHFORM: $($form.displayName). This is a MECHFORM (actual form used in mechset, not a reference form). Players build mechsets, which contain mechforms. Generate transformation enter particle effect showing the mech's structural components (armor plates, joints, core) physically reconfiguring into this MECHFORM. This mechform is based on reference form ${form.id}Form.json (template/inspiration) but altered for mechset consistency. The particles should show the same chassis elements moving and repositioning, not just color effects. Match the variant's color scheme and aesthetic."
                 OutputDir = $variantParticleDir
             }
+            if ($AllowProcedural) { $vfxParams['AllowProcedural'] = $true }
             & "$PSScriptRoot\StarboundOllamaAssetGenerator.ps1" @vfxParams | Out-Null
         }
         
@@ -1255,6 +1270,7 @@ CRITICAL: Each form must look like the SAME mech that has physically transformed
                 Prompt = "$cohesionPrompt`n`nMECHFORM: $($form.displayName). This is a MECHFORM (actual form used in mechset, not a reference form). Players build mechsets, which contain mechforms. Generate transformation exit particle effect showing the mech's structural components (armor plates, joints, core) physically reconfiguring away from this MECHFORM. This mechform is based on reference form ${form.id}Form.json (template/inspiration) but altered for mechset consistency. The particles should show the same chassis elements moving and repositioning, not just color effects. Match the variant's color scheme and aesthetic."
                 OutputDir = $variantParticleDir
             }
+            if ($AllowProcedural) { $vfxParams['AllowProcedural'] = $true }
             & "$PSScriptRoot\StarboundOllamaAssetGenerator.ps1" @vfxParams | Out-Null
         }
     }
@@ -1628,7 +1644,21 @@ Style: Starbound pixel art aesthetic, game-ready concept art, high detail, clear
     # Warn if C++ backend was requested but we're using description-based generation instead
     if ($UseCppBackend) {
         Write-Host "Note: Ollama description provided - using description-based generation for high-quality assets" -ForegroundColor Yellow
-        Write-Host "      This ensures the Ollama-generated description is used instead of simple procedural shapes" -ForegroundColor Yellow
+        Write-Host "      This ensures the Ollama-generated description drives Stable Diffusion art instead of simple procedural shapes" -ForegroundColor Yellow
+    }
+
+    # Art policy hand-off: StarboundAssetGenerator.ps1 makes the pixels with Stable Diffusion and
+    # throws when SD fails. Forward -AllowProcedural only when the caller asked for it. If the
+    # downstream generator has no such switch it is not SD-converted: refuse to run it for
+    # image-bearing asset types unless procedural art was explicitly allowed.
+    $downstreamParams = (Get-Command $assetGenerator -ErrorAction Stop).Parameters
+    if ($AllowProcedural.IsPresent) {
+        if ($downstreamParams.ContainsKey("AllowProcedural")) {
+            $generatorParams["AllowProcedural"] = $true
+        }
+    } elseif (-not $downstreamParams.ContainsKey("AllowProcedural") -and -not $script:ProceduralAllowed -and
+              $AssetType -notin @("Sound", "Behavior")) {
+        throw "StarboundAssetGenerator.ps1 has no -AllowProcedural switch (it is not Stable Diffusion based). Refusing to produce procedural placeholder art for '$currentAssetName'. Pass -AllowProcedural or set AAMT_SD_STRICT=0 to permit it."
     }
     
     # Validate generatorParams.OutputDir before calling asset generator

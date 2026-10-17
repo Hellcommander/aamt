@@ -6,7 +6,6 @@
 #include <chrono>
 #include <thread>
 #include <filesystem>
-#include "vendor/yaml-cpp/yaml.h"
 #include "vendor/xxhash/xxhash.h"
 
 namespace MagiTech {
@@ -588,8 +587,9 @@ uint64_t MechAssetFactory::computeFileHash(const std::filesystem::path& path) co
         XXH64_reset(&hash_state, 0);
         
         char buffer[4096];
-        while (file.read(buffer, sizeof(buffer))) {
-            XXH64_update(&hash_state, buffer, file.gcount());
+        // read() fails on the final partial chunk, so hash whatever gcount() reports each pass.
+        while (file.read(buffer, sizeof(buffer)) || file.gcount() > 0) {
+            XXH64_update(&hash_state, buffer, static_cast<size_t>(file.gcount()));
         }
         
         return XXH64_digest(&hash_state);

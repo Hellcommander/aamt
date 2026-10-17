@@ -3,6 +3,7 @@
 #include <vector>
 #include <optional>
 #include <glm/glm.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include "vendor/xxhash/xxhash.h"
 
 namespace MagiTech {

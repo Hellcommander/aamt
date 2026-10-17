@@ -2,57 +2,68 @@
 #include "QuadMechFactory.hpp"
 #include "core/Log.hpp"
 #include <memory>
+#include <mutex>
 #include <chrono>
 
 namespace MagiTech {
 namespace QuadMech {
 
-static std::unique_ptr<QuadMechFactory> g_quadMechFactory;
 static std::unique_ptr<QuadMechLoader> g_quadMechLoader;
 static std::unique_ptr<QuadMechEditor> g_quadMechEditor;
 
-// Validation functions
+namespace {
+
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+
+std::shared_ptr<QuadMechFactory>& factorySlot() {
+    static std::shared_ptr<QuadMechFactory> f;
+    return f;
+}
+
+// Standard quadruped mounting points (ids match ModuleType names and the
+// bone names used by example_phoenix_quad.quadmechdef).
+struct ModuleSlot {
+    const char* id;
+    ModuleType type;
+    const char* bone;
+};
+
+constexpr ModuleSlot kLegSlots[] = {
+    {"leg_front_left", ModuleType::LEG_FRONT_LEFT, "hip_FL"},
+    {"leg_front_right", ModuleType::LEG_FRONT_RIGHT, "hip_FR"},
+    {"leg_back_left", ModuleType::LEG_BACK_LEFT, "hip_BL"},
+    {"leg_back_right", ModuleType::LEG_BACK_RIGHT, "hip_BR"},
+};
+
+constexpr ModuleSlot kWeaponSlots[] = {
+    {"weapon_left", ModuleType::WEAPON_LEFT, "shoulder_L"},
+    {"weapon_right", ModuleType::WEAPON_RIGHT, "shoulder_R"},
+};
+
+// Same rules as the package pipeline (chassis + legs, mesh paths, bones, mass, animation paths).
 bool validateQuadMechDefinition(const QuadMechDefinition& def) {
-    if (def.name.empty()) {
-        Log::error("QuadMech definition must have a name");
-        return false;
+    return QuadMechGen::DefinitionParser::validateDefinition(def);
+}
+
+} // namespace
+
+void QuadMechLuaBindings::setFactory(std::shared_ptr<QuadMechFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<QuadMechFactory> QuadMechLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<QuadMechFactory>();
+        slot->initialize(100, 4);
     }
-    
-    if (def.modules.empty()) {
-        Log::error("QuadMech definition must have at least one module");
-        return false;
-    }
-    
-    // Check for required modules
-    bool hasChassis = false;
-    bool hasLegs = false;
-    
-    for (const auto& module : def.modules) {
-        if (module.id == "chassis") hasChassis = true;
-        if (module.id.find("leg") != std::string::npos) hasLegs = true;
-        
-        if (module.meshPath.empty()) {
-            Log::error("Module {} must have a mesh path", module.id);
-            return false;
-        }
-        
-        if (module.attachBone.empty()) {
-            Log::error("Module {} must have an attach bone", module.id);
-            return false;
-        }
-    }
-    
-    if (!hasChassis) {
-        Log::error("QuadMech must have a chassis module");
-        return false;
-    }
-    
-    if (!hasLegs) {
-        Log::error("QuadMech must have leg modules");
-        return false;
-    }
-    
-    return true;
+    return slot;
 }
 
 void QuadMechLuaBindings::bind(sol::state& lua) {
@@ -209,8 +220,30 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<PhysicsDefinition>("PhysicsDefinition",
         sol::constructors<PhysicsDefinition()>(),
         "totalMass", &PhysicsDefinition::totalMass,
-        "moduleMass", &PhysicsDefinition::moduleMass,
-        "jointLimits", &PhysicsDefinition::jointLimits,
+        // Maps are exposed as plain Lua tables (copied on get, replaced on set);
+        // this sol2 build cannot bind std::unordered_map members as containers.
+        "moduleMass", sol::property(
+            [](const PhysicsDefinition& p, sol::this_state ts) {
+                sol::state_view view(ts);
+                sol::table t = view.create_table();
+                for (const auto& [id, mass] : p.moduleMass) t[id] = mass;
+                return t;
+            },
+            [](PhysicsDefinition& p, sol::table t) {
+                p.moduleMass.clear();
+                for (const auto& [key, value] : t) p.moduleMass[key.as<std::string>()] = value.as<float>();
+            }),
+        "jointLimits", sol::property(
+            [](const PhysicsDefinition& p, sol::this_state ts) {
+                sol::state_view view(ts);
+                sol::table t = view.create_table();
+                for (const auto& [joint, limit] : p.jointLimits) t[joint] = limit;
+                return t;
+            },
+            [](PhysicsDefinition& p, sol::table t) {
+                p.jointLimits.clear();
+                for (const auto& [key, value] : t) p.jointLimits[key.as<std::string>()] = value.as<JointLimit>();
+            }),
         "enableCCD", &PhysicsDefinition::enableCCD,
         "collisionMargin", &PhysicsDefinition::collisionMargin,
         "hashKey", &PhysicsDefinition::hashKey
@@ -248,6 +281,7 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
     // Bind runtime types
     lua.new_usertype<QuadMechInstance>("QuadMechInstance",
         sol::no_constructor,
+        "id", sol::readonly(&QuadMechInstance::id),
         "transform", &QuadMechInstance::transform,
         "currentAnimationTime", &QuadMechInstance::currentAnimationTime,
         "currentAnimation", &QuadMechInstance::currentAnimation,
@@ -257,250 +291,250 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
         "cockpitOpen", &QuadMechInstance::cockpitOpen,
         "pilotInside", &QuadMechInstance::pilotInside,
         "physicsBodies", &QuadMechInstance::physicsBodies,
+        "accumulatedForce", &QuadMechInstance::accumulatedForce,
+        "accumulatedTorque", &QuadMechInstance::accumulatedTorque,
         "hashKey", &QuadMechInstance::hashKey
     );
     
-    // Initialize factories
-    g_quadMechFactory = std::make_unique<QuadMechFactory>();
-    g_quadMechFactory->initialize(100, 4);
-    
+    // Initialize the loader/editor; the shared factory is created lazily by factory()
+    // unless the host injected one with setFactory().
     g_quadMechLoader = std::make_unique<QuadMechLoader>();
     g_quadMechEditor = std::make_unique<QuadMechEditor>();
     
     // Bind factory functions
-    lua.set_function("load_quad_mech_sync", [&](const std::string& mechName, LODQuality quality) {
-        return g_quadMechFactory->loadSync(mechName, quality);
+    lua.set_function("load_quad_mech_sync", [](const std::string& mechName, LODQuality quality) {
+        return factory()->loadSync(mechName, quality);
     });
     
-    lua.set_function("load_quad_mech_async", [&](const std::string& mechName, LODQuality quality) {
-        return g_quadMechFactory->loadAsync(mechName, quality);
+    lua.set_function("load_quad_mech_async", [](const std::string& mechName, LODQuality quality) {
+        return factory()->loadAsync(mechName, quality);
     });
     
-    lua.set_function("generate_quad_mech_package", [&](const std::string& definitionPath, const std::string& outputPath) {
-        return g_quadMechFactory->generatePackageSync(definitionPath, outputPath);
+    lua.set_function("generate_quad_mech_package", [](const std::string& definitionPath, const std::string& outputPath) {
+        return factory()->generatePackageSync(definitionPath, outputPath);
     });
     
-    lua.set_function("generate_quad_mech_package_async", [&](const std::string& definitionPath, const std::string& outputPath) {
-        return g_quadMechFactory->generatePackageAsync(definitionPath, outputPath);
+    lua.set_function("generate_quad_mech_package_async", [](const std::string& definitionPath, const std::string& outputPath) {
+        return factory()->generatePackageAsync(definitionPath, outputPath);
     });
     
     // Bind loader functions
-    lua.set_function("create_quad_mech_instance", [&](const std::string& mechName, LODQuality quality) {
+    lua.set_function("create_quad_mech_instance", [](const std::string& mechName, LODQuality quality) {
         return g_quadMechLoader->createInstance(mechName, quality);
     });
     
-    lua.set_function("destroy_quad_mech_instance", [&](const std::string& instanceId) {
+    lua.set_function("destroy_quad_mech_instance", [](const std::string& instanceId) {
         g_quadMechLoader->destroyInstance(instanceId);
     });
     
-    lua.set_function("get_quad_mech_instance", [&](const std::string& instanceId) {
+    lua.set_function("get_quad_mech_instance", [](const std::string& instanceId) {
         return g_quadMechLoader->getInstance(instanceId);
     });
     
-    lua.set_function("update_quad_mech_instance", [&](const std::string& instanceId, const glm::mat4& transform) {
+    lua.set_function("update_quad_mech_instance", [](const std::string& instanceId, const glm::mat4& transform) {
         g_quadMechLoader->updateInstance(instanceId, transform);
     });
     
-    lua.set_function("set_quad_mech_animation", [&](const std::string& instanceId, const std::string& animationName) {
+    lua.set_function("set_quad_mech_animation", [](const std::string& instanceId, const std::string& animationName) {
         g_quadMechLoader->setInstanceAnimation(instanceId, animationName);
     });
     
-    lua.set_function("set_quad_mech_lod", [&](const std::string& instanceId, LODQuality quality) {
+    lua.set_function("set_quad_mech_lod", [](const std::string& instanceId, LODQuality quality) {
         g_quadMechLoader->setInstanceLOD(instanceId, quality);
     });
     
     // Bind Magitech runtime functions
-    lua.set_function("set_quad_mech_energy_level", [&](const std::string& instanceId, float energyLevel) {
+    lua.set_function("set_quad_mech_energy_level", [](const std::string& instanceId, float energyLevel) {
         g_quadMechLoader->setEnergyLevel(instanceId, energyLevel);
     });
     
-    lua.set_function("set_quad_mech_rune_glow", [&](const std::string& instanceId, float intensity) {
+    lua.set_function("set_quad_mech_rune_glow", [](const std::string& instanceId, float intensity) {
         g_quadMechLoader->setRuneGlowIntensity(instanceId, intensity);
     });
     
-    lua.set_function("set_quad_mech_cockpit_state", [&](const std::string& instanceId, bool open, bool pilotInside) {
+    lua.set_function("set_quad_mech_cockpit_state", [](const std::string& instanceId, bool open, bool pilotInside) {
         g_quadMechLoader->setCockpitState(instanceId, open, pilotInside);
     });
     
     // Bind physics functions
-    lua.set_function("apply_force_to_quad_mech", [&](const std::string& instanceId, const glm::vec3& force, const glm::vec3& point) {
+    lua.set_function("apply_force_to_quad_mech", [](const std::string& instanceId, const glm::vec3& force, const glm::vec3& point) {
         g_quadMechLoader->applyForce(instanceId, force, point);
     });
     
-    lua.set_function("set_quad_mech_physics_transform", [&](const std::string& instanceId, const glm::mat4& transform) {
+    lua.set_function("set_quad_mech_physics_transform", [](const std::string& instanceId, const glm::mat4& transform) {
         g_quadMechLoader->setPhysicsTransform(instanceId, transform);
     });
     
     // Bind editor functions
-    lua.set_function("load_quad_mech_for_editing", [&](const std::string& mechName) {
+    lua.set_function("load_quad_mech_for_editing", [](const std::string& mechName) {
         g_quadMechEditor->loadMechForEditing(mechName);
     });
     
-    lua.set_function("save_current_quad_mech", [&](const std::string& outputPath) {
+    lua.set_function("save_current_quad_mech", [](const std::string& outputPath) {
         g_quadMechEditor->saveCurrentMech(outputPath);
     });
     
-    lua.set_function("create_new_quad_mech", [&](const std::string& name) {
+    lua.set_function("create_new_quad_mech", [](const std::string& name) {
         g_quadMechEditor->createNewMech(name);
     });
     
     // Bind module editing
-    lua.set_function("add_quad_mech_module", [&](const ModuleDefinition& module) {
+    lua.set_function("add_quad_mech_module", [](const ModuleDefinition& module) {
         g_quadMechEditor->addModule(module);
     });
     
-    lua.set_function("remove_quad_mech_module", [&](const std::string& moduleId) {
+    lua.set_function("remove_quad_mech_module", [](const std::string& moduleId) {
         g_quadMechEditor->removeModule(moduleId);
     });
     
-    lua.set_function("update_quad_mech_module", [&](const std::string& moduleId, const ModuleDefinition& newDef) {
+    lua.set_function("update_quad_mech_module", [](const std::string& moduleId, const ModuleDefinition& newDef) {
         g_quadMechEditor->updateModule(moduleId, newDef);
     });
     
     // Bind material editing
-    lua.set_function("update_quad_mech_energy_runes", [&](const EnergyRunes& runes) {
+    lua.set_function("update_quad_mech_energy_runes", [](const EnergyRunes& runes) {
         g_quadMechEditor->updateEnergyRunes(runes);
     });
     
-    lua.set_function("update_quad_mech_energy_core", [&](const EnergyCore& core) {
+    lua.set_function("update_quad_mech_energy_core", [](const EnergyCore& core) {
         g_quadMechEditor->updateEnergyCore(core);
     });
     
-    lua.set_function("update_quad_mech_canopy_material", [&](const CanopyMaterial& canopy) {
+    lua.set_function("update_quad_mech_canopy_material", [](const CanopyMaterial& canopy) {
         g_quadMechEditor->updateCanopyMaterial(canopy);
     });
     
     // Bind animation editing
-    lua.set_function("add_quad_mech_animation", [&](const AnimationDefinition& anim) {
+    lua.set_function("add_quad_mech_animation", [](const AnimationDefinition& anim) {
         g_quadMechEditor->addAnimation(anim);
     });
     
-    lua.set_function("remove_quad_mech_animation", [&](const std::string& animId) {
+    lua.set_function("remove_quad_mech_animation", [](const std::string& animId) {
         g_quadMechEditor->removeAnimation(animId);
     });
     
-    lua.set_function("update_quad_mech_animation", [&](const std::string& animId, const AnimationDefinition& newDef) {
+    lua.set_function("update_quad_mech_animation", [](const std::string& animId, const AnimationDefinition& newDef) {
         g_quadMechEditor->updateAnimation(animId, newDef);
     });
     
     // Bind physics editing
-    lua.set_function("update_quad_mech_physics", [&](const PhysicsDefinition& physics) {
+    lua.set_function("update_quad_mech_physics", [](const PhysicsDefinition& physics) {
         g_quadMechEditor->updatePhysicsDefinition(physics);
     });
     
-    lua.set_function("update_quad_mech_joint_limits", [&](const std::string& jointName, const JointLimit& limits) {
+    lua.set_function("update_quad_mech_joint_limits", [](const std::string& jointName, const JointLimit& limits) {
         g_quadMechEditor->updateJointLimits(jointName, limits);
     });
     
     // Bind LOD editing
-    lua.set_function("add_quad_mech_lod", [&](const LODDefinition& lod) {
+    lua.set_function("add_quad_mech_lod", [](const LODDefinition& lod) {
         g_quadMechEditor->addLODDefinition(lod);
     });
     
-    lua.set_function("update_quad_mech_lod", [&](LODQuality quality, const LODDefinition& lod) {
+    lua.set_function("update_quad_mech_lod", [](LODQuality quality, const LODDefinition& lod) {
         g_quadMechEditor->updateLODDefinition(quality, lod);
     });
     
     // Bind preview functions
-    lua.set_function("set_quad_mech_preview_time", [&](float time) {
+    lua.set_function("set_quad_mech_preview_time", [](float time) {
         g_quadMechEditor->setPreviewTime(time);
     });
     
-    lua.set_function("set_quad_mech_preview_lod", [&](LODQuality quality) {
+    lua.set_function("set_quad_mech_preview_lod", [](LODQuality quality) {
         g_quadMechEditor->setPreviewLOD(quality);
     });
     
-    lua.set_function("set_quad_mech_preview_animation", [&](const std::string& animName) {
+    lua.set_function("set_quad_mech_preview_animation", [](const std::string& animName) {
         g_quadMechEditor->setPreviewAnimation(animName);
     });
     
-    lua.set_function("get_quad_mech_preview_instance", [&]() {
+    lua.set_function("get_quad_mech_preview_instance", []() {
         return g_quadMechEditor->getPreviewInstance();
     });
     
     // Bind utility functions
-    lua.set_function("get_available_quad_mechs", [&]() {
-        return g_quadMechFactory->getAvailableMechs();
+    lua.set_function("get_available_quad_mechs", []() {
+        return factory()->getAvailableMechs();
     });
     
-    lua.set_function("quad_mech_exists", [&](const std::string& mechName) {
-        return g_quadMechFactory->mechExists(mechName);
+    lua.set_function("quad_mech_exists", [](const std::string& mechName) {
+        return factory()->mechExists(mechName);
     });
     
-    lua.set_function("validate_quad_mech_definition", [&](const QuadMechDefinition& def) {
-        return g_quadMechFactory->validateMechDefinition(def);
+    lua.set_function("validate_quad_mech_definition", [](const QuadMechDefinition& def) {
+        return factory()->validateMechDefinition(def);
     });
     
-    lua.set_function("get_quad_mech_performance_metrics", [&]() {
-        return g_quadMechFactory->getPerformanceMetrics();
+    lua.set_function("get_quad_mech_performance_metrics", []() {
+        return factory()->getPerformanceMetrics();
     });
     
-    lua.set_function("reset_quad_mech_performance_metrics", [&]() {
-        g_quadMechFactory->resetPerformanceMetrics();
+    lua.set_function("reset_quad_mech_performance_metrics", []() {
+        factory()->resetPerformanceMetrics();
     });
     
     // Bind cache management
-    lua.set_function("clear_quad_mech_cache", [&]() {
-        g_quadMechFactory->clearCache();
+    lua.set_function("clear_quad_mech_cache", []() {
+        factory()->clearCache();
     });
     
-    lua.set_function("get_quad_mech_cache_size", [&]() {
-        return g_quadMechFactory->getCacheSize();
+    lua.set_function("get_quad_mech_cache_size", []() {
+        return factory()->getCacheSize();
     });
     
-    lua.set_function("get_quad_mech_cache_hit_rate", [&]() {
-        return g_quadMechFactory->getCacheHitRate();
+    lua.set_function("get_quad_mech_cache_hit_rate", []() {
+        return factory()->getCacheHitRate();
     });
     
     // Bind hot-reload functions
-    lua.set_function("watch_quad_mech_for_changes", [&](const std::string& mechName) {
-        g_quadMechFactory->watchForChanges(mechName);
+    lua.set_function("watch_quad_mech_for_changes", [](const std::string& mechName) {
+        factory()->watchForChanges(mechName);
     });
     
-    lua.set_function("unwatch_quad_mech_changes", [&](const std::string& mechName) {
-        g_quadMechFactory->unwatchForChanges(mechName);
+    lua.set_function("unwatch_quad_mech_changes", [](const std::string& mechName) {
+        factory()->unwatchForChanges(mechName);
     });
     
-    lua.set_function("check_quad_mech_for_updates", [&](const std::string& mechName) {
-        return g_quadMechFactory->checkForUpdates(mechName);
+    lua.set_function("check_quad_mech_for_updates", [](const std::string& mechName) {
+        return factory()->checkForUpdates(mechName);
     });
     
-    lua.set_function("reload_quad_mech", [&](const std::string& mechName) {
-        g_quadMechFactory->reloadMech(mechName);
+    lua.set_function("reload_quad_mech", [](const std::string& mechName) {
+        factory()->reloadMech(mechName);
     });
     
     // Bind editor state functions
-    lua.set_function("get_quad_mech_editor_state", [&]() {
+    lua.set_function("get_quad_mech_editor_state", []() {
         return g_quadMechEditor->getEditorState();
     });
     
-    lua.set_function("set_quad_mech_editor_state", [&](const EditorState& state) {
+    lua.set_function("set_quad_mech_editor_state", [](const EditorState& state) {
         g_quadMechEditor->setEditorState(state);
     });
     
-    lua.set_function("is_quad_mech_editor_dirty", [&]() {
+    lua.set_function("is_quad_mech_editor_dirty", []() {
         return g_quadMechEditor->isDirty();
     });
     
-    lua.set_function("mark_quad_mech_editor_dirty", [&](bool dirty) {
+    lua.set_function("mark_quad_mech_editor_dirty", [](bool dirty) {
         g_quadMechEditor->markDirty(dirty);
     });
     
     // Bind instance management
-    lua.set_function("get_active_quad_mech_count", [&]() {
+    lua.set_function("get_active_quad_mech_count", []() {
         return g_quadMechLoader->getActiveInstanceCount();
     });
     
-    lua.set_function("get_active_quad_mech_ids", [&]() {
+    lua.set_function("get_active_quad_mech_ids", []() {
         return g_quadMechLoader->getActiveInstanceIds();
     });
     
-    lua.set_function("clear_all_quad_mech_instances", [&]() {
+    lua.set_function("clear_all_quad_mech_instances", []() {
         g_quadMechLoader->clearAllInstances();
     });
     
     // Helper functions for creating common configurations
-    lua.set_function("create_scout_quad_mech", [&]() {
+    lua.set_function("create_scout_quad_mech", []() {
         // Create a lightweight scout mech configuration
         QuadMechDefinition def;
         def.name = "scout_quad";
@@ -518,13 +552,13 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
         def.modules.push_back(chassis);
         
         // Add legs
-        for (const auto& legName : {"leg_front_left", "leg_front_right", "leg_back_left", "leg_back_right"}) {
+        for (const auto& legSlot : kLegSlots) {
             ModuleDefinition leg;
-            leg.id = legName;
-            leg.type = ModuleType::LEG_FRONT_LEFT; // Simplified for example
+            leg.id = legSlot.id;
+            leg.type = legSlot.type;
             leg.meshPath = "modules/scout_leg.fbx";
-            leg.attachBone = "hip_" + std::string(legName.substr(4, 2));
-            leg.mass = 75.0;
+            leg.attachBone = legSlot.bone;
+            leg.mass = 75.0f;
             def.modules.push_back(leg);
         }
         
@@ -560,7 +594,7 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
         return def;
     });
     
-    lua.set_function("create_assault_quad_mech", [&]() {
+    lua.set_function("create_assault_quad_mech", []() {
         // Create a heavy assault mech configuration
         QuadMechDefinition def;
         def.name = "assault_quad";
@@ -578,24 +612,24 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
         def.modules.push_back(chassis);
         
         // Add heavy legs
-        for (const auto& legName : {"leg_front_left", "leg_front_right", "leg_back_left", "leg_back_right"}) {
+        for (const auto& legSlot : kLegSlots) {
             ModuleDefinition leg;
-            leg.id = legName;
-            leg.type = ModuleType::LEG_FRONT_LEFT;
+            leg.id = legSlot.id;
+            leg.type = legSlot.type;
             leg.meshPath = "modules/assault_leg.fbx";
-            leg.attachBone = "hip_" + std::string(legName.substr(4, 2));
-            leg.mass = 200.0;
+            leg.attachBone = legSlot.bone;
+            leg.mass = 200.0f;
             def.modules.push_back(leg);
         }
-        
+
         // Add weapons
-        for (const auto& weaponName : {"weapon_left", "weapon_right"}) {
+        for (const auto& weaponSlot : kWeaponSlots) {
             ModuleDefinition weapon;
-            weapon.id = weaponName;
-            weapon.type = ModuleType::WEAPON_LEFT;
+            weapon.id = weaponSlot.id;
+            weapon.type = weaponSlot.type;
             weapon.meshPath = "modules/assault_weapon.fbx";
-            weapon.attachBone = "shoulder_" + std::string(weaponName.substr(7, 1));
-            weapon.mass = 100.0;
+            weapon.attachBone = weaponSlot.bone;
+            weapon.mass = 100.0f;
             def.modules.push_back(weapon);
         }
         
@@ -626,22 +660,28 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
 }
 
 void QuadMechLuaBindings::poll_assets(sol::state& lua) {
-    // Poll for completed async operations
-    // In a real implementation, this would check for completed futures
-    // and call appropriate callbacks
-    
-    // Check for file changes and trigger hot-reload
-    auto availableMechs = g_quadMechFactory->getAvailableMechs();
-    for (const auto& mechName : availableMechs) {
-        if (g_quadMechFactory->checkForUpdates(mechName)) {
-            Log::info("QuadMech file changed, triggering reload: {}", mechName);
-            g_quadMechFactory->reloadMech(mechName);
-            
-            // Call Lua callback if available
-            if (lua["on_quad_mech_reloaded"]) {
-                lua["on_quad_mech_reloaded"](mechName);
+    // Async loads hand their std::future straight to Lua (load_quad_mech_async),
+    // so polling here only drives hot-reload of watched definition files.
+    auto quadFactory = factory();
+    for (const auto& mechName : quadFactory->getAvailableMechs()) {
+        if (!quadFactory->checkForUpdates(mechName)) continue;
+
+        Log::info("QuadMech", "QuadMech file changed, triggering reload: {}", mechName);
+        quadFactory->reloadMech(mechName);
+
+        // Call the Lua callback if one is defined
+        sol::optional<sol::protected_function> callback = lua["on_quad_mech_reloaded"];
+        if (callback) {
+            sol::protected_function_result result = (*callback)(mechName);
+            if (!result.valid()) {
+                sol::error err = result;
+                Log::error("QuadMech", "on_quad_mech_reloaded failed: {}", err.what());
             }
         }
+    }
+
+    if (g_quadMechEditor) {
+        g_quadMechEditor->checkForChanges();
     }
 }
 
@@ -655,13 +695,12 @@ void QuadMechLuaBindings::shutdown() {
         g_quadMechLoader.reset();
     }
     
-    if (g_quadMechFactory) {
-        g_quadMechFactory->shutdown();
-        g_quadMechFactory.reset();
-    }
+    // Drop our reference; the factory shuts down when its last owner releases it
+    // (an injected host factory keeps running).
+    setFactory(nullptr);
     
     Log::info("QuadMechLuaBindings shutdown complete");
 }
 
 } // namespace QuadMech
-} // namespace MagiTech 
+} // namespace MagiTech

@@ -25,7 +25,7 @@ std::future<GrappleBundle> GrappleAssetFactory::generateAsync(
     const PhysicsParams& pp,
     const LODParams& lp)
 {
-    uint64_t key = hashCombine(hp.hashKey(), cp.hashKey(), mp.hashKey(), pp.hashKey(), lp.hashKey());
+    uint64_t key = ud::hash::hash_of(hp.hashKey(), cp.hashKey(), mp.hashKey(), pp.hashKey(), lp.hashKey());
     if (auto hit = m_cache.find(key)) {
         return std::async(std::launch::deferred, [=]() { return *hit; });
     }

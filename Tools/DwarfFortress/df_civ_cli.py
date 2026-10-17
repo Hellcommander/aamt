@@ -207,7 +207,12 @@ def cmd_art(args: argparse.Namespace) -> int:
     if getattr(args, "blender", False):
         from df_blender_bake import bake_creature_art
 
-        bake = bake_creature_art(spec, root, no_sd=args.no_sd)
+        bake = bake_creature_art(
+            spec,
+            root,
+            no_sd=args.no_sd,
+            allow_procedural=bool(getattr(args, "allow_procedural", False)),
+        )
         print("[art] blender bake:")
         print(json.dumps({
             "blender": bake.get("blender"),
@@ -216,9 +221,20 @@ def cmd_art(args: argparse.Namespace) -> int:
         }, indent=2))
         return 0
 
-    arts = generate_art_for_spec(
-        spec, root, no_sd=args.no_sd, force=args.force, workers=getattr(args, "workers", None)
-    )
+    from sd_policy import SdUnavailable
+
+    try:
+        arts = generate_art_for_spec(
+            spec,
+            root,
+            no_sd=args.no_sd,
+            force=args.force,
+            workers=getattr(args, "workers", None),
+            allow_procedural=bool(getattr(args, "allow_procedural", False)),
+        )
+    except SdUnavailable as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     print(f"Art written under {root / 'graphics' / 'images'}")
     payload = {k: str(v) for k, v in arts.items() if k != "sd"}
     payload["sd_used"] = bool(arts.get("sd"))
@@ -323,7 +339,12 @@ def build_parser() -> argparse.ArgumentParser:
     a = sub.add_parser("art", help="Generate part sheet + portrait")
     a.add_argument("--spec")
     a.add_argument("--id")
-    a.add_argument("--no-sd", action="store_true")
+    a.add_argument("--no-sd", action="store_true", help="Explicit Pillow-only art (no SD)")
+    a.add_argument(
+        "--allow-procedural",
+        action="store_true",
+        help="Use Pillow art if SD is down/fails (default: fail; or AAMT_SD_STRICT=0)",
+    )
     a.add_argument("--force", action="store_true")
     a.add_argument("--blender", action="store_true", help="Route through df_blender_bake (falls back to tiles)")
     a.add_argument("--workers", type=int, default=None, help="Parallel Pillow part-sheet cells (AAMT-side)")

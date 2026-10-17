@@ -1,13 +1,42 @@
 #include "OrbLuaBindings.hpp"
 #include "OrbFactory.hpp"
 #include "OrbTypes.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <map>
 #include <future>
 #include <vector>
 
 namespace MagiTech {
 namespace Orbs {
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<OrbFactory>& factorySlot() {
+    static std::shared_ptr<OrbFactory> f;
+    return f;
+}
+} // namespace
+
+void OrbLuaBindings::setFactory(std::shared_ptr<OrbFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<OrbFactory> OrbLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<OrbFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 static std::vector<std::pair<std::future<OrbBundle>, std::string>> pendingOrbs;
 
@@ -28,7 +57,7 @@ void OrbLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_orb", [&](OrbParams p) {
-        auto factory = MainPlugin::instance().getOrbFactory();
+        auto factory = OrbLuaBindings::factory();
         auto fut = factory->generateAsync(p);
         pendingOrbs.emplace_back(std::move(fut), p.id);
     });

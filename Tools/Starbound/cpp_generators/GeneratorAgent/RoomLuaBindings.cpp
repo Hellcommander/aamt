@@ -1,7 +1,8 @@
 #include "RoomLuaBindings.hpp"
 #include "RoomFactory.hpp"
 #include "RoomTypes.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include <map>
 #include <future>
 #include <vector>
@@ -10,6 +11,33 @@ namespace MagiTech {
 namespace Rooms {
 
 static std::vector<std::pair<std::future<RoomBundle>, std::string>> pendingRooms;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<RoomFactory>& factorySlot() {
+    static std::shared_ptr<RoomFactory> f;
+    return f;
+}
+} // namespace
+
+void RoomLuaBindings::setFactory(std::shared_ptr<RoomFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<RoomFactory> RoomLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<RoomFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 void RoomLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<RoomParams>("RoomParams",
@@ -31,7 +59,7 @@ void RoomLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_room", [&](RoomParams p) {
-        auto factory = MainPlugin::instance().getRoomFactory();
+        auto factory = RoomLuaBindings::factory();
         auto fut = factory->generateAsync(p);
         pendingRooms.emplace_back(std::move(fut), p.id);
     });

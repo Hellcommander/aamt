@@ -1,25 +1,46 @@
 #include "BlackholeProjectileLuaBindings.hpp"
 #include "BlackholeProjectileFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
 #include "core/Log.hpp"
 #include <vector>
 #include <chrono>
 #include <memory>
+#include <mutex>
 
 namespace MagiTech {
 namespace BlackholeProjectiles {
 
 static std::vector<std::pair<std::future<BlackholeAssetBundle>, std::string>> pendingProjectiles;
-static std::unique_ptr<BlackholeProjectileFactory> g_factory;
 
-// Initialize the factory if not already done
-static BlackholeProjectileFactory* getFactory() {
-    if (!g_factory) {
-        g_factory = std::make_unique<BlackholeProjectileFactory>();
-        g_factory->initialize(1000, 4); // 1000 cache entries, 4 threads
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<BlackholeProjectileFactory>& factorySlot() {
+    static std::shared_ptr<BlackholeProjectileFactory> f;
+    return f;
+}
+} // namespace
+
+void BlackholeProjectileLuaBindings::setFactory(std::shared_ptr<BlackholeProjectileFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<BlackholeProjectileFactory> BlackholeProjectileLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<BlackholeProjectileFactory>();
+        slot->initialize(1000, 4); // 1000 cache entries, 4 threads
         Log::info("BlackholeProjectileFactory initialized");
     }
-    return g_factory.get();
+    return slot;
+}
+
+static std::shared_ptr<BlackholeProjectileFactory> getFactory() {
+    return BlackholeProjectileLuaBindings::factory();
 }
 
 void BlackholeProjectileLuaBindings::bind(sol::state& lua) {
@@ -86,19 +107,19 @@ void BlackholeProjectileLuaBindings::bind(sol::state& lua) {
                 
                 // Validate parameters
                 if (!p.validate()) {
-                    Log::error("Invalid blackhole projectile parameters for: {}", p.id);
+                    Log::error("BlackholeProjectile", "Invalid blackhole projectile parameters for: {}", p.id);
                     return BlackholeAssetBundle{}; // Return empty bundle
                 }
                 
-                Log::info("Generating blackhole projectile: {}", p.id);
+                Log::info("BlackholeProjectile", "Generating blackhole projectile: {}", p.id);
                 auto future = factory->generateAsync(p);
                 auto bundle = future.get();
                 
-                Log::info("Blackhole projectile generated successfully: {} ({} assets)", 
+                Log::info("BlackholeProjectile", "Blackhole projectile generated successfully: {} ({} assets)", 
                          p.id, bundle.getAssetCount());
                 return bundle;
             } catch (const std::exception& e) {
-                Log::error("Error generating blackhole projectile {}: {}", p.id, e.what());
+                Log::error("BlackholeProjectile", "Error generating blackhole projectile {}: {}", p.id, e.what());
                 return BlackholeAssetBundle{}; // Return empty bundle on error
             }
         }
@@ -111,16 +132,16 @@ void BlackholeProjectileLuaBindings::bind(sol::state& lua) {
                 auto factory = getFactory();
                 
                 if (!p.validate()) {
-                    Log::error("Invalid blackhole projectile parameters for: {}", p.id);
+                    Log::error("BlackholeProjectile", "Invalid blackhole projectile parameters for: {}", p.id);
                     return false;
                 }
                 
                 auto fut = factory->generateAsync(p);
                 pendingProjectiles.emplace_back(std::move(fut), p.id);
-                Log::info("Queued async blackhole projectile generation: {}", p.id);
+                Log::info("BlackholeProjectile", "Queued async blackhole projectile generation: {}", p.id);
                 return true;
             } catch (const std::exception& e) {
-                Log::error("Error queuing blackhole projectile {}: {}", p.id, e.what());
+                Log::error("BlackholeProjectile", "Error queuing blackhole projectile {}: {}", p.id, e.what());
                 return false;
             }
         }
@@ -191,7 +212,7 @@ void BlackholeProjectileLuaBindings::bind(sol::state& lua) {
     });
 
     // Parameter validation and utility functions
-    lua.set_function("validate_blackhole_params", [](const BlackholeProjectileParams& p) -> sol::table {
+    lua.set_function("validate_blackhole_params", [&lua](const BlackholeProjectileParams& p) -> sol::table {
         sol::table result = lua.create_table();
         
         bool isValid = true;
@@ -276,30 +297,40 @@ void BlackholeProjectileLuaBindings::bind(sol::state& lua) {
     // Factory management functions
     lua.set_function("initialize_blackhole_factory", [](size_t cache_size, size_t num_threads) -> bool {
         try {
-            if (!g_factory) {
-                g_factory = std::make_unique<BlackholeProjectileFactory>();
-            }
-            g_factory->initialize(cache_size, num_threads);
-            Log::info("BlackholeProjectileFactory initialized with cache_size={}, threads={}", 
+            // Replace the current factory with one using the requested sizes.
+            auto fresh = std::make_shared<BlackholeProjectileFactory>();
+            fresh->initialize(cache_size, num_threads);
+            BlackholeProjectileLuaBindings::setFactory(fresh);
+            Log::info("BlackholeProjectile", "BlackholeProjectileFactory initialized with cache_size={}, threads={}", 
                      cache_size, num_threads);
             return true;
         } catch (const std::exception& e) {
-            Log::error("Error initializing BlackholeProjectileFactory: {}", e.what());
+            Log::error("BlackholeProjectile", "Error initializing BlackholeProjectileFactory: {}", e.what());
             return false;
         }
     });
 
     lua.set_function("shutdown_blackhole_factory", []() {
-        if (g_factory) {
-            g_factory->shutdown();
+        std::shared_ptr<BlackholeProjectileFactory> current;
+        {
+            std::lock_guard<std::mutex> lock(factoryMutex());
+            current = factorySlot();
+        }
+        if (current) {
+            current->shutdown();
             Log::info("BlackholeProjectileFactory shutdown");
         }
     });
 
     // Cache management
-    lua.set_function("get_blackhole_cache_stats", []() -> sol::table {
+    lua.set_function("get_blackhole_cache_stats", [&lua]() -> sol::table {
         sol::table stats = lua.create_table();
-        if (g_factory) {
+        bool initialized;
+        {
+            std::lock_guard<std::mutex> lock(factoryMutex());
+            initialized = static_cast<bool>(factorySlot());
+        }
+        if (initialized) {
             // Note: This would require adding cache statistics to the factory
             stats["initialized"] = true;
         } else {
@@ -319,7 +350,7 @@ void BlackholeProjectileLuaBindings::poll_assets(sol::state& lua) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             try {
                 auto bundle = it->first.get();
-                Log::info("Blackhole projectile ready: {} ({} assets)", 
+                Log::info("BlackholeProjectile", "Blackhole projectile ready: {} ({} assets)", 
                          it->second, bundle.getAssetCount());
                 
                 // Call Lua callback if available
@@ -329,7 +360,7 @@ void BlackholeProjectileLuaBindings::poll_assets(sol::state& lua) {
                 
                 completed++;
             } catch (const std::exception& e) {
-                Log::error("Error getting blackhole projectile {}: {}", it->second, e.what());
+                Log::error("BlackholeProjectile", "Error getting blackhole projectile {}: {}", it->second, e.what());
             }
             it = pendingProjectiles.erase(it);
         } else {
@@ -340,14 +371,19 @@ void BlackholeProjectileLuaBindings::poll_assets(sol::state& lua) {
     if (completed > 0) {
         auto end = std::chrono::steady_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        Log::info("Completed {} blackhole projectiles in {}ms", completed, duration.count());
+        Log::info("BlackholeProjectile", "Completed {} blackhole projectiles in {}ms", completed, duration.count());
     }
 }
 
 void BlackholeProjectileLuaBindings::cleanup() {
-    if (g_factory) {
-        g_factory->shutdown();
-        g_factory.reset();
+    std::shared_ptr<BlackholeProjectileFactory> current;
+    {
+        std::lock_guard<std::mutex> lock(factoryMutex());
+        current = std::move(factorySlot());
+        factorySlot().reset();
+    }
+    if (current) {
+        current->shutdown();
     }
     pendingProjectiles.clear();
     Log::info("BlackholeProjectileLuaBindings cleaned up");

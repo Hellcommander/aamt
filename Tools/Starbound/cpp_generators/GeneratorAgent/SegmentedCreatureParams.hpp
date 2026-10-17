@@ -122,6 +122,19 @@ struct SegmentedCreatureParams {
         hash = hashCombine(hash, std::hash<float>{}(materialMetallic));
         hash = hashCombine(hash, std::hash<int>{}(static_cast<int>(animationProfile)));
         hash = hashCombine(hash, std::hash<int>{}(static_cast<int>(aiProfile)));
+        for (float v : customTaperCurve) hash = hashCombine(hash, std::hash<float>{}(v));
+        hash = hashCombine(hash, std::hash<float>{}(segmentSpacing));
+        hash = hashCombine(hash, std::hash<bool>{}(enableJoints));
+        hash = hashCombine(hash, std::hash<float>{}(jointFlexibility));
+        hash = hashCombine(hash, std::hash<bool>{}(enableArmor));
+        hash = hashCombine(hash, std::hash<float>{}(armorThickness));
+        hash = hashCombine(hash, std::hash<bool>{}(enableSpikes));
+        hash = hashCombine(hash, std::hash<int>{}(spikeCount));
+        hash = hashCombine(hash, std::hash<float>{}(spikeLength));
+        for (const auto& [key, value] : metadata) {
+            hash = hashCombine(hash, std::hash<std::string>{}(key));
+            hash = hashCombine(hash, std::hash<std::string>{}(value));
+        }
         return hash;
     }
     
@@ -215,6 +228,8 @@ struct BehaviorParams {
         hash = hashCombine(hash, std::hash<bool>{}(flyer));
         hash = hashCombine(hash, std::hash<float>{}(preferredTemperature));
         hash = hashCombine(hash, std::hash<float>{}(temperatureTolerance));
+        for (const auto& ability : abilities) hash = hashCombine(hash, std::hash<std::string>{}(ability));
+        hash = hashCombine(hash, std::hash<std::string>{}(behaviorName));
         return hash;
     }
     
@@ -245,10 +260,10 @@ namespace ParamUtils {
     
     // JSON serialization
     nlohmann::json toJson(const SegmentedCreatureParams& params);
-    SegmentedCreatureParams fromJson(const nlohmann::json& json);
+    SegmentedCreatureParams creatureFromJson(const nlohmann::json& json);
     
     nlohmann::json toJson(const BehaviorParams& params);
-    BehaviorParams fromJson(const nlohmann::json& json);
+    BehaviorParams behaviorFromJson(const nlohmann::json& json);
 }
 
 } // namespace SegmentedCreatures

@@ -46,6 +46,9 @@ if (Get-Command Initialize-ToolsetTools -ErrorAction SilentlyContinue) {
 
 # Stable Diffusion integration
 $sdModule = Join-Path $sharedPath "StableDiffusionIntegration.psm1"
+# Strict SD mode (default ON; AAMT_SD_STRICT=0 allows procedural placeholders): any SD problem
+# aborts the run instead of silently producing procedural art.
+$sdStrict = ($env:AAMT_SD_STRICT -ne '0')
 $script:SDAvailable = $false
 $script:SDImportError = $null
 if (Test-Path $sdModule) {
@@ -97,10 +100,13 @@ $designDraftsDir = Join-Path $ModPath "DesignDrafts"
 if ($shouldGenerateDraft -and $script:SDAvailable) {
     Write-Host "Step 0: Generating SD design drafts..." -ForegroundColor Yellow
 
+    # Module function: checks IPv4 + IPv6, starts the server if needed and waits for /ping.
+    $null = Start-SDServerIfNeeded
+
     if (Get-Command Test-StableDiffusionConnection -ErrorAction SilentlyContinue) {
         $sdConnected = Test-StableDiffusionConnection -Verbose
         if (-not $sdConnected) {
-            Write-Host "  [ERROR] SD server already running or start manually" -ForegroundColor Red
+            Write-Host "  [ERROR] SD server could not be started or reached" -ForegroundColor Red
         }
 
         if ($sdConnected) {
@@ -143,16 +149,18 @@ if ($shouldGenerateDraft -and $script:SDAvailable) {
                             -Steps 28 `
                             -GuidanceScale 7.0 `
                             -EnhanceWithOllama:$true `
-                            -AutoStartServer:$false | Out-Null
+                            -AutoStartServer:$true | Out-Null
 
                         if (Test-Path $draftPath) {
                             Write-Host "    [OK] $($asset.File)" -ForegroundColor Green
                         } else {
                             Write-Host "    [WARN] Draft not created: $($asset.File)" -ForegroundColor Yellow
+                            if ($sdStrict) { throw "SD draft not created: $($asset.File)" }
                         }
                     }
                 } catch {
                     Write-Host "    [WARN] SD draft failed: $_" -ForegroundColor Yellow
+                    if ($sdStrict) { throw }
                 }
             }
 
@@ -161,19 +169,19 @@ if ($shouldGenerateDraft -and $script:SDAvailable) {
             if (Test-Path $iconDraftPath) { $sdDraftIcon = $iconDraftPath }
             if (Test-Path $thumbDraftPath) { $sdDraftThumb = $thumbDraftPath }
         } else {
-            Write-Host "  [WARN] SD server not available (Python will use procedural fallback)" -ForegroundColor Yellow
+            Write-Host "  [ERROR] SD server not available" -ForegroundColor Red
             Write-Host "       Start SD3.5: Tools\Start-StableDiffusionServer.ps1 (port 1338)" -ForegroundColor Gray
-            Write-Host "       Note: port 1337 may be WebSocket++, not SD - do not rely on it" -ForegroundColor Gray
+            if ($sdStrict) { throw "SD3.5 server not available (strict mode): refusing procedural placeholder art. Set AAMT_SD_STRICT=0 to allow it." }
         }
     }
     Write-Host ""
 } elseif ($shouldGenerateDraft -and -not $script:SDAvailable) {
-    Write-Host "[WARN] StableDiffusionIntegration.psm1 not loaded; skipping SD drafts" -ForegroundColor Yellow
+    Write-Host "[ERROR] StableDiffusionIntegration.psm1 not loaded; cannot generate SD drafts" -ForegroundColor Red
     if ($script:SDImportError) {
         Write-Host "       Reason: $($script:SDImportError)" -ForegroundColor Gray
     }
-    Write-Host "       Python will use procedural fallback." -ForegroundColor Gray
     Write-Host ""
+    if ($sdStrict) { throw "StableDiffusionIntegration.psm1 not loaded (strict mode): $($script:SDImportError)" }
 }
 
 # Build Python args
@@ -186,6 +194,9 @@ $pythonArgs = @(
 
 if ($UseSD -or $Mode -eq "sd") {
     $pythonArgs += "--use-sd"
+}
+if (-not $sdStrict) {
+    $pythonArgs += "--allow-procedural"
 }
 if ($sdDraftIcon) {
     $pythonArgs += @("--sd-draft-icon", $sdDraftIcon)

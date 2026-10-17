@@ -1,10 +1,39 @@
 #include "DriftingOrbitalsLuaBindings.hpp"
 #include "DriftingOrbitalsFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <vector>
 
 namespace MagiTech {
 namespace DriftingOrbitals {
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<DriftingOrbitalsFactory>& factorySlot() {
+    static std::shared_ptr<DriftingOrbitalsFactory> f;
+    return f;
+}
+} // namespace
+
+void DriftingOrbitalsLuaBindings::setFactory(std::shared_ptr<DriftingOrbitalsFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<DriftingOrbitalsFactory> DriftingOrbitalsLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<DriftingOrbitalsFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 static std::vector<std::pair<std::future<DriftingOrbitalsAssetBundle>, std::string>> pendingAssets;
 
@@ -43,7 +72,7 @@ void DriftingOrbitalsLuaBindings::bind(sol::state& lua) {
 
     lua.set_function("spawn_drifting_orbitals",
         [&](const DriftingOrbitalParams& p) {
-            auto factory = MainPlugin::instance().getDriftingOrbitalsFactory();
+            auto factory = DriftingOrbitalsLuaBindings::factory();
             pendingAssets.emplace_back(factory->generateAsync(p), p.id);
         }
     );

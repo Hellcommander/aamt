@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <any>
 #include <memory>
 #include <atomic>
 #include <chrono>
@@ -249,14 +250,7 @@ namespace AnimationUtils {
     AnimationExportFormat getAnimationExportFormatFromString(const std::string& str);
 }
 
-// Hash function implementations
-template<typename T>
-uint64_t hashCombine(uint64_t seed, const T& value) {
-    XXH64_state_t hash_state;
-    XXH64_reset(&hash_state, seed);
-    XXH64_update(&hash_state, &value, sizeof(value));
-    return XXH64_digest(&hash_state);
-}
+// Hash helpers (hashCombine / xxhUpdateU64) come from ImageTypes.hpp.
 
 // Implementation of hashKey() methods
 inline uint64_t TimelineKeyframe::hashKey() const {
@@ -278,7 +272,7 @@ inline uint64_t AnimationTimeline::hashKey() const {
     XXH64_update(&hash_state, &frameRate, sizeof(frameRate));
     
     for (const auto& keyframe : keyframes) {
-        XXH64_update(&hash_state, &keyframe.hashKey(), sizeof(uint64_t));
+        xxhUpdateU64(&hash_state, keyframe.hashKey());
     }
     
     for (const auto& trackName : trackNames) {
@@ -307,7 +301,7 @@ inline uint64_t AnimationParams::hashKey() const {
     XXH64_update(&hash_state, &starboundCompatible, sizeof(starboundCompatible));
     XXH64_update(&hash_state, starboundCategory.c_str(), starboundCategory.length());
     XXH64_update(&hash_state, starboundType.c_str(), starboundType.length());
-    XXH64_update(&hash_state, &timeline.hashKey(), sizeof(uint64_t));
+    xxhUpdateU64(&hash_state, timeline.hashKey());
     return XXH64_digest(&hash_state);
 }
 
@@ -332,11 +326,11 @@ inline uint64_t StarboundAnimationMetadata::hashKey() const {
 inline uint64_t AnimationBundle::hashKey() const {
     XXH64_state_t hash_state;
     XXH64_reset(&hash_state, 0);
-    XXH64_update(&hash_state, &spritesheet.hashKey(), sizeof(uint64_t));
-    XXH64_update(&hash_state, &starboundMetadata.hashKey(), sizeof(uint64_t));
+    xxhUpdateU64(&hash_state, spritesheet.hashKey());
+    xxhUpdateU64(&hash_state, starboundMetadata.hashKey());
     XXH64_update(&hash_state, animationJsonPath.c_str(), animationJsonPath.length());
     XXH64_update(&hash_state, spritesheetPath.c_str(), spritesheetPath.length());
-    XXH64_update(&hash_state, &timeline.hashKey(), sizeof(uint64_t));
+    xxhUpdateU64(&hash_state, timeline.hashKey());
     
     for (const auto& frameTime : frameTimes) {
         XXH64_update(&hash_state, &frameTime, sizeof(frameTime));
@@ -356,11 +350,11 @@ inline uint64_t AnimationGeneratorState::hashKey() const {
     XXH64_state_t hash_state;
     XXH64_reset(&hash_state, 0);
     XXH64_update(&hash_state, id.c_str(), id.length());
-    XXH64_update(&hash_state, &animationParams.hashKey(), sizeof(uint64_t));
-    XXH64_update(&hash_state, &spritesheetParams.hashKey(), sizeof(uint64_t));
-    XXH64_update(&hash_state, &captureParams.hashKey(), sizeof(uint64_t));
-    XXH64_update(&hash_state, &uiParams.hashKey(), sizeof(uint64_t));
-    XXH64_update(&hash_state, &currentAnimation.hashKey(), sizeof(uint64_t));
+    xxhUpdateU64(&hash_state, animationParams.hashKey());
+    xxhUpdateU64(&hash_state, spritesheetParams.hashKey());
+    xxhUpdateU64(&hash_state, captureParams.hashKey());
+    xxhUpdateU64(&hash_state, uiParams.hashKey());
+    xxhUpdateU64(&hash_state, currentAnimation.hashKey());
     XXH64_update(&hash_state, &isGenerating, sizeof(isGenerating));
     XXH64_update(&hash_state, &isPreviewing, sizeof(isPreviewing));
     XXH64_update(&hash_state, &generationProgress, sizeof(generationProgress));

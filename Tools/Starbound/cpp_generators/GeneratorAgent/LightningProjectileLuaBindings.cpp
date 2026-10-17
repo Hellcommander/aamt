@@ -1,12 +1,41 @@
 #include "LightningProjectileLuaBindings.hpp"
 #include "LightningProjectileFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <chrono>
+#include <memory>
+#include <mutex>
 #include <vector>
 
 namespace MagiTech {
 namespace LightningProjectiles {
 
 static std::vector<std::pair<std::future<LightningBundle>, std::string>> pendingBolts;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<LightningProjectileFactory>& factorySlot() {
+    static std::shared_ptr<LightningProjectileFactory> f;
+    return f;
+}
+} // namespace
+
+void LightningProjectileLuaBindings::setFactory(std::shared_ptr<LightningProjectileFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<LightningProjectileFactory> LightningProjectileLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<LightningProjectileFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 void LightningProjectileLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<LightningProjectileParams>("LightningProjectileParams",
@@ -41,16 +70,21 @@ void LightningProjectileLuaBindings::bind(sol::state& lua) {
         "sfx", &LightningBundle::sfx
     );
 
+    // Fully initialized preset to start from (a bare LightningProjectileParams() leaves fields unset)
+    lua.set_function("lightning_projectile_default_params", []() {
+        return LightningProjectileFactory::defaultParams();
+    });
+
     lua.set_function("spawn_lightning_projectile",
-        [&](const LightningProjectileParams& p) {
-            auto factory = MainPlugin::instance().getLightningProjectileFactory();
+        [](const LightningProjectileParams& p) {
+            auto factory = LightningProjectileLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("spawn_lightning_projectile_async",
-        [&](const LightningProjectileParams& p) {
-            auto factory = MainPlugin::instance().getLightningProjectileFactory();
+        [](const LightningProjectileParams& p) {
+            auto factory = LightningProjectileLuaBindings::factory();
             auto fut = factory->generateAsync(p);
             pendingBolts.emplace_back(std::move(fut), p.id);
         }

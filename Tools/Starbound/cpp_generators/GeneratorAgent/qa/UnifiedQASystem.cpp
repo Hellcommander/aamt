@@ -1,4 +1,5 @@
 #include "UnifiedQASystem.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "VisualQASystem.hpp"
 #include <fstream>
 #include <sstream>

@@ -21,8 +21,6 @@ struct SampleVariation;
 struct AudioAnalysis;
 struct LoopInfo;
 struct LoopSettings;
-struct VariationSettings;
-struct TimeStretchSettings;
 struct MappingZone;
 struct MappingDefinition;
 struct SampleMetadataEntry;
@@ -75,108 +73,128 @@ public:
     
     // Sample pack creation
     SamplePack createSamplePack(const SampleDefinition& sampleDef, const std::vector<ProcessedSample>& samples, const std::vector<SampleVariation>& variations);
+    // Writes a .samplepack archive (ZIP: metadata.json + one WAV per sample/variation).
+    bool writeSamplePack(const SamplePack& pack, const std::string& filePath);
+
+    // Applies the per-request SampleParams (trim range, pitch, gain, fades) to interleaved audio.
+    void applySampleParams(std::vector<float>& audio, const SampleParams& params);
     
     // Audio decoders
     class WAVDecoder {
     public:
-        void initialize(uint32_t sampleRate) { m_sampleRate = sampleRate; }
+        void initialize(uint32_t sampleRate, uint32_t channels = 2) { m_sampleRate = sampleRate; m_channels = channels; }
+        // Returns interleaved audio converted to the configured rate/channel count; throws on failure.
         std::vector<float> decode(const std::string& filePath);
     private:
         uint32_t m_sampleRate = 44100;
+        uint32_t m_channels = 2;
     };
     
     class MP3Decoder {
     public:
-        void initialize(uint32_t sampleRate) { m_sampleRate = sampleRate; }
+        void initialize(uint32_t sampleRate, uint32_t channels = 2) { m_sampleRate = sampleRate; m_channels = channels; }
+        // Returns interleaved audio converted to the configured rate/channel count; throws on failure.
         std::vector<float> decode(const std::string& filePath);
     private:
         uint32_t m_sampleRate = 44100;
+        uint32_t m_channels = 2;
     };
     
     class OGGDecoder {
     public:
-        void initialize(uint32_t sampleRate) { m_sampleRate = sampleRate; }
+        void initialize(uint32_t sampleRate, uint32_t channels = 2) { m_sampleRate = sampleRate; m_channels = channels; }
+        // Returns interleaved audio converted to the configured rate/channel count; throws on failure.
         std::vector<float> decode(const std::string& filePath);
     private:
         uint32_t m_sampleRate = 44100;
+        uint32_t m_channels = 2;
     };
     
     // Analysis engines
     class PitchDetector {
     public:
-        void initialize(uint32_t sampleRate) { m_sampleRate = sampleRate; }
+        void initialize(uint32_t sampleRate, uint32_t channels = 2) { m_sampleRate = sampleRate; m_channels = channels; }
         int detectPitch(const std::vector<float>& audio, uint32_t sampleRate);
     private:
         uint32_t m_sampleRate = 44100;
+        uint32_t m_channels = 2;
     };
     
     class TempoDetector {
     public:
-        void initialize(uint32_t sampleRate) { m_sampleRate = sampleRate; }
+        void initialize(uint32_t sampleRate, uint32_t channels = 2) { m_sampleRate = sampleRate; m_channels = channels; }
         float detectTempo(const std::vector<float>& audio, uint32_t sampleRate);
     private:
         uint32_t m_sampleRate = 44100;
+        uint32_t m_channels = 2;
     };
     
     class LoudnessAnalyzer {
     public:
-        void initialize(uint32_t sampleRate) { m_sampleRate = sampleRate; }
+        void initialize(uint32_t sampleRate, uint32_t channels = 2) { m_sampleRate = sampleRate; m_channels = channels; }
         float analyzeLUFS(const std::vector<float>& audio, uint32_t sampleRate);
         float analyzePeak(const std::vector<float>& audio);
         float analyzeRMS(const std::vector<float>& audio);
     private:
         uint32_t m_sampleRate = 44100;
+        uint32_t m_channels = 2;
     };
     
     class SpectralAnalyzer {
     public:
-        void initialize(uint32_t sampleRate) { m_sampleRate = sampleRate; }
+        void initialize(uint32_t sampleRate, uint32_t channels = 2) { m_sampleRate = sampleRate; m_channels = channels; }
         float analyzeCentroid(const std::vector<float>& audio, uint32_t sampleRate);
         float analyzeRolloff(const std::vector<float>& audio, uint32_t sampleRate);
         float analyzeFlatness(const std::vector<float>& audio);
     private:
         uint32_t m_sampleRate = 44100;
+        uint32_t m_channels = 2;
     };
     
     // Processing engines
     class SilenceTrimmer {
     public:
-        void initialize(uint32_t sampleRate) { m_sampleRate = sampleRate; }
+        void initialize(uint32_t sampleRate, uint32_t channels = 2) { m_sampleRate = sampleRate; m_channels = channels; }
         std::vector<float> trim(const std::vector<float>& audio, float threshold);
     private:
         uint32_t m_sampleRate = 44100;
+        uint32_t m_channels = 2;
     };
     
     class Normalizer {
     public:
-        void initialize(uint32_t sampleRate) { m_sampleRate = sampleRate; }
+        void initialize(uint32_t sampleRate, uint32_t channels = 2) { m_sampleRate = sampleRate; m_channels = channels; }
         std::vector<float> normalize(const std::vector<float>& audio, float targetLevel);
     private:
         uint32_t m_sampleRate = 44100;
+        uint32_t m_channels = 2;
     };
     
     class LoopDetector {
     public:
-        void initialize(uint32_t sampleRate) { m_sampleRate = sampleRate; }
+        void initialize(uint32_t sampleRate, uint32_t channels = 2) { m_sampleRate = sampleRate; m_channels = channels; }
         LoopInfo detectLoop(const std::vector<float>& audio, uint32_t sampleRate);
     private:
         uint32_t m_sampleRate = 44100;
+        uint32_t m_channels = 2;
     };
     
     class PitchShifter {
     public:
-        void initialize(uint32_t sampleRate) { m_sampleRate = sampleRate; }
+        void initialize(uint32_t sampleRate, uint32_t channels = 2) { m_sampleRate = sampleRate; m_channels = channels; }
         std::vector<float> shift(const std::vector<float>& audio, int semitones);
     private:
         uint32_t m_sampleRate = 44100;
+        uint32_t m_channels = 2;
     };
     
     class TimeStretcher {
     public:
-        void initialize(uint32_t sampleRate) { m_sampleRate = sampleRate; }
+        void initialize(uint32_t sampleRate, uint32_t channels = 2) { m_sampleRate = sampleRate; m_channels = channels; }
         std::vector<float> stretch(const std::vector<float>& audio, float stretchFactor);
     private:
         uint32_t m_sampleRate = 44100;
+        uint32_t m_channels = 2;
     };
     
     // Quality settings
@@ -247,15 +265,6 @@ private:
 };
 
 // Sample Definition Structures
-struct SampleEntry {
-    std::string id;
-    std::string path;
-    bool trimSilence = true;
-    float normalizeLUFS = -14.0f;
-    LoopSettings loop;
-    std::map<std::string, float> parameters;
-};
-
 struct LoopSettings {
     LoopType type = LoopType::NONE;
     bool autoDetect = false;
@@ -265,10 +274,19 @@ struct LoopSettings {
     std::map<std::string, float> parameters;
 };
 
+struct SampleEntry {
+    std::string id;
+    std::string path;
+    bool trimSilence = true;
+    float normalizeLUFS = -14.0f;
+    LoopSettings loop;
+    std::map<std::string, float> parameters;
+};
+
 struct MappingZone {
     std::string sampleId;
-    std::pair<int, int> keyRange; // MIDI key range
-    std::pair<int, int> velocityRange; // Velocity range
+    std::pair<int, int> keyRange{60, 60}; // MIDI key range
+    std::pair<int, int> velocityRange{1, 127}; // Velocity range
     std::map<std::string, float> parameters;
 };
 
@@ -278,20 +296,7 @@ struct MappingDefinition {
     std::map<std::string, std::string> metadata;
 };
 
-struct TimeStretchSettings {
-    bool enabled = false;
-    float targetBPM = 120.0f;
-    float stretchFactor = 1.0f;
-    std::map<std::string, float> parameters;
-};
-
-struct VariationSettings {
-    std::pair<int, int> pitchRange = {-12, 12}; // semitones
-    TimeStretchSettings timeStretch;
-    bool enablePitchVariations = true;
-    bool enableTimeVariations = false;
-    std::map<std::string, float> parameters;
-};
+// TimeStretchSettings / VariationSettings are shared with SynthGen and live in AudioAssetTypes.hpp.
 
 struct SampleDefinition {
     std::string name;
@@ -335,9 +340,9 @@ struct ProcessedSample {
     std::string id;
     std::string originalPath;
     std::vector<float> audioData;
-    uint32_t sampleRate;
-    uint32_t numChannels;
-    float duration;
+    uint32_t sampleRate = 44100;
+    uint32_t numChannels = 2;
+    float duration = 0.0f;
     AudioAnalysis analysis;
     LoopInfo loopInfo;
     std::map<std::string, std::string> metadata;
@@ -350,52 +355,37 @@ struct SampleVariation {
     bool timeStretch = false;
     float targetBPM = 120.0f;
     std::vector<float> audioData;
-    uint32_t sampleRate;
-    uint32_t numChannels;
-    float duration;
+    uint32_t sampleRate = 44100;
+    uint32_t numChannels = 2;
+    float duration = 0.0f;
     std::map<std::string, float> parameters;
-};
-
-// Sample Result Structures
-struct SampleResult {
-    std::vector<float> audioData;
-    std::vector<ProcessedSample> processedSamples;
-    std::vector<SampleVariation> variations;
-    SampleMetadata metadata;
-    SamplePack samplePack;
-    SampleDefinition sampleDef;
-    std::chrono::system_clock::time_point processingTime;
-    bool success = true;
-    std::string errorMessage;
-    std::vector<std::string> warnings;
-    std::map<std::string, std::string> metadata;
 };
 
 // Metadata Structures
 struct SampleMetadataEntry {
     std::string id;
     std::string originalPath;
-    int rootKey;
-    float frequency;
-    float bpm;
-    float lufs;
-    float peak;
-    float rms;
-    float duration;
+    int rootKey = 60;
+    float frequency = 440.0f;
+    float bpm = 120.0f;
+    float lufs = 0.0f;
+    float peak = 0.0f;
+    float rms = 0.0f;
+    float duration = 0.0f;
     LoopInfo loopInfo;
-    float spectralCentroid;
-    float spectralRolloff;
-    float spectralFlatness;
+    float spectralCentroid = 0.0f;
+    float spectralRolloff = 0.0f;
+    float spectralFlatness = 0.0f;
     std::map<std::string, std::string> additionalMetadata;
 };
 
 struct VariationMetadataEntry {
     std::string sampleId;
-    int pitchShift;
-    int midiNote;
-    bool timeStretch;
-    float targetBPM;
-    float duration;
+    int pitchShift = 0;
+    int midiNote = 60;
+    bool timeStretch = false;
+    float targetBPM = 120.0f;
+    float duration = 0.0f;
     std::map<std::string, float> parameters;
 };
 
@@ -403,11 +393,11 @@ struct SampleMetadata {
     std::string packName;
     std::string category;
     std::string description;
-    uint32_t sampleRate;
-    uint32_t bitDepth;
-    uint32_t channels;
-    int numSamples;
-    int numVariations;
+    uint32_t sampleRate = 44100;
+    uint32_t bitDepth = 24;
+    uint32_t channels = 2;
+    int numSamples = 0;
+    int numVariations = 0;
     std::vector<SampleMetadataEntry> samples;
     std::vector<VariationMetadataEntry> variations;
     MappingDefinition mappings;
@@ -423,9 +413,24 @@ struct SamplePack {
     SampleDefinition sampleDef;
     std::chrono::system_clock::time_point creationTime;
     std::string filePath;
-    size_t totalSize;
-    std::string checksum;
+    size_t totalSize = 0;     // bytes of PCM audio in the pack
+    std::string checksum;     // SHA-256 over all PCM audio
+};
+
+// Sample Result Structures
+struct SampleResult {
+    std::vector<float> audioData;
+    std::vector<ProcessedSample> processedSamples;
+    std::vector<SampleVariation> variations;
+    SampleMetadata metadata;
+    SamplePack samplePack;
+    SampleDefinition sampleDef;
+    std::chrono::system_clock::time_point processingTime;
+    bool success = true;
+    std::string errorMessage;
+    std::vector<std::string> warnings;
+    std::map<std::string, std::string> extraMetadata; // free-form key/value info
 };
 
 } // namespace Audio
-} // namespace MagiTech 
+} // namespace MagiTech

@@ -1,7 +1,8 @@
 #include "DynamicAssetLuaBindings.hpp"
 #include "DynamicAssetManager.hpp"
 #include "DynamicAssetTypes.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include <map>
 #include <future>
 #include <vector>
@@ -10,6 +11,33 @@ namespace MagiTech {
 namespace DynamicAssets {
 
 static std::vector<std::pair<std::future<AssetBundle>, std::string>> pendingAssets;
+
+namespace {
+std::mutex& managerMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<DynamicAssetManager>& managerSlot() {
+    static std::shared_ptr<DynamicAssetManager> f;
+    return f;
+}
+} // namespace
+
+void DynamicAssetLuaBindings::setManager(std::shared_ptr<DynamicAssetManager> manager) {
+    std::lock_guard<std::mutex> lock(managerMutex());
+    managerSlot() = std::move(manager);
+}
+
+std::shared_ptr<DynamicAssetManager> DynamicAssetLuaBindings::manager() {
+    std::lock_guard<std::mutex> lock(managerMutex());
+    auto& slot = managerSlot();
+    if (!slot) {
+        // No instance injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<DynamicAssetManager>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 static std::vector<sol::function> callbacks;
 
 void DynamicAssetLuaBindings::bind(sol::state& lua) {
@@ -26,7 +54,7 @@ void DynamicAssetLuaBindings::bind(sol::state& lua) {
 
     lua.set_function("new_spellstone",
         [&](const SpellstoneParams& p){
-            auto manager = MainPlugin::instance().getDynamicAssetManager();
+            auto manager = DynamicAssetLuaBindings::manager();
             auto fut = manager->generateAsync(p);
             pendingAssets.emplace_back(std::move(fut), p.id);
         }

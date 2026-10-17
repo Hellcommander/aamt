@@ -30,7 +30,7 @@ std::future<MagicalItemBundle> MagicalItemFactory::generateAsync(const MagicalIt
         return std::async(std::launch::deferred, [existing]{ return *existing; });
     }
 
-    return m_pool.enqueue([p, this] {
+    return m_pool.enqueue([p, key, this] {
         MagicalItemBundle b;
         b.mesh    = MeshGen::buildItemMesh(p);
         b.texture = TextureGen::buildItemTexture(p);

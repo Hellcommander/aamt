@@ -4,7 +4,7 @@
 namespace MagiTech {
 namespace BarbedExplosiveProjectiles {
 
-#define LOG_BARBED_GEN(Action, Id) Log::info("BarbedExplosiveProjectileGen - {}: {}", #Action, Id)
+#define LOG_BARBED_GEN(Action, Id) Log::info("BarbedExplosiveProjectile", "BarbedExplosiveProjectileGen - {}: {}", #Action, Id)
 
 // Hash function implementations
 uint64_t GeometryParams::hashKey() const { return XXH64(this, sizeof(GeometryParams), 0); }

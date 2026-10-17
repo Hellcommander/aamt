@@ -28,6 +28,13 @@ from df_pixel_art import (
 )
 from df_sd_client import generate_sd_draft
 
+_SHARED = _HERE.parent / "Shared"
+if str(_SHARED) not in sys.path:
+    sys.path.insert(0, str(_SHARED))
+from sd_policy import procedural_fallback  # noqa: E402
+
+SD_ATTEMPTS = 3
+
 
 def _color_from_id(creature_id: str, art_prompt: str = "") -> Tuple[int, int, int]:
     h = hashlib.md5(f"{creature_id}:{art_prompt}".encode("utf-8")).hexdigest()
@@ -144,7 +151,11 @@ def generate_art_for_spec(
     no_sd: bool = False,
     force: bool = False,
     workers: Optional[int] = None,
+    allow_procedural: bool = False,
 ) -> Dict[str, Path]:
+    """no_sd=True is the explicit Pillow-only mode. Otherwise SD art is required: if SD is
+    down/fails (after bounded retries) this raises SdUnavailable unless allow_procedural
+    (--allow-procedural) or AAMT_SD_STRICT=0."""
     cid = str(spec["id"]).upper()
     cid_l = cid.lower()
     images = Path(mod_root) / "graphics" / "images"
@@ -159,25 +170,35 @@ def generate_art_for_spec(
     used_sd = False
     if not no_sd:
         draft = images / f"{cid_l}_sd_draft.png"
-        result = generate_sd_draft(
-            prompt=f"{prompt}, dwarf fortress tileset style, full body creature, pixel art",
-            output_path=draft,
-            negative_prompt="photo, blurry, text, watermark, 3d render",
-            width=512,
-            height=512,
-            force=force,
-            lock_label=f"df_art_{cid_l}",
-        )
-        if result.ok and result.output_path:
-            try:
-                _downscale_to_sheet(result.output_path, body_path)
-                Image, _ = _try_pillow()
-                if Image:
-                    im = Image.open(result.output_path).convert("RGBA")
-                    im.resize((96, 96), Image.Resampling.NEAREST).save(portrait_path)
-                used_sd = True
-            except Exception as exc:
-                print(f"  [WARN] SD postprocess failed, falling back to Pillow: {exc}")
+        last_err = "no SD output"
+        for attempt in range(SD_ATTEMPTS):  # bounded retry, new seed each time
+            result = generate_sd_draft(
+                prompt=f"{prompt}, dwarf fortress tileset style, full body creature, pixel art",
+                output_path=draft,
+                negative_prompt="photo, blurry, text, watermark, 3d render",
+                width=512,
+                height=512,
+                seed=0 if attempt == 0 else 7919 * attempt,
+                force=force or attempt > 0,
+                lock_label=f"df_art_{cid_l}",
+            )
+            if result.ok and result.output_path:
+                try:
+                    _downscale_to_sheet(result.output_path, body_path)
+                    Image, _ = _try_pillow()
+                    if Image:
+                        im = Image.open(result.output_path).convert("RGBA")
+                        im.resize((96, 96), Image.Resampling.NEAREST).save(portrait_path)
+                    used_sd = True
+                    break
+                except Exception as exc:
+                    last_err = f"SD postprocess failed: {exc}"
+            else:
+                last_err = result.error or last_err
+            print(f"  [WARN] SD attempt {attempt + 1}/{SD_ATTEMPTS} for {cid} failed: {last_err}")
+        if not used_sd:
+            # Raises SdUnavailable unless procedural art is explicitly allowed.
+            procedural_fallback(f"DF art for {cid}: {last_err}", allow=allow_procedural)
 
     if not used_sd or not body_path.exists():
         if workers and workers > 1:
@@ -235,11 +256,28 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="Generate DF creature tiles")
     ap.add_argument("--spec", type=Path, required=True)
     ap.add_argument("--mod-root", type=Path, required=True)
-    ap.add_argument("--no-sd", action="store_true")
+    ap.add_argument("--no-sd", action="store_true", help="Explicit Pillow-only art (no SD)")
+    ap.add_argument(
+        "--allow-procedural",
+        action="store_true",
+        help="Use Pillow art if SD is down/fails (default: fail; or AAMT_SD_STRICT=0)",
+    )
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
     spec = load_spec(args.spec)
-    paths = generate_art_for_spec(spec, args.mod_root, no_sd=args.no_sd, force=args.force)
+    from sd_policy import SdUnavailable
+
+    try:
+        paths = generate_art_for_spec(
+            spec,
+            args.mod_root,
+            no_sd=args.no_sd,
+            force=args.force,
+            allow_procedural=args.allow_procedural,
+        )
+    except SdUnavailable as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
     print(paths)
     return 0
 

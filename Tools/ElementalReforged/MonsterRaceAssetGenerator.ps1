@@ -31,6 +31,7 @@ param(
     [switch]$SkipSD,
     [switch]$NoEnhance,
     [switch]$Force,
+    [switch]$AllowProcedural,   # explicit opt-in: procedural/original stand-ins when SD is down (default: fail)
     [switch]$Banner,
     [switch]$BannerOnly,
     [string]$OutputDir = "",
@@ -104,6 +105,7 @@ function Invoke-Banner {
     if ($InstallToMod) { $ban += "--install" }
     if ($Force) { $ban += "--force" }
     if ($NoEnhance) { $ban += "--no-enhance" }
+    if ($AllowProcedural) { $ban += "--allow-procedural" }
     if ($StartSD -or -not $SkipSD) { $ban += "--start-sd" }
     Write-Host "`n=== Mod Manager banner (local SD/Ollama, high quality) ===" -ForegroundColor Cyan
     return (Invoke-PyTool $ban)
@@ -156,6 +158,7 @@ if ($StartSD -or ($modeLower -ne "tools" -and -not $SkipSD)) { $gen += "--start-
 if ($SkipSD) { $gen += "--skip-sd-start" }
 if ($NoEnhance) { $gen += "--no-enhance" }
 if ($Force) { $gen += "--force-ai" }
+if ($AllowProcedural) { $gen += "--allow-procedural" }
 
 Write-Host "`n=== Elemental Reforged Monster Gear (AAMT) ===" -ForegroundColor Cyan
 Write-Host "Mode: $Mode | Race: $Race | Install: $InstallToMod | StartSD: $StartSD" -ForegroundColor Gray

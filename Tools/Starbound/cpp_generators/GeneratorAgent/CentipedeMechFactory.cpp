@@ -1,4 +1,5 @@
 #include "CentipedeMechFactory.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "core/Log.hpp"
 
 namespace MagiTech {
@@ -6,9 +7,9 @@ namespace CentipedeMechs {
 
 void CentipedeMechFactory::initialize(size_t num_threads) {
     if (m_initialized) return;
-    m_pool = std::make_unique<MultithreadBusPlugin>(num_threads);
+    m_pool = std::make_unique<GeneratorTaskPool>(num_threads);
     m_initialized = true;
-    Log::info("CentipedeMechFactory initialized with {} threads", num_threads);
+    Log::info("CentipedeMech", "CentipedeMechFactory initialized with {} threads", num_threads);
 }
 
 void CentipedeMechFactory::shutdown() {
@@ -29,14 +30,16 @@ std::future<MechBundle> CentipedeMechFactory::generateAsync(
     }
     
     return m_pool->enqueue([=]() {
-        Log::info("Starting async mech generation for: {}", m.id);
+        Log::info("CentipedeMech", "Starting async mech generation for: {}", m.id);
         
         MechBundle bundle;
         
-        // Generate all components in parallel where possible
-        auto segmentsFuture = m_pool->enqueue([=]() { return SegmentGen::buildSegments(m, l); });
-        auto jointsFuture = m_pool->enqueue([=]() { return JointGen::buildJoints(m.segmentCount, l.jointRadius); });
-        auto legsFuture = m_pool->enqueue([=]() { return LegGen::buildAllLegs(m.segmentCount, l); });
+        // Generate all components in parallel where possible. These run as
+        // separate async tasks rather than on m_pool: this lambda already
+        // occupies a pool worker, so blocking on more pool tasks could deadlock.
+        auto segmentsFuture = std::async(std::launch::async, [=]() { return SegmentGen::buildSegments(m, l); });
+        auto jointsFuture = std::async(std::launch::async, [=]() { return JointGen::buildJoints(m.segmentCount, l.jointRadius); });
+        auto legsFuture = std::async(std::launch::async, [=]() { return LegGen::buildAllLegs(m.segmentCount, l); });
         
         // Wait for parallel components
         bundle.segments = segmentsFuture.get();
@@ -58,7 +61,7 @@ std::future<MechBundle> CentipedeMechFactory::generateAsync(
         bundle.audio = AudioGen::buildMechSounds();
         bundle.collider = CollisionGen::buildMechCollider(m, l);
         
-        Log::info("Completed async mech generation for: {}", m.id);
+        Log::info("CentipedeMech", "Completed async mech generation for: {}", m.id);
         return bundle;
     });
 }

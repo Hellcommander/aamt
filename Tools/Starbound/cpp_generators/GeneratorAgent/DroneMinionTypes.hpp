@@ -1,10 +1,34 @@
 #pragma once
 #include <string>
+#include <type_traits>
 #include <glm/glm.hpp>
 #include "vendor/xxhash/xxhash.h"
 
 namespace MagiTech {
 namespace DroneMinions {
+
+namespace detail {
+    // Field-wise hashing: hashing raw struct bytes would include padding and
+    // std::string heap pointers, which makes cache keys non-deterministic.
+    inline void hashField(XXH64_state_t& s, const std::string& v) noexcept {
+        const uint64_t len = v.size();
+        XXH64_update(&s, &len, sizeof(len));
+        XXH64_update(&s, v.data(), v.size());
+    }
+    template <typename T>
+    inline void hashField(XXH64_state_t& s, const T& v) noexcept {
+        static_assert(std::is_trivially_copyable_v<T>, "hash members field by field");
+        XXH64_update(&s, &v, sizeof(T));
+    }
+    template <typename... Ts>
+    inline uint64_t hashFields(const Ts&... fields) noexcept {
+        XXH64_state_t s;
+        XXH64_reset(&s, 0);
+        (hashField(s, fields), ...);
+        return XXH64_digest(&s);
+    }
+} // namespace detail
+
 
 using MeshHandle = uint32_t;
 using TextureHandle = uint32_t;
@@ -64,23 +88,20 @@ struct DroneMinionParams {
     int maxLODLevel = 3;
 
     uint64_t hashKey() const noexcept {
-        XXH64_state_t hash_state;
-        XXH64_reset(&hash_state, 0);
-        XXH64_update(&hash_state, this, sizeof(DroneMinionParams));
-        return XXH64_digest(&hash_state);
+        return detail::hashFields(id, bodyRadius, bodyHeight, bodyDetail, rotorCount, rotorRadius, rotorThickness, hoverHeight, bodyColorPrimary, bodyColorSecondary, ledColor, enableSensorArray, sensorCount, enableWeaponMount, weaponCount, weaponLength, enableThrusterFX, thrusterColor, thrusterLifetime, sparkCount, sparkColor, maxSpeed, acceleration, turnRateDeg, mass, detectionRange, attackRange, retreatThreshold, idlePatrolRadius, dynamicLOD, maxLODLevel);
     }
 };
 
 struct DroneMinionBundle {
-    MeshHandle bodyMesh;
-    MeshHandle rotorMesh;
-    TextureHandle bodyTexture;
-    ShaderHandle bodyShader;
-    ParticleHandle thrusterFX;
-    ParticleHandle jointSparks;
-    PhysicsHandle flightPhysics;
-    AIHandle aiController;
-    TextureHandle icon;
+    MeshHandle bodyMesh = 0;
+    MeshHandle rotorMesh = 0;
+    TextureHandle bodyTexture = 0;
+    ShaderHandle bodyShader = 0;
+    ParticleHandle thrusterFX = 0;
+    ParticleHandle jointSparks = 0;
+    PhysicsHandle flightPhysics = 0;
+    AIHandle aiController = 0;
+    TextureHandle icon = 0;
 };
 
 } // namespace DroneMinions

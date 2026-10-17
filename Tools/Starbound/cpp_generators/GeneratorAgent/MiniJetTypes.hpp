@@ -8,17 +8,106 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <xxhash.h>
-#include <yaml-cpp/yaml.h>
+#include "vendor/json/include/nlohmann/json.hpp"
 
 namespace MiniJetGen {
 
-// Forward declarations
-struct MeshHandle;
-struct MaterialHandle;
-struct Skeleton;
-struct Animation;
-struct PhysicsBody;
-struct ThrusterNode;
+// ---------------------------------------------------------------------------------------------
+// Runtime asset data (CPU side). "Handles" own their data so they can be cached, serialized and
+// uploaded by whichever renderer consumes the package.
+// ---------------------------------------------------------------------------------------------
+
+// Triangle mesh with optional skinning data (up to 4 bone influences per vertex)
+struct MeshHandle {
+    std::string name;
+    std::vector<glm::vec3> positions;
+    std::vector<glm::vec3> normals;
+    std::vector<glm::vec2> uvs;
+    std::vector<uint32_t> indices;
+    std::vector<glm::uvec4> boneIndices;
+    std::vector<glm::vec4> boneWeights;
+
+    bool isValid() const { return !positions.empty() && !indices.empty(); }
+    size_t vertexCount() const { return positions.size(); }
+    size_t triangleCount() const { return indices.size() / 3; }
+};
+
+// Material: shader name plus named scalar / vector parameters
+struct MaterialHandle {
+    std::string name;
+    std::string shader;
+    std::unordered_map<std::string, float> floatParams;
+    std::unordered_map<std::string, glm::vec3> vec3Params;
+    float textureResolutionScale = 1.0f;   // 1 = full resolution textures
+    int shaderComplexity = 3;              // 0 (cheapest) .. 3 (full feature set)
+
+    bool isValid() const { return !name.empty(); }
+};
+
+struct Bone {
+    std::string name;
+    int parent = -1;                       // index into Skeleton::bones, -1 for the root
+    glm::vec3 position{0.0f};              // bind position (model space)
+};
+
+struct Skeleton {
+    std::vector<Bone> bones;
+
+    bool isValid() const { return !bones.empty(); }
+    int findBone(const std::string& boneName) const {
+        for (size_t i = 0; i < bones.size(); ++i)
+            if (bones[i].name == boneName) return static_cast<int>(i);
+        return -1;
+    }
+};
+
+struct Keyframe {
+    float time = 0.0f;
+    glm::vec3 translation{0.0f};
+    glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+    glm::vec3 scale{1.0f};
+};
+
+struct AnimationTrack {
+    std::string boneName;
+    std::vector<Keyframe> keys;
+};
+
+struct Animation {
+    std::string name;
+    float duration = 0.0f;
+    std::vector<AnimationTrack> tracks;
+    Skeleton skeleton;                     // skeleton the tracks were authored for
+
+    bool isValid() const { return !tracks.empty() && duration > 0.0f; }
+    Animation clone() const { return *this; }
+    const Skeleton& getSkeleton() const { return skeleton; }
+    std::vector<AnimationTrack>& getTracks() { return tracks; }
+    const std::vector<AnimationTrack>& getTracks() const { return tracks; }
+};
+
+struct PhysicsBody {
+    enum class Shape { None, Box, Capsule, ConvexHull };
+    std::string name;
+    Shape shape = Shape::None;
+    glm::vec3 halfExtents{0.5f};           // Box
+    float radius = 0.5f;                   // Capsule
+    float height = 1.0f;                   // Capsule (cylinder part)
+    std::vector<glm::vec3> hullPoints;     // ConvexHull
+    float mass = 0.0f;
+
+    bool isValid() const { return shape != Shape::None; }
+};
+
+struct ThrusterNode {
+    std::string name;
+    float force = 0.0f;                    // Newtons at full throttle
+    glm::vec3 direction{0.0f, 0.0f, -1.0f};
+    float heatDistortion = 0.0f;
+    glm::vec3 position{0.0f};
+
+    bool isValid() const { return force > 0.0f; }
+};
 
 // Quality levels for LOD system
 enum class Quality {
@@ -81,7 +170,7 @@ enum class AnimationType {
 // Module definition structure
 struct ModuleDefinition {
     std::string id;
-    ModuleType type;
+    ModuleType type = ModuleType::Fuselage;
     std::string meshPath;
     std::string attachBone;
     glm::vec3 offset = {0, 0, 0};
@@ -127,7 +216,7 @@ struct CockpitDefinition {
     std::string meshPath;
     std::string attachBone;
     glm::vec3 seatPosition = {0, 0.6f, -0.2f};
-    glm::vec3 hudAnchors[4]; // speedometer, targeting, altitude, energy
+    std::array<glm::vec3, 4> hudAnchors{}; // speedometer, targeting, altitude, energy
     std::string canopyMaterial;
     float canopyTransparency = 0.8f;
     bool enableHolographicHUD = true;
@@ -138,7 +227,7 @@ struct CockpitDefinition {
         XXH64_update(&state, meshPath.c_str(), meshPath.length());
         XXH64_update(&state, attachBone.c_str(), attachBone.length());
         XXH64_update(&state, &seatPosition, sizeof(seatPosition));
-        XXH64_update(&state, hudAnchors, sizeof(hudAnchors));
+        XXH64_update(&state, hudAnchors.data(), sizeof(glm::vec3) * hudAnchors.size());
         XXH64_update(&state, canopyMaterial.c_str(), canopyMaterial.length());
         XXH64_update(&state, &canopyTransparency, sizeof(canopyTransparency));
         XXH64_update(&state, &enableHolographicHUD, sizeof(enableHolographicHUD));
@@ -234,7 +323,7 @@ struct FlightParameters {
 // Animation definition
 struct AnimationDefinition {
     std::string id;
-    AnimationType type;
+    AnimationType type = AnimationType::Hover;
     std::string path;
     float speed = 1.0f;
     bool loop = true;
@@ -272,7 +361,7 @@ struct PhysicsDefinition {
     
     // Collision shapes
     struct CollisionShape {
-        enum class Type { Box, Capsule, ConvexHull } type;
+        enum class Type { Box, Capsule, ConvexHull } type = Type::Box;
         glm::vec3 size = {1, 1, 1};
         float radius = 0.5f;
         float height = 1.0f;
@@ -290,7 +379,7 @@ struct PhysicsDefinition {
 
 // LOD definition
 struct LODDefinition {
-    Quality quality;
+    Quality quality = Quality::High;
     float meshDecimate = 0.0f;
     float materialDetail = 1.0f;
     int maxBoneInfluences = 4;
@@ -330,21 +419,21 @@ struct MiniJetDefinition {
         XXH64_update(&state, version.c_str(), version.length());
         
         for (const auto& module : modules) {
-            XXH64_update(&state, &module.hashKey(), sizeof(size_t));
+            { const size_t h = module.hashKey(); XXH64_update(&state, &h, sizeof(h)); }
         }
         
-        XXH64_update(&state, &cockpit.hashKey(), sizeof(size_t));
-        XXH64_update(&state, &magitechMaterials.hashKey(), sizeof(size_t));
-        XXH64_update(&state, &flightParameters.hashKey(), sizeof(size_t));
+        { const size_t h = cockpit.hashKey(); XXH64_update(&state, &h, sizeof(h)); }
+        { const size_t h = magitechMaterials.hashKey(); XXH64_update(&state, &h, sizeof(h)); }
+        { const size_t h = flightParameters.hashKey(); XXH64_update(&state, &h, sizeof(h)); }
         
         for (const auto& anim : animations) {
-            XXH64_update(&state, &anim.hashKey(), sizeof(size_t));
+            { const size_t h = anim.hashKey(); XXH64_update(&state, &h, sizeof(h)); }
         }
         
-        XXH64_update(&state, &physics.hashKey(), sizeof(size_t));
+        { const size_t h = physics.hashKey(); XXH64_update(&state, &h, sizeof(h)); }
         
         for (const auto& lod : lods) {
-            XXH64_update(&state, &lod.hashKey(), sizeof(size_t));
+            { const size_t h = lod.hashKey(); XXH64_update(&state, &h, sizeof(h)); }
         }
         
         return XXH64_digest(&state);
@@ -369,7 +458,7 @@ struct MiniJetAsset {
     size_t hashKey() const {
         XXH64_state_t state;
         XXH64_reset(&state, 0);
-        XXH64_update(&state, &definition.hashKey(), sizeof(size_t));
+        { const size_t h = definition.hashKey(); XXH64_update(&state, &h, sizeof(h)); }
         return XXH64_digest(&state);
     }
 };
@@ -378,7 +467,7 @@ struct MiniJetAsset {
 struct MiniJetPackage {
     std::string name;
     std::string version;
-    size_t definitionHash;
+    size_t definitionHash = 0;
     std::vector<std::string> meshFiles;
     std::vector<std::string> materialFiles;
     std::vector<std::string> animationFiles;
@@ -405,6 +494,8 @@ struct MiniJetInstance {
     float throttle = 0.0f;
     float altitude = 0.0f;
     float speed = 0.0f;
+    
+    glm::vec3 controlInput = {0, 0, 0};   // pitch, yaw, roll in [-1, 1]
     
     // Flight state
     bool isFlying = false;

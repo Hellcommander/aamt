@@ -1,12 +1,40 @@
 #include "ShotgunPelletLuaBindings.hpp"
 #include "ShotgunPelletFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include <vector>
 
 namespace MagiTech {
 namespace ShotgunPellets {
 
 static std::vector<std::pair<std::future<ShotgunAssetBundle>, std::string>> pendingSystems;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<ShotgunPelletFactory>& factorySlot() {
+    static std::shared_ptr<ShotgunPelletFactory> f;
+    return f;
+}
+} // namespace
+
+void ShotgunPelletLuaBindings::setFactory(std::shared_ptr<ShotgunPelletFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<ShotgunPelletFactory> ShotgunPelletLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<ShotgunPelletFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 void ShotgunPelletLuaBindings::bind(sol::state& lua) {
     lua.new_enum("SpreadPattern",
@@ -46,15 +74,15 @@ void ShotgunPelletLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("fire_shotgun",
-        [&](const ShotgunPelletParams& p) {
-            auto factory = MainPlugin::instance().getShotgunPelletFactory();
+        [](const ShotgunPelletParams& p) {
+            auto factory = ShotgunPelletLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("fire_shotgun_async",
-        [&](const ShotgunPelletParams& p) {
-            auto factory = MainPlugin::instance().getShotgunPelletFactory();
+        [](const ShotgunPelletParams& p) {
+            auto factory = ShotgunPelletLuaBindings::factory();
             pendingSystems.emplace_back(factory->generateAsync(p), p.id);
         }
     );

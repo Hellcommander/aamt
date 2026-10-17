@@ -82,8 +82,8 @@ private:
     struct FileWatcher {
         std::string mechName;
         std::filesystem::path definitionPath;
-        std::chrono::system_clock::time_point lastModified;
-        uint64_t lastHash;
+        std::filesystem::file_time_type lastModified;
+        uint64_t lastHash = 0;
     };
     std::vector<FileWatcher> fileWatchers_;
     std::mutex watcherMutex_;

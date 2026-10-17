@@ -111,10 +111,10 @@ void GyroProjectileLuaBindings::bind(sol::state& lua) {
         
         try {
             pendingGyros.emplace_back(g_factory->generateAsync(g, f, t, v, p, a, c), g.id);
-            Log::info("Gyro projectile generation started: {}", g.id);
+            Log::info("GyroProjectile", "Gyro projectile generation started: {}", g.id);
             return true;
         } catch (const std::exception& e) {
-            Log::error("Failed to spawn gyro projectile: {}", e.what());
+            Log::error("GyroProjectile", "Failed to spawn gyro projectile: {}", e.what());
             return false;
         }
     });
@@ -155,12 +155,12 @@ void GyroProjectileLuaBindings::poll_assets(sol::state& lua) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             try {
                 auto bundle = it->first.get();
-                Log::info("Gyro projectile ready: {} (mesh: {}, flight: {}, trail: {}, shader: {}, particles: {}, audio: {}, collider: {})", 
+                Log::info("GyroProjectile", "Gyro projectile ready: {} (mesh: {}, flight: {}, trail: {}, shader: {}, particles: {}, audio: {}, collider: {})", 
                     it->second, bundle.mesh, bundle.flightSim, bundle.trailMesh, bundle.vfxShader, 
                     bundle.particleSys, bundle.humAudio, bundle.collider);
                 lua["on_gyro_ready"](it->second, bundle);
             } catch (const std::exception& e) {
-                Log::error("Gyro generation failed for {}: {}", it->second, e.what());
+                Log::error("GyroProjectile", "Gyro generation failed for {}: {}", it->second, e.what());
                 lua["on_gyro_error"](it->second, e.what());
             }
             it = pendingGyros.erase(it);

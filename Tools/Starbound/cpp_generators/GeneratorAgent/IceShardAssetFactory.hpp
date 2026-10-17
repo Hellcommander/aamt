@@ -3,6 +3,7 @@
 #include <optional>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "IceShardTypes.hpp"
 
 namespace MagiTech {
@@ -38,7 +39,7 @@ inline uint64_t hashCombine(uint64_t h1, uint64_t h2) {
 
 class IceShardAssetFactory {
     ConcurrentLRUCache<uint64_t, IceShardBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized = false;
 
 public:

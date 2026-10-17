@@ -465,6 +465,10 @@ ColorTheme createAbyssTheme() {
 // Accessibility features
 namespace Accessibility {
 
+using ColorUtils::getContrastRatio;
+using ColorUtils::getLuminance;
+using ColorUtils::linearToSrgb;
+
 ColorPalette createColorBlindFriendlyPalette() {
     ColorPalette palette("Color Blind Friendly");
     palette.description = "Colors optimized for color vision deficiency";

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Starbound Cursor Generator - Creates cursor files for custom mouse cursors
 
@@ -14,7 +14,10 @@ $settingsPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "..\
 if (Test-Path $settingsPath) {
     . $settingsPath
 }
-    - Placeholder image generation
+    - Cursor sprite sheet painted by the local Stable Diffusion 3.5 server (:1338)
+      (background knocked out to alpha, palette-quantized to the frame size).
+      SD or throw: procedural System.Drawing art only runs with -AllowProcedural
+      (or AAMT_SD_STRICT=0) after SD fails.
 
 .PARAMETER CursorName
     Name of the cursor (used for filename)
@@ -64,10 +67,26 @@ param(
     [string]$ImagePath = "",  # Path to existing image (relative to assets)
 
     [Parameter(Mandatory=$false)]
-    [switch]$GeneratePlaceholderImage,  # Generate a placeholder PNG
+    [switch]$GeneratePlaceholderImage,  # Kept for compatibility: the PNG is always written (via Stable Diffusion)
 
     [Parameter(Mandatory=$false)]
-    [switch]$Animated  # Whether cursor has multiple states
+    [switch]$Animated,  # Whether cursor has multiple states
+
+    [Parameter(Mandatory=$false)]
+    [switch]$AllowProcedural,  # Permit the old System.Drawing art, only as fallback after SD failure (or AAMT_SD_STRICT=0)
+
+    # Ollama / art direction
+    [Parameter(Mandatory=$false)]
+    [string]$Description = "",
+
+    [Parameter(Mandatory=$false)]
+    [switch]$UseOllama,
+
+    [Parameter(Mandatory=$false)]
+    [string]$OllamaModel = "codellama:7b-instruct",
+
+    [Parameter(Mandatory=$false)]
+    [string]$VisualModel = "wizardlm-uncensored"
 )
 
 # Import shared Ollama integration module if available
@@ -81,6 +100,9 @@ if (Test-Path $sharedModulePath) {
         }
     }
 }
+
+# Stable Diffusion art helper (SD3.5 server :1338). No procedural art unless -AllowProcedural.
+Import-Module (Join-Path $PSScriptRoot "StarboundSdArt.psm1") -Force
 
 # ============================================================================
 # PRESET DEFINITIONS
@@ -173,7 +195,36 @@ $CursorPresets = @{
 # HELPER FUNCTIONS
 # ============================================================================
 
-function New-PlaceholderCursorImage {
+function Get-StableSeed {
+    param([string]$Text)
+    $h = 17
+    foreach ($ch in $Text.ToCharArray()) { $h = (($h * 31) + [int]$ch) % 900000 }
+    return [int]($h + 1)
+}
+
+function Get-CursorFrameHint {
+    # Per-frame prompt wording from the Starbound frame name.
+    param([string]$Name, [int]$Index, [int]$Total)
+    switch -Regex ($Name.ToLower()) {
+        '^(default|normal|neutral|open|horizontal)$' { return "idle resting state" }
+        '^(hover|active)$'   { return "highlighted hover state, brighter and glowing" }
+        '^(click|down)$'     { if ($_ -eq 'click') { return "pressed click state, slightly smaller and bright flash" } else { return "indicator pushed toward the bottom" } }
+        '^up$'               { return "indicator pushed toward the top" }
+        '^left$'             { return "indicator pushed toward the left" }
+        '^right$'            { return "indicator pushed toward the right" }
+        '^pointing$'         { return "index finger extended pointing" }
+        '^grabbing$'         { return "closed grabbing fist" }
+        '^vertical$'         { return "vertical orientation" }
+        '^diagonal1$'        { return "rotated diagonal orientation, top-left to bottom-right" }
+        '^diagonal2$'        { return "rotated diagonal orientation, top-right to bottom-left" }
+        '^frame\d+$'         { return "animation frame $($Index + 1) of $Total, rotated by $([int](360 * $Index / [Math]::Max(1, $Total))) degrees" }
+        default              { return "state: $Name" }
+    }
+}
+
+function New-ProceduralCursorFallbackImage {
+    # LEGACY FALLBACK ONLY: coloured lines/ellipses. Runs solely when
+    # -AllowProcedural (or AAMT_SD_STRICT=0) is set and Stable Diffusion failed.
     param(
         [string]$OutputPath,
         [int]$Width,
@@ -433,16 +484,16 @@ Return ONLY the JSON object."
 }
 
 # ============================================================================
-# Generate placeholder or intelligent image (optional)
+# Generate the cursor sprite sheet PNG with Stable Diffusion (SD3.5 :1338)
 # ============================================================================
 
-# Always write a real cursor PNG (procedural art fills the role)
+# Always write a real cursor PNG. Pixels come from SD; Ollama refines the prompt above.
 if ($true) {
     $pngFile = Join-Path $outputPath "$CursorName.png"
-    
-    # Use AI design if available
+
+    # Legacy style key (only used by the explicit procedural fallback)
     $style = if ($script:cursorDesign -and $script:cursorDesign.CursorStyle) {
-        $script:cursorDesign.CursorStyle.ToLower()
+        ([string]$script:cursorDesign.CursorStyle).ToLower()
     } else {
         switch ($Preset) {
             "Pointer" { "pointer" }
@@ -451,16 +502,97 @@ if ($true) {
             default { "crosshair" }
         }
     }
-    
-    $success = New-PlaceholderCursorImage -OutputPath $pngFile `
-        -Width ([int]$finalFrameSize[0]) -Height ([int]$finalFrameSize[1]) `
-        -Columns ([int]$finalColumns) -Rows ([int]$finalRows) `
-        -Style ([string]$style)
-    
+
+    $presetSubject = switch ($Preset) {
+        "Default"   { "arrow mouse pointer" }
+        "Pointer"   { "arrow mouse pointer with a sharp tip at the top-left" }
+        "Crosshair" { "targeting crosshair reticle with a small central dot" }
+        "Joystick"  { "round virtual joystick ring with a ball indicator in the middle" }
+        "Hand"      { "pointing hand cursor" }
+        "Text"      { "thin vertical text-insertion I-beam cursor" }
+        "Wait"      { "circular loading spinner made of segments" }
+        "Move"      { "four-way move cursor, cross of four arrows" }
+        "Resize"    { "double-headed resize arrow" }
+        default     { "small game cursor pointer" }
+    }
+
+    $parts = New-Object System.Collections.Generic.List[string]
+    $parts.Add("single game UI cursor icon: $presetSubject")
+    if (-not [string]::IsNullOrWhiteSpace($Description)) { $parts.Add($Description.Trim()) }
+    if ($script:cursorDesign) {
+        if ($script:cursorDesign.VisualDescription) { $parts.Add([string]$script:cursorDesign.VisualDescription) }
+        if ($script:cursorDesign.CursorStyle)       { $parts.Add("$($script:cursorDesign.CursorStyle) style") }
+        if ($script:cursorDesign.ColorPalette) {
+            $words = @()
+            foreach ($rgb in @($script:cursorDesign.ColorPalette)) {
+                try {
+                    if (@($rgb).Count -ge 3) { $words += ("rgb({0},{1},{2})" -f [int]$rgb[0], [int]$rgb[1], [int]$rgb[2]) }
+                } catch { }
+            }
+            if ($words) { $parts.Add("colors " + ($words -join " and ")) }
+        }
+    } else {
+        $parts.Add("bright glowing cyan and white with a dark outline")
+    }
+    $parts.Add("bold simple shape, one centered cursor symbol only, Starbound sci-fantasy pixel art")
+    $cursorPromptText = $parts -join ", "
+
+    # Flatten frame names (may be 1D, or an array of rows) and turn each into a per-cell hint.
+    $flatNames = New-Object System.Collections.Generic.List[string]
+    foreach ($entry in @($finalFrameNames)) {
+        if ($entry -is [System.Collections.IEnumerable] -and $entry -isnot [string]) {
+            foreach ($n in $entry) { $flatNames.Add([string]$n) }
+        } else {
+            $flatNames.Add([string]$entry)
+        }
+    }
+    $cellCount = [int]$finalColumns * [int]$finalRows
+    $cellVariants = @()
+    if ($cellCount -gt 1) {
+        for ($ci = 0; $ci -lt $cellCount; $ci++) {
+            $nm = if ($ci -lt $flatNames.Count) { $flatNames[$ci] } else { "state$($ci + 1)" }
+            $cellVariants += (Get-CursorFrameHint -Name $nm -Index $ci -Total $cellCount)
+        }
+    }
+
+    $sdArgs = @{
+        Kind        = "sheet"
+        Prompt      = $cursorPromptText
+        OutputPath  = $pngFile
+        Width       = [int]$finalFrameSize[0]
+        Height      = [int]$finalFrameSize[1]
+        Count       = $cellCount
+        Columns     = [int]$finalColumns
+        SdKind      = "icon"
+        Transparent = $true
+        Pixel       = $true
+        Colors      = 12
+        Seed        = (Get-StableSeed -Text "$CursorName|$Preset")
+        AllowProcedural = $AllowProcedural
+    }
+    if ($cellVariants.Count -gt 0) { $sdArgs.Variants = [string[]]$cellVariants }
+    # Hover/click/direction/spinner frames must be the same cursor in different states.
+    if ($cellCount -gt 1) { $sdArgs.Consistent = $true }
+
+    Write-Host "[SD] Painting $cellCount cursor frame(s) at $($finalFrameSize[0])x$($finalFrameSize[1]) with Stable Diffusion..." -ForegroundColor Yellow
+    # Throws when SD fails and procedural art is not allowed; returns $false only when it is allowed.
+    $success = New-StarboundSdArt @sdArgs
+
+    if (-not $success) {
+        Write-Host "[Fallback] Drawing procedural cursor art (explicitly allowed)" -ForegroundColor Yellow
+        $success = New-ProceduralCursorFallbackImage -OutputPath $pngFile `
+            -Width ([int]$finalFrameSize[0]) -Height ([int]$finalFrameSize[1]) `
+            -Columns ([int]$finalColumns) -Rows ([int]$finalRows) `
+            -Style ([string]$style)
+        $cursorArtSource = "procedural fallback"
+    } else {
+        $cursorArtSource = "Stable Diffusion"
+    }
+
     if ($success) {
-        Write-Host "[Created] $pngFile" -ForegroundColor Green
+        Write-Host "[Created] $pngFile ($cursorArtSource)" -ForegroundColor Green
         if ($script:cursorDesign) {
-            Write-Host "  AI-designed cursor" -ForegroundColor Gray
+            Write-Host "  AI-designed cursor prompt" -ForegroundColor Gray
         }
     }
 }
@@ -489,7 +621,8 @@ if ($hasMultipleFrames) {
     Write-Host "  - $CursorName.frames" -ForegroundColor White
 }
 if (Test-Path (Join-Path $outputPath "$CursorName.png")) {
-    Write-Host "  - $CursorName.png (procedural)" -ForegroundColor White
+    $pngLabel = if ($cursorArtSource) { $cursorArtSource } else { "existing file" }
+    Write-Host "  - $CursorName.png ($pngLabel)" -ForegroundColor White
 }
 
 Write-Host ""

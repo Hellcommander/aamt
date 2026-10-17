@@ -2,14 +2,13 @@
 """
 Overnight sequential branding runner.
 
-Asset-size policy:
-  - S.png (32×32): procedural PIL only — fast, GPU-free, run first.
-  - thumbnail2.png (800×600): SD sequentially (one GPU job at a time) when server
-    healthy; procedural fallback on OOM/failure.
+Asset policy: every asset is Stable Diffusion art, generated sequentially (one GPU job
+at a time). There is no procedural fallback: if the SD server cannot be brought up or a
+draft fails QA the job fails and the run reports it.
 
 Order:
-  1. hemohydraulic icon (procedural)
-  2. water magic icon (procedural)
+  1. hemohydraulic icon (SD)
+  2. water magic icon (SD)
   3. hemohydraulic thumbnail (SD)
   4. water magic thumbnail (SD)
 
@@ -28,7 +27,7 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-TOOLS = Path(r"D:\games\Steam\steamapps\common\Transcendence\Tools\Soulash2")
+TOOLS = Path(__file__).resolve().parent
 MODS = Path(r"E:\SteamLibrary\steamapps\common\Soulash 2\data\mods")
 SD_SERVER = Path(r"E:\tools\sd3.5\sd3.5\server.py")
 GEN = TOOLS / "generate_mod_branding_assets.py"
@@ -36,15 +35,15 @@ SD_PORT = 1338
 PING_URL = f"http://127.0.0.1:{SD_PORT}/ping"
 PAUSE_BETWEEN_JOBS_SEC = 5
 
-# Phase 1 — procedural icons (no GPU)
+# Phase 1 — SD icons (drafts rendered at SD's quality floor, then downscaled to 32x32)
 ICON_JOBS = [
     {"mod": MODS / "arendeth_hemohydraulic_magic", "theme": "hemohydraulic", "mode": "icon",
-     "prefer_keep_backup": False, "backup": True, "use_sd": False},
+     "prefer_keep_backup": False, "backup": True, "use_sd": True},
     {"mod": MODS / "arendeth_water_magic", "theme": "hydromancy", "mode": "icon",
-     "prefer_keep_backup": True, "backup": True, "use_sd": False},
+     "prefer_keep_backup": True, "backup": True, "use_sd": True},
 ]
 
-# Phase 2 — SD thumbnails only (sequential, one GPU job at a time)
+# Phase 2 — SD thumbnails (sequential, one GPU job at a time)
 THUMB_JOBS = [
     {"mod": MODS / "arendeth_hemohydraulic_magic", "theme": "hemohydraulic", "mode": "thumbnail",
      "prefer_keep_backup": False, "backup": False, "use_sd": True},
@@ -160,15 +159,15 @@ def run_image_job(job: dict, job_index: int, total_jobs: int) -> dict:
         "--quality", "mechanical",
         "--max-attempts", "2",
     ]
-    if job.get("use_sd"):
-        cmd.append("--use-sd")
+    if not job.get("use_sd", True):
+        cmd.append("--no-sd")
     if job.get("prefer_keep_backup"):
         cmd.append("--prefer-keep-backup")
     if not job.get("backup", False):
         cmd.append("--skip-backup")
 
     label = f"{mod_path.name} / {job['mode']}"
-    source = "SD thumbnail" if job.get("use_sd") else "procedural icon"
+    source = f"SD {job['mode']}" if job.get("use_sd", True) else f"procedural {job['mode']} (--no-sd)"
     log(f"=== JOB {job_index + 1}/{total_jobs}: {label} ({job['theme']}, {source}) ===")
     t0 = time.monotonic()
     proc = subprocess.run(cmd, capture_output=True, text=True)
@@ -220,14 +219,18 @@ def verify_assets() -> list:
 
 def main() -> int:
     log("Sequential overnight branding runner starting.")
-    log("Policy: procedural icons first, then SD thumbnails only (no SD for 32×32 icons).")
-    log("Order: hemo icon -> water icon -> hemo thumb (SD) -> water thumb (SD)")
+    log("Policy: all assets are SD art; no procedural fallback.")
+    log("Order: hemo icon -> water icon -> hemo thumb -> water thumb (all SD)")
 
     results = []
     total = len(ALL_JOBS)
 
-    # Phase 1: procedural icons (GPU-free)
-    log("=== PHASE 1: procedural icons (no SD) ===")
+    if not ensure_sd_server():
+        log("ABORT: SD server unavailable. No procedural placeholders were written.")
+        return 1
+
+    # Phase 1: SD icons (one at a time)
+    log("=== PHASE 1: SD icons (sequential) ===")
     for i, job in enumerate(ICON_JOBS):
         if not job["mod"].exists():
             log(f"SKIP missing mod: {job['mod']}")
@@ -236,8 +239,6 @@ def main() -> int:
 
     # Phase 2: SD thumbnails (one at a time)
     log("=== PHASE 2: SD thumbnails (sequential) ===")
-    if not ensure_sd_server():
-        log("SD server unavailable; thumbnail jobs will use procedural fallback via generator.")
     for i, job in enumerate(THUMB_JOBS, start=len(ICON_JOBS)):
         if not job["mod"].exists():
             log(f"SKIP missing mod: {job['mod']}")
@@ -252,15 +253,15 @@ def main() -> int:
     report = {
         "finished": datetime.now().isoformat(),
         "policy": {
-            "icons": "procedural PIL only (32×32, no SD)",
-            "thumbnails": "SD when server healthy; procedural fallback on failure",
+            "icons": "SD (rendered at the SD quality floor, downscaled to 32x32)",
+            "thumbnails": "SD; no procedural fallback (job fails instead)",
         },
         "constraints": {
             "sequential": True,
-            "sd_jobs": "thumbnails only",
+            "sd_jobs": "icons and thumbnails",
             "offload": "model_cpu_offload (sequential on OOM)",
             "thumb_settings": "1024x768 @ 24 steps",
-            "oom_fallback": "reduced resolution once, then procedural",
+            "oom_fallback": "reduced resolution once, then the job fails",
         },
         "jobs": results,
         "verification": verification,

@@ -11,6 +11,9 @@
 
 namespace MagiTech {
 namespace Audio {
+// The shared-asset pipeline lives in its own namespace: its ShaderType / TextureFormat must not clash
+// with WeaponGen.hpp or AudioAssetTypes.hpp, which share MagiTech::Audio.
+namespace SharedAssets {
 
 // Forward declarations
 struct SharedAssetDefinition;
@@ -73,6 +76,14 @@ enum class ScriptLanguage {
     CUSTOM
 };
 
+// Input parameters for SharedAssetGen::process
+struct SharedAssetParams {
+    std::string id = "shared";
+    std::string sharedDefinitionPath;   // JSON shared-asset definition; empty = single audio asset from filePath
+    std::string filePath;               // source file used by the default definition
+    float normalizeLUFS = -14.0f;       // loudness target for the default audio asset
+};
+
 // SharedAssetGen Class
 class SharedAssetGen {
 public:
@@ -132,6 +143,9 @@ public:
                               const std::vector<ProcessedAsset>& assets,
                               const SharedAssetManifest& manifest);
     
+    // Writes the .sharedpack archive (header, manifest JSON, asset blobs)
+    bool writeSharedPack(SharedPack& pack, const std::string& filePath);
+
     // Asset categorization
     void categorizeAssets(const std::vector<ProcessedAsset>& assets, SharedAssetResult& result);
     
@@ -191,7 +205,8 @@ public:
     float calculateDynamicRange(const std::vector<float>& samples);
     float calculateSignalToNoiseRatio(const std::vector<float>& samples);
     
-    // Test data generation
+    // Test fixture generation: small, valid files of each supported format (OBJ, material JSON,
+    // PNG, 16-bit PCM WAV, Lua) for exercising the importers
     std::vector<uint8_t> generateTestModelData();
     std::vector<uint8_t> generateTestMaterialData();
     std::vector<uint8_t> generateTestTextureData();
@@ -323,8 +338,8 @@ struct ProcessedAsset {
     AudioData audioData;
     ScriptData scriptData;
     
-    // Audio compatibility
-    std::vector<float> audioData;
+    // Decoded audio (interleaved float samples) for AUDIO assets
+    std::vector<float> audioSamples;
     uint32_t sampleRate = 44100;
     uint32_t numChannels = 2;
 };
@@ -389,6 +404,12 @@ struct SharedAssetResult {
     std::vector<std::string> warnings;
     std::map<std::string, std::string> metadata;
 };
+
+} // namespace SharedAssets
+
+// The shared-asset entry points are also reachable as MagiTech::Audio::SharedAssetGen / SharedAssetParams.
+using SharedAssets::SharedAssetGen;
+using SharedAssets::SharedAssetParams;
 
 } // namespace Audio
 } // namespace MagiTech 

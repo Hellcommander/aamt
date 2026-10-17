@@ -28,7 +28,7 @@ inline float simplex2(const glm::vec3& p) {
 
 namespace MeshGen {
     MeshHandle buildItem(const AlchemicalGrenadeParams& g) {
-        Log::info("Building grenade item mesh for: {}", g.id);
+        Log::info("AlchemicalGrenade", "Building grenade item mesh for: {}", g.id);
         
         Mesh mesh;
         
@@ -66,7 +66,7 @@ namespace MeshGen {
     }
     
     MeshHandle buildProjectile(const AlchemicalGrenadeParams& g) {
-        Log::info("Building grenade projectile mesh for: {}", g.id);
+        Log::info("AlchemicalGrenade", "Building grenade projectile mesh for: {}", g.id);
         
         Mesh mesh;
         
@@ -131,7 +131,7 @@ namespace MeshGen {
 
 namespace ShaderGen {
     ShaderHandle buildItem(const AlchemicalGrenadeParams& g) {
-        Log::info("Building grenade item shader for: {}", g.id);
+        Log::info("AlchemicalGrenade", "Building grenade item shader for: {}", g.id);
         
         Shader s;
         s.addStage("vertex", "grenade_item.vert");
@@ -178,7 +178,7 @@ namespace ShaderGen {
     }
     
     ShaderHandle buildProjectile(const AlchemicalGrenadeParams& g) {
-        Log::info("Building grenade projectile shader for: {}", g.id);
+        Log::info("AlchemicalGrenade", "Building grenade projectile shader for: {}", g.id);
         
         Shader s;
         s.addStage("vertex", "grenade_projectile.vert");
@@ -264,7 +264,7 @@ namespace ShaderGen {
 
 namespace TextureGen {
     TextureHandle buildItem(const AlchemicalGrenadeParams& g) {
-        Log::info("Building grenade item texture for: {}", g.id);
+        Log::info("AlchemicalGrenade", "Building grenade item texture for: {}", g.id);
         
         int W = 256, H = 256;
         std::vector<glm::u8vec4> pixels(W * H);
@@ -394,7 +394,7 @@ namespace TextureGen {
 
 namespace ParticleGen {
     ParticleHandle buildExplosion(const AlchemicalGrenadeParams& g) {
-        Log::info("Building grenade explosion particles for: {}", g.id);
+        Log::info("AlchemicalGrenade", "Building grenade explosion particles for: {}", g.id);
         
         ParticleSystem ps;
         ps.setType(ParticleType::BURST);
@@ -441,7 +441,7 @@ namespace ParticleGen {
     }
     
     ParticleHandle buildResidue(const AlchemicalGrenadeParams& g) {
-        Log::info("Building grenade residue particles for: {}", g.id);
+        Log::info("AlchemicalGrenade", "Building grenade residue particles for: {}", g.id);
         
         ParticleSystem ps;
         ps.setType(ParticleType::AREA_PUFF);
@@ -508,7 +508,7 @@ namespace ParticleGen {
 
 namespace AudioGen {
     AudioHandle buildExplosion(const AlchemicalGrenadeParams& g) {
-        Log::info("Building grenade explosion audio for: {}", g.id);
+        Log::info("AlchemicalGrenade", "Building grenade explosion audio for: {}", g.id);
         
         AudioClip clip;
         clip.setVolume(g.soundVolume);
@@ -585,7 +585,7 @@ namespace AudioGen {
 
 namespace IconGen {
     IconHandle buildItemIcon(const AlchemicalGrenadeParams& g, const UIItemParams& u) {
-        Log::info("Building grenade icon for: {}", g.id);
+        Log::info("AlchemicalGrenade", "Building grenade icon for: {}", g.id);
         
         IconRenderer renderer(u.iconSize, u.iconSize);
         
@@ -710,7 +710,7 @@ namespace IconGen {
 
 namespace PhysGen {
     PhysicsHandle buildShrapnel(const AlchemicalGrenadeParams& g) {
-        Log::info("Building grenade shrapnel physics for: {}", g.id);
+        Log::info("AlchemicalGrenade", "Building grenade shrapnel physics for: {}", g.id);
         
         PhysicsSystem ps;
         

@@ -20,7 +20,7 @@ CometType parseCometType(const std::string& str) {
     if (lower == "celestial_rock" || lower == "celestialrock") return CometType::CELESTIAL_ROCK;
     if (lower == "custom") return CometType::CUSTOM;
     
-    Log::warn("Unknown comet type: {}, defaulting to METEOR", str);
+    Log::warn("CometProjectile", "Unknown comet type: {}, defaulting to METEOR", str);
     return CometType::METEOR;
 }
 
@@ -34,7 +34,7 @@ CometShape parseCometShape(const std::string& str) {
     if (lower == "crystalline" || lower == "crystal") return CometShape::CRYSTALLINE;
     if (lower == "custom_shape" || lower == "custom") return CometShape::CUSTOM_SHAPE;
     
-    Log::warn("Unknown comet shape: {}, defaulting to SPHERE", str);
+    Log::warn("CometProjectile", "Unknown comet shape: {}, defaulting to SPHERE", str);
     return CometShape::SPHERE;
 }
 
@@ -49,7 +49,7 @@ TrailType parseTrailType(const std::string& str) {
     if (lower == "sparks" || lower == "spark") return TrailType::SPARKS;
     if (lower == "custom") return TrailType::CUSTOM;
     
-    Log::warn("Unknown trail type: {}, defaulting to DUST", str);
+    Log::warn("CometProjectile", "Unknown trail type: {}, defaulting to DUST", str);
     return TrailType::DUST;
 }
 
@@ -63,7 +63,7 @@ FragmentationType parseFragmentationType(const std::string& str) {
     if (lower == "disintegrate" || lower == "vaporize") return FragmentationType::DISINTEGRATE;
     if (lower == "custom") return FragmentationType::CUSTOM;
     
-    Log::warn("Unknown fragmentation type: {}, defaulting to NONE", str);
+    Log::warn("CometProjectile", "Unknown fragmentation type: {}, defaulting to NONE", str);
     return FragmentationType::NONE;
 }
 
@@ -77,7 +77,7 @@ NoiseType parseNoiseType(const std::string& str) {
     if (lower == "fractal") return NoiseType::FRACTAL;
     if (lower == "custom") return NoiseType::CUSTOM;
     
-    Log::warn("Unknown noise type: {}, defaulting to PERLIN", str);
+    Log::warn("CometProjectile", "Unknown noise type: {}, defaulting to PERLIN", str);
     return NoiseType::PERLIN;
 }
 
@@ -91,7 +91,7 @@ BlendMode parseBlendMode(const std::string& str) {
     if (lower == "overlay") return BlendMode::OVERLAY;
     if (lower == "normal" || lower == "alpha") return BlendMode::NORMAL;
     
-    Log::warn("Unknown blend mode: {}, defaulting to ADDITIVE", str);
+    Log::warn("CometProjectile", "Unknown blend mode: {}, defaulting to ADDITIVE", str);
     return BlendMode::ADDITIVE;
 }
 
@@ -412,7 +412,7 @@ CometProjectileParams fromJson(const nlohmann::json& json) {
         }
         
     } catch (const std::exception& e) {
-        Log::error("Error parsing comet projectile JSON: {}", e.what());
+        Log::error("CometProjectile", "Error parsing comet projectile JSON: {}", e.what());
         // Return default parameters on error
         params.id = "error_loading";
         params.cometType = CometType::METEOR;

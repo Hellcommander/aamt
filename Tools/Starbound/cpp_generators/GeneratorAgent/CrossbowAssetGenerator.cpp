@@ -51,7 +51,7 @@ CrossbowAssetGenerator::AssetOutput CrossbowAssetGenerator::generateCrossbowAsse
     generateSprite(output.spriteFile, params);
     generateIcon(output.iconFile, config.itemName);
     
-    Log::info("Generated crossbow assets for: {}", params.id);
+    Log::info("CrossbowAsset", "Generated crossbow assets for: {}", params.id);
     return output;
 }
 
@@ -82,7 +82,7 @@ CrossbowAssetGenerator::AssetOutput CrossbowAssetGenerator::generateBoltAssets(
     generateSprite(output.spriteFile, params);
     generateIcon(output.iconFile, config.itemName);
     
-    Log::info("Generated bolt assets for: {}", params.id);
+    Log::info("CrossbowAsset", "Generated bolt assets for: {}", params.id);
     return output;
 }
 
@@ -113,7 +113,7 @@ CrossbowAssetGenerator::AssetOutput CrossbowAssetGenerator::generateArrowAssets(
     generateSprite(output.spriteFile, params);
     generateIcon(output.iconFile, config.itemName);
     
-    Log::info("Generated arrow assets for: {}", params.id);
+    Log::info("CrossbowAsset", "Generated arrow assets for: {}", params.id);
     return output;
 }
 
@@ -377,7 +377,7 @@ bool CrossbowAssetGenerator::generateSprite(const std::string& outputPath, const
         // Create a simple 256x256 PNG placeholder
         // In a real implementation, this would use the mesh data to generate a sprite
         file.close();
-        Log::info("Generated crossbow sprite: {}", outputPath);
+        Log::info("CrossbowAsset", "Generated crossbow sprite: {}", outputPath);
         return true;
     }
     return false;
@@ -389,7 +389,7 @@ bool CrossbowAssetGenerator::generateSprite(const std::string& outputPath, const
     if (file.is_open()) {
         // Create a simple 32x32 PNG placeholder for bolt
         file.close();
-        Log::info("Generated bolt sprite: {}", outputPath);
+        Log::info("CrossbowAsset", "Generated bolt sprite: {}", outputPath);
         return true;
     }
     return false;
@@ -401,7 +401,7 @@ bool CrossbowAssetGenerator::generateSprite(const std::string& outputPath, const
     if (file.is_open()) {
         // Create a simple 32x64 PNG placeholder for arrow
         file.close();
-        Log::info("Generated arrow sprite: {}", outputPath);
+        Log::info("CrossbowAsset", "Generated arrow sprite: {}", outputPath);
         return true;
     }
     return false;
@@ -413,7 +413,7 @@ bool CrossbowAssetGenerator::generateIcon(const std::string& outputPath, const s
     if (file.is_open()) {
         // Create a simple 32x32 PNG placeholder icon
         file.close();
-        Log::info("Generated icon: {}", outputPath);
+        Log::info("CrossbowAsset", "Generated icon: {}", outputPath);
         return true;
     }
     return false;
@@ -424,7 +424,7 @@ bool CrossbowAssetGenerator::createDirectory(const std::string& path) {
         std::filesystem::create_directories(path);
         return true;
     } catch (const std::exception& e) {
-        Log::error("Failed to create directory {}: {}", path, e.what());
+        Log::error("CrossbowAsset", "Failed to create directory {}: {}", path, e.what());
         return false;
     }
 }
@@ -435,12 +435,12 @@ bool CrossbowAssetGenerator::writeFile(const std::string& path, const std::strin
         if (file.is_open()) {
             file << content;
             file.close();
-            Log::info("Written file: {}", path);
+            Log::info("CrossbowAsset", "Written file: {}", path);
             return true;
         }
         return false;
     } catch (const std::exception& e) {
-        Log::error("Failed to write file {}: {}", path, e.what());
+        Log::error("CrossbowAsset", "Failed to write file {}: {}", path, e.what());
         return false;
     }
 }

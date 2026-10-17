@@ -1,16 +1,24 @@
 #pragma once
 
 #include "MiniJetTypes.hpp"
+#include "GeneratorConcurrency.hpp"
 #include <future>
 #include <memory>
 #include <unordered_map>
 #include <filesystem>
+#include <mutex>
+#include <chrono>
 
 namespace MiniJetGen {
 
+using MagiTech::GeneratorTaskPool;
+
 // Forward declarations for generator modules
 namespace DefinitionParser {
-    MiniJetDefinition parseFromYAML(const std::string& filePath);
+    // Definitions are JSON files (same layout as the former YAML format).
+    MiniJetDefinition parseFromFile(const std::string& filePath);
+    MiniJetDefinition parseFromJson(const nlohmann::json& root);
+    nlohmann::json definitionToJson(const MiniJetDefinition& def);   // inverse of parseFromJson
     bool validateDefinition(const MiniJetDefinition& def);
 }
 
@@ -73,7 +81,10 @@ namespace LODGenerator {
 }
 
 namespace PackageWriter {
+    // Writes assets/minijets/<name>.mjpack
     bool writePackage(const std::string& name, const MiniJetAsset& asset);
+    // Writes the package directory at an explicit path
+    bool writePackageTo(const std::string& packagePath, const MiniJetAsset& asset);
     bool writeMesh(const std::string& path, const MeshHandle& mesh);
     bool writeMaterial(const std::string& path, const MaterialHandle& material);
     bool writeAnimation(const std::string& path, const Animation& animation);
@@ -82,11 +93,14 @@ namespace PackageWriter {
 }
 
 namespace PackageReader {
+    // Reads assets/minijets/<name>.mjpack
     MiniJetAsset readPackage(const std::string& name);
+    // Reads a package directory at an explicit path
+    MiniJetAsset readPackageFrom(const std::string& packagePath);
     MeshHandle readMesh(const std::string& path);
     MaterialHandle readMaterial(const std::string& path);
     Animation readAnimation(const std::string& path);
-    PhysicsBody readPhysics(const std::string& path);
+    PhysicsRigBuilder::PhysicsResult readPhysics(const std::string& path);
     MiniJetDefinition readMetadata(const std::string& path);
 }
 
@@ -101,19 +115,33 @@ class MiniJetCache {
     };
     
     std::unordered_map<std::string, CacheEntry> m_cache;
-    std::mutex m_mutex;
+    mutable std::mutex m_mutex;
     
 public:
     std::shared_ptr<MiniJetAsset> get(const std::string& name, size_t hash);
     void put(const std::string& name, std::shared_ptr<MiniJetAsset> asset, size_t hash);
     void clear();
-    void evictOldest();
+    void erase(const std::string& name);
+    void evictOldest();   // caller holds m_mutex
     size_t size() const;
 };
 
 // Main factory class
 class MiniJetFactory {
-    std::unique_ptr<MultithreadBusPlugin> m_pool;
+public:
+    // Performance metrics
+    struct Metrics {
+        size_t totalAssetsGenerated = 0;
+        size_t cacheHits = 0;
+        size_t cacheMisses = 0;
+        double averageGenerationTime = 0.0;   // seconds, running mean
+        double averageLoadTime = 0.0;         // seconds, running mean
+        size_t generationSamples = 0;
+        size_t loadSamples = 0;
+    };
+
+private:
+    std::unique_ptr<GeneratorTaskPool> m_pool;   // runs tasks inline until initialize() starts it
     std::unique_ptr<MiniJetCache> m_cache;
     bool m_initialized = false;
     
@@ -121,14 +149,10 @@ class MiniJetFactory {
     std::unordered_map<std::string, std::filesystem::file_time_type> m_fileTimestamps;
     std::unordered_map<std::string, size_t> m_fileHashes;
     
-    // Performance metrics
-    struct Metrics {
-        size_t totalAssetsGenerated = 0;
-        size_t cacheHits = 0;
-        size_t cacheMisses = 0;
-        double averageGenerationTime = 0.0;
-        double averageLoadTime = 0.0;
-    } m_metrics;
+    Metrics m_metrics;
+    mutable std::mutex m_metricsMutex;
+    mutable std::mutex m_watchMutex;   // guards m_fileTimestamps / m_definitionPaths
+    std::unordered_map<std::string, std::string> m_definitionPaths;   // asset name -> definition file
     
 public:
     MiniJetFactory();
@@ -160,7 +184,7 @@ public:
     void reloadAsset(const std::string& name);
     
     // Performance monitoring
-    const Metrics& getMetrics() const { return m_metrics; }
+    Metrics getMetrics() const;
     void resetMetrics();
     
     // Utility functions

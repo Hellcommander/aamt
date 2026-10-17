@@ -1,52 +1,60 @@
 <#
 .SYNOPSIS
-    Shared Stable Diffusion 3.5 integration module for AI-Assisted Modding Tools (AAMT).
+    SD3.5-only Stable Diffusion integration for AI-Assisted Modding Tools (AAMT).
 
 .DESCRIPTION
-    Talks to the local SD3.5 Medium server (Shared\sd35_server.py, port 1338,
-    version string "aamt-1338*"). Optionally enhances prompts through Ollama first.
+    One server (SD3.5 Medium, default port 1338), one endpoint (/v1/images/generations),
+    one payload shape. No AUTOMATIC1111 / ComfyUI / InvokeAI / legacy-server code paths.
 
-    Design notes
-    - File is plain ASCII / UTF-8 without BOM. Keep it that way: Windows PowerShell 5.1
-      reads BOM-less files as ANSI, so smart quotes and em-dashes corrupt parsing.
-    - Detection order: SD3.5 /ping -> SD3.5 python process -> fallback servers
-      (A1111, ComfyUI, legacy API server, InvokeAI).
-    - IPv4 and IPv6 loopback are both probed (127.0.0.1 and [::1]). The host that
-      answered last is cached and tried first. Override with AAMT_SD_HOST, disable
-      IPv6 with AAMT_SD_IPV6=0, change the port with AAMT_SD_PORT.
-    - "Busy" is not "down": /ping uses a generous timeout with retries, requests never
-      go through a system proxy, and a server that stops answering /ping while its
-      port still accepts connections is treated as busy for AAMT_SD_BUSY_GRACE_SEC.
-    - The AAMT server speaks HTTP/1.1 only. A 426 reply means a foreign process owns
-      the port (for example a WebSocket++ service), not that HTTP/2 is needed.
+    Request payload (exactly these keys, in this order):
+        model, prompt, negative_prompt, size, width, height, steps, guidance_scale,
+        response_format, seed, image, strength, n
+
+    NOTE ON width/height: the AAMT server (sd35_server.py) reads width and height and
+    ignores "size". Without them every image is generated at 512x512. They are therefore
+    sent alongside "size". If your server really rejects them, delete the two lines
+    marked WIDTH-HEIGHT in Invoke-StableDiffusionGeneration.
+
+    Strict mode (default ON; AAMT_SD_STRICT=0 or -Strict:$false turns it off):
+      - any SD error aborts; there is no fallback of any kind
+      - a PNG whose size differs from the requested size is an error (else a warning)
+      - the server must identify as the AAMT SD3.5 server (aamt-1338*) unless
+        AAMT_SD_ACCEPT_FOREIGN=1 is set
+    These checks are errors in BOTH modes: HTTP status other than 200, missing data or
+    b64_json, undecodable base64, not a PNG, empty PNG, all-white / all-black /
+    fully-transparent / single-colour image, and /ping reporting cuda=false.
+
+    Logging: pass -Verbose (or set AAMT_SD_VERBOSE=1) to log the exact payload (the image
+    field is shown as a length, not megabytes of base64), the response (truncated), CUDA
+    and pipeline status, decoded PNG size and the output path.
+
+    IPv4 and IPv6 loopback (127.0.0.1 and [::1]) are both probed. Overrides:
+    AAMT_SD_HOST, AAMT_SD_IPV6=0, AAMT_SD_PORT.
+
+    File is plain ASCII, UTF-8 without BOM. Keep it that way for Windows PowerShell 5.1.
 #>
 
 # ============================================================
 # CONFIGURATION
 # ============================================================
 
-# Fallback servers probed only after the SD3.5 server was not found.
-$script:KnownSDSetups = @(
-    @{ Name = "SD3.5 API Server"; Port = 1338; ApiEndpoint = "/v1/images/generations"; HealthEndpoint = "/ping"; Type = "SD35Server" },
-    @{ Name = "AUTOMATIC1111 WebUI"; Port = 7860; ApiEndpoint = "/sdapi/v1/txt2img"; HealthEndpoint = "/sdapi/v1/sd-models"; Type = "A1111" },
-    @{ Name = "ComfyUI"; Port = 8188; ApiEndpoint = "/prompt"; HealthEndpoint = "/system_stats"; Type = "ComfyUI" },
-    @{ Name = "Legacy Stable Diffusion API Server (Port 8000)"; Port = 8000; ApiEndpoint = "/v1/images/generations"; HealthEndpoint = "/ping"; Type = "APIServer" },
-    @{ Name = "InvokeAI"; Port = 9090; ApiEndpoint = "/api/v1/images/generate"; HealthEndpoint = "/api/v1/app/version"; Type = "InvokeAI" }
-)
-
 $script:SDPort = 1338
 $parsedPort = 0
 if ($env:AAMT_SD_PORT -and [int]::TryParse($env:AAMT_SD_PORT, [ref]$parsedPort) -and $parsedPort -gt 0 -and $parsedPort -lt 65536) {
     $script:SDPort = $parsedPort
 }
-$script:KnownSDSetups[0].Port = $script:SDPort
 
+$script:SDApiPath = "/v1/images/generations"      # the ONLY generation endpoint
+$script:SDModelName = "stable-diffusion-3-medium"
+$script:SDStrictDefault = ($env:AAMT_SD_STRICT -ne '0')
+$script:SDAcceptForeign = ($env:AAMT_SD_ACCEPT_FOREIGN -eq '1')
 $script:ServerStartupScript = "Start-StableDiffusionServer.ps1"
-$script:SDPreferredHost = $null      # host that answered last (127.0.0.1 or ::1)
+$script:DefaultNegativePrompt = "blurry, low quality, pixelated, distorted, deformed, bad anatomy, text, watermark, simple, basic"
+
+$script:SDPreferredHost = $null      # loopback host that answered last (127.0.0.1 or ::1)
 $script:SDLastGoodPing = $null       # [datetime] of the last successful /ping
 
-# Probe tuning. The server is threaded, but heavy torch work can still starve /ping,
-# so the timeout is generous and a miss is retried before the server is called down.
+# /ping can be slow while torch loads or renders: generous timeout, one retry.
 $script:SDPingTimeoutSec = 4.0
 $script:SDPingAttempts = 2
 $script:SDBusyGraceSec = 120
@@ -58,30 +66,30 @@ if ($env:AAMT_SD_BUSY_GRACE_SEC -and [double]::TryParse($env:AAMT_SD_BUSY_GRACE_
     $script:SDBusyGraceSec = $parsedNum
 }
 
-# Default generation parameters tuned for SD3 Medium.
-$script:DefaultGenerationParams = @{
-    Width = 1024
-    Height = 1024
-    Steps = 28
-    GuidanceScale = 7.0
-    NegativePrompt = "blurry, low quality, pixelated, distorted, deformed, bad anatomy, text, watermark, simple, basic"
-}
-
-# Generous FINITE read timeout. SD3.5 Medium with CPU offload can take many minutes
-# per image. Override with AAMT_SD_HTTP_TIMEOUT_SEC.
+# Finite read timeout; SD3.5 Medium with CPU offload can take many minutes per image.
 $script:SDHttpTimeoutSec = 3600
 $parsedTimeout = 0
 if ($env:AAMT_SD_HTTP_TIMEOUT_SEC -and [int]::TryParse($env:AAMT_SD_HTTP_TIMEOUT_SEC, [ref]$parsedTimeout) -and $parsedTimeout -gt 0) {
     $script:SDHttpTimeoutSec = $parsedTimeout
 }
 
-# On-disk output cache of the SD3.5 server (mirrors sd_http_client.py salvage).
-$script:SDOutputsDir = "E:\tools\sd3.5\sd3.5\outputs"
-if ($env:AAMT_SD_OUTPUTS_DIR) { $script:SDOutputsDir = $env:AAMT_SD_OUTPUTS_DIR }
-
 # ============================================================
 # PRIVATE HELPERS (not exported)
 # ============================================================
+
+function Write-SdLog {
+    param([string]$Message)
+    if ($env:AAMT_SD_VERBOSE -eq '1') {
+        Write-Host "  [SD] $Message" -ForegroundColor DarkGray
+    } else {
+        Write-Verbose "[SD] $Message"
+    }
+}
+
+function Get-SdNoCudaMessage {
+    # Exact required text; the dash is built from a code point so this file stays ASCII.
+    return ("SD3.5 server is running without CUDA " + [char]0x2014 + " image generation aborted.")
+}
 
 function Format-SdUrlHost {
     param([string]$HostName)
@@ -115,26 +123,22 @@ function Get-SdHostCandidates {
 }
 
 function New-SdSetup {
-    param(
-        [string]$Name,
-        [string]$HostName,
-        [int]$Port,
-        [string]$ApiEndpoint,
-        [string]$HealthEndpoint,
-        [string]$Type,
-        [bool]$Responding = $false
-    )
+    param([string]$HostName, [int]$Port, [bool]$Responding = $false)
     return @{
-        Name = $Name
+        Name = "SD3.5 API Server"
         Host = $HostName
         Port = $Port
         BaseUrl = (Get-SdBaseUrl -HostName $HostName -Port $Port)
-        ApiEndpoint = $ApiEndpoint
-        HealthEndpoint = $HealthEndpoint
-        Type = $Type
+        ApiEndpoint = $script:SDApiPath
+        HealthEndpoint = "/ping"
+        Type = "SD35Server"
         Responding = $Responding
         Loaded = $false
+        Loading = $false
         Version = ""
+        HasCuda = $false      # does /ping report a "cuda" field at all?
+        Cuda = $false
+        DeviceCount = -1
         ProcessFound = $false
         ProcessId = 0
     }
@@ -144,7 +148,7 @@ function Set-SdActiveSetup {
     param([hashtable]$Setup)
     $script:ActiveSDSetup = $Setup
     $script:StableDiffusionUrl = [string]$Setup.BaseUrl
-    $script:StableDiffusionApiUrl = ([string]$Setup.BaseUrl) + ([string]$Setup.ApiEndpoint)
+    $script:StableDiffusionApiUrl = ([string]$Setup.BaseUrl) + $script:SDApiPath
     if ($Setup.Host) { $script:SDPreferredHost = [string]$Setup.Host }
 }
 
@@ -153,9 +157,35 @@ function Resolve-SdOutputPath {
     return $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Path)
 }
 
+function Get-SdMember {
+    # Reads a member from either a PSCustomObject or a dictionary (5.1 big-JSON fallback).
+    param($Object, [string]$Name)
+    if ($null -eq $Object) { return $null }
+    if ($Object -is [System.Collections.IDictionary]) {
+        if ($Object.Contains($Name)) { return $Object[$Name] }
+        return $null
+    }
+    $prop = $Object.PSObject.Properties[$Name]
+    if ($prop) { return $prop.Value }
+    return $null
+}
+
+function ConvertFrom-SdJson {
+    # Windows PowerShell 5.1 ConvertFrom-Json fails above 2 MB; fall back to a serializer
+    # without a length cap.
+    param([string]$Raw)
+    try {
+        return ($Raw | ConvertFrom-Json)
+    } catch {
+        Add-Type -AssemblyName System.Web.Extensions -ErrorAction Stop
+        $ser = New-Object System.Web.Script.Serialization.JavaScriptSerializer
+        $ser.MaxJsonLength = [int]::MaxValue
+        return $ser.DeserializeObject($Raw)
+    }
+}
+
 function Test-SdTcpPort {
-    # True if any address of HostName accepts a TCP connection on Port. Works for
-    # IPv4 literals, IPv6 literals and DNS names (all resolved addresses are tried).
+    # True if any address of HostName accepts a TCP connection (IPv4, IPv6 or DNS name).
     param([string]$HostName, [int]$Port, [int]$TimeoutMs = 500)
     $addresses = @()
     try {
@@ -187,7 +217,7 @@ function Test-SdTcpPort {
 }
 
 function Invoke-SdHttpRequest {
-    # Single place that builds an HTTP/1.1 request. Never throws; returns a hashtable:
+    # The single place that builds an HTTP/1.1 request. Never throws. Returns a hashtable:
     #   Ok, StatusCode (0 = no HTTP response), Body, Error, TimedOut, Refused
     param(
         [string]$Url,
@@ -203,12 +233,10 @@ function Invoke-SdHttpRequest {
     try {
         Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
         $handler = [System.Net.Http.HttpClientHandler]::new()
-        # Loopback traffic must never be routed through a system proxy.
-        try { $handler.UseProxy = $false } catch { }
+        try { $handler.UseProxy = $false } catch { }   # loopback never goes through a proxy
         $client = [System.Net.Http.HttpClient]::new($handler)
         $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSec)
-        $httpMethod = [System.Net.Http.HttpMethod]::new($Method)
-        $request = [System.Net.Http.HttpRequestMessage]::new($httpMethod, $Url)
+        $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::new($Method), $Url)
         try { $request.Version = [Version]"1.1" } catch { }
         $request.Headers.Add("Accept", "application/json")
         if (-not [string]::IsNullOrEmpty($JsonBody)) {
@@ -222,8 +250,7 @@ function Invoke-SdHttpRequest {
         $ex = $_.Exception
         $result.Error = $ex.Message
         while ($ex) {
-            $typeName = $ex.GetType().Name
-            if ($typeName -match 'TaskCanceled|OperationCanceled|Timeout') { $result.TimedOut = $true }
+            if ($ex.GetType().Name -match 'TaskCanceled|OperationCanceled|Timeout') { $result.TimedOut = $true }
             if ($ex -is [System.Net.Sockets.SocketException] -and $ex.SocketErrorCode -eq [System.Net.Sockets.SocketError]::ConnectionRefused) {
                 $result.Refused = $true
             }
@@ -255,23 +282,35 @@ function Get-SdPingProbe {
                 Loaded = $false
                 Loading = $false
                 Generating = $false
+                HasCuda = $false
+                Cuda = $false
+                DeviceCount = -1
                 IsAamt = $false
+                Accepted = $false
+                Raw = [string]$r.Body
             }
             if ($r.StatusCode -eq 200 -and $r.Body) {
                 try {
                     $data = $r.Body | ConvertFrom-Json
-                    if ($data.version) { $probe.Version = [string]$data.version }
-                    $probe.Loaded = [bool]$data.loaded
-                    $probe.Loading = [bool]$data.loading
-                    $probe.Generating = [bool]$data.generating
+                    $names = @($data.PSObject.Properties.Name)
+                    if ($names -contains 'version' -and $data.version) { $probe.Version = [string]$data.version }
+                    if ($names -contains 'loaded') { $probe.Loaded = [bool]$data.loaded }
+                    if ($names -contains 'loading') { $probe.Loading = [bool]$data.loading }
+                    if ($names -contains 'generating') { $probe.Generating = [bool]$data.generating }
+                    if ($names -contains 'cuda') {
+                        $probe.HasCuda = $true
+                        $probe.Cuda = ($data.cuda -eq $true)
+                    }
+                    if ($names -contains 'device_count') { $probe.DeviceCount = [int]$data.device_count }
                 } catch {
-                    # not JSON; stays "foreign"
+                    # not JSON: stays unaccepted
                 }
             }
             $probe.IsAamt = $probe.Version.StartsWith("aamt-1338")
+            $probe.Accepted = ($probe.IsAamt -or ($script:SDAcceptForeign -and $r.StatusCode -eq 200))
             return $probe
         }
-        if ($r.Refused) { return $null }   # nothing listening on this family; do not wait
+        if ($r.Refused) { return $null }   # nothing listening on this family
         if ($i -lt $Attempts) { Start-Sleep -Milliseconds 300 }
     }
     return $null
@@ -297,7 +336,7 @@ function Get-SdListenerPid {
 }
 
 function Find-SdServerProcess {
-    # python process running the AAMT server.py (not sd_server.py of other tools).
+    # The AAMT server.py python process (not sd_server.py of other tools).
     param([int]$Port)
     try {
         $procs = @(Get-CimInstance Win32_Process -Filter "Name LIKE 'python%'" -ErrorAction Stop)
@@ -313,7 +352,7 @@ function Find-SdServerProcess {
 }
 
 function Test-SdBusyGrace {
-    # A server that does not answer /ping right now is still "up" when its port accepts
+    # A server that is not answering /ping right now is still "up" when its port accepts
     # connections and it either answered recently or its process is found.
     param([hashtable]$Setup)
     if (-not (Test-SdTcpPort -HostName ([string]$Setup.Host) -Port ([int]$Setup.Port) -TimeoutMs 1000)) { return $false }
@@ -325,78 +364,94 @@ function Test-SdBusyGrace {
         }
     }
     if ($Setup.ProcessFound) {
-        Write-Host "  [SD] /ping not answering but SD3.5 process owns the port; treating server as busy" -ForegroundColor Yellow
+        Write-Host "  [SD] /ping not answering but the SD3.5 process owns the port; treating server as busy" -ForegroundColor Yellow
         return $true
     }
     return $false
 }
 
-function ConvertFrom-SdJson {
-    # ConvertFrom-Json in Windows PowerShell 5.1 fails on strings over 2 MB; fall back
-    # to a serializer with no length cap.
-    param([string]$Raw)
-    try {
-        return ($Raw | ConvertFrom-Json)
-    } catch {
-        Add-Type -AssemblyName System.Web.Extensions -ErrorAction Stop
-        $ser = New-Object System.Web.Script.Serialization.JavaScriptSerializer
-        $ser.MaxJsonLength = [int]::MaxValue
-        return $ser.DeserializeObject($Raw)
-    }
-}
-
-function Get-SdImagesFromResponse {
-    # Returns an array of base64 image strings. Handles SD3.5 / OpenAI "b64_json",
-    # OpenAI "url" and A1111 "images".
-    param([string]$Raw, [string]$ApiType)
-    if ([string]::IsNullOrWhiteSpace($Raw)) { throw "Empty response from SD API" }
-    $images = @()
-
-    # Fast path that also avoids JSON size limits: pull b64_json values directly.
-    foreach ($m in [regex]::Matches($Raw, '"b64_json"\s*:\s*"([^"]+)"')) {
-        $images += ($m.Groups[1].Value -replace '\\/', '/')
-    }
-    if ($images.Count -gt 0) { return $images }
-
-    $data = ConvertFrom-SdJson -Raw $Raw
-    if ($ApiType -eq "A1111") {
-        if ($data.images -and @($data.images).Count -gt 0) {
-            foreach ($img in @($data.images)) { $images += [string]$img }
-        } else {
-            throw "No images in A1111 response"
-        }
+function Assert-SdCuda {
+    # Aborts when the server reports it is not running on CUDA. A server that does not
+    # report a "cuda" field at all (the AAMT server today) cannot be checked: warn only.
+    param([hashtable]$Setup)
+    Write-SdLog ("pipeline status: loaded=" + $Setup.Loaded + " loading=" + $Setup.Loading + " version=" + $Setup.Version)
+    if ($Setup.HasCuda) {
+        Write-SdLog ("CUDA status: cuda=" + $Setup.Cuda + " device_count=" + $Setup.DeviceCount)
+        if (-not $Setup.Cuda) { throw (Get-SdNoCudaMessage) }
+        if ($Setup.DeviceCount -ge 0 -and $Setup.DeviceCount -lt 1) { throw (Get-SdNoCudaMessage) }
     } else {
-        if ($data.data -and @($data.data).Count -gt 0) {
-            foreach ($item in @($data.data)) {
-                if ($item.b64_json) {
-                    $images += [string]$item.b64_json
-                } elseif ($item.url) {
-                    $bytes = Get-SdBytesFromUrl -Url ([string]$item.url)
-                    $images += [Convert]::ToBase64String($bytes)
-                }
-            }
-        } elseif ($data.images -and @($data.images).Count -gt 0) {
-            foreach ($img in @($data.images)) { $images += [string]$img }
-        } else {
-            throw "No image data in API response"
-        }
+        Write-Host "  [WARN] /ping has no 'cuda' field; CUDA status cannot be confirmed (the server itself refuses to load without CUDA)." -ForegroundColor Yellow
     }
-    if ($images.Count -eq 0) { throw "No images were generated" }
-    return $images
+    if (-not $Setup.Loaded) {
+        Write-Host "  [SD] Pipeline is not loaded yet; the first request will wait for the model to load." -ForegroundColor Gray
+    }
 }
 
-function Get-SdBytesFromUrl {
-    param([string]$Url)
-    Add-Type -AssemblyName System.Net.Http -ErrorAction Stop
-    $handler = [System.Net.Http.HttpClientHandler]::new()
-    try { $handler.UseProxy = $false } catch { }
-    $client = [System.Net.Http.HttpClient]::new($handler)
+function Test-SdPngBytes {
+    # Validates decoded image bytes. Returns @{ Valid; Reason; Width; Height; Warning }.
+    param([byte[]]$Bytes, [int]$Width = 0, [int]$Height = 0, [bool]$Strict = $true)
+    $r = @{ Valid = $false; Reason = ""; Width = 0; Height = 0; Warning = "" }
+    if ($null -eq $Bytes -or $Bytes.Length -eq 0) { $r.Reason = "PNG is empty (0 bytes)"; return $r }
+    if ($Bytes.Length -lt 67) { $r.Reason = "data is $($Bytes.Length) bytes, too small to be a PNG"; return $r }
+    $sig = @(0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+    for ($i = 0; $i -lt 8; $i++) {
+        if ($Bytes[$i] -ne $sig[$i]) { $r.Reason = "data does not start with the PNG signature"; return $r }
+    }
+
+    $stream = $null
+    $bmp = $null
     try {
-        $client.Timeout = [TimeSpan]::FromSeconds(120)
-        return $client.GetByteArrayAsync($Url).GetAwaiter().GetResult()
+        try {
+            Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+        } catch {
+            $r.Reason = "System.Drawing is unavailable, so the image content cannot be validated"
+            return $r
+        }
+        $stream = [System.IO.MemoryStream]::new($Bytes)
+        $bmp = [System.Drawing.Bitmap]::new($stream)
+        $r.Width = $bmp.Width
+        $r.Height = $bmp.Height
+
+        # Sample a grid of pixels.
+        $cols = [Math]::Min(48, $bmp.Width)
+        $rows = [Math]::Min(48, $bmp.Height)
+        $opaque = 0
+        $white = 0
+        $black = 0
+        $minLum = 255.0
+        $maxLum = 0.0
+        for ($yi = 0; $yi -lt $rows; $yi++) {
+            $y = [int][Math]::Min($bmp.Height - 1, [Math]::Floor(($yi + 0.5) * $bmp.Height / $rows))
+            for ($xi = 0; $xi -lt $cols; $xi++) {
+                $x = [int][Math]::Min($bmp.Width - 1, [Math]::Floor(($xi + 0.5) * $bmp.Width / $cols))
+                $px = $bmp.GetPixel($x, $y)
+                if ($px.A -lt 16) { continue }
+                $opaque++
+                if ($px.R -ge 250 -and $px.G -ge 250 -and $px.B -ge 250) { $white++ }
+                if ($px.R -le 5 -and $px.G -le 5 -and $px.B -le 5) { $black++ }
+                $lum = (0.299 * $px.R) + (0.587 * $px.G) + (0.114 * $px.B)
+                if ($lum -lt $minLum) { $minLum = $lum }
+                if ($lum -gt $maxLum) { $maxLum = $lum }
+            }
+        }
+        if ($opaque -eq 0) { $r.Reason = "image is fully transparent"; return $r }
+        if ($white -eq $opaque) { $r.Reason = "image is all white"; return $r }
+        if ($black -eq $opaque) { $r.Reason = "image is all black"; return $r }
+        if (($maxLum - $minLum) -lt 2) { $r.Reason = "image is a single flat colour"; return $r }
+
+        if ($Width -gt 0 -and $Height -gt 0 -and ($bmp.Width -ne $Width -or $bmp.Height -ne $Height)) {
+            $msg = "image is $($bmp.Width)x$($bmp.Height) but $($Width)x$($Height) was requested"
+            if ($Strict) { $r.Reason = $msg; return $r }
+            $r.Warning = $msg
+        }
+        $r.Valid = $true
+        return $r
+    } catch {
+        $r.Reason = "PNG could not be decoded: $($_.Exception.Message)"
+        return $r
     } finally {
-        $client.Dispose()
-        $handler.Dispose()
+        if ($bmp) { $bmp.Dispose() }
+        if ($stream) { $stream.Dispose() }
     }
 }
 
@@ -430,31 +485,12 @@ function Get-SdEnhancedPrompt {
     return $Prompt
 }
 
-function Test-SdImageDimensions {
-    # $true = size matches, $false = size differs, $null = could not read the image.
-    param([string]$Path, [int]$Width, [int]$Height)
-    $stream = $null
-    $img = $null
-    try {
-        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
-        $stream = [System.IO.File]::Open($Path, 'Open', 'Read', 'ReadWrite')
-        $img = [System.Drawing.Image]::FromStream($stream, $false, $false)
-        return (($img.Width -eq $Width) -and ($img.Height -eq $Height))
-    } catch {
-        return $null
-    } finally {
-        if ($img) { $img.Dispose() }
-        if ($stream) { $stream.Dispose() }
-    }
-}
-
 # ------------------------------------------------------------
-# Module state. ActiveSDSetup is ALWAYS a hashtable and the URLs are ALWAYS strings.
+# Module state. ActiveSDSetup is ALWAYS a hashtable; the URLs are ALWAYS strings.
 # ------------------------------------------------------------
-$script:ActiveSDSetup = New-SdSetup -Name "SD3.5 API Server" -HostName "127.0.0.1" -Port $script:SDPort `
-    -ApiEndpoint "/v1/images/generations" -HealthEndpoint "/ping" -Type "SD35Server" -Responding $false
+$script:ActiveSDSetup = New-SdSetup -HostName "127.0.0.1" -Port $script:SDPort -Responding $false
 $script:StableDiffusionUrl = [string]$script:ActiveSDSetup.BaseUrl
-$script:StableDiffusionApiUrl = [string]$script:ActiveSDSetup.BaseUrl + [string]$script:ActiveSDSetup.ApiEndpoint
+$script:StableDiffusionApiUrl = [string]$script:ActiveSDSetup.BaseUrl + $script:SDApiPath
 
 # ============================================================
 # PUBLIC FUNCTIONS
@@ -467,8 +503,7 @@ function Get-FreeVramMB {
     #>
     param([switch]$Total)
     try {
-        $smi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
-        if (-not $smi) { return $null }
+        if (-not (Get-Command nvidia-smi -ErrorAction SilentlyContinue)) { return $null }
         $query = "memory.free"
         if ($Total) { $query = "memory.total" }
         $out = & nvidia-smi --query-gpu=$query --format=csv,noheader,nounits 2>$null
@@ -481,166 +516,68 @@ function Get-FreeVramMB {
     }
 }
 
-function Test-SdOomError {
-    <#
-    .SYNOPSIS
-    Heuristic: does this message look like a CUDA / GPU out-of-memory failure?
-    #>
-    param([string]$Message)
-    if ([string]::IsNullOrWhiteSpace($Message)) { return $false }
-    $m = $Message.ToLowerInvariant()
-    if ($m -match 'out of memory') { return $true }
-    if ($m -match 'cuda' -and $m -match 'memory') { return $true }
-    if ($m -match '\boom\b') { return $true }
-    return $false
-}
-
-function Get-SalvagedSdOutput {
-    <#
-    .SYNOPSIS
-    Recovers a finished image from the server's output cache when the HTTP client gave
-    up but generation completed server-side. Returns the output path or $null.
-    Mirrors sd_http_client.py salvage_server_output.
-    #>
-    param(
-        [Parameter(Mandatory = $true)][string]$OutputPath,
-        [Parameter(Mandatory = $true)][datetime]$StartedAt,
-        [int]$MaxAgeSec = 14400,
-        [int]$Width = 0,
-        [int]$Height = 0
-    )
-    try {
-        $dir = $script:SDOutputsDir
-        if ([string]::IsNullOrWhiteSpace($dir)) { return $null }
-        if (-not (Test-Path -LiteralPath $dir -PathType Container)) { return $null }
-        $target = Resolve-SdOutputPath -Path $OutputPath
-
-        $candidates = @()
-        # gen_*.png is unique per job; prefer it over the shared latest.png.
-        $candidates += @(Get-ChildItem -LiteralPath $dir -Filter "gen_*.png" -File -ErrorAction SilentlyContinue |
-            Sort-Object LastWriteTime -Descending)
-        $latest = Join-Path $dir "latest.png"
-        if (Test-Path -LiteralPath $latest -PathType Leaf) { $candidates += (Get-Item -LiteralPath $latest) }
-
-        $now = Get-Date
-        $seen = @{}
-        foreach ($src in $candidates) {
-            if (-not $src) { continue }
-            if ($seen.ContainsKey($src.FullName)) { continue }
-            $seen[$src.FullName] = $true
-            if (($now - $src.LastWriteTime).TotalSeconds -gt $MaxAgeSec) { continue }
-            if ($src.LastWriteTime -lt $StartedAt.AddSeconds(-5)) { continue }
-            if ($Width -gt 0 -and $Height -gt 0) {
-                $dimOk = Test-SdImageDimensions -Path $src.FullName -Width $Width -Height $Height
-                if ($dimOk -eq $false) { continue }
-            }
-            try {
-                $outDir = Split-Path -Parent $target
-                if ($outDir -and -not (Test-Path -LiteralPath $outDir)) {
-                    New-Item -ItemType Directory -Path $outDir -Force | Out-Null
-                }
-                Copy-Item -LiteralPath $src.FullName -Destination $target -Force -ErrorAction Stop
-                Write-Host "  [OK] Salvaged SD output from server cache: $($src.FullName)" -ForegroundColor Green
-                return $target
-            } catch {
-                continue
-            }
-        }
-    } catch {
-        return $null
-    }
-    return $null
-}
-
 function Find-LocalStableDiffusionServer {
     <#
     .SYNOPSIS
-    Finds a usable local SD server. Order: SD3.5 /ping (IPv4 then IPv6) -> SD3.5 python
-    process -> fallback servers. Returns the setup hashtable, or $null if none found.
-    Updates the module's active setup and URLs when something is found.
+    Finds the local SD3.5 server: /ping on IPv4 then IPv6, then the SD3.5 python process.
+    Returns the setup hashtable, or $null when there is none. Updates the active setup.
     #>
     [CmdletBinding()]
     param()
-    $isVerbose = ($VerbosePreference -eq 'Continue')
     $port = $script:SDPort
-    $hostList = @(Get-SdHostCandidates)
+    Write-SdLog "scanning for the SD3.5 server on port $port"
 
-    if ($isVerbose) { Write-Host "`n  Scanning for local Stable Diffusion servers..." -ForegroundColor Cyan }
-
-    # 1) SD3.5 /ping on each loopback family
     $foreign = $null
-    foreach ($h in $hostList) {
-        if ($isVerbose) { Write-Host "    Checking SD3.5 /ping at $(Get-SdBaseUrl -HostName $h -Port $port) ..." -ForegroundColor Gray }
+    foreach ($h in @(Get-SdHostCandidates)) {
+        Write-SdLog ("GET " + (Get-SdBaseUrl -HostName $h -Port $port) + "/ping")
         $probe = Get-SdPingProbe -HostName $h -Port $port
         if ($null -eq $probe) { continue }
-        if ($probe.IsAamt) {
-            $setup = New-SdSetup -Name "SD3.5 API Server" -HostName $h -Port $port `
-                -ApiEndpoint "/v1/images/generations" -HealthEndpoint "/ping" -Type "SD35Server" -Responding $true
+        if ($probe.Accepted) {
+            $setup = New-SdSetup -HostName $h -Port $port -Responding $true
             $setup.Loaded = [bool]$probe.Loaded
+            $setup.Loading = [bool]$probe.Loading
             $setup.Version = [string]$probe.Version
+            $setup.HasCuda = [bool]$probe.HasCuda
+            $setup.Cuda = [bool]$probe.Cuda
+            $setup.DeviceCount = [int]$probe.DeviceCount
             Set-SdActiveSetup -Setup $setup
             $script:SDLastGoodPing = Get-Date
-            if ($isVerbose) { Write-Host "    [OK] SD3.5 server answered on $h (version $($probe.Version), loaded=$($probe.Loaded))" -ForegroundColor Green }
+            Write-SdLog ("/ping response: " + $probe.Raw)
             return $setup
         }
         if (-not $foreign) { $foreign = $probe }
     }
     if ($foreign) {
-        Write-Host "    [WARN] Port $port answers but is not the AAMT SD3.5 server (HTTP $($foreign.StatusCode), version '$($foreign.Version)')." -ForegroundColor Yellow
+        Write-Host "  [WARN] Port $port answers but is not the AAMT SD3.5 server (HTTP $($foreign.StatusCode), version '$($foreign.Version)'). Set AAMT_SD_ACCEPT_FOREIGN=1 to accept it." -ForegroundColor Yellow
+        return $null
     }
 
-    # 2) SD3.5 python process (server alive but /ping not answering yet, or busy)
-    if (-not $foreign) {
-        if ($isVerbose) { Write-Host "    Checking for SD3.5 server process (port $port)..." -ForegroundColor Gray }
-        $proc = Find-SdServerProcess -Port $port
-        if ($proc) {
-            $h = "127.0.0.1"
-            if ($script:SDPreferredHost) { $h = [string]$script:SDPreferredHost }
-            $setup = New-SdSetup -Name "SD3.5 API Server" -HostName $h -Port $port `
-                -ApiEndpoint "/v1/images/generations" -HealthEndpoint "/ping" -Type "SD35Server" -Responding $false
-            $setup.ProcessFound = $true
-            $setup.ProcessId = [int]$proc.ProcessId
-            Set-SdActiveSetup -Setup $setup
-            if ($isVerbose) { Write-Host "    [OK] Found SD3.5 server process (PID $($proc.ProcessId)) but /ping did not answer" -ForegroundColor Yellow }
-            return $setup
-        }
+    $proc = Find-SdServerProcess -Port $port
+    if ($proc) {
+        $h = "127.0.0.1"
+        if ($script:SDPreferredHost) { $h = [string]$script:SDPreferredHost }
+        $setup = New-SdSetup -HostName $h -Port $port -Responding $false
+        $setup.ProcessFound = $true
+        $setup.ProcessId = [int]$proc.ProcessId
+        Set-SdActiveSetup -Setup $setup
+        Write-SdLog "SD3.5 process found (PID $($proc.ProcessId)) but /ping did not answer"
+        return $setup
     }
-
-    # 3) Fallback servers
-    foreach ($def in $script:KnownSDSetups) {
-        if ($def.Type -eq "SD35Server") { continue }
-        foreach ($h in $hostList) {
-            if (-not (Test-SdTcpPort -HostName $h -Port ([int]$def.Port) -TimeoutMs 300)) { continue }
-            if ($isVerbose) { Write-Host "    Checking $($def.Name) on $(Get-SdBaseUrl -HostName $h -Port ([int]$def.Port)) ..." -ForegroundColor Gray }
-            $url = (Get-SdBaseUrl -HostName $h -Port ([int]$def.Port)) + [string]$def.HealthEndpoint
-            $r = Invoke-SdHttpRequest -Url $url -Method "GET" -TimeoutSec 3
-            if ($r.StatusCode -eq 200) {
-                $setup = New-SdSetup -Name ([string]$def.Name) -HostName $h -Port ([int]$def.Port) `
-                    -ApiEndpoint ([string]$def.ApiEndpoint) -HealthEndpoint ([string]$def.HealthEndpoint) `
-                    -Type ([string]$def.Type) -Responding $true
-                Set-SdActiveSetup -Setup $setup
-                if ($isVerbose) { Write-Host "    [OK] Found $($def.Name)" -ForegroundColor Green }
-                return $setup
-            }
-        }
-    }
-
-    if ($isVerbose) { Write-Host "    [FAIL] No Stable Diffusion server detected" -ForegroundColor Red }
+    Write-SdLog "no SD3.5 server detected"
     return $null
 }
 
 function Test-StableDiffusionConnection {
     <#
     .SYNOPSIS
-    $true if a Stable Diffusion server can take requests, otherwise $false.
-    Without -Url the server is auto-detected (IPv4 and IPv6). Always returns a [bool].
+    $true when the SD3.5 server can take requests, otherwise $false. Always a [bool].
+    Without -Url the server is auto-detected (IPv4 and IPv6).
     #>
     [CmdletBinding()]
     param([string]$Url = "")
-    $isVerbose = ($VerbosePreference -eq 'Continue')
 
     if ([string]::IsNullOrWhiteSpace($Url)) {
-        $setup = Find-LocalStableDiffusionServer -Verbose:$isVerbose
+        $setup = Find-LocalStableDiffusionServer
         if ($setup -is [hashtable]) {
             if ($setup.Responding) { return $true }
             return [bool](Test-SdBusyGrace -Setup $setup)
@@ -650,24 +587,11 @@ function Test-StableDiffusionConnection {
 
     $uri = $null
     if (-not [System.Uri]::TryCreate($Url, [System.UriKind]::Absolute, [ref]$uri)) {
-        if ($isVerbose) { Write-Host "    [FAIL] Not a valid URL: $Url" -ForegroundColor Red }
+        Write-SdLog "not a valid URL: $Url"
         return $false
     }
-    if ($isVerbose) { Write-Host "    Testing connection to $Url ..." -ForegroundColor Gray }
-    if (-not (Test-SdTcpPort -HostName $uri.DnsSafeHost -Port $uri.Port -TimeoutMs 1500)) {
-        if ($isVerbose) { Write-Host "    [FAIL] Port $($uri.Port) is not accepting connections" -ForegroundColor Red }
-        return $false
-    }
-    $base = $uri.GetLeftPart([System.UriPartial]::Authority)
-    foreach ($endpoint in @("/ping", "/", "/sdapi/v1/sd-models", "/system_stats", "/api/v1/app/version")) {
-        $r = Invoke-SdHttpRequest -Url ($base + $endpoint) -Method "GET" -TimeoutSec 4
-        if ($r.StatusCode -eq 200) {
-            if ($isVerbose) { Write-Host "    [OK] Server responded to $endpoint" -ForegroundColor Green }
-            return $true
-        }
-    }
-    if ($isVerbose) { Write-Host "    [FAIL] Server did not answer any known health endpoint" -ForegroundColor Red }
-    return $false
+    $probe = Get-SdPingProbe -HostName $uri.DnsSafeHost -Port $uri.Port
+    return [bool]($probe -and $probe.Accepted)
 }
 
 function Stop-StableDiffusionServer {
@@ -695,7 +619,7 @@ function Stop-StableDiffusionServer {
 function Start-StableDiffusionServerIfNeeded {
     <#
     .SYNOPSIS
-    Makes sure the SD3.5 server is running; starts it when it is not. Returns [bool].
+    Makes sure the SD3.5 server is running and starts it when it is not. Returns [bool].
     -NoStart only checks. -TimeoutSec is how long to wait for /ping after launching.
     #>
     [CmdletBinding()]
@@ -704,21 +628,20 @@ function Start-StableDiffusionServerIfNeeded {
         [int]$TimeoutSec = 300,
         [switch]$NoStart
     )
-    $isVerbose = ($VerbosePreference -eq 'Continue')
     $port = $script:SDPort
     if ([string]::IsNullOrWhiteSpace($ToolsRoot)) { $ToolsRoot = $PSScriptRoot }
     Write-Host "`n  Checking SD3.5 server status..." -ForegroundColor Cyan
 
-    if (Test-StableDiffusionConnection -Verbose:$isVerbose) {
+    if (Test-StableDiffusionConnection) {
         Write-Host "  [OK] SD server is running ($($script:ActiveSDSetup.BaseUrl))" -ForegroundColor Green
         return $true
     }
 
-    # Is port 1338 held by a foreign HTTP server (for example Starfield sd_server.py)?
+    # Is the port held by a foreign HTTP server (for example Starfield sd_server.py)?
     $foreign = $null
     foreach ($h in @(Get-SdHostCandidates)) {
         $probe = Get-SdPingProbe -HostName $h -Port $port -Attempts 1
-        if ($probe -and -not $probe.IsAamt) { $foreign = $probe; break }
+        if ($probe -and -not $probe.Accepted) { $foreign = $probe; break }
     }
     $listeners = @(Get-SdListenerPid -Port $port)
 
@@ -730,9 +653,9 @@ function Start-StableDiffusionServerIfNeeded {
         Start-Sleep -Seconds 1
     } elseif ($listeners.Count -gt 0) {
         $ownerPid = $listeners[0]
-        $name = "unknown"
-        try { $name = (Get-Process -Id $ownerPid -ErrorAction Stop).ProcessName } catch { }
-        Write-Host "  Port $port is held by PID $ownerPid ($name) but /ping is not answering; waiting up to 20s..." -ForegroundColor Yellow
+        $procName = "unknown"
+        try { $procName = (Get-Process -Id $ownerPid -ErrorAction Stop).ProcessName } catch { }
+        Write-Host "  Port $port is held by PID $ownerPid ($procName) but /ping is not answering; waiting up to 20s..." -ForegroundColor Yellow
         for ($i = 0; $i -lt 10; $i++) {
             Start-Sleep -Seconds 2
             if (Test-StableDiffusionConnection) {
@@ -740,7 +663,7 @@ function Start-StableDiffusionServerIfNeeded {
                 return $true
             }
         }
-        Write-Host "  [ERROR] Port $port is blocked by PID $ownerPid ($name). Stop it: Stop-Process -Id $ownerPid -Force" -ForegroundColor Red
+        Write-Host "  [ERROR] Port $port is blocked by PID $ownerPid ($procName). Stop it: Stop-Process -Id $ownerPid -Force" -ForegroundColor Red
         return $false
     }
 
@@ -809,12 +732,11 @@ function Start-SDServerIfNeeded {
         [int]$TimeoutSec = 300,
         [switch]$NoStart
     )
-    $isVerbose = ($VerbosePreference -eq 'Continue')
     $root = $ToolsRoot
     if ([string]::IsNullOrWhiteSpace($root)) { $root = $PSScriptRoot }
     try {
-        if ($isVerbose) { Write-Host "Invoking Start-StableDiffusionServerIfNeeded..." -ForegroundColor Gray }
-        $ok = Start-StableDiffusionServerIfNeeded -ToolsRoot $root -TimeoutSec $TimeoutSec -NoStart:$NoStart -Verbose:$isVerbose
+        Write-SdLog "Start-SDServerIfNeeded -> Start-StableDiffusionServerIfNeeded"
+        $ok = Start-StableDiffusionServerIfNeeded -ToolsRoot $root -TimeoutSec $TimeoutSec -NoStart:$NoStart
         return [bool]($ok | Select-Object -Last 1)
     } catch {
         Write-Host "  [ERROR] Start-StableDiffusionServerIfNeeded failed: $($_.Exception.Message)" -ForegroundColor Red
@@ -825,8 +747,8 @@ function Start-SDServerIfNeeded {
 function Invoke-StableDiffusionGeneration {
     <#
     .SYNOPSIS
-    Generates image(s). Returns base64 string(s); wrap the call in @() when you need
-    an array (a single image comes back as one string). Supports the SD3.5 server (primary), A1111 and OpenAI-style servers.
+    Generates ONE image through POST /v1/images/generations and returns it as a validated
+    base64 PNG string. Throws on any problem; never returns an unvalidated image.
     #>
     [CmdletBinding()]
     param(
@@ -837,250 +759,172 @@ function Invoke-StableDiffusionGeneration {
         [int]$Steps = 28,
         [double]$GuidanceScale = 7.0,
         [int]$Seed = 0,
-        [int]$NumOutputs = 1,
-        [string]$ApiUrl = "",
+        [string]$ReferenceImagePath = "",
+        [double]$ImageStrength = 0.7,
         [switch]$AutoStartServer,
         [switch]$EnhanceWithOllama,
-        [string]$OllamaUrl = "http://localhost:11434",
-        [string]$ReferenceImagePath = "",
-        [double]$ImageStrength = 0.7
+        [bool]$Strict = $script:SDStrictDefault
     )
-    $isVerbose = ($VerbosePreference -eq 'Continue')
 
     if ($EnhanceWithOllama) { $Prompt = Get-SdEnhancedPrompt -Prompt $Prompt }
+    if ([string]::IsNullOrWhiteSpace($NegativePrompt)) { $NegativePrompt = $script:DefaultNegativePrompt }
 
-    # Server must be reachable (optionally start it).
-    if (-not (Test-StableDiffusionConnection -Verbose:$isVerbose)) {
+    # 1) Server reachable?
+    if (-not (Test-StableDiffusionConnection)) {
         if ($AutoStartServer) {
-            if (-not (Start-SDServerIfNeeded -Verbose:$isVerbose)) {
-                throw "SD server is not running and could not be started."
-            }
+            if (-not (Start-SDServerIfNeeded)) { throw "SD3.5 server is not running and could not be started." }
         } else {
-            throw "SD server is not reachable on port $($script:SDPort). Run Start-StableDiffusionServer.ps1 or pass -AutoStartServer."
+            throw "SD3.5 server is not reachable on port $($script:SDPort). Run Start-StableDiffusionServer.ps1 or pass -AutoStartServer."
         }
     }
     $setup = $script:ActiveSDSetup
 
-    # Resolve the API URL. An explicit -ApiUrl is honoured; otherwise use the detected one.
-    $explicitUrl = -not [string]::IsNullOrWhiteSpace($ApiUrl)
-    if (-not $explicitUrl) { $ApiUrl = [string]$script:StableDiffusionApiUrl }
-    $parsedUri = $null
-    if ([string]::IsNullOrWhiteSpace($ApiUrl) -or -not [System.Uri]::TryCreate($ApiUrl, [System.UriKind]::Absolute, [ref]$parsedUri)) {
-        $ApiUrl = [string]$script:StableDiffusionApiUrl
-        if (-not [System.Uri]::TryCreate($ApiUrl, [System.UriKind]::Absolute, [ref]$parsedUri)) {
-            throw "Stable Diffusion API URL is invalid: '$ApiUrl'"
-        }
+    # 2) CUDA + pipeline status
+    Assert-SdCuda -Setup $setup
+
+    # 3) Optional reference image (img2img uses the same endpoint)
+    $imageValue = $null
+    $strengthValue = $null
+    if (-not [string]::IsNullOrWhiteSpace($ReferenceImagePath)) {
+        $refPath = Resolve-SdOutputPath -Path $ReferenceImagePath
+        if (-not (Test-Path -LiteralPath $refPath -PathType Leaf)) { throw "Reference image not found: $refPath" }
+        $imageValue = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($refPath))
+        $strengthValue = $ImageStrength
     }
-    $apiType = [string]$setup.Type
-    if ($explicitUrl -and $parsedUri.Port -ne [int]$setup.Port) { $apiType = "APIServer" }
+    $seedValue = $null
+    if ($Seed -ne 0) { $seedValue = $Seed }
 
-    if ([string]::IsNullOrWhiteSpace($NegativePrompt)) { $NegativePrompt = $script:DefaultGenerationParams.NegativePrompt }
-
-    $referenceImageBase64 = $null
-    if ($ReferenceImagePath -and (Test-Path -LiteralPath $ReferenceImagePath)) {
-        try {
-            $referenceImageBase64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes((Resolve-SdOutputPath -Path $ReferenceImagePath)))
-            Write-Host "  Using reference image: $(Split-Path -Leaf $ReferenceImagePath) (strength $ImageStrength)" -ForegroundColor Cyan
-        } catch {
-            Write-Host "  [WARN] Failed to load reference image: $($_.Exception.Message)" -ForegroundColor Yellow
-        }
+    # 4) Payload: exactly this shape
+    $payload = [ordered]@{
+        model           = $script:SDModelName
+        prompt          = $Prompt
+        negative_prompt = $NegativePrompt
+        size            = "$($Width)x$($Height)"
+        width           = $Width                  # WIDTH-HEIGHT: server ignores "size" (see header)
+        height          = $Height                 # WIDTH-HEIGHT
+        steps           = $Steps
+        guidance_scale  = $GuidanceScale
+        response_format = "b64_json"
+        seed            = $seedValue
+        image           = $imageValue
+        strength        = $strengthValue
+        n               = 1
     }
+    $jsonBody = $payload | ConvertTo-Json -Depth 4 -Compress
 
-    $mode = "Text-to-Image"
-    if ($referenceImageBase64) { $mode = "Image-to-Image" }
-    Write-Host "  Generating image with $($setup.Name) ($mode)..." -ForegroundColor Cyan
-    Write-Host "    ${Width}x${Height}, steps $Steps, guidance $GuidanceScale -> $ApiUrl" -ForegroundColor Gray
+    $apiUrl = ([string]$setup.BaseUrl) + $script:SDApiPath
+    $logPayload = [ordered]@{}
+    foreach ($k in $payload.Keys) { $logPayload[$k] = $payload[$k] }
+    if ($null -ne $imageValue) { $logPayload['image'] = "<base64, $($imageValue.Length) chars>" }
+    Write-SdLog "POST $apiUrl"
+    Write-SdLog ("payload: " + ($logPayload | ConvertTo-Json -Depth 4 -Compress))
+    Write-Host "  Generating $($Width)x$($Height), steps $Steps, guidance $GuidanceScale (strict=$Strict)..." -ForegroundColor Cyan
 
-    # Build the JSON body for the detected API flavour.
-    $body = @{}
-    switch ($apiType) {
-        "A1111" {
-            $body = @{
-                prompt = $Prompt
-                negative_prompt = $NegativePrompt
-                width = $Width
-                height = $Height
-                steps = $Steps
-                cfg_scale = $GuidanceScale
-                sampler_name = "DPM++ 2M"
-                sampler_index = "DPM++ 2M"
-                seed = -1
-            }
-            if ($Seed -ne 0) { $body.seed = $Seed }
-            if ($NumOutputs -gt 1) { $body.n_iter = $NumOutputs }
-            if ($referenceImageBase64) {
-                $ApiUrl = $ApiUrl -replace "/txt2img", "/img2img"
-                $body.init_images = @($referenceImageBase64)
-                $body.denoising_strength = $ImageStrength
-            }
-        }
-        "ComfyUI" {
-            throw "ComfyUI needs a workflow JSON; use the AAMT SD3.5 server or AUTOMATIC1111."
-        }
-        "SD35Server" {
-            $body = @{
-                prompt = $Prompt
-                negative_prompt = $NegativePrompt
-                width = $Width
-                height = $Height
-                size = "${Width}x${Height}"
-                steps = $Steps
-                guidance_scale = $GuidanceScale
-                n = 1
-            }
-            if ($Seed -ne 0) { $body.seed = $Seed }
-            if ($referenceImageBase64) {
-                $body.image = $referenceImageBase64
-                $body.strength = $ImageStrength
-            }
-        }
-        default {
-            $body = @{
-                model = "stable-diffusion-3"
-                prompt = $Prompt
-                n = $NumOutputs
-                size = "${Width}x${Height}"
-                quality = "standard"
-                response_format = "b64_json"
-            }
-            if ($NegativePrompt) { $body.negative_prompt = $NegativePrompt }
-            if ($Steps -gt 0) { $body.steps = $Steps }
-            if ($GuidanceScale -gt 0) { $body.guidance_scale = $GuidanceScale }
-            if ($Seed -ne 0) { $body.seed = $Seed }
-            if ($referenceImageBase64) {
-                $body.image = $referenceImageBase64
-                $body.strength = $ImageStrength
-            }
-        }
-    }
-    $jsonBody = $body | ConvertTo-Json -Depth 6 -Compress
-
-    # POST. A refused/unreachable connection is retried once after re-detecting the
-    # server (covers a restart or a v4/v6 switch); a timeout is NOT retried because the
-    # server may still be rendering and the caller can salvage the output from disk.
-    $reply = $null
-    for ($attempt = 1; $attempt -le 2; $attempt++) {
-        $reply = Invoke-SdHttpRequest -Url $ApiUrl -Method "POST" -JsonBody $jsonBody -TimeoutSec $script:SDHttpTimeoutSec
-        if ($reply.StatusCode -gt 0 -or $reply.TimedOut) { break }
-        if ($attempt -eq 1) {
-            Write-Host "    [WARN] Connection failed ($($reply.Error)); re-detecting server and retrying once..." -ForegroundColor Yellow
-            Start-Sleep -Seconds 2
-            $null = Find-LocalStableDiffusionServer
-            if (-not $explicitUrl) { $ApiUrl = [string]$script:StableDiffusionApiUrl }
-        }
-    }
-
+    # 5) Send. No retry, no fallback: any failure stops here.
+    $reply = Invoke-SdHttpRequest -Url $apiUrl -Method "POST" -JsonBody $jsonBody -TimeoutSec $script:SDHttpTimeoutSec
     if ($reply.TimedOut) {
-        throw "Image generation timed out after $($script:SDHttpTimeoutSec)s (set AAMT_SD_HTTP_TIMEOUT_SEC to raise it)."
+        throw "SD server did not answer within $($script:SDHttpTimeoutSec)s (AAMT_SD_HTTP_TIMEOUT_SEC)."
     }
     if ($reply.StatusCode -eq 0) {
-        throw "Image generation failed: could not reach $ApiUrl ($($reply.Error))"
+        throw "Could not reach the SD server at ${apiUrl}: $($reply.Error)"
     }
-    if (-not $reply.Ok) {
-        if ($reply.StatusCode -eq 426) {
-            throw "HTTP 426 from ${ApiUrl}: a non-AAMT service owns this port (not the SD3.5 server). Stop it and restart Start-StableDiffusionServer.ps1."
-        }
-        $snippet = [string]$reply.Body
-        if ($snippet.Length -gt 500) { $snippet = $snippet.Substring(0, 500) }
-        throw "Image generation failed: HTTP $($reply.StatusCode) from ${ApiUrl}: $snippet"
+    $preview = [string]$reply.Body
+    if ($preview.Length -gt 300) { $preview = $preview.Substring(0, 300) + "... [$($reply.Body.Length) chars total]" }
+    Write-SdLog "response: HTTP $($reply.StatusCode) $preview"
+    if ($reply.StatusCode -ne 200) {
+        $detail = "SD server error $($reply.StatusCode): $($reply.Body)"
+        Write-Host "  [ERROR] $detail" -ForegroundColor Red
+        throw $detail
     }
     $script:SDLastGoodPing = Get-Date
 
-    $images = @(Get-SdImagesFromResponse -Raw $reply.Body -ApiType $apiType)
-    Write-Host "  [OK] Generated $($images.Count) image(s)" -ForegroundColor Green
-    return $images
+    # 6) Response structure
+    $result = $null
+    try {
+        $result = ConvertFrom-SdJson -Raw ([string]$reply.Body)
+    } catch {
+        throw "SD3.5 returned a response that is not valid JSON: $($_.Exception.Message)"
+    }
+    $data = Get-SdMember -Object $result -Name "data"
+    if ($null -eq $data -or @($data).Count -eq 0) {
+        throw "SD3.5 returned no image data."
+    }
+    $imgB64 = [string](Get-SdMember -Object (@($data)[0]) -Name "b64_json")
+    if ([string]::IsNullOrWhiteSpace($imgB64)) {
+        throw "SD3.5 returned empty b64_json."
+    }
+    if ($imgB64 -match '^data:image/[^;]+;base64,') { $imgB64 = $imgB64.Substring($imgB64.IndexOf(',') + 1) }
+    $imgB64 = ($imgB64 -replace '\s', '') -replace '\\/', '/'
+
+    # 7) Decode + validate
+    $pngBytes = $null
+    try {
+        $pngBytes = [Convert]::FromBase64String($imgB64)
+    } catch {
+        throw "Failed to decode SD3.5 PNG: $($_.Exception.Message)"
+    }
+    Write-SdLog "decoded PNG: $($pngBytes.Length) bytes"
+    $check = Test-SdPngBytes -Bytes $pngBytes -Width $Width -Height $Height -Strict $Strict
+    if (-not $check.Valid) {
+        throw "SD3.5 returned an unusable image: $($check.Reason)."
+    }
+    if ($check.Warning) { Write-Host "  [WARN] $($check.Warning)" -ForegroundColor Yellow }
+    Write-SdLog "PNG ok: $($check.Width)x$($check.Height)"
+    return [string]$imgB64
 }
 
 function Save-StableDiffusionImage {
     <#
     .SYNOPSIS
-    Saves a base64 image to disk. Returns the full output path.
+    Validates and saves a base64 PNG. Nothing is written unless the image is valid, and an
+    existing file is only replaced by a complete, valid PNG (temp file + move).
+    Returns the full output path.
     #>
+    [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)][string]$Base64Image,
-        [Parameter(Mandatory = $true)][string]$OutputPath
-    )
-    try {
-        $target = Resolve-SdOutputPath -Path $OutputPath
-        $payload = $Base64Image.Trim()
-        if ($payload -match '^data:image/[^;]+;base64,') {
-            $payload = $payload.Substring($payload.IndexOf(',') + 1)
-        }
-        $payload = ($payload -replace '\s', '') -replace '\\/', '/'
-        $imageBytes = [Convert]::FromBase64String($payload)
-        if ($imageBytes.Length -lt 100) { throw "decoded image is only $($imageBytes.Length) bytes" }
-        $outDir = Split-Path -Parent $target
-        if ($outDir -and -not (Test-Path -LiteralPath $outDir)) {
-            New-Item -ItemType Directory -Path $outDir -Force | Out-Null
-        }
-        [System.IO.File]::WriteAllBytes($target, $imageBytes)
-        Write-Host "  [OK] Image saved: $target" -ForegroundColor Green
-        return $target
-    } catch {
-        throw "Failed to save image: $($_.Exception.Message)"
-    }
-}
-
-function Invoke-SdGenerationViaPython {
-    <#
-    .SYNOPSIS
-    Generates through sd_http_client.py (HTTP/1.1, GPU lock, disk salvage). Returns the output path.
-    #>
-    param(
-        [Parameter(Mandatory = $true)][string]$Prompt,
         [Parameter(Mandatory = $true)][string]$OutputPath,
-        [string]$NegativePrompt = "",
-        [int]$Width = 1024,
-        [int]$Height = 1024,
-        [int]$Steps = 28,
-        [double]$GuidanceScale = 7.0,
-        [int]$Seed = 0,
-        [string]$ApiUrl = "",
-        [double]$TimeoutSec = 0,
-        [string]$ReferenceImagePath = "",
-        [double]$ImageStrength = 0.65
+        [int]$Width = 0,
+        [int]$Height = 0,
+        [bool]$Strict = $script:SDStrictDefault
     )
-    $pythonClient = Join-Path $PSScriptRoot "sd_http_client.py"
-    if (-not (Test-Path -LiteralPath $pythonClient)) { throw "Python SD client not found: $pythonClient" }
-
-    $pythonCmd = $null
-    if (Get-Command python -ErrorAction SilentlyContinue) { $pythonCmd = "python" }
-    elseif (Get-Command python3 -ErrorAction SilentlyContinue) { $pythonCmd = "python3" }
-    else { throw "Python not found in PATH" }
-
     $target = Resolve-SdOutputPath -Path $OutputPath
+    $payload = $Base64Image.Trim()
+    if ($payload -match '^data:image/[^;]+;base64,') { $payload = $payload.Substring($payload.IndexOf(',') + 1) }
+    $payload = ($payload -replace '\s', '') -replace '\\/', '/'
+
+    $pngBytes = $null
+    try {
+        $pngBytes = [Convert]::FromBase64String($payload)
+    } catch {
+        throw "Failed to decode SD3.5 PNG: $($_.Exception.Message)"
+    }
+    $check = Test-SdPngBytes -Bytes $pngBytes -Width $Width -Height $Height -Strict $Strict
+    if (-not $check.Valid) {
+        throw "Refusing to save $target : $($check.Reason)."
+    }
+
     $outDir = Split-Path -Parent $target
     if ($outDir -and -not (Test-Path -LiteralPath $outDir)) {
         New-Item -ItemType Directory -Path $outDir -Force | Out-Null
     }
-
-    $timeout = [double]$script:SDHttpTimeoutSec
-    if ($TimeoutSec -gt 0) { $timeout = $TimeoutSec }
-    $pyArgs = @(
-        $pythonClient, "--prompt", $Prompt, "--output", $target,
-        "--negative-prompt", $NegativePrompt,
-        "--width", "$Width", "--height", "$Height",
-        "--steps", "$Steps", "--guidance-scale", "$GuidanceScale", "--seed", "$Seed",
-        "--timeout", "$timeout"
-    )
-    if ($ApiUrl) { $pyArgs += @("--api-url", $ApiUrl) }
-    if ($ReferenceImagePath) {
-        $pyArgs += @("--reference-image", (Resolve-SdOutputPath -Path $ReferenceImagePath), "--image-strength", "$ImageStrength")
+    $tmp = $target + ".sdtmp"
+    try {
+        [System.IO.File]::WriteAllBytes($tmp, $pngBytes)
+        Move-Item -LiteralPath $tmp -Destination $target -Force
+    } finally {
+        if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
     }
-
-    Write-Host "  Using Python SD client (HTTP/1.1, timeout=${timeout}s)..." -ForegroundColor Cyan
-    # Out-Host keeps the client's stdout out of this function's return value.
-    & $pythonCmd @pyArgs | Out-Host
-    if ($LASTEXITCODE -ne 0) { throw "Python SD client failed (exit $LASTEXITCODE)" }
-    if (-not (Test-Path -LiteralPath $target)) { throw "Python SD client did not create output: $target" }
+    Write-SdLog "saved $($pngBytes.Length) bytes ($($check.Width)x$($check.Height)) -> $target"
+    Write-Host "  [OK] Image saved: $target" -ForegroundColor Green
     return $target
 }
 
 function Generate-AssetImageWithSD3 {
     <#
     .SYNOPSIS
-    Full workflow: optional Ollama prompt enhancement, generate with SD3.5, save the image.
-    Returns the saved path (string), or an array of paths when several images came back.
+    Optional Ollama prompt enhancement, generate with SD3.5, validate, save.
+    Returns the saved path (string). Throws on any failure; nothing is saved on failure.
     #>
     [CmdletBinding()]
     param(
@@ -1094,96 +938,20 @@ function Generate-AssetImageWithSD3 {
         [int]$Seed = 0,
         [switch]$EnhanceWithOllama = $true,
         [switch]$AutoStartServer = $false,
-        [string]$ApiUrl = "",
         [string]$ReferenceImagePath = "",
-        [double]$ImageStrength = 0.7
+        [double]$ImageStrength = 0.7,
+        [bool]$Strict = $script:SDStrictDefault
     )
-    $isVerbose = ($VerbosePreference -eq 'Continue')
     $OutputPath = Resolve-SdOutputPath -Path $OutputPath
+    Write-SdLog "output path: $OutputPath"
 
-    # Enhance ONCE here; downstream calls are told not to enhance again.
-    if ($EnhanceWithOllama) { $Prompt = Get-SdEnhancedPrompt -Prompt $Prompt }
+    $b64 = Invoke-StableDiffusionGeneration `
+        -Prompt $Prompt -NegativePrompt $NegativePrompt -Width $Width -Height $Height `
+        -Steps $Steps -GuidanceScale $GuidanceScale -Seed $Seed `
+        -ReferenceImagePath $ReferenceImagePath -ImageStrength $ImageStrength `
+        -EnhanceWithOllama:$EnhanceWithOllama -AutoStartServer:$AutoStartServer -Strict $Strict
 
-    if (-not (Test-StableDiffusionConnection -Verbose:$isVerbose)) {
-        if ($AutoStartServer) {
-            if (-not (Start-SDServerIfNeeded -Verbose:$isVerbose)) {
-                throw "SD server is not running and could not be started."
-            }
-        } else {
-            throw "SD server is not reachable on port $($script:SDPort). Start it or pass -AutoStartServer."
-        }
-    }
-    $setup = $script:ActiveSDSetup
-
-    # Preferred path: Python HTTP/1.1 client (SD3.5 server only).
-    $pythonClient = Join-Path $PSScriptRoot "sd_http_client.py"
-    if ($setup.Type -eq "SD35Server" -and (Test-Path -LiteralPath $pythonClient)) {
-        $pyStarted = Get-Date
-        try {
-            $pyUrl = $ApiUrl
-            if ([string]::IsNullOrWhiteSpace($pyUrl)) { $pyUrl = [string]$script:StableDiffusionApiUrl }
-            return (Invoke-SdGenerationViaPython `
-                -Prompt $Prompt -OutputPath $OutputPath -NegativePrompt $NegativePrompt `
-                -Width $Width -Height $Height -Steps $Steps -GuidanceScale $GuidanceScale -Seed $Seed `
-                -ApiUrl $pyUrl -ReferenceImagePath $ReferenceImagePath -ImageStrength $ImageStrength)
-        } catch {
-            Write-Host "  [WARN] Python SD client failed: $($_.Exception.Message)" -ForegroundColor Yellow
-            $salvaged = Get-SalvagedSdOutput -OutputPath $OutputPath -StartedAt $pyStarted -Width $Width -Height $Height
-            if ($salvaged) { return $salvaged }
-            Write-Host "  [INFO] Falling back to the PowerShell HTTP client..." -ForegroundColor Gray
-        }
-    }
-
-    # Fallback: PowerShell HTTP client with OOM retry and disk salvage.
-    $startedAt = Get-Date
-    $images = @()
-    try {
-        $images = @(Invoke-StableDiffusionGeneration `
-            -Prompt $Prompt -NegativePrompt $NegativePrompt -Width $Width -Height $Height `
-            -Steps $Steps -GuidanceScale $GuidanceScale -Seed $Seed `
-            -EnhanceWithOllama:$false -AutoStartServer:$AutoStartServer `
-            -ApiUrl $ApiUrl -ReferenceImagePath $ReferenceImagePath -ImageStrength $ImageStrength)
-    } catch {
-        $errText = $_.Exception.Message
-        $salvaged = Get-SalvagedSdOutput -OutputPath $OutputPath -StartedAt $startedAt -Width $Width -Height $Height
-        if ($salvaged) { return $salvaged }
-
-        if (Test-SdOomError -Message $errText) {
-            $redW = [Math]::Max(512, [int]($Width * 0.66))
-            $redH = [Math]::Max(512, [int]($Height * 0.66))
-            $redSteps = [Math]::Max(12, [int]($Steps * 0.6))
-            Write-Host "  [SD] CUDA OOM detected; retrying at ${redW}x${redH}@${redSteps}..." -ForegroundColor Yellow
-            $startedAt = Get-Date
-            try {
-                $images = @(Invoke-StableDiffusionGeneration `
-                    -Prompt $Prompt -NegativePrompt $NegativePrompt -Width $redW -Height $redH -Steps $redSteps `
-                    -GuidanceScale $GuidanceScale -Seed $Seed -EnhanceWithOllama:$false -AutoStartServer:$false `
-                    -ApiUrl $ApiUrl -ReferenceImagePath $ReferenceImagePath -ImageStrength $ImageStrength)
-            } catch {
-                $salvaged = Get-SalvagedSdOutput -OutputPath $OutputPath -StartedAt $startedAt -Width $redW -Height $redH
-                if ($salvaged) { return $salvaged }
-                throw
-            }
-        } else {
-            throw
-        }
-    }
-
-    if ($images.Count -eq 0) { throw "No images were generated" }
-
-    $savedPath = Save-StableDiffusionImage -Base64Image ([string]$images[0]) -OutputPath $OutputPath
-    if ($images.Count -gt 1) {
-        $baseDir = [System.IO.Path]::GetDirectoryName($OutputPath)
-        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($OutputPath)
-        $extension = [System.IO.Path]::GetExtension($OutputPath)
-        $paths = @($savedPath)
-        for ($i = 1; $i -lt $images.Count; $i++) {
-            $extra = Join-Path $baseDir ("{0}_{1}{2}" -f $baseName, $i, $extension)
-            $paths += Save-StableDiffusionImage -Base64Image ([string]$images[$i]) -OutputPath $extra
-        }
-        return $paths
-    }
-    return $savedPath
+    return (Save-StableDiffusionImage -Base64Image ([string]$b64) -OutputPath $OutputPath -Width $Width -Height $Height -Strict $Strict)
 }
 
 # ============================================================
@@ -1197,8 +965,5 @@ Export-ModuleMember -Function `
     Stop-StableDiffusionServer, `
     Invoke-StableDiffusionGeneration, `
     Save-StableDiffusionImage, `
-    Invoke-SdGenerationViaPython, `
     Generate-AssetImageWithSD3, `
-    Get-FreeVramMB, `
-    Get-SalvagedSdOutput, `
-    Test-SdOomError
+    Get-FreeVramMB

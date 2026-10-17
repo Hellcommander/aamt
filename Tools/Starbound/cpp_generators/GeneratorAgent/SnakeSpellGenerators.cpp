@@ -1,12 +1,15 @@
 #include "SnakeSpellFactory.hpp"
 #include "core/Log.hpp"
 #include <cmath>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 #include <algorithm>
 
 namespace MagiTech {
 namespace SnakeSpells {
 
-#define LOG_SNAKE_GEN(Action, Id) Log::info("SnakeSpellGen - {}: {}", #Action, Id)
+#define LOG_SNAKE_GEN(Action, Id) Log::info("SnakeSpell", "SnakeSpellGen - {}: {}", #Action, Id)
 
 // Hash function implementations
 uint64_t SnakeBodyParams::hashKey() const {

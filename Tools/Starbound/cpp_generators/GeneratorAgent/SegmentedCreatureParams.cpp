@@ -180,7 +180,7 @@ nlohmann::json toJson(const SegmentedCreatureParams& params) {
     return j;
 }
 
-SegmentedCreatureParams fromJson(const nlohmann::json& json) {
+SegmentedCreatureParams creatureFromJson(const nlohmann::json& json) {
     SegmentedCreatureParams params;
     
     // Helper function to safely get values with defaults
@@ -319,7 +319,7 @@ nlohmann::json toJson(const BehaviorParams& params) {
     return j;
 }
 
-BehaviorParams fromJson(const nlohmann::json& json) {
+BehaviorParams behaviorFromJson(const nlohmann::json& json) {
     BehaviorParams params;
     
     // Helper functions (same as above)

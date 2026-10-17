@@ -7,6 +7,9 @@
 #include <vector>
 #include <string>
 #include <functional>
+#include <any>
+#include <mutex>
+#include <chrono>
 
 namespace MagiTech {
 namespace AssetGen {
@@ -210,7 +213,8 @@ public:
     virtual bool generateAsset(const AssetMetadata& metadata) = 0;
     virtual bool validateParameters(const std::unordered_map<std::string, std::any>& params) = 0;
     virtual std::vector<std::string> getSupportedParameters() const = 0;
-    virtual std::vector<std::string> getSupportedAssetTypes() const = 0;
+    // Display names of the supported asset types (the enum list is getSupportedAssetTypes()).
+    virtual std::vector<std::string> getSupportedAssetTypeNames() const = 0;
     
     // Metadata
     virtual std::string getName() const = 0;
@@ -271,7 +275,18 @@ private:
     bool m_showPreviewPanel = true;
     bool m_showExportPanel = true;
     bool m_showSettingsPanel = false;
-    
+    bool m_mainWindowOpen = true;
+    bool m_showAboutPopup = false;
+    bool m_showDocsPopup = false;
+
+    // Preview / export / settings state
+    float m_previewZoom = 1.0f;
+    int m_exportFormatIndex = 0;          // 0 JSON, 1 YAML, 2 Binary (MessagePack), 3 Custom (CBOR)
+    std::string m_exportDirectory = "assets/export";
+    std::string m_settingsPath = "asset_generator_ui.json";
+    std::string m_statusMessage;
+    std::vector<std::string> m_recentAssets;
+
     // Asset generators
     std::unordered_map<std::string, std::unique_ptr<IAssetGenerator>> m_generators;
     std::unordered_map<AssetCategory, std::vector<std::string>> m_categoryGenerators;
@@ -345,7 +360,7 @@ public:
 private:
     std::unordered_map<std::string, GeneratorCreator> m_creators;
     std::unordered_map<AssetCategory, std::vector<std::string>> m_categoryGenerators;
-    std::mutex m_mutex;
+    mutable std::mutex m_mutex;
 };
 
 // Utility functions

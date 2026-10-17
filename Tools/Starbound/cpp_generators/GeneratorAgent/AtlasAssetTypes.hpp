@@ -53,14 +53,14 @@ struct ImportedSprite {
     std::string id;
     // placeholder for pixel data
     std::vector<uint8_t> pixelData;
-    int width;
-    int height;
+    int width = 0;
+    int height = 0;
 };
 
 struct AtlasLayout {
     std::unordered_map<std::string, UVRect> uvMap;
-    int atlasWidth;
-    int atlasHeight;
+    int atlasWidth = 0;
+    int atlasHeight = 0;
 };
 
 struct AtlasBundle {

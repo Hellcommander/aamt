@@ -1,4 +1,5 @@
 #include "SynthGen.hpp"
+#include "AudioFileIO.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -8,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <mutex>
 #include "vendor/json/include/nlohmann/json.hpp"
 
 // YAML-CPP include (if available)
@@ -113,12 +115,6 @@ namespace {
         return (it != parameters.end()) ? it->second : defaultValue;
     }
     
-    // Helper functions for writing little-endian values
-    template<typename T>
-    void writeLittleEndian(std::ofstream& file, T value) {
-        file.write(reinterpret_cast<const char*>(&value), sizeof(T));
-    }
-    
     // Parse oscillator type from string
     OscillatorType parseOscillatorType(const std::string& typeStr) {
         if (typeStr == "sine") return OscillatorType::SINE;
@@ -154,6 +150,8 @@ namespace {
         if (typeStr == "reverb") return EffectType::REVERB;
         if (typeStr == "delay") return EffectType::DELAY;
         if (typeStr == "chorus") return EffectType::CHORUS;
+        if (typeStr == "flanger") return EffectType::FLANGER;
+        if (typeStr == "filter") return EffectType::FILTER;
         if (typeStr == "distortion") return EffectType::DISTORTION;
         if (typeStr == "compressor") return EffectType::COMPRESSOR;
         if (typeStr == "equalizer") return EffectType::EQUALIZER;
@@ -547,6 +545,8 @@ bool SynthGen::saveInstrumentDefinition(const InstrumentDefinition& def, const s
                     case EffectType::DISTORTION: return "distortion";
                     case EffectType::COMPRESSOR: return "compressor";
                     case EffectType::EQUALIZER: return "equalizer";
+                    case EffectType::FLANGER: return "flanger";
+                    case EffectType::FILTER: return "filter";
                     default: return "reverb";
                 }
             }(effect.type);
@@ -624,7 +624,14 @@ InstrumentDefinition SynthGen::createDefaultInstrumentDefinition(const SynthPara
     def.description = "Default synthesized instrument";
     
     // Configure based on params
-    def.voice.oscillator.type = params.waveformType == WaveformType::SINE ? OscillatorType::SINE : OscillatorType::WAVETABLE;
+    switch (params.waveformType) {
+        case WaveformType::SINE: def.voice.oscillator.type = OscillatorType::SINE; break;
+        case WaveformType::SQUARE: def.voice.oscillator.type = OscillatorType::SQUARE; break;
+        case WaveformType::SAW: def.voice.oscillator.type = OscillatorType::SAW; break;
+        case WaveformType::TRIANGLE: def.voice.oscillator.type = OscillatorType::TRIANGLE; break;
+        case WaveformType::NOISE: def.voice.oscillator.type = OscillatorType::GRANULAR; break;
+        case WaveformType::CUSTOM: def.voice.oscillator.type = OscillatorType::WAVETABLE; break;
+    }
     def.voice.oscillator.frequency = params.frequency;
     def.voice.oscillator.amplitude = params.amplitude;
     def.voice.oscillator.phase = params.phase;
@@ -634,7 +641,31 @@ InstrumentDefinition SynthGen::createDefaultInstrumentDefinition(const SynthPara
     def.voice.ampEnvelope.decay = params.adsrEnvelope.y;
     def.voice.ampEnvelope.sustain = params.adsrEnvelope.z;
     def.voice.ampEnvelope.release = params.adsrEnvelope.w;
-    
+
+    // Modulation from the request (x = rate Hz, y = depth 0..1)
+    if (params.amplitudeModulation.y > 0.0f) {
+        def.voice.lfo.target = ModulationTarget::AMPLITUDE;
+        def.voice.lfo.rate = params.amplitudeModulation.x;
+        def.voice.lfo.depth = params.amplitudeModulation.y;
+    } else if (params.frequencyModulation.y > 0.0f) {
+        def.voice.lfo.target = ModulationTarget::FREQUENCY;
+        def.voice.lfo.rate = params.frequencyModulation.x;
+        def.voice.lfo.depth = params.frequencyModulation.y;
+    } else if (params.phaseModulation.y > 0.0f) {
+        def.voice.lfo.target = ModulationTarget::PHASE;
+        def.voice.lfo.rate = params.phaseModulation.x;
+        def.voice.lfo.depth = params.phaseModulation.y;
+    } else {
+        def.voice.lfo.depth = 0.0f; // no modulation requested
+    }
+    // Keep the filter open so the requested waveform is heard as specified.
+    def.voice.filter.cutoff = std::min(18000.0f, static_cast<float>(m_sampleRate) * 0.45f);
+    def.voice.filter.resonance = 0.7071f;
+
+    // A single parameterised note does not produce a variation pack.
+    def.variations.enableVariations = false;
+    def.variations.enablePitchVariations = false;
+
     return def;
 }
 
@@ -652,10 +683,17 @@ SynthResult SynthGen::processSynthesisPipeline(const InstrumentDefinition& instr
     std::vector<float> processedVoice = applyEffectChain(baseVoice, instrumentDef.effects);
     
     // Step 4: Generate variations
-    std::vector<VariationSample> variations = generateVariations(processedVoice, instrumentDef.variations);
-    
+    std::vector<VariationSample> variations;
+    if (instrumentDef.variations.enableVariations) {
+        variations = generateVariations(processedVoice, instrumentDef.variations);
+    }
+
     // Step 5: Generate metadata
+    result.synthesisTime = std::chrono::system_clock::now();
     result.metadata = generateMetadata(instrumentDef, variations);
+    result.metadata.duration = m_numChannels > 0
+        ? static_cast<float>(processedVoice.size()) / (static_cast<float>(m_sampleRate) * m_numChannels)
+        : 0.0f;
     
     // Step 6: Package synthesis results
     result.audioData = processedVoice;
@@ -737,9 +775,11 @@ std::vector<float> SynthGen::synthesizeVoice(const VoiceDefinition& voice, const
     
     // Apply filter
     std::vector<float> filteredOutput = applyFilter(envelopedOutput, voice.filter);
-    
-    // Apply LFO modulation
-    std::vector<float> modulatedOutput = applyLFO(modulatedOutput, voice.lfo);
+
+    // Apply LFO modulation (cutoff modulation is centred on the voice's filter cutoff)
+    LFODefinition lfo = voice.lfo;
+    lfo.parameters.emplace("baseCutoff", voice.filter.cutoff);
+    std::vector<float> modulatedOutput = applyLFO(filteredOutput, lfo);
     
     // Convert to stereo if needed
     if (m_numChannels == 2) {
@@ -789,28 +829,42 @@ std::vector<float> SynthGen::generateOscillatorOutput(const OscillatorDefinition
 std::vector<float> SynthGen::applyEnvelope(const std::vector<float>& input, const ADSR& envelope) {
     std::vector<float> output(input.size());
     
-    size_t attackSamples = static_cast<size_t>(envelope.attack * m_sampleRate);
-    size_t decaySamples = static_cast<size_t>(envelope.decay * m_sampleRate);
-    size_t releaseSamples = static_cast<size_t>(envelope.release * m_sampleRate);
-    size_t sustainSamples = input.size() - attackSamples - decaySamples - releaseSamples;
+    // Envelope stages are scaled down proportionally when the note is shorter than A+D+R.
+    double attackSamples = std::max(0.0f, envelope.attack) * m_sampleRate;
+    double decaySamples = std::max(0.0f, envelope.decay) * m_sampleRate;
+    double releaseSamples = std::max(0.0f, envelope.release) * m_sampleRate;
+    const double envelopeTotal = attackSamples + decaySamples + releaseSamples;
+    if (envelopeTotal > static_cast<double>(input.size()) && envelopeTotal > 0.0) {
+        const double scale = static_cast<double>(input.size()) / envelopeTotal;
+        attackSamples *= scale;
+        decaySamples *= scale;
+        releaseSamples *= scale;
+    }
+    const size_t aS = static_cast<size_t>(attackSamples);
+    const size_t dS = static_cast<size_t>(decaySamples);
+    const size_t rS = static_cast<size_t>(releaseSamples);
+    const size_t sustainSamples = input.size() > aS + dS + rS ? input.size() - aS - dS - rS : 0;
+    const size_t attackLen = aS;
+    const size_t decayLen = dS;
+    const size_t releaseLen = std::max<size_t>(1, rS);
     
     for (size_t i = 0; i < input.size(); ++i) {
         float envelopeValue = 0.0f;
         
-        if (i < attackSamples) {
+        if (i < attackLen) {
             // Attack phase
-            envelopeValue = static_cast<float>(i) / attackSamples;
-        } else if (i < attackSamples + decaySamples) {
+            envelopeValue = static_cast<float>(i) / static_cast<float>(attackLen);
+        } else if (i < attackLen + decayLen) {
             // Decay phase
-            float decayProgress = static_cast<float>(i - attackSamples) / decaySamples;
+            float decayProgress = static_cast<float>(i - attackLen) / static_cast<float>(decayLen);
             envelopeValue = 1.0f - (1.0f - envelope.sustain) * decayProgress;
-        } else if (i < attackSamples + decaySamples + sustainSamples) {
+        } else if (i < attackLen + decayLen + sustainSamples) {
             // Sustain phase
             envelopeValue = envelope.sustain;
         } else {
             // Release phase
-            float releaseProgress = static_cast<float>(i - (attackSamples + decaySamples + sustainSamples)) / releaseSamples;
-            envelopeValue = envelope.sustain * (1.0f - releaseProgress);
+            float releaseProgress = static_cast<float>(i - (attackLen + decayLen + sustainSamples)) / static_cast<float>(releaseLen);
+            envelopeValue = envelope.sustain * std::max(0.0f, 1.0f - releaseProgress);
         }
         
         output[i] = input[i] * envelopeValue;
@@ -841,31 +895,58 @@ std::vector<float> SynthGen::applyFilter(const std::vector<float>& input, const 
     return output;
 }
 
-// LFO Application
+// LFO Application (operates on the mono voice signal)
 std::vector<float> SynthGen::applyLFO(const std::vector<float>& input, const LFODefinition& lfo) {
+    if (lfo.depth == 0.0f || lfo.rate <= 0.0f || input.empty()) {
+        return input;
+    }
     std::vector<float> output(input.size());
+    const float sr = static_cast<float>(m_sampleRate);
     
-    for (size_t i = 0; i < input.size(); ++i) {
-        float time = static_cast<float>(i) / m_sampleRate;
-        float lfoValue = generateLFOValue(lfo.waveform, lfo.rate, lfo.depth, lfo.phase, time);
-        
-        switch (lfo.target) {
-            case ModulationTarget::FREQUENCY:
-                // Apply frequency modulation (FM synthesis)
-                output[i] = input[i] * (1.0f + lfoValue);
-                break;
-            case ModulationTarget::AMPLITUDE:
-                // Apply amplitude modulation (AM synthesis)
-                output[i] = input[i] * (1.0f + lfoValue);
-                break;
-            case ModulationTarget::CUTOFF:
-                // Apply filter cutoff modulation
-                output[i] = input[i] * (1.0f + lfoValue);
-                break;
-            case ModulationTarget::PHASE:
-                // Apply phase modulation
-                output[i] = input[i] * (1.0f + lfoValue);
-                break;
+    switch (lfo.target) {
+        case ModulationTarget::AMPLITUDE: {
+            // Tremolo: depth is a 0..1 modulation index (values > 1 are treated as percent)
+            const float index = std::clamp(lfo.depth > 1.0f ? lfo.depth / 100.0f : lfo.depth, 0.0f, 1.0f);
+            for (size_t i = 0; i < input.size(); ++i) {
+                const float l = generateLFOValue(lfo.waveform, lfo.rate, 1.0f, lfo.phase, i / sr);
+                output[i] = input[i] * (1.0f - index * 0.5f * (1.0f - l));
+            }
+            break;
+        }
+        case ModulationTarget::FREQUENCY:
+        case ModulationTarget::PHASE: {
+            // Vibrato / phase modulation through a modulated fractional delay line.
+            // depth: 0..1 (or percent) of a 5 ms maximum excursion.
+            const float index = std::clamp(lfo.depth > 1.0f ? lfo.depth / 100.0f : lfo.depth, 0.0f, 1.0f);
+            const float maxDelay = 0.005f * sr * index;
+            for (size_t i = 0; i < input.size(); ++i) {
+                const float l = generateLFOValue(lfo.waveform, lfo.rate, 1.0f, lfo.phase, i / sr);
+                const float delay = maxDelay * 0.5f * (1.0f + l);
+                const float readPos = static_cast<float>(i) - delay;
+                if (readPos <= 0.0f) {
+                    output[i] = input[0];
+                    continue;
+                }
+                const size_t i0 = static_cast<size_t>(readPos);
+                const size_t i1 = std::min(i0 + 1, input.size() - 1);
+                const float frac = readPos - static_cast<float>(i0);
+                output[i] = input[i0] + (input[i1] - input[i0]) * frac;
+            }
+            break;
+        }
+        case ModulationTarget::CUTOFF: {
+            // Time-varying one-pole low-pass; depth is the cutoff swing in Hz.
+            auto base = lfo.parameters.find("baseCutoff");
+            const float baseCutoff = base != lfo.parameters.end() ? base->second : 2000.0f;
+            float state = 0.0f;
+            for (size_t i = 0; i < input.size(); ++i) {
+                const float l = generateLFOValue(lfo.waveform, lfo.rate, 1.0f, lfo.phase, i / sr);
+                const float cutoff = std::clamp(baseCutoff + lfo.depth * l, 20.0f, sr * 0.45f);
+                const float alpha = 1.0f - std::exp(-TWO_PI * cutoff / sr);
+                state += alpha * (input[i] - state);
+                output[i] = state;
+            }
+            break;
         }
     }
     
@@ -879,6 +960,7 @@ float SynthGen::generateLFOValue(WaveformType waveform, float rate, float depth,
     
     switch (waveform) {
         case WaveformType::SINE:
+        case WaveformType::CUSTOM:
             lfoValue = std::sin(lfoPhase);
             break;
         case WaveformType::SQUARE:
@@ -890,6 +972,14 @@ float SynthGen::generateLFOValue(WaveformType waveform, float rate, float depth,
         case WaveformType::TRIANGLE:
             lfoValue = 2.0f * std::abs(2.0f * (lfoPhase / TWO_PI - std::floor(lfoPhase / TWO_PI + 0.5f))) - 1.0f;
             break;
+        case WaveformType::NOISE: {
+            // Sample-and-hold noise: a new deterministic random value every LFO cycle
+            const uint64_t cycle = static_cast<uint64_t>(std::max(0.0f, lfoPhase / TWO_PI));
+            uint64_t x = cycle * 0x9E3779B97F4A7C15ULL + 0x632BE59BD9B4E019ULL;
+            x ^= x >> 33; x *= 0xff51afd7ed558ccdULL; x ^= x >> 33;
+            lfoValue = static_cast<float>(x % 20001ULL) / 10000.0f - 1.0f;
+            break;
+        }
     }
     
     return lfoValue * depth;
@@ -900,6 +990,7 @@ std::vector<float> SynthGen::applyEffectChain(const std::vector<float>& input, c
     std::vector<float> output = input;
     
     for (const auto& effect : effects) {
+        if (!effect.enabled) continue;
         output = applyEffect(output, effect);
     }
     
@@ -914,26 +1005,46 @@ std::vector<float> SynthGen::applyEffect(const std::vector<float>& input, const 
             return m_delayEffect->process(input, effect.parameters);
         case EffectType::CHORUS:
             return m_chorusEffect->process(input, effect.parameters);
+        case EffectType::FLANGER: {
+            // Flanger = short, fast-modulated chorus
+            std::map<std::string, float> p = effect.parameters;
+            p.emplace("rate", 0.25f);
+            p.emplace("depth", 0.001f);
+            p.emplace("mix", 0.7f);
+            return m_chorusEffect->process(input, p);
+        }
         case EffectType::DISTORTION:
             return m_distortionEffect->process(input, effect.parameters);
         case EffectType::COMPRESSOR:
             return m_compressorEffect->process(input, effect.parameters);
         case EffectType::EQUALIZER:
             return m_equalizerEffect->process(input, effect.parameters);
-        default:
-            return input;
+        case EffectType::FILTER: {
+            auto get = [&](const char* k, float d) {
+                auto it = effect.parameters.find(k);
+                return it != effect.parameters.end() ? it->second : d;
+            };
+            return m_lowpassFilter->process(input, get("cutoff", 2000.0f), get("resonance", 0.7071f));
+        }
     }
+    return input;
 }
-
 // Variation Generation
 std::vector<VariationSample> SynthGen::generateVariations(const std::vector<float>& baseVoice, const VariationSettings& variations) {
     std::vector<VariationSample> samples;
     
-    // Generate pitch variations
-    for (int semitone = variations.pitchRange.first; semitone <= variations.pitchRange.second; ++semitone) {
+    // Generate pitch variations (only the unshifted voice when pitch variations are off)
+    const int first = variations.enablePitchVariations ? variations.pitchRange.first : 0;
+    const int last = variations.enablePitchVariations ? variations.pitchRange.second : 0;
+    for (int semitone = first; semitone <= last; ++semitone) {
         VariationSample sample;
         sample.midiNote = 60 + semitone; // C4 = 60
         sample.pitchShift = semitone;
+        sample.name = "note_" + std::to_string(sample.midiNote) + (semitone < 0 ? "_m" : "_p") + std::to_string(std::abs(semitone));
+        sample.description = "Pitch variation " + std::string(semitone < 0 ? "" : "+") + std::to_string(semitone) +
+                             " semitones (MIDI " + std::to_string(sample.midiNote) + ")";
+        sample.generationTime = std::chrono::system_clock::now();
+        sample.parameters["pitchShift"] = static_cast<float>(semitone);
         
         // Apply pitch shifting
         sample.audioData = pitchShift(baseVoice, semitone);
@@ -944,11 +1055,11 @@ std::vector<VariationSample> SynthGen::generateVariations(const std::vector<floa
         }
         
         // Apply randomization if enabled
-        if (variations.randomization.enabled) {
+        if (variations.randomization.enabled && (variations.enableRandomVariations || variations.randomization.amount > 0.0f)) {
             applyRandomization(sample.audioData, variations.randomization);
         }
         
-        samples.push_back(sample);
+        samples.push_back(std::move(sample));
     }
     
     return samples;
@@ -1010,9 +1121,8 @@ std::vector<float> SynthGen::timeStretch(const std::vector<float>& input, const 
 
 // Randomization
 void SynthGen::applyRandomization(std::vector<float>& audio, const RandomizationSettings& settings) {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
+    thread_local std::mt19937 gen(std::random_device{}());
+    std::uniform_real_distribution<float> dis(-1.0f, 1.0f);
     
     for (float& sample : audio) {
         float randomValue = dis(gen) * settings.amount;
@@ -1139,6 +1249,13 @@ std::vector<std::string> SynthGen::generateTimbreTags(const InstrumentDefinition
             case EffectType::EQUALIZER:
                 tags.push_back("eq");
                 break;
+            case EffectType::FLANGER:
+                tags.push_back("flanger");
+                tags.push_back("swirling");
+                break;
+            case EffectType::FILTER:
+                tags.push_back("filtered");
+                break;
         }
     }
     
@@ -1149,6 +1266,8 @@ std::vector<std::string> SynthGen::generateTimbreTags(const InstrumentDefinition
 }
 
 // Synth Pack Creation
+// Writes packs/<instrument>.synthpack.json, one WAV per variation (packs/<instrument>_<variation>.wav)
+// and the packs/<instrument>.synthpack archive ("SYNTHPACK" + metadata + [name, size, wav]...).
 SynthPack SynthGen::createSynthPack(const InstrumentDefinition& instrumentDef, const SynthResult& result) {
     SynthPack pack;
     
@@ -1157,127 +1276,102 @@ SynthPack SynthGen::createSynthPack(const InstrumentDefinition& instrumentDef, c
     pack.metadata = result.metadata;
     pack.variations = result.variations;
     pack.instrumentDef = instrumentDef;
+    pack.creationTime = std::chrono::system_clock::now();
     
-    // Implement actual pack creation with audio encoding and file bundling
-    // Create the .synthpack archive with audio files and metadata
+    // Encode every variation as PCM WAV (interleaved, m_numChannels channels)
+    std::vector<std::vector<uint8_t>> wavFiles;
+    std::vector<uint8_t> allAudio;
+    for (auto& variation : pack.variations) {
+        std::vector<uint8_t> wav = FileIO::encodeWav(variation.audioData, m_sampleRate,
+                                                     static_cast<uint16_t>(m_numChannels), 16);
+        variation.filename = instrumentDef.name + "_" + variation.name + ".wav";
+        variation.fileSize = wav.size();
+        variation.checksum = FileIO::sha256Hex(wav.data(), wav.size());
+        allAudio.insert(allAudio.end(), wav.begin(), wav.end());
+        wavFiles.push_back(std::move(wav));
+    }
+    pack.totalSize = allAudio.size();
+    pack.checksum = FileIO::sha256Hex(allAudio.data(), allAudio.size());
     
-    // Generate pack filename
-    std::string packFilename = "packs/" + instrumentDef.name + ".synthpack";
+    // A pack is the set of rendered variations; nothing to write without any.
+    if (pack.variations.empty()) {
+        return pack;
+    }
     
-    // Create pack directory if it doesn't exist
-    std::filesystem::create_directories("packs");
+    const std::filesystem::path packDir = "packs";
+    std::error_code ec;
+    std::filesystem::create_directories(packDir, ec);
+    if (ec) {
+        m_lastError = "Could not create pack directory: " + ec.message();
+        return pack;
+    }
+    const std::string packFilename = (packDir / (instrumentDef.name + ".synthpack")).string();
+    pack.filePath = packFilename;
     
-    // Write pack metadata
+    // Pack metadata
     nlohmann::json packJson;
     packJson["name"] = instrumentDef.name;
     packJson["version"] = pack.version;
     packJson["description"] = instrumentDef.description;
     packJson["category"] = instrumentDef.category;
     packJson["author"] = "MagiTech Audio Generator";
-    packJson["created"] = std::chrono::system_clock::now().time_since_epoch().count();
-    
-    // Add variations metadata
+    packJson["created"] = pack.creationTime.time_since_epoch().count();
+    packJson["sampleRate"] = m_sampleRate;
+    packJson["channels"] = m_numChannels;
+    packJson["checksum"] = pack.checksum;
+    packJson["timbreTags"] = pack.metadata.timbreTags;
     packJson["variations"] = nlohmann::json::array();
-    for (const auto& variation : result.variations) {
+    for (const auto& variation : pack.variations) {
         nlohmann::json varJson;
         varJson["name"] = variation.name;
         varJson["description"] = variation.description;
-        varJson["audioFile"] = variation.name + ".wav";
+        varJson["midiNote"] = variation.midiNote;
+        varJson["pitchShift"] = variation.pitchShift;
+        varJson["audioFile"] = variation.filename;
+        varJson["size"] = variation.fileSize;
+        varJson["sha256"] = variation.checksum;
         packJson["variations"].push_back(varJson);
     }
+    const std::string metadataStr = packJson.dump(2);
     
-    // Write pack metadata file
     std::ofstream metadataFile(packFilename + ".json");
     if (metadataFile.is_open()) {
-        metadataFile << packJson.dump(2);
-        metadataFile.close();
+        metadataFile << metadataStr;
+    } else {
+        m_lastError = "Could not write pack metadata: " + packFilename + ".json";
     }
     
-    // Write audio files for each variation
-    for (size_t i = 0; i < result.variations.size(); ++i) {
-        const auto& variation = result.variations[i];
-        std::string audioFilename = "packs/" + variation.name + ".wav";
-        
-        // Write WAV file
-        std::ofstream audioFile(audioFilename, std::ios::binary);
-        if (audioFile.is_open()) {
-            // Write WAV header
-            const size_t sampleRate = m_sampleRate;
-            const size_t numChannels = 1;
-            const size_t bitsPerSample = 16;
-            const size_t dataSize = variation.audioData.size() * sizeof(int16_t);
-            const size_t fileSize = 36 + dataSize;
-            
-            // RIFF header
-            audioFile.write("RIFF", 4);
-            writeLittleEndian(audioFile, static_cast<uint32_t>(fileSize));
-            audioFile.write("WAVE", 4);
-            
-            // Format chunk
-            audioFile.write("fmt ", 4);
-            writeLittleEndian(audioFile, static_cast<uint32_t>(16)); // chunk size
-            writeLittleEndian(audioFile, static_cast<uint16_t>(1)); // PCM format
-            writeLittleEndian(audioFile, static_cast<uint16_t>(numChannels));
-            writeLittleEndian(audioFile, static_cast<uint32_t>(sampleRate));
-            writeLittleEndian(audioFile, static_cast<uint32_t>(sampleRate * numChannels * bitsPerSample / 8));
-            writeLittleEndian(audioFile, static_cast<uint16_t>(numChannels * bitsPerSample / 8));
-            writeLittleEndian(audioFile, static_cast<uint16_t>(bitsPerSample));
-            
-            // Data chunk
-            audioFile.write("data", 4);
-            writeLittleEndian(audioFile, static_cast<uint32_t>(dataSize));
-            
-            // Write audio data
-            for (float sample : variation.audioData) {
-                int16_t pcmSample = static_cast<int16_t>(std::clamp(sample * 32767.0f, -32768.0f, 32767.0f));
-                audioFile.write(reinterpret_cast<const char*>(&pcmSample), sizeof(int16_t));
-            }
-            
-            audioFile.close();
+    // Individual WAV files
+    for (size_t i = 0; i < pack.variations.size(); ++i) {
+        const std::string audioFilename = (packDir / pack.variations[i].filename).string();
+        if (!FileIO::writeFileBytes(audioFilename, wavFiles[i])) {
+            m_lastError = "Could not write variation audio: " + audioFilename;
         }
     }
     
-    // Create archive file (simple concatenation for now)
-    std::ofstream archiveFile(packFilename, std::ios::binary);
-    if (archiveFile.is_open()) {
-        // Write pack header
-        std::string header = "SYNTHPACK";
-        archiveFile.write(header.c_str(), header.length());
-        
-        // Write metadata
-        std::string metadataStr = packJson.dump();
-        uint32_t metadataSize = static_cast<uint32_t>(metadataStr.length());
-        archiveFile.write(reinterpret_cast<const char*>(&metadataSize), sizeof(uint32_t));
-        archiveFile.write(metadataStr.c_str(), metadataStr.length());
-        
-        // Write audio files
-        for (const auto& variation : result.variations) {
-            std::string audioFilename = "packs/" + variation.name + ".wav";
-            std::ifstream audioFile(audioFilename, std::ios::binary);
-            if (audioFile.is_open()) {
-                // Write file header
-                uint32_t filenameLength = static_cast<uint32_t>(variation.name.length());
-                archiveFile.write(reinterpret_cast<const char*>(&filenameLength), sizeof(uint32_t));
-                archiveFile.write(variation.name.c_str(), variation.name.length());
-                
-                // Get file size
-                audioFile.seekg(0, std::ios::end);
-                uint32_t fileSize = static_cast<uint32_t>(audioFile.tellg());
-                audioFile.seekg(0, std::ios::beg);
-                
-                // Write file size and data
-                archiveFile.write(reinterpret_cast<const char*>(&fileSize), sizeof(uint32_t));
-                archiveFile << audioFile.rdbuf();
-                audioFile.close();
-            }
-        }
-        
-        archiveFile.close();
+    // Archive: header, metadata block, then [name length, name, size, data] per variation
+    std::vector<uint8_t> archive;
+    auto putU32 = [&archive](uint32_t v) {
+        for (int b = 0; b < 4; ++b) archive.push_back(static_cast<uint8_t>((v >> (8 * b)) & 0xFF));
+    };
+    const std::string header = "SYNTHPACK";
+    archive.insert(archive.end(), header.begin(), header.end());
+    const std::string compactMeta = packJson.dump();
+    putU32(static_cast<uint32_t>(compactMeta.size()));
+    archive.insert(archive.end(), compactMeta.begin(), compactMeta.end());
+    for (size_t i = 0; i < pack.variations.size(); ++i) {
+        const std::string& name = pack.variations[i].name;
+        putU32(static_cast<uint32_t>(name.size()));
+        archive.insert(archive.end(), name.begin(), name.end());
+        putU32(static_cast<uint32_t>(wavFiles[i].size()));
+        archive.insert(archive.end(), wavFiles[i].begin(), wavFiles[i].end());
+    }
+    if (!FileIO::writeFileBytes(packFilename, archive)) {
+        m_lastError = "Could not write synth pack: " + packFilename;
     }
     
     return pack;
 }
-
 // Oscillator Implementations
 std::vector<float> SynthGen::SineOscillator::generate(float frequency, float amplitude, float phase, size_t numSamples) {
     std::vector<float> output(numSamples);
@@ -1327,52 +1421,46 @@ std::vector<float> SynthGen::TriangleOscillator::generate(float frequency, float
 }
 
 std::vector<float> SynthGen::WavetableOscillator::generate(float frequency, float amplitude, float phase, size_t numSamples, const std::string& wavetablePath) {
-    // Implement wavetable loading and interpolation
+    // Wavetables are loaded once per path (one cycle = up to the first 1024 mono frames of the file)
+    static std::mutex cacheMutex;
     static std::map<std::string, std::vector<float>> wavetableCache;
-    
-    // Load wavetable if not cached
-    if (wavetableCache.find(wavetablePath) == wavetableCache.end()) {
-        std::vector<float> wavetable;
-        
-        // Try to load from file
-        std::ifstream file(wavetablePath, std::ios::binary);
-        if (file.is_open()) {
-            // Simple WAV file header parsing (basic implementation)
-            char header[44];
-            file.read(header, 44);
-            
-            // Check if it's a valid WAV file
-            if (std::string(header, 4) == "RIFF" && std::string(header + 8, 4) == "WAVE") {
-                // Read sample data (assuming 16-bit PCM)
-                file.seekg(44); // Skip header
-                wavetable.resize(1024); // Default size
-                for (size_t i = 0; i < wavetable.size(); ++i) {
-                    int16_t sample;
-                    if (file.read(reinterpret_cast<char*>(&sample), 2)) {
-                        wavetable[i] = static_cast<float>(sample) / 32768.0f;
-                    } else {
-                        wavetable[i] = 0.0f;
-                    }
-                }
+
+    std::vector<float> wavetable;
+    {
+        std::lock_guard<std::mutex> lock(cacheMutex);
+        auto cached = wavetableCache.find(wavetablePath);
+        if (cached != wavetableCache.end()) {
+            wavetable = cached->second;
+        }
+    }
+
+    if (wavetable.empty()) {
+        if (!wavetablePath.empty()) {
+            FileIO::DecodedAudio decoded;
+            std::string error;
+            if (FileIO::decodeFile(wavetablePath, decoded, error)) {
+                std::vector<float> mono = FileIO::convertChannels(decoded.samples, decoded.channels, 1);
+                if (mono.size() > 1024) mono.resize(1024);
+                wavetable = std::move(mono);
             }
         }
-        
+
         // If loading failed, generate a default wavetable
         if (wavetable.empty()) {
             wavetable.resize(1024);
             for (size_t i = 0; i < wavetable.size(); ++i) {
                 float t = static_cast<float>(i) / wavetable.size();
                 // Generate a complex waveform
-                wavetable[i] = 0.5f * std::sin(TWO_PI * t) + 
-                              0.25f * std::sin(TWO_PI * 3.0f * t) + 
+                wavetable[i] = 0.5f * std::sin(TWO_PI * t) +
+                              0.25f * std::sin(TWO_PI * 3.0f * t) +
                               0.125f * std::sin(TWO_PI * 5.0f * t);
             }
         }
-        
+
+        std::lock_guard<std::mutex> lock(cacheMutex);
         wavetableCache[wavetablePath] = wavetable;
     }
-    
-    const std::vector<float>& wavetable = wavetableCache[wavetablePath];
+
     std::vector<float> output(numSamples);
     
     // Generate wavetable output with interpolation
@@ -1604,10 +1692,10 @@ std::vector<float> SynthGen::ReverbEffect::process(const std::vector<float>& inp
     static const size_t allpassDelays[numAllpasses] = {556, 441};
     
     // Initialize delay lines (static to persist between calls)
-    static std::vector<std::vector<float>> combBuffers(numCombs);
-    static std::vector<std::vector<float>> allpassBuffers(numAllpasses);
-    static std::vector<size_t> combIndices(numCombs, 0);
-    static std::vector<size_t> allpassIndices(numAllpasses, 0);
+    std::vector<std::vector<float>> combBuffers(numCombs);
+    std::vector<std::vector<float>> allpassBuffers(numAllpasses);
+    std::vector<size_t> combIndices(numCombs, 0);
+    std::vector<size_t> allpassIndices(numAllpasses, 0);
     
     // Initialize buffers if needed
     for (size_t i = 0; i < numCombs; ++i) {
@@ -1656,12 +1744,12 @@ std::vector<float> SynthGen::DelayEffect::process(const std::vector<float>& inpu
     float feedback = getParameter(parameters, "feedback", 0.3f);
     float wetLevel = getParameter(parameters, "wetLevel", 0.5f);
     
-    size_t delaySamples = static_cast<size_t>(delayTime * m_sampleRate);
+    size_t delaySamples = std::max<size_t>(1, static_cast<size_t>(delayTime * m_sampleRate));
     std::vector<float> output(input.size());
     
     // Initialize delay buffer
-    static std::vector<float> delayBuffer;
-    static size_t delayIndex = 0;
+    std::vector<float> delayBuffer;
+    size_t delayIndex = 0;
     
     if (delayBuffer.size() != delaySamples) {
         delayBuffer.resize(delaySamples, 0.0f);
@@ -1692,9 +1780,9 @@ std::vector<float> SynthGen::ChorusEffect::process(const std::vector<float>& inp
     std::vector<float> output(input.size());
     
     // Initialize delay buffer for chorus
-    static std::vector<float> chorusBuffer(static_cast<size_t>(0.03f * m_sampleRate), 0.0f);
-    static size_t chorusIndex = 0;
-    static float lfoPhase = 0.0f;
+    std::vector<float> chorusBuffer(std::max<size_t>(2, static_cast<size_t>(0.03f * m_sampleRate)), 0.0f);
+    size_t chorusIndex = 0;
+    float lfoPhase = 0.0f;
     
     for (size_t i = 0; i < input.size(); ++i) {
         float inputSample = input[i];
@@ -1795,9 +1883,8 @@ std::vector<float> SynthGen::EqualizerEffect::process(const std::vector<float>& 
     std::vector<float> output(input.size());
     
     // Simple IIR filter implementation for 3 bands
-    static float lowState[2] = {0.0f, 0.0f};
-    static float midState[2] = {0.0f, 0.0f};
-    static float highState[2] = {0.0f, 0.0f};
+    float lowState[2] = {0.0f, 0.0f};
+    float highState[2] = {0.0f, 0.0f};
     
     // Calculate filter coefficients
     float lowOmega = TWO_PI * lowFreq / m_sampleRate;

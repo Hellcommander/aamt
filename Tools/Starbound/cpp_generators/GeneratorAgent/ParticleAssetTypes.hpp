@@ -1,4 +1,7 @@
 #pragma once
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <map>
@@ -18,79 +21,79 @@ using ComputeShaderHandle = uint32_t;
 // Enhanced Emitter Parameters
 struct EmitterParams {
     std::string id;
-    glm::vec3 position;
-    glm::vec3 rotation;
-    glm::vec3 scale;
-    float rate;
-    float duration;
-    bool loop;
-    bool burstMode;
-    int burstCount;
-    float burstInterval;
-    bool gpuDriven;
+    glm::vec3 position{0.0f};
+    glm::vec3 rotation{0.0f};
+    glm::vec3 scale{1.0f};
+    float rate = 10.0f;
+    float duration = 1.0f;          // < 0 means infinite
+    bool loop = false;
+    bool burstMode = false;
+    int burstCount = 0;
+    float burstInterval = 0.0f;
+    bool gpuDriven = false;
     std::map<std::string, float> customParameters;
     uint64_t hashKey() const;
 };
 
 // Enhanced Behavior Parameters
 struct BehaviorParams {
-    glm::vec3 initialVelocity;
-    glm::vec3 velocityVariance;
-    glm::vec3 acceleration;
-    float gravity;
-    float drag;
-    bool collision;
-    bool turbulence;
-    float turbulenceStrength;
-    glm::vec3 wind;
-    bool attractorMode;
-    glm::vec3 attractorPosition;
-    float attractorStrength;
-    float attractorRadius;
+    glm::vec3 initialVelocity{0.0f};
+    glm::vec3 velocityVariance{0.0f};
+    glm::vec3 acceleration{0.0f};
+    float gravity = 0.0f;
+    float drag = 0.0f;
+    bool collision = false;
+    bool turbulence = false;
+    float turbulenceStrength = 0.0f;
+    glm::vec3 wind{0.0f};
+    bool attractorMode = false;
+    glm::vec3 attractorPosition{0.0f};
+    float attractorStrength = 0.0f;
+    float attractorRadius = 0.0f;
     std::map<std::string, float> customParameters;
     uint64_t hashKey() const;
 };
 
 // Enhanced Shape Parameters
 struct ShapeParams {
-    enum ShapeType { 
-        Point, 
-        Sphere, 
-        Box, 
-        Cone, 
-        Circle, 
+    enum ShapeType {
+        Point,
+        Sphere,
+        Box,
+        Cone,
+        Circle,
         Cylinder,
         Torus,
         CustomMesh
-    } type;
-    
-    glm::vec3 dimensions;
-    float angle;
-    float radius;
-    float innerRadius;  // For torus
-    std::string meshPath;  // For custom mesh
-    bool randomRotation;
-    bool alignToVelocity;
+    } type = Point;
+
+    glm::vec3 dimensions{0.0f};
+    float angle = 0.0f;              // Cone half-angle in degrees
+    float radius = 0.0f;
+    float innerRadius = 0.0f;        // For torus
+    std::string meshPath;            // For custom mesh
+    bool randomRotation = false;
+    bool alignToVelocity = false;
     std::map<std::string, float> customParameters;
     uint64_t hashKey() const;
 };
 
 // Enhanced Lifetime Parameters
 struct LifetimeParams {
-    float minLife;
-    float maxLife;
-    glm::vec2 sizeRange;
-    bool sizeOverLife;
-    bool fadeIn;
-    bool fadeOut;
-    float fadeInTime;
-    float fadeOutTime;
-    bool colorOverLife;
-    glm::vec4 startColor;
-    glm::vec4 endColor;
-    bool velocityOverLife;
-    glm::vec3 velocityStart;
-    glm::vec3 velocityEnd;
+    float minLife = 1.0f;
+    float maxLife = 1.0f;
+    glm::vec2 sizeRange{1.0f, 1.0f};
+    bool sizeOverLife = false;
+    bool fadeIn = false;
+    bool fadeOut = false;
+    float fadeInTime = 0.0f;
+    float fadeOutTime = 0.0f;
+    bool colorOverLife = false;
+    glm::vec4 startColor{1.0f};
+    glm::vec4 endColor{1.0f};
+    bool velocityOverLife = false;
+    glm::vec3 velocityStart{0.0f};
+    glm::vec3 velocityEnd{0.0f};
     std::map<std::string, float> customParameters;
     uint64_t hashKey() const;
 };
@@ -98,21 +101,21 @@ struct LifetimeParams {
 // Enhanced Render Parameters
 struct RenderParams {
     std::string texturePath;
-    bool animated;
-    int frameCount;
-    float frameRate;
-    glm::vec2 frameSize;
-    bool billboard;
-    bool alignToCamera;
-    bool softParticles;
-    glm::vec4 colorOverLife[4];  // Start, middle, end, custom
-    bool alphaOverLife;
-    bool additive;
-    bool multiply;
-    bool distortion;
-    float distortionStrength;
-    bool glow;
-    float glowIntensity;
+    bool animated = false;
+    int frameCount = 1;
+    float frameRate = 0.0f;
+    glm::vec2 frameSize{1.0f, 1.0f};
+    bool billboard = true;
+    bool alignToCamera = false;
+    bool softParticles = false;
+    glm::vec4 colorOverLife[4] = {glm::vec4(1.0f), glm::vec4(1.0f), glm::vec4(1.0f), glm::vec4(1.0f)};  // Start, middle, end, custom
+    bool alphaOverLife = false;
+    bool additive = false;
+    bool multiply = false;
+    bool distortion = false;
+    float distortionStrength = 0.0f;
+    bool glow = false;
+    float glowIntensity = 0.0f;
     std::string normalMapPath;
     std::string emissionMapPath;
     std::map<std::string, float> customParameters;
@@ -124,8 +127,8 @@ struct LODParams {
     std::vector<float> screenSizes;
     std::vector<float> rateScales;
     std::vector<float> qualityScales;
-    bool adaptiveLOD;
-    float adaptiveThreshold;
+    bool adaptiveLOD = false;
+    float adaptiveThreshold = 0.0f;
     std::map<std::string, float> customParameters;
     uint64_t hashKey() const;
 };
@@ -141,15 +144,15 @@ struct LODData {
 
 // Enhanced Particle Bundle
 struct ParticleBundle {
-    ParticleSystemHandle system;
+    ParticleSystemHandle system = 0;
     LODData lodData;
-    TextureHandle texture;
-    ShaderHandle shader;
-    ComputeShaderHandle computeShader;
+    TextureHandle texture = 0;
+    ShaderHandle shader = 0;
+    ComputeShaderHandle computeShader = 0;
     std::map<std::string, std::string> metadata;
-    std::chrono::system_clock::time_point creationTime;
-    size_t memoryUsage;
-    bool gpuAccelerated;
+    std::chrono::system_clock::time_point creationTime{};
+    size_t memoryUsage = 0;
+    bool gpuAccelerated = false;
 };
 
 // Particle Effect Definition
@@ -165,8 +168,8 @@ struct ParticleEffectDefinition {
     LODParams lod;
     std::vector<std::string> tags;
     std::map<std::string, std::string> metadata;
-    bool enableHotReload;
-    bool enableCaching;
+    bool enableHotReload = false;
+    bool enableCaching = true;
     uint64_t hashKey() const;
 };
 
@@ -174,8 +177,8 @@ struct ParticleEffectDefinition {
 struct ParticleEffectResult {
     ParticleBundle bundle;
     ParticleEffectDefinition definition;
-    std::chrono::system_clock::time_point processingTime;
-    bool success;
+    std::chrono::system_clock::time_point processingTime{};
+    bool success = false;
     std::string errorMessage;
     std::vector<std::string> warnings;
     std::map<std::string, std::string> metadata;
@@ -183,15 +186,15 @@ struct ParticleEffectResult {
 
 // Particle System State
 struct ParticleSystemState {
-    uint32_t activeParticles;
-    uint32_t totalParticles;
-    float updateTime;
-    float renderTime;
-    float memoryUsage;
-    bool isActive;
-    bool isPaused;
-    float currentTime;
-    int currentLOD;
+    uint32_t activeParticles = 0;
+    uint32_t totalParticles = 0;
+    float updateTime = 0.0f;
+    float renderTime = 0.0f;
+    float memoryUsage = 0.0f;
+    bool isActive = false;
+    bool isPaused = false;
+    float currentTime = 0.0f;
+    int currentLOD = 0;
 };
 
 // Particle Data Structure
@@ -207,9 +210,9 @@ struct Particle {
     float rotationSpeed;
     glm::vec2 uvOffset;
     bool active;
-    
-    Particle() : position(0), velocity(0), acceleration(0), color(1), 
-                 size(1), age(0), lifetime(1), rotation(0), rotationSpeed(0), 
+
+    Particle() : position(0), velocity(0), acceleration(0), color(1),
+                 size(1), age(0), lifetime(1), rotation(0), rotationSpeed(0),
                  uvOffset(0), active(true) {}
 };
 
@@ -223,14 +226,15 @@ struct ParticleForceField {
         Repulsor,
         Vortex,
         Custom
-    } type;
-    
-    glm::vec3 position;
-    glm::vec3 direction;
-    float strength;
-    float radius;
-    float falloff;
-    bool active;
+    } type = Gravity;
+
+    std::string id;                  // Used to remove a field again
+    glm::vec3 position{0.0f};
+    glm::vec3 direction{0.0f, -1.0f, 0.0f};  // Wind direction / vortex axis
+    float strength = 0.0f;
+    float radius = 0.0f;             // <= 0 means unbounded
+    float falloff = 1.0f;
+    bool active = true;
     std::function<glm::vec3(const glm::vec3&, float)> customForce;
 };
 
@@ -242,50 +246,52 @@ struct ParticleCollision {
         Box,
         Plane,
         Mesh
-    } type;
-    
-    glm::vec3 position;
-    glm::vec3 dimensions;
-    glm::vec3 normal;
-    float restitution;
-    float friction;
-    bool active;
+    } type = None;
+
+    std::string id;                  // Used to remove a collider again
+    glm::vec3 position{0.0f};
+    glm::vec3 dimensions{0.0f};      // Box extents; x = radius for spheres
+    glm::vec3 normal{0.0f, 1.0f, 0.0f};
+    float restitution = 0.5f;
+    float friction = 0.0f;
+    bool active = true;
+    std::string meshPath;            // For mesh colliders
 };
 
 // Particle Trail
 struct ParticleTrail {
-    bool enabled;
-    int maxPoints;
-    float fadeTime;
-    float width;
-    glm::vec4 color;
-    bool useTexture;
+    bool enabled = false;
+    int maxPoints = 16;
+    float fadeTime = 1.0f;
+    float width = 0.1f;
+    glm::vec4 color{1.0f};
+    bool useTexture = false;
     std::string texturePath;
 };
 
 // Particle Sub-Emitter
 struct ParticleSubEmitter {
     std::string effectName;
-    float probability;
-    glm::vec3 offset;
-    bool inheritVelocity;
-    bool inheritRotation;
-    bool inheritColor;
-    bool inheritSize;
+    float probability = 1.0f;        // Spawn chance per second of parent life
+    glm::vec3 offset{0.0f};
+    bool inheritVelocity = false;
+    bool inheritRotation = false;
+    bool inheritColor = false;
+    bool inheritSize = false;
 };
 
 // Advanced Particle Parameters
 struct AdvancedParticleParams {
-    bool useGPU;
-    bool useInstancing;
-    bool useGeometryShaders;
-    int maxParticles;
-    int batchSize;
-    bool enableSorting;
-    bool enableCulling;
-    float cullDistance;
-    bool enableOcclusion;
-    bool enableDepthPrePass;
+    bool useGPU = false;
+    bool useInstancing = false;
+    bool useGeometryShaders = false;
+    int maxParticles = 1000;
+    int batchSize = 256;
+    bool enableSorting = false;
+    bool enableCulling = true;
+    float cullDistance = 100.0f;
+    bool enableOcclusion = false;
+    bool enableDepthPrePass = false;
     std::map<std::string, float> customParameters;
     uint64_t hashKey() const;
 };
@@ -307,15 +313,16 @@ struct ParticleEffectTemplate {
 
 // Particle Effect Instance
 struct ParticleEffectInstance {
+    std::string id;                  // Unique instance id (key for destroy/update)
     std::string templateName;
     ParticleEffectDefinition definition;
-    glm::vec3 position;
-    glm::vec3 rotation;
-    glm::vec3 scale;
-    bool active;
-    float startTime;
-    float duration;
-    int loopCount;
+    glm::vec3 position{0.0f};
+    glm::vec3 rotation{0.0f};
+    glm::vec3 scale{1.0f};
+    bool active = false;
+    float startTime = 0.0f;
+    float duration = 0.0f;
+    int loopCount = 0;
     std::map<std::string, float> parameters;
     ParticleSystemState state;
 };
@@ -326,11 +333,11 @@ struct ParticleManager {
     std::map<std::string, ParticleEffectInstance> instances;
     std::vector<ParticleForceField> globalForceFields;
     std::vector<ParticleCollision> globalCollisions;
-    bool enableGlobalForces;
-    bool enableGlobalCollisions;
-    float globalTime;
-    int maxInstances;
-    size_t totalMemoryUsage;
+    bool enableGlobalForces = true;
+    bool enableGlobalCollisions = true;
+    float globalTime = 0.0f;
+    int maxInstances = 256;
+    size_t totalMemoryUsage = 0;
 };
 
 // Quality Settings
@@ -343,17 +350,17 @@ enum class ParticleQuality {
 
 // Performance Metrics
 struct ParticlePerformanceMetrics {
-    float frameTime;
-    float updateTime;
-    float renderTime;
-    int drawCalls;
-    int activeParticles;
-    int totalParticles;
-    size_t memoryUsage;
-    float gpuTime;
-    float cpuTime;
-    int lodLevel;
-    bool gpuAccelerated;
+    float frameTime = 0.0f;
+    float updateTime = 0.0f;
+    float renderTime = 0.0f;
+    int drawCalls = 0;
+    int activeParticles = 0;
+    int totalParticles = 0;
+    size_t memoryUsage = 0;
+    float gpuTime = 0.0f;
+    float cpuTime = 0.0f;
+    int lodLevel = 0;
+    bool gpuAccelerated = false;
 };
 
 } // namespace Particles

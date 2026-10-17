@@ -1,9 +1,10 @@
 #pragma once
+#include <fstream>
 #include <future>
+#include <stdexcept>
 #include <vector>
 #include <string>
-#include "core/ConcurrentLRU.hpp"
-#include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "LightningProjectileTypes.hpp"
 
 namespace MagiTech {
@@ -27,6 +28,7 @@ namespace ShaderGen {
     ShaderHandle buildLightningVertexShader(const LightningProjectileParams& p);
     ShaderHandle buildLightningFragmentShader(const LightningProjectileParams& p);
     std::string generateLightningShaderCode(const LightningProjectileParams& p);
+    std::string generateLightningVertexShaderCode(const LightningProjectileParams& p);
 }
 
 namespace TextureGen {
@@ -349,7 +351,7 @@ public:
     }
 
     double getCacheHitRate() const {
-        return m_cache.hit_rate();
+        return m_cache.getHitRate();
     }
 
     void setCacheCapacity(size_t capacity) {
@@ -388,10 +390,23 @@ public:
 
 private:
     LightningProjectileParams loadParamsFromJson(const std::string& jsonPath) {
-        // Implementation would load JSON file and parse parameters
-        // For now, return default parameters
+        std::ifstream file(jsonPath);
+        if (!file.is_open()) {
+            throw std::runtime_error("LightningProjectileFactory: cannot open params file " + jsonPath);
+        }
+        nlohmann::json json = nlohmann::json::parse(file);  // throws on malformed JSON
+        LightningProjectileParams params = ParamUtils::fromJson(json);
+        if (params.id.empty()) {
+            params.id = jsonPath;
+        }
+        return params;
+    }
+
+public:
+    /** Built-in bolt preset (used when a caller has no params file). */
+    static LightningProjectileParams defaultParams() {
         LightningProjectileParams params;
-        params.id = "loaded_from_json";
+        params.id = "default_lightning";
         params.lightningType = LightningType::BOLT;
         params.trailType = TrailType::ELECTRIC_TAIL;
         params.noiseType = NoiseType::PERLIN;
@@ -472,15 +487,16 @@ private:
         params.enableHotReload = true;
         params.enableParallelProcessing = true;
         params.lodLevel = 0;
-        params.description = "Loaded from JSON";
-        params.tags = {"lightning", "projectile", "json"};
-        params.metadata = {{"source", "json_file"}};
-        
+        params.description = "Default lightning bolt";
+        params.tags = {"lightning", "projectile", "default"};
+        params.metadata = {{"source", "builtin_default"}};
+
         return params;
     }
 
+private:
     ConcurrentLRUCache<uint64_t, LightningBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
     mutable PerformanceMetrics m_performanceMetrics;
 };

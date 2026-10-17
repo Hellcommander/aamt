@@ -9,8 +9,8 @@ instead of Cursor's image generator. SD3.5 Medium owns pixel production.
   python ai_resources.py --ensure image
 
 POST path is /v1/images/generations (alias /generate). Do not POST / on :1338.
-Weights are gated: the server applies hf_token_switch profile "media"
-(display name "SD3.5 Token"). plan_sd_size(..., kind="icon") for tiles.
+Weights are gated: the server uses the machine's existing `hf auth login`
+(via hf_token_switch). plan_sd_size(..., kind="icon") for tiles.
 
 Every generation takes the shared GPU lock (gpu_hub.py).
 """
@@ -37,7 +37,8 @@ def _known_ports() -> list[int]:
         ports.append(int(sd_port()))
     except Exception:
         ports.append(1338)
-    for p in (1338, 1337, 7860, 8188, 8000, 9090):
+    # 1337 is deliberately not probed: other programs (WebSocket++) squat on it.
+    for p in (1338, 7860, 8188, 8000, 9090):
         if p not in ports:
             ports.append(p)
     return ports
@@ -476,8 +477,7 @@ def generate_image(
     if not api_url:
         raise RuntimeError(
             "No Stable Diffusion server detected. Start SD3.5 with "
-            "Tools\\Start-StableDiffusionServer.ps1 (default port 1338). "
-            "Port 1337 may be occupied by another service (WebSocket++)."
+            "Tools\\Start-StableDiffusionServer.ps1 (default port 1338)."
         )
 
     body = build_request_body(

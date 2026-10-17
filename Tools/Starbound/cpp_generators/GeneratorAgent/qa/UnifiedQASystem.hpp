@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include "GeneratorConcurrency.hpp"
 #include <vector>
 #include <unordered_map>
 #include <memory>

@@ -23,7 +23,7 @@ sprites, tilesheets, and concept refs.
 - Client: `sd_http_client.py` (`detect_server`, `generate_image`, `plan_sd_size`)
 - Lifecycle: `sd_server_lifecycle.py` (`ensure_sd_server`, `managed_sd_server`)
 - Server source: `sd35_server.py` (copied to `E:\tools\sd3.5\sd3.5\server.py` on start)
-- Token: `hf_token_switch.use_token_profile("media")` — display name `SD3.5 Token`
+- Auth: the machine's existing `hf auth login` (`hf_token_switch.use_media_token()` just confirms it; no token names live in the repo)
 - Start: `Tools\Start-StableDiffusionServer.ps1`  Stop: `Stop-StableDiffusionServer.ps1`
 
 Do **not**:

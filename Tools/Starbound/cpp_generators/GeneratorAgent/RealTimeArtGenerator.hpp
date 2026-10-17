@@ -3,6 +3,7 @@
 #include "AIArtGenerator.hpp"
 #include "core/Log.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "core/graphics/Texture.hpp"
 #include <string>
 #include <vector>
@@ -112,7 +113,7 @@ public:
     Stats getStats() const;
 
 private:
-    std::unique_ptr<ThreadPool> pool;
+    std::unique_ptr<GeneratorTaskPool> pool;
     std::shared_ptr<AIArt::AIArtGenerator> aiGenerator;
     
     // Task queues

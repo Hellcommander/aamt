@@ -44,7 +44,7 @@ void ProjectileLuaBindings::bind(sol::state& lua) {
         
         auto fut = factory->generateAsync(p);
         pendingProjectiles.emplace_back(std::move(fut), p.id);
-        Log::info("Queued projectile generation for: {}", p.id);
+        Log::info("Projectile", "Queued projectile generation for: {}", p.id);
     });
 
     // Function to create predefined projectile types
@@ -165,11 +165,11 @@ void ProjectileLuaBindings::poll_assets(sol::state& lua) {
                     lua["on_projectile_ready"](it->second, bundle);
                 }
                 
-                Log::info("Projectile ready: {}", it->second);
+                Log::info("Projectile", "Projectile ready: {}", it->second);
                 it = pendingProjectiles.erase(it);
             }
             catch (const std::exception& e) {
-                Log::error("Failed to load projectile {}: {}", it->second, e.what());
+                Log::error("Projectile", "Failed to load projectile {}: {}", it->second, e.what());
                 it = pendingProjectiles.erase(it);
             }
         } else {

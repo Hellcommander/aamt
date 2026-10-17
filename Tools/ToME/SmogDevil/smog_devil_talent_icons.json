@@ -1,0 +1,512 @@
+[
+ {
+  "short_name": "STEAM_STAFF_BLAST",
+  "name": "Steam Staff Blast",
+  "category": "steamtech/steamstave-training",
+  "subject": "brass steam-staff tip firing a scalding bolt of teal steam with a violet gem flare"
+ },
+ {
+  "short_name": "STEAMSTAFF_MASTERY",
+  "name": "Steam Staff Mastery",
+  "category": "steamtech/steamstave-training",
+  "subject": "gauntleted hand gripping an ornate brass steam-staff, gauges glowing, steam curling around"
+ },
+ {
+  "short_name": "RETOOL_STAFF",
+  "name": "Retool Staff",
+  "category": "steamtech/steamstave-training",
+  "subject": "wrench and screwdriver adjusting the brass valves of a steam-staff on a workbench"
+ },
+ {
+  "short_name": "STEAM_STAFF_CHARGE",
+  "name": "Trajectory Gears",
+  "category": "steamtech/steamstave-training",
+  "subject": "interlocking brass gears guiding a curving arc of steam projectile"
+ },
+ {
+  "short_name": "STEAM_STAFF_CHANNEL",
+  "name": "Steam Leech Lens",
+  "category": "steamtech/steamstave-training",
+  "subject": "brass lens on a staff drawing red life essence through green steam"
+ },
+ {
+  "short_name": "STEAM_STAFF_SWEEP",
+  "name": "Smog Beam",
+  "category": "steamtech/steamstave-training",
+  "subject": "long straight beam of dense toxic smog blasting from a staff tip"
+ },
+ {
+  "short_name": "STEAM_STAFF_OVERDRIVE",
+  "name": "Steam Staff Overdrive",
+  "category": "steamtech/steamstave-training",
+  "subject": "steam-staff shaking violently, gauges spinning red, steam jets erupting from every joint"
+ },
+ {
+  "short_name": "SMOG_DEVIL_STEALTH",
+  "name": "Steam Veil",
+  "category": "steamtech/smog-devil-veil",
+  "subject": "cloaked figure fading into a thick curtain of grey steam, only glowing goggles visible"
+ },
+ {
+  "short_name": "SMOG_DEVIL_SHADOWSTRIKE",
+  "name": "Smog Shadowstrike",
+  "category": "steamtech/smog-devil-veil",
+  "subject": "dagger striking out of black smog, teal steam trail, surprised silhouette"
+ },
+ {
+  "short_name": "SMOG_DEVIL_CLOAK_OF_SHADOWS_AND_STEAM",
+  "name": "Steam Cloak Mastery",
+  "category": "steamtech/smog-devil-veil",
+  "subject": "billowing hooded cloak made of smoke and steam with brass clasps"
+ },
+ {
+  "short_name": "SMOG_DEVIL_DANCE_OF_SHADOWS_AND_STEAM",
+  "name": "Steam Veil Dance",
+  "category": "steamtech/smog-devil-veil",
+  "subject": "twirling shadowy dancer leaving spiraling ribbons of steam"
+ },
+ {
+  "short_name": "SMOG_STEAM_VENT_TRAP",
+  "name": "Steam Vent Trap",
+  "category": "steamtech/smog-devil-veil",
+  "subject": "brass floor grate trap venting a scalding geyser of steam"
+ },
+ {
+  "short_name": "ORB_OF_STEAM",
+  "name": "Orb of Steam",
+  "category": "steamtech/corrupted-steam",
+  "subject": "swirling sphere of corrupted green-black steam crackling with red sparks"
+ },
+ {
+  "short_name": "CORRUPTED_STEAM_CLOUD",
+  "name": "Poisonous Steam",
+  "category": "steamtech/corrupted-steam",
+  "subject": "spreading cloud of poisonous green steam with a faint skull shape inside"
+ },
+ {
+  "short_name": "STEAM_CLOUD_LEECH",
+  "name": "Cloud Leech",
+  "category": "steamtech/corrupted-steam",
+  "subject": "tendrils of dark steam pulling glowing red life orbs out of a victim"
+ },
+ {
+  "short_name": "BOILER_DETONATION",
+  "name": "Boiler Detonation",
+  "category": "steamtech/corrupted-steam",
+  "subject": "brass boiler exploding in a ball of corrupted green fire and shrapnel"
+ },
+ {
+  "short_name": "STEAM_SOUL_BURN",
+  "name": "Steam Soul Burn",
+  "category": "steamtech/steam-warlock",
+  "subject": "ghostly soul wreathed in crimson steam flames, screaming"
+ },
+ {
+  "short_name": "STEAM_DEMONIC_PACT",
+  "name": "Demonic Steam Pact",
+  "category": "steamtech/steam-warlock",
+  "subject": "demonic clawed hand shaking a brass gauntlet over a glowing infernal sigil"
+ },
+ {
+  "short_name": "STEAM_HELLFIRE",
+  "name": "Steam Hellfire",
+  "category": "steamtech/steam-warlock",
+  "subject": "pillar of red hellfire mixed with superheated white steam"
+ },
+ {
+  "short_name": "STEAM_DEMONIC_SERVANT",
+  "name": "Demonic Steam Servant",
+  "category": "steamtech/steam-warlock",
+  "subject": "small horned demon made of brass plates and boiling steam, glowing red eyes"
+ },
+ {
+  "short_name": "STEAM_SOUL_HARVEST",
+  "name": "Soul Harvest",
+  "category": "steamtech/steam-warlock",
+  "subject": "brass soul-canister collecting wisps of glowing souls through a pipe"
+ },
+ {
+  "short_name": "STEAM_MANA_CONVERTER",
+  "name": "Steam Mana Converter",
+  "category": "steamtech/steam-arcane",
+  "subject": "brass gear converter ring turning violet mana into white steam jets"
+ },
+ {
+  "short_name": "STEAM_CHANNEL",
+  "name": "Steam Channel",
+  "category": "steamtech/steam-arcane",
+  "subject": "mage channeling a stream of violet-white arcane steam between both hands"
+ },
+ {
+  "short_name": "STEAM_ARCANE_BOLT",
+  "name": "Steam Arcane Bolt",
+  "category": "steamtech/steam-arcane",
+  "subject": "violet arcane missile wrapped in a spiral of steam"
+ },
+ {
+  "short_name": "STEAM_OVERLOAD",
+  "name": "Steam Overload",
+  "category": "steamtech/steam-arcane",
+  "subject": "brass boiler bursting with pressurized teal steam, ruptured pipes, red-hot pressure gauge needle past the red line"
+ },
+ {
+  "short_name": "STEAM_ARCANE_STORM",
+  "name": "Steam Arcane Storm",
+  "category": "steamtech/steam-arcane",
+  "subject": "storm cloud of steam with violet arcane lightning raining down"
+ },
+ {
+  "short_name": "STEAM_MANA_SYMPHONY",
+  "name": "Steam Mana Symphony",
+  "category": "steamtech/steam-arcane",
+  "subject": "interlocking concentric rings of teal steam and violet arcane light like a musical harmony"
+ },
+ {
+  "short_name": "ARCANE_STEAM_AFFINITY",
+  "name": "Arcane Steam Affinity",
+  "category": "steamtech/smog-devil",
+  "subject": "open palm with a violet rune glowing inside a wisp of steam"
+ },
+ {
+  "short_name": "EXTRACT_REFINED_GEMS",
+  "name": "Extract Corrupted Gems",
+  "category": "steamtech/smog-devil",
+  "subject": "brass tongs pulling a glowing corrupted gem out of a staff socket"
+ },
+ {
+  "short_name": "REFINE_NATURAL_GEM",
+  "name": "Corrupt Alchemist Gem",
+  "category": "steamtech/smog-devil",
+  "subject": "raw gemstone in an alchemist crucible being tainted by green-black vapour"
+ },
+ {
+  "short_name": "BOILER_DISTILL",
+  "name": "Boiler Distill",
+  "category": "steamtech/smog-devil",
+  "subject": "copper distillation coils dripping glowing teal liquid into a flask"
+ },
+ {
+  "short_name": "PRESSURIZED_SORCERY",
+  "name": "Pressurized Sorcery",
+  "category": "steamtech/smog-devil",
+  "subject": "glass pressure chamber filled with compressed violet magic, gauge needle high"
+ },
+ {
+  "short_name": "SMOG_GOGGLES",
+  "name": "Smog Goggles",
+  "category": "steamtech/smog-devil",
+  "subject": "brass steampunk goggles with glowing teal lenses seeing through smog"
+ },
+ {
+  "short_name": "SMOG_CONDENSER",
+  "name": "Smog Condenser",
+  "category": "steamtech/smog-devil",
+  "subject": "brass condenser tank sucking in grey smog and condensing it into green droplets"
+ },
+ {
+  "short_name": "BLOOD_TO_VIM",
+  "name": "Blood to Vim",
+  "category": "steamtech/smog-devil",
+  "subject": "drops of blood flowing into a pipe and emerging as dark crimson vim smoke"
+ },
+ {
+  "short_name": "MANA_VIM_CONVERTER",
+  "name": "Mana to Vim Converter",
+  "category": "steamtech/mana-vim-conversion",
+  "subject": "brass valve machine with violet liquid entering and crimson vapour leaving"
+ },
+ {
+  "short_name": "MANA_VIM_SIPHON",
+  "name": "Mana Vim Siphon",
+  "category": "steamtech/mana-vim-conversion",
+  "subject": "brass siphon tube draining violet energy from an enemy silhouette"
+ },
+ {
+  "short_name": "DUAL_RESOURCE_MASTERY",
+  "name": "Dual Resource Mastery",
+  "category": "steamtech/mana-vim-conversion",
+  "subject": "two hands, one holding violet mana orb, the other a crimson vim orb, balanced"
+ },
+ {
+  "short_name": "MANA_VIM_EXCHANGE",
+  "name": "Mana Vim Exchange",
+  "category": "steamtech/mana-vim-conversion",
+  "subject": "two orbs violet and crimson swapping places along curved arrows of steam"
+ },
+ {
+  "short_name": "CORRUPTED_ARCANE_FUSION",
+  "name": "Corrupted Arcane Fusion",
+  "category": "steamtech/mana-vim-conversion",
+  "subject": "violet and crimson energies fusing into a black-purple corrupted star"
+ },
+ {
+  "short_name": "RESOURCE_HARMONY",
+  "name": "Resource Harmony",
+  "category": "steamtech/mana-vim-conversion",
+  "subject": "brass balance scale holding violet, crimson and teal orbs perfectly level"
+ },
+ {
+  "short_name": "STEAM_RUSH",
+  "name": "Steam Rush",
+  "category": "steamtech/steam-staff-combat",
+  "subject": "figure dashing forward propelled by steam jets from boots, motion blur"
+ },
+ {
+  "short_name": "JET_STREAM",
+  "name": "Jet Stream",
+  "category": "steamtech/steam-staff-combat",
+  "subject": "narrow high-pressure jet of steam knocking an enemy back"
+ },
+ {
+  "short_name": "VENT_ESCAPE",
+  "name": "Vent Escape",
+  "category": "steamtech/steam-staff-combat",
+  "subject": "figure vanishing through an exploding puff of steam, leaping away"
+ },
+ {
+  "short_name": "CLUSTER_VENTS",
+  "name": "Cluster Vents",
+  "category": "steamtech/steam-staff-combat",
+  "subject": "multiple brass vents in the ground erupting steam geysers in a ring"
+ },
+ {
+  "short_name": "ARCANA_SIPHON",
+  "name": "Arcana Siphon",
+  "category": "steamtech/corrupted-nature",
+  "subject": "green ooze tendril drinking violet arcane light from a crystal"
+ },
+ {
+  "short_name": "ARCANE_OOZE_HORROR",
+  "name": "Arcane Ooze Horror",
+  "category": "steamtech/corrupted-nature",
+  "subject": "dripping green ooze monster with glowing violet arcane core and brass shards"
+ },
+ {
+  "short_name": "ABSORB_OOZE",
+  "name": "Absorb Ooze",
+  "category": "steamtech/corrupted-nature",
+  "subject": "hand absorbing a glob of glowing green ooze into its veins"
+ },
+ {
+  "short_name": "CORRUPTED_SMOG_MANIPULATION",
+  "name": "Corrupted Smog Manipulation",
+  "category": "steamtech/corrupted-nature",
+  "subject": "clawed hand shaping a vortex of toxic green smog"
+ },
+ {
+  "short_name": "CORRUPTED_NATURE_STORM",
+  "name": "Corrupted Nature Storm",
+  "category": "steamtech/corrupted-nature",
+  "subject": "acid rain storm of green clouds with twisted corroded thorny vines"
+ },
+ {
+  "short_name": "FIRST_VENT",
+  "name": "First Vent",
+  "category": "steamtech/smog-ambush",
+  "subject": "opening brass valve releasing a first puff of smog in the dark, an eye watching"
+ },
+ {
+  "short_name": "NEEDLE_STEAM",
+  "name": "Needle Steam",
+  "category": "steamtech/smog-ambush",
+  "subject": "thin needles of scalding steam piercing through fog"
+ },
+ {
+  "short_name": "BACKBOILER",
+  "name": "Backboiler",
+  "category": "steamtech/smog-ambush",
+  "subject": "brass boiler backpack on a stalking assassin, venting from behind"
+ },
+ {
+  "short_name": "EXECUTION_CLOUD",
+  "name": "Execution Cloud",
+  "category": "steamtech/smog-ambush",
+  "subject": "dark smog cloud closing like a fist around a kneeling silhouette, glinting blade"
+ },
+ {
+  "short_name": "FURNACE_BREATH",
+  "name": "Furnace Breath",
+  "category": "steamtech/acid-furnace",
+  "subject": "masked face with a brass respirator breathing out a cone of acid-green fire"
+ },
+ {
+  "short_name": "MELTING_PRESSURE",
+  "name": "Melting Pressure",
+  "category": "steamtech/acid-furnace",
+  "subject": "steel armor plate melting and dripping under green acidic steam"
+ },
+ {
+  "short_name": "RUST_HEX",
+  "name": "Rust Hex",
+  "category": "steamtech/acid-furnace",
+  "subject": "glowing hex sigil spreading orange rust across an iron shield"
+ },
+ {
+  "short_name": "OVERPRESSURE",
+  "name": "Overpressure",
+  "category": "steamtech/acid-furnace",
+  "subject": "furnace door blown open by bubbling green acid pressure, rivets flying"
+ },
+ {
+  "short_name": "TRIUNE_CAPACITANCE",
+  "name": "Triune Capacitance",
+  "category": "steamtech/trinity-engine",
+  "subject": "three glass capacitor tubes filled with teal, violet and crimson energy"
+ },
+ {
+  "short_name": "CROSSFEED",
+  "name": "Crossfeed",
+  "category": "steamtech/trinity-engine",
+  "subject": "three pipes crossing and exchanging teal, violet and crimson flows"
+ },
+ {
+  "short_name": "TRINITY_DISCHARGE",
+  "name": "Trinity Discharge",
+  "category": "steamtech/trinity-engine",
+  "subject": "triangular blast of braided teal, violet and crimson energy beams"
+ },
+ {
+  "short_name": "OVERCLOCKED_SOUL",
+  "name": "Overclocked Soul",
+  "category": "steamtech/trinity-engine",
+  "subject": "glowing heart made of spinning brass gears overheating with tri-colored light"
+ },
+ {
+  "short_name": "GAUGE_SORCERY",
+  "name": "Gauge Sorcery",
+  "category": "steamtech/boiler-thaumaturgy",
+  "subject": "large brass pressure gauge with arcane runes on its dial, needle glowing violet"
+ },
+ {
+  "short_name": "PRESSURE_LANCE",
+  "name": "Pressure Lance",
+  "category": "steamtech/boiler-thaumaturgy",
+  "subject": "piercing spear-shaped jet of superheated white steam"
+ },
+ {
+  "short_name": "RELIEF_VALVE",
+  "name": "Relief Valve",
+  "category": "steamtech/boiler-thaumaturgy",
+  "subject": "brass relief valve venting steam that forms a protective shimmering shield"
+ },
+ {
+  "short_name": "CATASTROPHIC_VENT",
+  "name": "Catastrophic Vent",
+  "category": "steamtech/boiler-thaumaturgy",
+  "subject": "huge arcane boiler cracking apart with a massive blast of white-violet steam"
+ },
+ {
+  "short_name": "PIPE_ATTUNEMENT",
+  "name": "Pipe Attunement",
+  "category": "steamtech/aetheric-pipeworks",
+  "subject": "hand resting on a glowing aether pipe, energy flowing into the arm"
+ },
+ {
+  "short_name": "STEAM_PIPE_JUMP",
+  "name": "Steam Pipe",
+  "category": "steamtech/aetheric-pipeworks",
+  "subject": "figure diving into one pipe opening and emerging from another, steam trail"
+ },
+ {
+  "short_name": "FLUSH_LINE",
+  "name": "Flush Line",
+  "category": "steamtech/aetheric-pipeworks",
+  "subject": "straight pipe blasting a line of steam that flushes enemies away"
+ },
+ {
+  "short_name": "MANIFOLD_EXIT",
+  "name": "Manifold Exit",
+  "category": "steamtech/aetheric-pipeworks",
+  "subject": "brass manifold with many outlet pipes all bursting steam at once"
+ },
+ {
+  "short_name": "CALIBRATED_LENS",
+  "name": "Calibrated Lens",
+  "category": "steamtech/lenscraft",
+  "subject": "brass focus lens on adjustment screws, crosshair etched on the glass"
+ },
+ {
+  "short_name": "REFRACT_BOLT",
+  "name": "Refract Bolt",
+  "category": "steamtech/lenscraft",
+  "subject": "bolt of light bending and splitting through a crystal lens into several beams"
+ },
+ {
+  "short_name": "FOCAL_BURN",
+  "name": "Focal Burn",
+  "category": "steamtech/lenscraft",
+  "subject": "lens concentrating a burning point of light that scorches a target"
+ },
+ {
+  "short_name": "PRISM_OVERLOAD",
+  "name": "Prism Overload",
+  "category": "steamtech/lenscraft",
+  "subject": "prism cracking under overloaded rainbow beams exploding outward"
+ },
+ {
+  "short_name": "SMOG_TRINITY_OF_POWER",
+  "name": "Trinity of Power",
+  "category": "uber/magic",
+  "subject": "three crowned orbs of teal steam, violet mana and crimson vim orbiting a brass core"
+ },
+ {
+  "short_name": "SMOG_PERPETUAL_MOTION",
+  "name": "Perpetual Motion Engine",
+  "category": "uber/magic",
+  "subject": "impossible ever-spinning brass gear engine with an infinity loop of glowing steam"
+ },
+ {
+  "short_name": "SMOG_DEVIL_APOTHEOSIS",
+  "name": "Smog Devil's Apotheosis",
+  "category": "uber/magic",
+  "subject": "horned brass devil silhouette rising from toxic smog with a violet arcane corona"
+ },
+ {
+  "short_name": "SMOG_RESOURCE_VORTEX",
+  "name": "Resource Vortex",
+  "category": "uber/cunning",
+  "subject": "spiraling vortex of teal, violet and crimson streams being sucked into a center"
+ },
+ {
+  "short_name": "SMOG_LIVING_STEAM_CLOUD",
+  "name": "Living Steam Cloud",
+  "category": "uber/cunning",
+  "subject": "sentient cloud of steam with a grinning face and glowing eyes"
+ },
+ {
+  "short_name": "SMOG_DEVIL_MASTERY",
+  "name": "Smog Devil's Mastery",
+  "category": "uber/cunning",
+  "subject": "masked smog devil in brass goggles and a horned helm commanding swirling smog"
+ },
+ {
+  "short_name": "SMOG_VAT_FAMILIAR",
+  "name": "Vat-Born Familiar",
+  "category": "steamtech/smog-homunculi",
+  "subject": "small hunched creature of living green smog climbing out of a bubbling brass vat, tiny glowing boiler heart in its chest"
+ },
+ {
+  "short_name": "SMOG_PRESSURE_HEART",
+  "name": "Pressure Heart",
+  "category": "steamtech/smog-homunculi",
+  "subject": "tiny brass boiler heart cracking open and bursting in a blast of scalding green smog"
+ },
+ {
+  "short_name": "SMOG_THINKING_FOG",
+  "name": "Thinking Fog",
+  "category": "steamtech/smog-homunculi",
+  "subject": "wisp of green smog with a glowing violet arcane brain-rune inside its head, thinking"
+ },
+ {
+  "short_name": "SMOG_GRAND_HOMUNCULUS",
+  "name": "Grand Homunculus",
+  "category": "steamtech/smog-homunculi",
+  "subject": "full-body towering humanoid giant made of churning green smog, small glowing boiler in its chest, tiny cloaked mage standing at its feet for scale, dark sky"
+ },
+ {
+  "short_name": "SMOG_HOMUNCULUS_BOLT",
+  "name": "Homunculus Bolt",
+  "category": "steamtech/smog-homunculi",
+  "subject": "small smog creature spitting a glowing violet arcane mote wrapped in green acid fog"
+ }
+]

@@ -5,6 +5,7 @@
 #include <array>
 #include <glm/glm.hpp>
 #include "xxhash.h"
+#include <cstdint>
 
 namespace MagiTech {
 namespace SegmentedCreatures {
@@ -235,6 +236,12 @@ struct SegmentedCreatureGenerationResult {
     explicit operator bool() const { return success; }
 };
 
+// Asset handle aliases (same definitions as the other GeneratorAgent *Types headers)
+using MeshHandle = uint32_t;
+using TextureHandle = uint32_t;
+using SkeletonHandle = uint32_t;
+using AnimationHandle = uint32_t;
+using AIHandle = uint32_t;
 // Segmented creature asset bundle with enhanced metadata
 struct SegmentedCreatureAssetBundle {
     // Core assets

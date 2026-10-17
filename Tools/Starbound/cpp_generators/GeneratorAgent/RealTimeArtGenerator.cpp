@@ -1,4 +1,5 @@
 #include "RealTimeArtGenerator.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "AIArtGenerator.hpp"
 #include "CrossbowAssetGenerator.hpp"
 #include "core/Log.hpp"
@@ -17,7 +18,7 @@ namespace RealTimeArt {
 std::unique_ptr<RealTimeArtGenerator> g_realTimeArtGenerator;
 
 RealTimeArtGenerator::RealTimeArtGenerator() : shutdown_(false) {
-    pool = std::make_unique<ThreadPool>(4);
+    pool = std::make_unique<GeneratorTaskPool>(4);
     stats_ = {0, 0, 0, 0, 0.0f, 0.0f};
 }
 
@@ -51,7 +52,7 @@ bool RealTimeArtGenerator::initialize(const AIArt::ModelConfig& aiConfig) {
         Log::info("Real-time art generator initialized successfully");
         return true;
     } catch (const std::exception& e) {
-        Log::error("Failed to initialize real-time art generator: {}", e.what());
+        Log::error("RealTimeArt", "Failed to initialize real-time art generator: {}", e.what());
         return false;
     }
 }
@@ -267,7 +268,7 @@ RealTimeArtGenerator::TextureHandle RealTimeArtGenerator::runModel(const GenDef&
     AIArt::ArtOutput output = aiGenerator->generateSprite(prompt);
     
     if (!output.success) {
-        Log::error("Failed to generate sprite: {}", output.errorMessage);
+        Log::error("RealTimeArt", "Failed to generate sprite: {}", output.errorMessage);
         return {0, 0, 0, false};
     }
     
@@ -294,7 +295,7 @@ RealTimeArtGenerator::TextureHandle RealTimeArtGenerator::runDamageModel(const D
     AIArt::ArtOutput output = aiGenerator->generateSprite(prompt);
     
     if (!output.success) {
-        Log::error("Failed to generate damage: {}", output.errorMessage);
+        Log::error("RealTimeArt", "Failed to generate damage: {}", output.errorMessage);
         return {0, 0, 0, false};
     }
     
@@ -353,7 +354,7 @@ RealTimeArtGenerator::TextureHandle RealTimeArtGenerator::postProcessSprite(cons
 RealTimeArtGenerator::TextureHandle RealTimeArtGenerator::packDirections(const std::vector<TextureHandle>& directions, const GenDef& def) {
     // Pack multiple direction sprites into a single texture sheet
     if (directions.size() != def.directions) {
-        Log::error("Direction count mismatch: expected {}, got {}", def.directions, directions.size());
+        Log::error("RealTimeArt", "Direction count mismatch: expected {}, got {}", def.directions, directions.size());
         return {0, 0, 0, false};
     }
     

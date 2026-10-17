@@ -52,6 +52,3 @@ $script:DefaultAnimationFrames = 8
 $script:StableAudioDir = if ($env:AAMT_STABLE_AUDIO_DIR) { $env:AAMT_STABLE_AUDIO_DIR } else { "C:\tools\stable-audio" }
 $script:StableAudioModel = if ($env:AAMT_STABLE_AUDIO_MODEL) { $env:AAMT_STABLE_AUDIO_MODEL } else { "medium" }
 $script:StableAudioPython = if ($env:AAMT_STABLE_AUDIO_PYTHON) { $env:AAMT_STABLE_AUDIO_PYTHON } else { "python" }
-
-$script:HfTokenProfileMedia = if ($env:AAMT_HF_TOKEN_MEDIA) { $env:AAMT_HF_TOKEN_MEDIA } else { "SD3.5 Token" }
-$script:HfTokenProfileTraining = if ($env:AAMT_HF_TOKEN_TRAINING) { $env:AAMT_HF_TOKEN_TRAINING } else { "Custom Modul for creation" }

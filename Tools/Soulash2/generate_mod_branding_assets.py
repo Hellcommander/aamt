@@ -2,19 +2,23 @@
 """
 Per-mod Soulash 2 branding asset generator (icon S.png + thumbnail2.png).
 
-Asset-size policy:
-  - S.png (32×32 mod icon): ALWAYS procedural PIL (+ optional Ollama design spec).
-  - thumbnail2.png (800×600 workshop banner): SD when --use-sd; sizes from
-    ``s2_icon_pipeline.planned_sd_settings`` (same floor/contain path as
-    SkillCreator generate-icons), then downscale. Procedural fallback on failure.
+Asset policy (SD is the intended source for BOTH assets; procedural art is only drawn
+when explicitly requested with --no-sd, or allowed with --allow-procedural /
+AAMT_SD_STRICT=0):
+  - S.png (32×32 mod icon): SD draft rendered at SD's quality floor, then downscaled
+    through the same floor/contain path as SkillCreator generate-icons.
+  - thumbnail2.png (800×600 workshop banner): SD draft sized by
+    ``s2_icon_pipeline.planned_sd_settings``, then downscaled.
+  If SD is unreachable, a draft is missing, or every attempt fails QA the run aborts
+  instead of silently stamping procedural art.
 
 Supports themed palettes/prompts via --theme or auto-detection from --mod-path.
 
 Themes: hemohydraulic, hydromancy, reactive_crafting
 
 Pipeline:
-  Icons: Ollama spec (optional) → procedural render → mechanical/vision QA
-  Thumbnails: optional SD draft (1024×768) → downscale → QA → procedural fallback
+  SD draft → finalize/downscale → mechanical (+ optional vision) QA
+  (--no-sd: Ollama spec (optional) → procedural render → QA, explicit placeholder opt-in)
 """
 
 from __future__ import annotations
@@ -53,6 +57,7 @@ from hydromancy_quality import (  # noqa: E402
     validate_thumbnail,
 )
 from s2_icon_pipeline import NEGATIVE, planned_sd_settings, sd_session  # noqa: E402
+from sd_policy import SdUnavailable, procedural_fallback  # noqa: E402
 
 try:
     from sd_http_client import detect_server, generate_image  # noqa: E402
@@ -646,9 +651,57 @@ def _generate_sd_draft(prompt: str, output_path: Path, settings: Dict[str, Any],
         return False, elapsed, settings, err
 
 
+def _pid_alive(pid: int) -> bool:
+    """True if a process with this pid is running (Windows-safe; never signals it)."""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+        handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            ok = ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+            return bool(ok) and code.value == STILL_ACTIVE
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    return True
+
+
+def _drop_dead_lock() -> None:
+    """A lock left by a crashed/killed run must not block for hours."""
+    try:
+        holder = SD_LOCK_PATH.read_text(encoding="utf-8")
+    except Exception:
+        return
+    marker = "pid="
+    if marker not in holder:
+        return
+    try:
+        pid = int(holder.split(marker, 1)[1].split()[0])
+    except (ValueError, IndexError):
+        return
+    if not _pid_alive(pid):
+        print(f"  [LOCK] removing stale SD lock from dead pid {pid}")
+        try:
+            SD_LOCK_PATH.unlink()
+        except OSError:
+            pass
+
+
 def _acquire_sd_lock(label: str) -> bool:
     """Exclusive lock so only one SD HTTP job runs cluster-wide."""
     SD_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if SD_LOCK_PATH.exists():
+        _drop_dead_lock()
     if SD_LOCK_PATH.exists():
         age = time.time() - SD_LOCK_PATH.stat().st_mtime
         if age < SD_LOCK_STALE_SEC:
@@ -761,8 +814,8 @@ def generate_sd_drafts(theme: BrandingTheme, mod_path: Path, api_url: Optional[s
 
 
 def sd_allowed_for_kind(kind: str, use_sd: bool) -> bool:
-    """SD only for thumbnails; 32x32 icons are always procedural."""
-    return use_sd and kind == "thumbnail"
+    """SD is the source for both the 32x32 icon and the thumbnail unless --no-sd."""
+    return bool(use_sd)
 
 
 def generate_asset(
@@ -779,6 +832,7 @@ def generate_asset(
     sd_log: Optional[List[Dict[str, Any]]],
     prefer_keep_backup: bool = False,
     backup_dir: Optional[Path] = None,
+    allow_procedural: bool = False,
 ) -> Dict[str, Any]:
     is_icon = kind == "icon"
     out_name = "S.png" if is_icon else "thumbnail2.png"
@@ -799,14 +853,19 @@ def generate_asset(
                 return finalize_icon_from_sd(src.copy())
             return finalize_thumbnail_from_sd(src.copy())
 
-    # Policy: SD is only ever applied to thumbnails. 32x32 icons are ALWAYS
-    # procedural, even if --use-sd is passed or a stray icon draft path exists.
+    # Policy: SD is the source for both assets. Procedural only via --no-sd (use_sd False)
+    # or an explicit allow (allow_procedural / AAMT_SD_STRICT=0).
     want_sd = sd_allowed_for_kind(kind, use_sd)
     render_fn: Callable[[int], Image.Image] = _render_proc
     source = "procedural"
     if want_sd and draft_path and draft_path.exists():
         render_fn = _render_sd
         source = "sd"
+    elif want_sd:
+        procedural_fallback(
+            f"SD {kind} draft is missing (SD generation failed or the server is unreachable)",
+            allow=allow_procedural,
+        )
 
     backup_path = (backup_dir / out_name) if backup_dir and (backup_dir / out_name).exists() else None
     best_backup_score = 0.0
@@ -833,12 +892,9 @@ def generate_asset(
               f"palette={pal_score:.2f} ({mech_reason})")
 
         if not mech_ok:
-            if source == "sd":
-                render_fn = _render_proc
-                source = "procedural"
-                best = report
-                continue
             best = report
+            if source == "sd":
+                break  # the SD draft itself failed QA; re-rendering it cannot change that
             continue
 
         if quality == "full":
@@ -849,8 +905,7 @@ def generate_asset(
                 if best is None or v_score > best.get("vision", {}).get("score", 0):
                     best = report
                 if source == "sd":
-                    render_fn = _render_proc
-                    source = "procedural"
+                    break  # same draft, same verdict
                 continue
         else:
             report["pass"] = True
@@ -867,7 +922,10 @@ def generate_asset(
         return report
 
     if source == "sd" and draft_path:
-        print(f"  [{kind}] SD exhausted; procedural fallback")
+        procedural_fallback(
+            f"SD {kind} draft failed QA (regenerate the draft)", allow=allow_procedural
+        )
+        print(f"  [{kind}] SD draft failed QA; procedural stand-in (explicitly allowed)")
         img = _render_proc(7 + max_attempts * 13)
         img.save(out_path)
         mech_ok, mech_reason = (validate_mod_icon(img) if is_icon else validate_thumbnail(img))
@@ -908,6 +966,7 @@ def run_generation(
     max_attempts: int = 3,
     prefer_keep_backup: bool = False,
     skip_backup: bool = False,
+    allow_procedural: bool = False,
 ) -> Dict[str, Any]:
     mod_path = mod_path.resolve()
     backup_dir = None if skip_backup else backup_existing_assets(mod_path)
@@ -930,12 +989,15 @@ def run_generation(
                 )
                 if kind == "thumbnail":
                     sd_thumb = draft
+                else:
+                    sd_icon = draft
 
             print(f"\n-- generating {kind} ({theme.name}) --")
             results.append(generate_asset(
                 kind, mod_path, theme, quality, model, max_attempts, use_ollama_spec, use_sd,
                 sd_icon, sd_thumb, sd_log if sd_allowed_for_kind(kind, use_sd) else None,
                 prefer_keep_backup=prefer_keep_backup, backup_dir=backup_dir,
+                allow_procedural=allow_procedural,
             ))
 
     if use_sd and any(sd_allowed_for_kind(k, True) for k in kinds):
@@ -956,7 +1018,12 @@ def main() -> int:
     ap.add_argument("--max-attempts", type=int, default=3)
     ap.add_argument("--use-ollama-spec", action="store_true")
     ap.add_argument("--use-sd", action="store_true",
-                    help="SD concept drafts for thumbnails only (icons stay procedural)")
+                    help="Accepted for compatibility: SD is the default source for icon and thumbnail")
+    ap.add_argument("--no-sd", action="store_true",
+                    help="Explicit placeholder opt-in: draw procedural art instead of using SD")
+    ap.add_argument("--allow-procedural", action="store_true",
+                    help="Permit a procedural stand-in when SD is unreachable or fails QA "
+                         "(default: abort; same as AAMT_SD_STRICT=0)")
     ap.add_argument("--sd-api-url", default=None)
     ap.add_argument("--prefer-keep-backup", action="store_true",
                     help="Keep prior asset if new palette score is worse (water magic)")
@@ -982,14 +1049,19 @@ def main() -> int:
 
     print(f"== Mod branding: {theme.display_name} ==")
     print(f"mod: {mod_path}")
-    sd_note = "thumbnails only" if args.use_sd else "off"
-    print(f"sd: {sd_note} | icons: procedural | quality: {args.quality}")
+    use_sd = not args.no_sd
+    sd_note = "icon + thumbnail" if use_sd else "OFF (--no-sd: procedural placeholders)"
+    print(f"sd: {sd_note} | quality: {args.quality}")
 
-    summary = run_generation(
-        mod_path, theme, args.mode, args.quality, args.use_sd, args.sd_api_url,
-        args.use_ollama_spec, args.model, args.max_attempts, args.prefer_keep_backup,
-        skip_backup=args.skip_backup,
-    )
+    try:
+        summary = run_generation(
+            mod_path, theme, args.mode, args.quality, use_sd, args.sd_api_url,
+            args.use_ollama_spec, args.model, args.max_attempts, args.prefer_keep_backup,
+            skip_backup=args.skip_backup, allow_procedural=args.allow_procedural,
+        )
+    except (SdUnavailable, RuntimeError) as exc:
+        print(f"[FAIL] {exc}", file=sys.stderr)
+        return 1
 
     print("\n== SUMMARY ==")
     all_pass = True

@@ -141,6 +141,11 @@ struct StatusEffectParams {
     bool enableHotReload = true;
     bool enableParallelProcessing = true;
 
+    // Same rule as StatusEffectFactory::validateEffectParams.
+    bool validate() const noexcept {
+        return duration > 0 && intensity >= 0 && intensity <= 1;
+    }
+
     uint64_t hashKey() const noexcept {
         XXH64_state_t hash_state;
         XXH64_reset(&hash_state, 0);
@@ -228,6 +233,11 @@ struct UIParams {
     std::vector<std::string> tags;
     std::map<std::string, std::string> metadata;
 
+    // Same rule as StatusEffectFactory::validateUIParams.
+    bool validate() const noexcept {
+        return iconSize > 0 && iconSize <= 512;
+    }
+
     uint64_t hashKey() const noexcept {
         XXH64_state_t hash_state;
         XXH64_reset(&hash_state, 0);
@@ -265,11 +275,17 @@ struct UIParams {
 };
 
 struct EffectBundle {
-    ShaderHandle   shader;
-    TextureHandle  texture;
-    MeshHandle     mesh;
-    ParticleHandle particles;
-    TextureHandle  icon;
+    ShaderHandle   shader = 0;
+    TextureHandle  texture = 0;
+    MeshHandle     mesh = 0;
+    ParticleHandle particles = 0;
+    TextureHandle  icon = 0;
+
+    // Number of generated (non-zero) asset handles in the bundle.
+    int getAssetCount() const noexcept {
+        return (shader ? 1 : 0) + (texture ? 1 : 0) + (mesh ? 1 : 0) +
+               (particles ? 1 : 0) + (icon ? 1 : 0);
+    }
 };
 
 // Utility functions for parameter conversion
@@ -292,8 +308,10 @@ namespace ParamUtils {
     nlohmann::json toJson(const StatusEffectParams& params);
     StatusEffectParams fromJson(const nlohmann::json& json);
     
+    // UIParams cannot overload fromJson (the overloads would differ only by
+    // return type), so it has its own name.
     nlohmann::json toJson(const UIParams& params);
-    UIParams fromJson(const nlohmann::json& json);
+    UIParams uiParamsFromJson(const nlohmann::json& json);
 }
 
 } // namespace StatusEffects

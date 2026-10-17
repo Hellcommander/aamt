@@ -1,12 +1,40 @@
 #include "FireballLuaBindings.hpp"
 #include "FireballFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include <vector>
 
 namespace MagiTech {
 namespace Fireballs {
 
 static std::vector<std::pair<std::future<FireballAssetBundle>, std::string>> pendingFireballs;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<FireballFactory>& factorySlot() {
+    static std::shared_ptr<FireballFactory> f;
+    return f;
+}
+} // namespace
+
+void FireballLuaBindings::setFactory(std::shared_ptr<FireballFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<FireballFactory> FireballLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<FireballFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 void FireballLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<FireballParams>("FireballParams",
@@ -54,15 +82,15 @@ void FireballLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_fireball",
-        [&](const FireballParams& p) {
-            auto factory = MainPlugin::instance().getFireballFactory();
+        [](const FireballParams& p) {
+            auto factory = FireballLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("spawn_fireball_async",
-        [&](const FireballParams& p) {
-            auto factory = MainPlugin::instance().getFireballFactory();
+        [](const FireballParams& p) {
+            auto factory = FireballLuaBindings::factory();
             pendingFireballs.emplace_back(factory->generateAsync(p), p.id);
         }
     );

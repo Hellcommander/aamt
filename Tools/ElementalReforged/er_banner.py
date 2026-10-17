@@ -28,6 +28,14 @@ from er_ai_pipeline import (
     probe_tools,
 )
 
+# Shared SD policy (er_ai_pipeline already put Tools/Shared on sys.path; be explicit anyway)
+_SHARED = Path(__file__).resolve().parents[1] / "Shared"
+if str(_SHARED) not in sys.path:
+    sys.path.insert(0, str(_SHARED))
+from sd_policy import procedural_fallback  # noqa: E402
+
+SD_BANNER_ATTEMPTS = 3
+
 try:
     from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont
 
@@ -348,7 +356,7 @@ def generate_banner(
     force: bool = False,
     steps: int | None = None,
     guidance: float | None = None,
-    allow_procedural: bool = True,
+    allow_procedural: bool = False,
     start_sd: bool = False,
     sd_wait: float = 120.0,
 ) -> dict[str, Any]:
@@ -409,45 +417,54 @@ def generate_banner(
     raw = output.with_name(output.stem + "_AI_raw.png")
     hires = output.with_name(output.stem + "_hires.png")
 
+    sd_reason = "SD server unavailable"
     if tools.get("sd"):
-        print(
-            f"[Banner] SD quality pass {gw}x{gh} @ {use_steps} steps "
-            f"cfg={use_cfg} -> {output.name}",
-            flush=True,
-        )
-        ok = generate_ai_image(
-            prompt=prompt_text,
-            output=raw,
-            negative=negative,
-            width=gw,
-            height=gh,
-            steps=use_steps,
-            seed=seed,
-            api_url=tools.get("sd_url"),
-            enhance=False,  # already banner-enhanced above
-            kind="banner",
-            guidance_scale=use_cfg,
-        )
-        if ok and raw.exists():
-            shutil.copy2(raw, output)
-            if postprocess_banner(output, tw, th, keep_hires=hires):
-                result["ok"] = True
-                result["source"] = "sd"
-                result["hires"] = str(hires) if hires.exists() else None
-                print(
-                    f"[Banner] OK (SD) {output} ({tw}x{th}) from {gw}x{gh}",
-                    flush=True,
-                )
-                return result
-            print("[Banner] SD produced file but resize failed", file=sys.stderr)
+        # Bounded retry (new seed each time) for transient SD failures before giving up.
+        for attempt in range(SD_BANNER_ATTEMPTS):
+            try_seed = seed + attempt * 7919
+            print(
+                f"[Banner] SD quality pass {gw}x{gh} @ {use_steps} steps "
+                f"cfg={use_cfg} seed={try_seed} -> {output.name} "
+                f"(attempt {attempt + 1}/{SD_BANNER_ATTEMPTS})",
+                flush=True,
+            )
+            ok = generate_ai_image(
+                prompt=prompt_text,
+                output=raw,
+                negative=negative,
+                width=gw,
+                height=gh,
+                steps=use_steps,
+                seed=try_seed,
+                api_url=tools.get("sd_url"),
+                enhance=False,  # already banner-enhanced above
+                kind="banner",
+                guidance_scale=use_cfg,
+            )
+            if ok and raw.exists():
+                shutil.copy2(raw, output)
+                if postprocess_banner(output, tw, th, keep_hires=hires):
+                    result["ok"] = True
+                    result["source"] = "sd"
+                    result["hires"] = str(hires) if hires.exists() else None
+                    print(
+                        f"[Banner] OK (SD) {output} ({tw}x{th}) from {gw}x{gh}",
+                        flush=True,
+                    )
+                    return result
+                print("[Banner] SD produced file but resize failed", file=sys.stderr)
+                sd_reason = "SD produced a banner but resize/postprocess failed"
+            else:
+                sd_reason = f"SD banner generation failed after {attempt + 1} attempt(s)"
 
-    if allow_procedural:
-        print("[Banner] SD unavailable - procedural fallback", flush=True)
-        if procedural_banner(cfg, output, tw, th):
-            result["ok"] = True
-            result["source"] = "procedural"
-            print(f"[Banner] OK (procedural) {output}", flush=True)
-            return result
+    # SD down or failed: raises SdUnavailable unless --allow-procedural / AAMT_SD_STRICT=0.
+    procedural_fallback(f"Banner: {sd_reason}", allow=allow_procedural)
+    print("[Banner] SD unavailable - procedural fallback (explicitly allowed)", flush=True)
+    if procedural_banner(cfg, output, tw, th):
+        result["ok"] = True
+        result["source"] = "procedural"
+        print(f"[Banner] OK (procedural) {output}", flush=True)
+        return result
 
     print("[Banner] FAILED", file=sys.stderr)
     return result
@@ -515,5 +532,11 @@ if __name__ == "__main__":
 
     cfg = load_config()
     out = ROOT / "Output" / package_cfg(cfg)["bannerFile"]
-    info = generate_banner(cfg, output=out, force=True, allow_procedural=True)
+    # Procedural banner only with --allow-procedural (or AAMT_SD_STRICT=0); otherwise SD or fail.
+    info = generate_banner(
+        cfg,
+        output=out,
+        force=True,
+        allow_procedural="--allow-procedural" in sys.argv[1:],
+    )
     print(json.dumps(info, indent=2))

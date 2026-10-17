@@ -4,7 +4,10 @@ Qud wrapper around Tools/Shared/sd_http_client.py.
 
 - Reuses detect_server (never starts a second SD server)
 - Single-flight file lock for cluster-wide SD HTTP jobs
-- OOM → reduced settings retry → caller procedural fallback
+- OOM → reduced settings retry → returns SdGenerateResult(ok=False). Callers where SD is the
+  intended art source must NOT draw procedural art on failure silently: call
+  Shared/sd_policy.procedural_fallback(reason, allow=...) which raises SdUnavailable unless
+  procedural art was explicitly allowed (--allow-procedural / AAMT_SD_STRICT=0).
 - Salvage path inherited from sd_http_client on timeout
 """
 

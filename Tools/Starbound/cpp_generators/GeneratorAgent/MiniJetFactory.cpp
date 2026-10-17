@@ -1,4 +1,5 @@
 #include "MiniJetFactory.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "core/Log.hpp"
 #include "core/plugins/AdaptiveBusPlugin.hpp"
 #include <chrono>
@@ -71,10 +72,10 @@ MiniJetFactory::~MiniJetFactory() {
 void MiniJetFactory::initialize(size_t num_threads) {
     if (m_initialized) return;
     
-    m_pool = std::make_unique<MultithreadBusPlugin>(num_threads);
+    m_pool = std::make_unique<GeneratorTaskPool>(num_threads);
     m_initialized = true;
     
-    Log::info("MiniJetFactory initialized with {} threads", num_threads);
+    Log::info("MiniJet", "MiniJetFactory initialized with {} threads", num_threads);
 }
 
 void MiniJetFactory::shutdown() {
@@ -99,7 +100,7 @@ std::shared_ptr<MiniJetAsset> MiniJetFactory::load(const std::string& name, Qual
     // Load from package
     auto asset = PackageReader::readPackage(name);
     if (asset.definition.name.empty()) {
-        Log::error("Failed to load MiniJet asset: {}", name);
+        Log::error("MiniJet", "Failed to load MiniJet asset: {}", name);
         updateMetrics(0.0, std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - startTime).count(), false);
         return nullptr;
     }
@@ -116,9 +117,9 @@ std::shared_ptr<MiniJetAsset> MiniJetFactory::generate(const std::string& defini
     auto startTime = std::chrono::high_resolution_clock::now();
     
     // Parse definition
-    auto definition = DefinitionParser::parseFromYAML(definitionPath);
+    auto definition = DefinitionParser::parseFromFile(definitionPath);
     if (!DefinitionParser::validateDefinition(definition)) {
-        Log::error("Failed to validate MiniJet definition: {}", definitionPath);
+        Log::error("MiniJet", "Failed to validate MiniJet definition: {}", definitionPath);
         updateMetrics(std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - startTime).count(), 0.0, false);
         return nullptr;
     }
@@ -126,7 +127,7 @@ std::shared_ptr<MiniJetAsset> MiniJetFactory::generate(const std::string& defini
     // Generate asset
     auto asset = generateAsset(definition, quality);
     if (!asset) {
-        Log::error("Failed to generate MiniJet asset from definition: {}", definitionPath);
+        Log::error("MiniJet", "Failed to generate MiniJet asset from definition: {}", definitionPath);
         updateMetrics(std::chrono::duration<double>(std::chrono::high_resolution_clock::now() - startTime).count(), 0.0, false);
         return nullptr;
     }
@@ -174,7 +175,7 @@ void MiniJetFactory::preload(const std::vector<std::string>& names) {
         });
     }
     
-    Log::info("Preloading {} MiniJet assets", names.size());
+    Log::info("MiniJet", "Preloading {} MiniJet assets", names.size());
 }
 
 size_t MiniJetFactory::getCacheSize() const {
@@ -183,13 +184,13 @@ size_t MiniJetFactory::getCacheSize() const {
 
 void MiniJetFactory::watchForChanges(const std::string& definitionPath) {
     updateFileTimestamps(definitionPath);
-    Log::info("Watching for changes in: {}", definitionPath);
+    Log::info("MiniJet", "Watching for changes in: {}", definitionPath);
 }
 
 void MiniJetFactory::checkForUpdates() {
     for (const auto& [path, timestamp] : m_fileTimestamps) {
         if (hasFileChanged(path)) {
-            Log::info("File changed detected: {}", path);
+            Log::info("MiniJet", "File changed detected: {}", path);
             
             // Extract asset name from path
             std::filesystem::path fsPath(path);
@@ -213,7 +214,7 @@ void MiniJetFactory::reloadAsset(const std::string& name) {
         std::filesystem::path fsPath(path);
         if (fsPath.stem().string() == name) {
             generatePackage(name, path);
-            Log::info("Reloaded MiniJet asset: {}", name);
+            Log::info("MiniJet", "Reloaded MiniJet asset: {}", name);
             break;
         }
     }
@@ -225,7 +226,7 @@ void MiniJetFactory::resetMetrics() {
 }
 
 bool MiniJetFactory::validateDefinition(const std::string& definitionPath) {
-    auto definition = DefinitionParser::parseFromYAML(definitionPath);
+    auto definition = DefinitionParser::parseFromFile(definitionPath);
     return DefinitionParser::validateDefinition(definition);
 }
 
@@ -259,7 +260,7 @@ size_t MiniJetFactory::getAssetHash(const std::string& name) const {
 }
 
 std::shared_ptr<MiniJetAsset> MiniJetFactory::generateAsset(const MiniJetDefinition& def, Quality quality) {
-    Log::info("Generating MiniJet asset: {}", def.name);
+    Log::info("MiniJet", "Generating MiniJet asset: {}", def.name);
     
     auto asset = std::make_shared<MiniJetAsset>();
     asset->definition = def;
@@ -312,7 +313,7 @@ std::shared_ptr<MiniJetAsset> MiniJetFactory::generateAsset(const MiniJetDefinit
         asset->modules[moduleDef.id] = moduleAssets;
     }
     
-    Log::info("MiniJet asset generation completed: {}", def.name);
+    Log::info("MiniJet", "MiniJet asset generation completed: {}", def.name);
     return asset;
 }
 
@@ -322,7 +323,7 @@ void MiniJetFactory::updateFileTimestamps(const std::string& definitionPath) {
         m_fileTimestamps[definitionPath] = timestamp;
         
         // Also watch module files
-        auto definition = DefinitionParser::parseFromYAML(definitionPath);
+        auto definition = DefinitionParser::parseFromFile(definitionPath);
         for (const auto& module : definition.modules) {
             if (std::filesystem::exists(module.meshPath)) {
                 auto moduleTimestamp = std::filesystem::last_write_time(module.meshPath);
@@ -377,7 +378,7 @@ MiniJetLoader::MiniJetLoader(std::shared_ptr<MiniJetFactory> factory) : m_factor
 MiniJetInstance MiniJetLoader::createInstance(const std::string& name, Quality quality) {
     auto asset = m_factory->load(name, quality);
     if (!asset) {
-        Log::error("Failed to create MiniJet instance: {}", name);
+        Log::error("MiniJet", "Failed to create MiniJet instance: {}", name);
         return MiniJetInstance{};
     }
     

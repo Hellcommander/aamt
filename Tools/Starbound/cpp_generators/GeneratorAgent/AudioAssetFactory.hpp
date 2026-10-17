@@ -5,7 +5,11 @@
 #include <atomic>
 #include <shared_mutex>
 #include <unordered_map>
+#include <optional>
+#include <chrono>
+#include <mutex>
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "core/ConcurrentLRU.hpp"
 #include "AudioAssetTypes.hpp"
 
@@ -74,8 +78,9 @@ class OptimizedLRUCache {
 public:
     explicit OptimizedLRUCache(size_t capacity) : m_capacity(capacity) {}
     
-    std::optional<V> find(const K& key) const {
-        std::shared_lock<std::shared_mutex> lock(m_mutex);
+    // Not const: a hit moves the entry to the front of the LRU list.
+    std::optional<V> find(const K& key) {
+        std::unique_lock<std::shared_mutex> lock(m_mutex);
         auto it = m_cache.find(key);
         if (it != m_cache.end()) {
             m_hits++;
@@ -162,7 +167,7 @@ private:
 
 class AudioAssetFactory {
     OptimizedLRUCache<uint64_t, AudioBundle> m_cache;
-    std::unique_ptr<ThreadPool> m_threadPool;
+    std::unique_ptr<GeneratorTaskPool> m_threadPool;
     std::unique_ptr<GPUAudioInterface> m_gpuDevice;
     AudioPerformanceMetrics m_metrics;
     ObjectPool<AudioBundle> m_bundlePool;
@@ -174,7 +179,6 @@ class AudioAssetFactory {
                 std::unique_ptr<MixerGen> m_mixerGen;
                 std::unique_ptr<ExportGen> m_exportGen;
                 std::unique_ptr<LODGen> m_lodGen;
-                std::unique_ptr<GPUAudioInterface> m_gpuDevice;
     
     // Configuration
     bool m_initialized = false;
@@ -245,7 +249,7 @@ public:
     void setGPUDevice(std::unique_ptr<GPUAudioInterface> device);
     
     // Configuration
-    void setThreadPool(std::unique_ptr<ThreadPool> pool);
+    void setThreadPool(std::unique_ptr<GeneratorTaskPool> pool);
     void setMaxProcessingThreads(int threads);
     void setQualitySettings(float multiplier);
     

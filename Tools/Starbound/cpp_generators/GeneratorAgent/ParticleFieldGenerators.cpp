@@ -4,7 +4,7 @@
 namespace MagiTech {
 namespace ParticleFields {
 
-#define LOG_FIELD_GEN(Action, Id) Log::info("ParticleFieldGen - {}: {}", #Action, Id)
+#define LOG_FIELD_GEN(Action, Id) Log::info("ParticleField", "ParticleFieldGen - {}: {}", #Action, Id)
 
 // Hash function implementations
 uint64_t LODParams::hashKey() const {

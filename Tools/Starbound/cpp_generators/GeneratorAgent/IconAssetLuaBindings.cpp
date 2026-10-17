@@ -1,12 +1,40 @@
 #include "IconAssetLuaBindings.hpp"
 #include "IconAssetFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include <vector>
 
 namespace MagiTech {
 namespace IconAssets {
 
 static std::vector<std::pair<std::future<IconAsset>, std::string>> pendingIcons;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<IconAssetFactory>& factorySlot() {
+    static std::shared_ptr<IconAssetFactory> f;
+    return f;
+}
+} // namespace
+
+void IconAssetLuaBindings::setFactory(std::shared_ptr<IconAssetFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<IconAssetFactory> IconAssetLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No instance injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<IconAssetFactory>();
+        slot->initialize(128, 4);
+    }
+    return slot;
+}
 static std::vector<std::pair<std::future<IconAtlas>, std::string>> pendingAtlases;
 
 void IconAssetLuaBindings::bind(sol::state& lua) {
@@ -153,7 +181,7 @@ void IconAssetLuaBindings::bind(sol::state& lua) {
     // Main icon generation functions
     lua.set_function("spawn_icon",
         [&](const IconParams& ip) {
-            auto factory = MainPlugin::instance().getIconAssetFactory();
+            auto factory = IconAssetLuaBindings::factory();
             pendingIcons.emplace_back(factory->generateIconAsync(ip), ip.id);
         }
     );
@@ -166,7 +194,7 @@ void IconAssetLuaBindings::bind(sol::state& lua) {
                     iconParamsVec.push_back(kv.second.as<IconParams>());
                 }
             }
-            auto factory = MainPlugin::instance().getIconAssetFactory();
+            auto factory = IconAssetLuaBindings::factory();
             pendingAtlases.emplace_back(factory->generateAtlasAsync(iconParamsVec, ap), ap.id);
         }
     );

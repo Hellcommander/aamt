@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "core/mesh/Mesh.hpp"
 #include "core/rendering/Materials.hpp"
 #include "core/animation/AssetAnimation.hpp"
@@ -84,7 +85,7 @@ struct ProjectileBundle {
 
 // Combined Factory for Weapons and Projectiles
 class CrossbowAssetFactory {
-    std::unique_ptr<ThreadPool> pool;
+    std::unique_ptr<GeneratorTaskPool> pool;
     std::unordered_map<uint64_t, CrossbowBundle> crossbowCache;
     std::unordered_map<uint64_t, ProjectileBundle> projectileCache;
 

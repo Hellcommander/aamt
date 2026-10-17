@@ -1,12 +1,41 @@
 #include "GasGrenadeLuaBindings.hpp"
 #include "GasGrenadeFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <vector>
 
 namespace MagiTech {
 namespace GasGrenades {
 
 static std::vector<std::pair<std::future<GrenadeBundle>, std::string>> pendingGrenades;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<GasGrenadeFactory>& factorySlot() {
+    static std::shared_ptr<GasGrenadeFactory> f;
+    return f;
+}
+} // namespace
+
+void GasGrenadeLuaBindings::setFactory(std::shared_ptr<GasGrenadeFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<GasGrenadeFactory> GasGrenadeLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<GasGrenadeFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 void GasGrenadeLuaBindings::bind(sol::state& lua) {
 
@@ -64,14 +93,14 @@ void GasGrenadeLuaBindings::bind(sol::state& lua) {
 
     lua.set_function("spawn_gas_grenade",
         [&](const GasGrenadeParams& p, const UIParams& u) {
-            auto factory = MainPlugin::instance().getGasGrenadeFactory();
+            auto factory = GasGrenadeLuaBindings::factory();
             return factory->generateAsync(p, u).get();
         }
     );
 
     lua.set_function("spawn_gas_grenade_async",
         [&](const GasGrenadeParams& p, const UIParams& u) {
-            auto factory = MainPlugin::instance().getGasGrenadeFactory();
+            auto factory = GasGrenadeLuaBindings::factory();
             pendingGrenades.emplace_back(factory->generateAsync(p, u), p.id);
         }
     );
@@ -81,10 +110,10 @@ void GasGrenadeLuaBindings::poll_assets(sol::state& lua) {
     for (auto it = pendingGrenades.begin(); it != pendingGrenades.end();) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             try {
-                auto b = it->first.get();
+                it->first.get();
                 lua["print"]("Gas Grenade asset ready: " + it->second);
             } catch (const std::exception& e) {
-                // log error
+                Log::error("GasGrenades", "Gas grenade asset {} failed: {}", it->second, e.what());
             }
             it = pendingGrenades.erase(it);
         } else {

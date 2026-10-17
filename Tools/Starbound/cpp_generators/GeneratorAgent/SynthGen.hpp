@@ -21,10 +21,7 @@ struct ADSR;
 struct FilterDefinition;
 struct LFODefinition;
 struct EffectDefinition;
-struct VariationSettings;
 struct VariationSample;
-struct TimeStretchSettings;
-struct RandomizationSettings;
 
 // Oscillator Types
 enum class OscillatorType {
@@ -53,15 +50,7 @@ enum class ModulationTarget {
     PHASE
 };
 
-// Effect Types
-enum class EffectType {
-    REVERB,
-    DELAY,
-    CHORUS,
-    DISTORTION,
-    COMPRESSOR,
-    EQUALIZER
-};
+// EffectType is shared with EffectGen and lives in AudioAssetTypes.hpp.
 
 // Instrument Definition Structures
 struct OscillatorDefinition {
@@ -108,34 +97,15 @@ struct VoiceDefinition {
 };
 
 struct EffectDefinition {
-    EffectType type;
+    EffectType type = EffectType::REVERB;
     std::map<std::string, float> parameters;
     bool enabled = true;
     float wetLevel = 0.5f;
     float dryLevel = 0.5f;
 };
 
-struct TimeStretchSettings {
-    bool enabled = false;
-    size_t windowSize = 1024;
-    float overlap = 0.5f;
-    float stretchFactor = 1.0f;
-};
-
-struct RandomizationSettings {
-    bool enabled = false;
-    float amount = 0.1f;
-    std::map<std::string, float> ranges;
-};
-
-struct VariationSettings {
-    std::pair<int, int> pitchRange = {-12, 12};
-    TimeStretchSettings timeStretch;
-    RandomizationSettings randomization;
-    bool enablePitchVariations = true;
-    bool enableTimeVariations = false;
-    bool enableRandomVariations = false;
-};
+// TimeStretchSettings, RandomizationSettings and VariationSettings are shared with SampleGen
+// and live in AudioAssetTypes.hpp.
 
 struct InstrumentDefinition {
     std::string name;
@@ -154,40 +124,29 @@ struct InstrumentDefinition {
 
 // Synthesis Result Structures
 struct VariationSample {
-    int midiNote;
-    int pitchShift;
+    std::string name;          // file-safe identifier, e.g. "lead_p+3"
+    std::string description;
+    int midiNote = 60;
+    int pitchShift = 0;
     std::vector<float> audioData;
     std::vector<float> stretchedData;
     std::map<std::string, float> parameters;
     std::chrono::system_clock::time_point generationTime;
     std::string filename;
-    size_t fileSize;
+    size_t fileSize = 0;
     std::string checksum;
-};
-
-struct SynthResult {
-    std::vector<float> audioData;
-    std::vector<VariationSample> variations;
-    SynthMetadata metadata;
-    SynthPack synthPack;
-    InstrumentDefinition instrumentDef;
-    std::chrono::system_clock::time_point synthesisTime;
-    bool success = true;
-    std::string errorMessage;
-    std::vector<std::string> warnings;
-    std::map<std::string, std::string> metadata;
 };
 
 // Metadata Structures
 struct VoiceParameters {
-    OscillatorType oscillatorType;
-    float frequency;
-    float amplitude;
+    OscillatorType oscillatorType = OscillatorType::SINE;
+    float frequency = 440.0f;
+    float amplitude = 0.8f;
     ADSR ampEnvelope;
     ADSR filterEnvelope;
-    FilterType filterType;
-    float filterCutoff;
-    float filterResonance;
+    FilterType filterType = FilterType::LOWPASS;
+    float filterCutoff = 2000.0f;
+    float filterResonance = 0.3f;
     std::map<std::string, float> additionalParams;
 };
 
@@ -195,15 +154,15 @@ struct SynthMetadata {
     std::string instrumentName;
     std::string category;
     std::string description;
-    uint32_t sampleRate;
-    uint32_t bitDepth;
-    uint32_t channels;
-    float duration;
+    uint32_t sampleRate = 44100;
+    uint32_t bitDepth = 16;
+    uint32_t channels = 2;
+    float duration = 0.0f;
     VoiceParameters voiceParams;
-    std::pair<int, int> pitchRange;
-    int numVariations;
-    bool timeStretchEnabled;
-    bool randomizationEnabled;
+    std::pair<int, int> pitchRange{0, 0};
+    int numVariations = 0;
+    bool timeStretchEnabled = false;
+    bool randomizationEnabled = false;
     std::vector<EffectDefinition> effects;
     std::vector<std::string> timbreTags;
     std::map<std::string, std::string> additionalMetadata;
@@ -217,8 +176,21 @@ struct SynthPack {
     InstrumentDefinition instrumentDef;
     std::chrono::system_clock::time_point creationTime;
     std::string filePath;
-    size_t totalSize;
+    size_t totalSize = 0;
     std::string checksum;
+};
+
+struct SynthResult {
+    std::vector<float> audioData;
+    std::vector<VariationSample> variations;
+    SynthMetadata metadata;
+    SynthPack synthPack;
+    InstrumentDefinition instrumentDef;
+    std::chrono::system_clock::time_point synthesisTime;
+    bool success = true;
+    std::string errorMessage;
+    std::vector<std::string> warnings;
+    std::map<std::string, std::string> extraMetadata; // free-form key/value info
 };
 
 // SynthGen Class

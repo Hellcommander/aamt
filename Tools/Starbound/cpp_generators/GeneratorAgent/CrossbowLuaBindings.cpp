@@ -130,10 +130,10 @@ void CrossbowLuaBindings::bind(sol::state& lua) {
         
         try {
             pendingCrossbows.emplace_back(g_factory->generateCrossbowAsync(p), p.id);
-            Log::info("Crossbow generation started: {}", p.id);
+            Log::info("Crossbow", "Crossbow generation started: {}", p.id);
             return true;
         } catch (const std::exception& e) {
-            Log::error("Failed to spawn crossbow {}: {}", p.id, e.what());
+            Log::error("Crossbow", "Failed to spawn crossbow {}: {}", p.id, e.what());
             return false;
         }
     });
@@ -143,10 +143,10 @@ void CrossbowLuaBindings::bind(sol::state& lua) {
         
         try {
             pendingProjectiles.emplace_back(g_factory->generateBoltAsync(p), p.id);
-            Log::info("Bolt generation started: {}", p.id);
+            Log::info("Crossbow", "Bolt generation started: {}", p.id);
             return true;
         } catch (const std::exception& e) {
-            Log::error("Failed to spawn bolt {}: {}", p.id, e.what());
+            Log::error("Crossbow", "Failed to spawn bolt {}: {}", p.id, e.what());
             return false;
         }
     });
@@ -156,10 +156,10 @@ void CrossbowLuaBindings::bind(sol::state& lua) {
         
         try {
             pendingProjectiles.emplace_back(g_factory->generateArrowAsync(p), p.id);
-            Log::info("Arrow generation started: {}", p.id);
+            Log::info("Crossbow", "Arrow generation started: {}", p.id);
             return true;
         } catch (const std::exception& e) {
-            Log::error("Failed to spawn arrow {}: {}", p.id, e.what());
+            Log::error("Crossbow", "Failed to spawn arrow {}: {}", p.id, e.what());
             return false;
         }
     });
@@ -167,42 +167,42 @@ void CrossbowLuaBindings::bind(sol::state& lua) {
     // Synchronous factory methods for immediate access
     lua.set_function("generate_crossbow", [&](const CrossbowParams& p) -> CrossbowBundle {
         if (!p.validate()) {
-            Log::error("Invalid crossbow parameters for {}", p.id);
+            Log::error("Crossbow", "Invalid crossbow parameters for {}", p.id);
             return CrossbowBundle{};
         }
         
         try {
             return g_factory->generateCrossbow(p);
         } catch (const std::exception& e) {
-            Log::error("Failed to generate crossbow {}: {}", p.id, e.what());
+            Log::error("Crossbow", "Failed to generate crossbow {}: {}", p.id, e.what());
             return CrossbowBundle{};
         }
     });
 
     lua.set_function("generate_bolt", [&](const BoltParams& p) -> ProjectileBundle {
         if (!p.validate()) {
-            Log::error("Invalid bolt parameters for {}", p.id);
+            Log::error("Crossbow", "Invalid bolt parameters for {}", p.id);
             return ProjectileBundle{};
         }
         
         try {
             return g_factory->generateBolt(p);
         } catch (const std::exception& e) {
-            Log::error("Failed to generate bolt {}: {}", p.id, e.what());
+            Log::error("Crossbow", "Failed to generate bolt {}: {}", p.id, e.what());
             return ProjectileBundle{};
         }
     });
 
     lua.set_function("generate_arrow", [&](const ArrowParams& p) -> ProjectileBundle {
         if (!p.validate()) {
-            Log::error("Invalid arrow parameters for {}", p.id);
+            Log::error("Crossbow", "Invalid arrow parameters for {}", p.id);
             return ProjectileBundle{};
         }
         
         try {
             return g_factory->generateArrow(p);
         } catch (const std::exception& e) {
-            Log::error("Failed to generate arrow {}: {}", p.id, e.what());
+            Log::error("Crossbow", "Failed to generate arrow {}: {}", p.id, e.what());
             return ProjectileBundle{};
         }
     });
@@ -337,11 +337,11 @@ void CrossbowLuaBindings::bind(sol::state& lua) {
             result["behaviorFile"] = output.behaviorFile;
             result["effectFile"] = output.effectFile;
             
-            Log::info("Generated crossbow assets: {}", p.id);
+            Log::info("Crossbow", "Generated crossbow assets: {}", p.id);
             return result;
             
         } catch (const std::exception& e) {
-            Log::error("Failed to generate crossbow assets for {}: {}", p.id, e.what());
+            Log::error("Crossbow", "Failed to generate crossbow assets for {}: {}", p.id, e.what());
             return lua.create_table();
         }
     });
@@ -386,11 +386,11 @@ void CrossbowLuaBindings::bind(sol::state& lua) {
             result["iconFile"] = output.iconFile;
             result["effectFile"] = output.effectFile;
             
-            Log::info("Generated bolt assets: {}", p.id);
+            Log::info("Crossbow", "Generated bolt assets: {}", p.id);
             return result;
             
         } catch (const std::exception& e) {
-            Log::error("Failed to generate bolt assets for {}: {}", p.id, e.what());
+            Log::error("Crossbow", "Failed to generate bolt assets for {}: {}", p.id, e.what());
             return lua.create_table();
         }
     });
@@ -435,11 +435,11 @@ void CrossbowLuaBindings::bind(sol::state& lua) {
             result["iconFile"] = output.iconFile;
             result["effectFile"] = output.effectFile;
             
-            Log::info("Generated arrow assets: {}", p.id);
+            Log::info("Crossbow", "Generated arrow assets: {}", p.id);
             return result;
             
         } catch (const std::exception& e) {
-            Log::error("Failed to generate arrow assets for {}: {}", p.id, e.what());
+            Log::error("Crossbow", "Failed to generate arrow assets for {}: {}", p.id, e.what());
             return lua.create_table();
         }
     });
@@ -451,13 +451,13 @@ void CrossbowLuaBindings::poll_assets(sol::state& lua) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             try {
                 auto bundle = it->first.get();
-                Log::info("Crossbow asset ready: {} (mesh: {}, string: {}, anim: {})", 
+                Log::info("Crossbow", "Crossbow asset ready: {} (mesh: {}, string: {}, anim: {})", 
                     it->second, bundle.mesh, bundle.string, bundle.reloadAnim);
                 
                 // Notify Lua about completion
                 lua["on_crossbow_ready"](it->second, bundle);
             } catch (const std::exception& e) {
-                Log::error("Crossbow generation failed for {}: {}", it->second, e.what());
+                Log::error("Crossbow", "Crossbow generation failed for {}: {}", it->second, e.what());
                 lua["on_crossbow_error"](it->second, e.what());
             }
             it = pendingCrossbows.erase(it);
@@ -471,13 +471,13 @@ void CrossbowLuaBindings::poll_assets(sol::state& lua) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             try {
                 auto bundle = it->first.get();
-                Log::info("Projectile asset ready: {} (mesh: {}, material: {}, sim: {})", 
+                Log::info("Crossbow", "Projectile asset ready: {} (mesh: {}, material: {}, sim: {})", 
                     it->second, bundle.mesh, bundle.material, bundle.flightSim);
                 
                 // Notify Lua about completion
                 lua["on_projectile_ready"](it->second, bundle);
             } catch (const std::exception& e) {
-                Log::error("Projectile generation failed for {}: {}", it->second, e.what());
+                Log::error("Crossbow", "Projectile generation failed for {}: {}", it->second, e.what());
                 lua["on_projectile_error"](it->second, e.what());
             }
             it = pendingProjectiles.erase(it);

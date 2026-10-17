@@ -191,7 +191,7 @@ namespace {
 
 namespace ShaderGen {
     ShaderHandle build(const StatusEffectParams& s) {
-        Log::info("Building shader for effect: {}", s.id);
+        Log::info("StatusEffect", "Building shader for effect: {}", s.id);
         
         // Generate shader source with parameters
         std::string vertexShader = R"(
@@ -287,14 +287,14 @@ void main() {
 }
 )";
 
-        Log::info("Shader created with handle: {}", nextShaderHandle);
+        Log::info("StatusEffect", "Shader created with handle: {}", nextShaderHandle);
         return nextShaderHandle++;
     }
 }
 
 namespace TextureGen {
     TextureHandle build(const StatusEffectParams& s) {
-        Log::info("Building texture for effect: {}", s.id);
+        Log::info("StatusEffect", "Building texture for effect: {}", s.id);
         
         const int width = 256;
         const int height = 256;
@@ -319,7 +319,7 @@ namespace TextureGen {
             combinedPixels[i + 3] = 255;     // A
         }
         
-        Log::info("Texture created with handle: {}, size: {}x{}", 
+        Log::info("StatusEffect", "Texture created with handle: {}, size: {}x{}", 
                  nextTextureHandle, width, height);
         return nextTextureHandle++;
     }
@@ -327,7 +327,7 @@ namespace TextureGen {
 
 namespace MeshGen {
     MeshHandle build(const StatusEffectParams& s) {
-        Log::info("Building mesh for effect: {}", s.id);
+        Log::info("StatusEffect", "Building mesh for effect: {}", s.id);
         
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
@@ -389,7 +389,7 @@ namespace MeshGen {
                 break;
         }
         
-        Log::info("Mesh created with handle: {}, vertices: {}, indices: {}", 
+        Log::info("StatusEffect", "Mesh created with handle: {}, vertices: {}, indices: {}", 
                  nextMeshHandle, vertices.size(), indices.size());
         return nextMeshHandle++;
     }
@@ -397,10 +397,10 @@ namespace MeshGen {
 
 namespace ParticleGen {
     ParticleHandle build(const StatusEffectParams& s) {
-        Log::info("Building particles for effect: {}", s.id);
+        Log::info("StatusEffect", "Building particles for effect: {}", s.id);
         
         if (s.particleType == ParticleType::NONE) {
-            Log::info("No particles requested for effect: {}", s.id);
+            Log::info("StatusEffect", "No particles requested for effect: {}", s.id);
             return 0;
         }
         
@@ -464,7 +464,7 @@ namespace ParticleGen {
                 break;
         }
         
-        Log::info("Particle system created with handle: {}, type: {}, count: {}", 
+        Log::info("StatusEffect", "Particle system created with handle: {}, type: {}, count: {}", 
                  nextParticleHandle, ps.type, ps.count);
         return nextParticleHandle++;
     }
@@ -472,7 +472,7 @@ namespace ParticleGen {
 
 namespace IconGen {
     TextureHandle build(const StatusEffectParams& s, const UIParams& u) {
-        Log::info("Building icon for effect: {}", s.id);
+        Log::info("StatusEffect", "Building icon for effect: {}", s.id);
         
         const int width = u.iconSize;
         const int height = u.iconSize;
@@ -548,7 +548,7 @@ namespace IconGen {
             Log::info("  - Adding flash overlay to icon");
         }
         
-        Log::info("Icon created with handle: {}, size: {}x{}", 
+        Log::info("StatusEffect", "Icon created with handle: {}, size: {}x{}", 
                  nextIconHandle, width, height);
         return nextIconHandle++;
     }
@@ -569,7 +569,7 @@ void StatusEffectFactory::initialize(size_t cache_size, size_t num_threads) {
     m_pool.start(num_threads);
     m_initialized = true;
     
-    Log::info("StatusEffectFactory initialized with cache_size={}, threads={}", 
+    Log::info("StatusEffect", "StatusEffectFactory initialized with cache_size={}, threads={}", 
              cache_size, num_threads);
 }
 
@@ -613,7 +613,7 @@ std::future<EffectBundle> StatusEffectFactory::generateFromJson(const std::strin
         std::ifstream effectFile(effectJsonPath);
         if (effectFile.is_open()) {
             // Parse JSON and populate effectParams
-            Log::info("Loading effect params from: {}", effectJsonPath);
+            Log::info("StatusEffect", "Loading effect params from: {}", effectJsonPath);
         }
         
         // Load UI params from JSON
@@ -621,7 +621,7 @@ std::future<EffectBundle> StatusEffectFactory::generateFromJson(const std::strin
         std::ifstream uiFile(uiJsonPath);
         if (uiFile.is_open()) {
             // Parse JSON and populate uiParams
-            Log::info("Loading UI params from: {}", uiJsonPath);
+            Log::info("StatusEffect", "Loading UI params from: {}", uiJsonPath);
         }
         
         return generateSync(effectParams, uiParams);

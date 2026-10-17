@@ -1,12 +1,15 @@
 #include "IconAssetFactory.hpp"
 #include "core/Log.hpp"
 #include <cmath>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 #include <algorithm>
 
 namespace MagiTech {
 namespace IconAssets {
 
-#define LOG_ICON_GEN(Action, Id) Log::info("IconGen - {}: {}", #Action, Id)
+#define LOG_ICON_GEN(Action, Id) Log::info("Icon", "IconGen - {}: {}", #Action, Id)
 
 // Hash function implementations
 uint64_t IconParams::hashKey() const {

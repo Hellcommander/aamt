@@ -1,9 +1,12 @@
 #pragma once
 #include <future>
 #include <memory>
+#include <mutex>
 #include <unordered_map>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "core/Log.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "WormMechTypes.hpp"
 
 namespace MagiTech {
@@ -62,20 +65,7 @@ public:
         if (auto hit = m_cache.find(key)) {
             return std::async(std::launch::deferred, [=] { return *hit; });
         }
-        return m_pool.enqueue([=]() {
-            MechAssetBundle bundle;
-            bundle.mesh = MeshGen::buildWormMech(params);
-            bundle.texture = TextureGen::buildWormMech(params);
-            bundle.shader = ShaderGen::buildWormMech(params);
-            bundle.skeleton = RigGen::buildWormMech(params);
-            bundle.animation = AnimGen::buildProfile(params.animationProfile, params.segmentCount);
-            bundle.cockpitMesh = CockpitGen::build(params);
-            bundle.cockpitTexture = CockpitGen::buildTexture(params);
-            bundle.exhaustFX = ParticleGen::buildExhaust(params);
-            bundle.icon = IconGen::buildMechIcon(params, ui);
-            m_cache.insert(key, bundle);
-            return bundle;
-        });
+        return m_pool.enqueue([this, params, ui, key]() { return buildBundle(params, ui, key); });
     }
 
     // Create a new dynamic mech instance from initial parameters
@@ -83,20 +73,26 @@ public:
         auto mech = std::make_shared<DynamicWormMech>();
         mech->params.setSilently(initialParams);
 
-        // Set up the callback for when parameters change
-        mech->params.onChanged = [this, mech, ui = UIParams()](const WormMechParams& newParams) {
-            this->regenerateDynamicMech(mech, newParams, ui);
+        // Set up the callback for when parameters change. The mech owns this
+        // callback, so it only holds a weak reference back to the mech.
+        std::weak_ptr<DynamicWormMech> weakMech = mech;
+        mech->params.onChanged = [this, weakMech, ui = UIParams()](const WormMechParams& newParams) {
+            if (auto locked = weakMech.lock()) {
+                this->regenerateDynamicMech(locked, newParams, ui);
+            }
         };
 
         // Perform the initial generation
         regenerateDynamicMech(mech, initialParams, UIParams());
-        
+
+        std::lock_guard<std::mutex> lock(m_dynamicMutex);
         m_dynamicMechs[initialParams.id] = mech;
         return mech;
     }
 
     // Get a managed dynamic mech instance
     std::shared_ptr<DynamicWormMech> getDynamicMech(const std::string& id) {
+        std::lock_guard<std::mutex> lock(m_dynamicMutex);
         auto it = m_dynamicMechs.find(id);
         if (it != m_dynamicMechs.end()) {
             return it->second;
@@ -105,19 +101,47 @@ public:
     }
 
 private:
+    MechAssetBundle buildBundle(const WormMechParams& params, const UIParams& ui, uint64_t key) {
+        MechAssetBundle bundle;
+        bundle.mesh = MeshGen::buildWormMech(params);
+        bundle.texture = TextureGen::buildWormMech(params);
+        bundle.shader = ShaderGen::buildWormMech(params);
+        bundle.skeleton = RigGen::buildWormMech(params);
+        bundle.animation = AnimGen::buildProfile(params.animationProfile, params.segmentCount);
+        bundle.cockpitMesh = CockpitGen::build(params);
+        bundle.cockpitTexture = CockpitGen::buildTexture(params);
+        bundle.exhaustFX = ParticleGen::buildExhaust(params);
+        bundle.icon = IconGen::buildMechIcon(params, ui);
+        m_cache.insert(key, bundle);
+        return bundle;
+    }
+
+    // Generates (or fetches from cache) the bundle on the pool and applies it
+    // to the live mech once ready. Generation and application happen in the
+    // same pool task, so no worker ever blocks waiting on another task.
     void regenerateDynamicMech(std::shared_ptr<DynamicWormMech> mech, const WormMechParams& params, const UIParams& ui) {
-        generateAsync(params, ui).then([mech](std::future<MechAssetBundle> bundleFuture) {
+        const uint64_t key = params.hashKey() ^ ui.hashKey();
+        std::weak_ptr<DynamicWormMech> weakMech = mech;
+        m_pool.enqueue([this, weakMech, params, ui, key]() {
             try {
-                MechAssetBundle bundle = bundleFuture.get();
-                mech->applyBundle(bundle);
+                MechAssetBundle bundle;
+                if (auto hit = m_cache.find(key)) {
+                    bundle = *hit;
+                } else {
+                    bundle = buildBundle(params, ui, key);
+                }
+                if (auto locked = weakMech.lock()) {
+                    locked->applyBundle(bundle);
+                }
             } catch (const std::exception& e) {
-                // Log error
+                Log::error("WormMech", "Dynamic mech regeneration failed for {}: {}", params.id, e.what());
             }
         });
     }
 
     ConcurrentLRUCache<uint64_t, MechAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
+    std::mutex m_dynamicMutex;
     std::unordered_map<std::string, std::shared_ptr<DynamicWormMech>> m_dynamicMechs;
     bool m_initialized;
 };

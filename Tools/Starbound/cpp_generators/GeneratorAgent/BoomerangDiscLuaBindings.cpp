@@ -1,6 +1,7 @@
 #include "BoomerangDiscLuaBindings.hpp"
 #include "BoomerangDiscFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include <vector>
 
 namespace MagiTech {
@@ -8,6 +9,33 @@ namespace BoomerangDiscs {
 
 static std::vector<std::pair<std::future<BoomerangAssetBundle>, std::string>> pendingBoomerangs;
 static std::vector<std::pair<std::future<DiscAssetBundle>, std::string>> pendingDiscs;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<BoomerangDiscFactory>& factorySlot() {
+    static std::shared_ptr<BoomerangDiscFactory> f;
+    return f;
+}
+} // namespace
+
+void BoomerangDiscLuaBindings::setFactory(std::shared_ptr<BoomerangDiscFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<BoomerangDiscFactory> BoomerangDiscLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<BoomerangDiscFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 void BoomerangDiscLuaBindings::bind(sol::state& lua) {
     // Boomerang
@@ -63,14 +91,14 @@ void BoomerangDiscLuaBindings::bind(sol::state& lua) {
 
     // API
     lua.set_function("spawn_boomerang",
-        [&](const BoomerangParams& p) {
-            auto factory = MainPlugin::instance().getBoomerangDiscFactory();
+        [](const BoomerangParams& p) {
+            auto factory = BoomerangDiscLuaBindings::factory();
             return factory->generateBoomerangAsync(p).get();
         }
     );
      lua.set_function("spawn_returning_disc",
-        [&](const ReturningDiscParams& p) {
-            auto factory = MainPlugin::instance().getBoomerangDiscFactory();
+        [](const ReturningDiscParams& p) {
+            auto factory = BoomerangDiscLuaBindings::factory();
             return factory->generateDiscAsync(p).get();
         }
     );

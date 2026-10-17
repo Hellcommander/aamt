@@ -1,4 +1,5 @@
 #include "ParticleFieldAssetFactory.hpp"
+#include "GeneratorConcurrency.hpp"
 #include <algorithm>
 #include <cmath>
 #include <numeric>
@@ -44,7 +45,7 @@ void ParticleFieldAssetFactory::initializeComponents() {
     m_cache = std::make_unique<ConcurrentLRU<uint64_t, ParticleFieldBundle>>(100);
     
     // Initialize thread pool
-    m_pool = std::make_unique<ThreadPool>(m_maxThreads);
+    m_pool = std::make_unique<GeneratorTaskPool>(m_maxThreads);
     
     // Initialize generator components
     m_fieldGen = std::make_unique<FieldGen>();
@@ -181,7 +182,7 @@ size_t ParticleFieldAssetFactory::getCacheMisses() const {
 // Thread Pool Management
 void ParticleFieldAssetFactory::setMaxThreads(int threads) {
     m_maxThreads = std::max(1, threads);
-    m_pool = std::make_unique<ThreadPool>(m_maxThreads);
+    m_pool = std::make_unique<GeneratorTaskPool>(m_maxThreads);
 }
 
 int ParticleFieldAssetFactory::getMaxThreads() const {

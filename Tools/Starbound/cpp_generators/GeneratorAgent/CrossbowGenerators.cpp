@@ -11,7 +11,7 @@
 namespace MagiTech {
 namespace Crossbows {
 
-#define LOG_CROSSBOW_GEN(Action, Id) Log::info("CrossbowGen - {}: {}", #Action, Id)
+#define LOG_CROSSBOW_GEN(Action, Id) Log::info("Crossbow", "CrossbowGen - {}: {}", #Action, Id)
 
 // Hash function implementations
 uint64_t CrossbowParams::hashKey() const {

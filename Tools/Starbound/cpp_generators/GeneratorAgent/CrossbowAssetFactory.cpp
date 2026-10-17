@@ -1,4 +1,5 @@
 #include "CrossbowAssetFactory.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "CrossbowGenerators.cpp"
 #include "core/Log.hpp"
 #include <xxhash.h>
@@ -10,13 +11,13 @@ namespace Crossbows {
 std::unique_ptr<CrossbowAssetFactory> g_crossbowFactory;
 
 CrossbowAssetFactory::CrossbowAssetFactory() {
-    pool = std::make_unique<ThreadPool>(4);
+    pool = std::make_unique<GeneratorTaskPool>(4);
 }
 
 CrossbowAssetFactory::~CrossbowAssetFactory() = default;
 
 void CrossbowAssetFactory::initialize(size_t threadCount) {
-    pool = std::make_unique<ThreadPool>(threadCount);
+    pool = std::make_unique<GeneratorTaskPool>(threadCount);
 }
 
 std::future<CrossbowBundle> CrossbowAssetFactory::generateCrossbowAsync(const CrossbowParams& p) {

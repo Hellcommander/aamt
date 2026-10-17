@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ParticleFieldTypes.hpp"
+#include "GeneratorConcurrency.hpp"
 #include <memory>
 #include <future>
 #include <unordered_map>
@@ -12,7 +13,6 @@ namespace ParticleFields {
 
 // Forward declarations
 class ConcurrentLRU;
-class ThreadPool;
 class FieldGen;
 class NoiseGen;
 class ColorGen;
@@ -82,7 +82,7 @@ public:
 private:
     // Core components
     std::unique_ptr<ConcurrentLRU<uint64_t, ParticleFieldBundle>> m_cache;
-    std::unique_ptr<ThreadPool> m_pool;
+    std::unique_ptr<GeneratorTaskPool> m_pool;
     
     // Generator components
     std::unique_ptr<FieldGen> m_fieldGen;

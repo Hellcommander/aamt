@@ -33,10 +33,25 @@ param(
     
     [string]$OllamaModel = "",  # Auto-selects based on content (llama3.1:8b for regular, wizardlm-uncensored for taboo)
     
-    [switch]$SkipIfBundleExists
+    [switch]$SkipIfBundleExists,
+
+    # Accept procedural (PIL) placeholder art when local Stable Diffusion is down or fails.
+    # Default: abort. (AAMT_SD_STRICT=0 in the environment does the same.)
+    [switch]$AllowProcedural
 )
 
 $ErrorActionPreference = "Stop"
+
+# SD policy: procedural placeholder art is never a silent fallback.
+$sdStrict = (-not $AllowProcedural) -and ($env:AAMT_SD_STRICT -ne '0')
+if (-not $sdStrict) { $PSDefaultParameterValues['Invoke-ElinAssetImage:AllowProcedural'] = $true }
+function Assert-ProceduralAllowed {
+    param([Parameter(Mandatory)][string]$What)
+    if ($sdStrict) {
+        throw "$What. Refusing procedural placeholder art - start the SD server (:1338) and retry, or pass -AllowProcedural / set AAMT_SD_STRICT=0."
+    }
+    Write-Host "  [Warn] $What; using procedural placeholder (explicitly allowed)" -ForegroundColor Yellow
+}
 
 # Load shared asset generation settings
 $settingsPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "..\\AssetGenerationSettings.ps1"
@@ -263,7 +278,9 @@ function Generate-SlotReel {
             Write-Host "  [OK] Slot reel via local AI" -ForegroundColor Green
             return $true
         }
-        Write-Host "  [Info] Local AI reel incomplete; procedural fallback" -ForegroundColor Gray
+        Assert-ProceduralAllowed "Local SD slot reel art incomplete"
+    } else {
+        Assert-ProceduralAllowed "Invoke-ElinAssetImage unavailable (ElinAssetRender.psm1 not loaded)"
     }
     
     $pythonScript = @"
@@ -364,7 +381,9 @@ function Generate-SlotSymbol {
             Write-Host "  [OK] Slot symbol $($Symbol.Name) via local AI" -ForegroundColor Green
             return $true
         }
-        Write-Host "  [Info] Local AI miss for $($Symbol.Name); procedural fallback" -ForegroundColor Gray
+        Assert-ProceduralAllowed "Local SD art failed for slot symbol $($Symbol.Name)"
+    } else {
+        Assert-ProceduralAllowed "Invoke-ElinAssetImage unavailable (ElinAssetRender.psm1 not loaded)"
     }
     
     $pythonScript = @"
@@ -591,7 +610,9 @@ function Generate-SlotMachinePanel {
             Write-Host "  [OK] Slot panel via local AI" -ForegroundColor Green
             return $true
         }
-        Write-Host "  [Info] Local AI panel miss; procedural fallback" -ForegroundColor Gray
+        Assert-ProceduralAllowed "Local SD slot machine panel art failed"
+    } else {
+        Assert-ProceduralAllowed "Invoke-ElinAssetImage unavailable (ElinAssetRender.psm1 not loaded)"
     }
     
     $pythonScript = @"
@@ -712,7 +733,9 @@ function Generate-WinIndicator {
             Write-Host "  [OK] Win/loss indicators via local AI" -ForegroundColor Green
             return $true
         }
-        Write-Host "  [Info] Local AI win/loss incomplete; procedural fallback" -ForegroundColor Gray
+        Assert-ProceduralAllowed "Local SD win/loss indicator art incomplete"
+    } else {
+        Assert-ProceduralAllowed "Invoke-ElinAssetImage unavailable (ElinAssetRender.psm1 not loaded)"
     }
     
     $pythonScript = @"

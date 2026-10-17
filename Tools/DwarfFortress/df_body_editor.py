@@ -409,6 +409,7 @@ class EditorHandler(BaseHTTPRequestHandler):
                     no_sd=bool(body.get("no_sd", True)),
                     force=bool(body.get("force")),
                     workers=body.get("workers"),
+                    allow_procedural=bool(body.get("allow_procedural")),
                 )
                 _json_response(
                     self,

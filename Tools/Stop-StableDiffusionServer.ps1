@@ -8,6 +8,19 @@
 $ErrorActionPreference = "Continue"
 $toolsRoot = $PSScriptRoot
 
+# Launched from PowerShell 7 (pwsh), Windows PowerShell 5.1 inherits a PSModulePath listing the
+# PowerShell 7 module folders, so Invoke-WebRequest / Get-NetTCPConnection fail to load (and the
+# try/catch blocks below would hide it). Restore the stock 5.1 module path first.
+if ($PSVersionTable.PSEdition -eq 'Desktop' -and $env:PSModulePath -match '\\PowerShell\\Modules|microsoft\.powershell_') {
+    $stock = @(
+        (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsPowerShell\Modules'),
+        (Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules'),
+        (Join-Path $PSHOME 'Modules')
+    )
+    $machine = [Environment]::GetEnvironmentVariable('PSModulePath', 'Machine') -split ';'
+    $env:PSModulePath = (($stock + $machine) | Where-Object { $_ } | Select-Object -Unique) -join ';'
+}
+
 # Prefer graceful HTTP shutdown (unloads model cleanly)
 # The server listens on 127.0.0.1 and ::1; ask whichever answers.
 foreach ($bindAddr in @("127.0.0.1", "[::1]")) {

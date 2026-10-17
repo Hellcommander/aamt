@@ -1,7 +1,9 @@
 #pragma once
 #include <future>
+#include <optional>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "AlchemicalLauncherTypes.hpp"
 
 namespace MagiTech {
@@ -10,6 +12,16 @@ namespace AlchemicalLaunchers {
 // Forward declarations of generator functions
 namespace MeshGen {
     MeshHandle buildLauncherBody(const AlchemicalLauncherParams& p);
+
+    // PBR surface properties recorded per generated mesh handle (the generic
+    // MagiTech::Mesh carries geometry only).
+    struct LauncherSurfaceMaterial {
+        float metallic = 0.0f;
+        float roughness = 0.5f;
+        float emissivePower = 0.0f;
+    };
+    void setMeshMaterial(MeshHandle mesh, const LauncherSurfaceMaterial& material);
+    std::optional<LauncherSurfaceMaterial> getMeshMaterial(MeshHandle mesh);
 }
 namespace TextureGen {
     TextureHandle buildLauncherTexture(const AlchemicalLauncherParams& p);
@@ -113,7 +125,7 @@ public:
 
 private:
     ConcurrentLRUCache<uint64_t, LauncherAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
     
     // Performance measurement helpers

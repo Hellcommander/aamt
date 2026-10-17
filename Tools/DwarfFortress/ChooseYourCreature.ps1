@@ -28,6 +28,7 @@ param(
     [switch]$Fix,
     [switch]$Police,
     [switch]$NoSD,
+    [switch]$AllowProcedural,   # Art: allow Pillow art when SD is down/fails (default: fail)
     [switch]$Force,
     [switch]$Blender,
     [switch]$AdventureKit,
@@ -107,6 +108,7 @@ switch ($Action) {
         $sp = Resolve-SpecPath
         $args = @("art", "--spec", $sp)
         if ($NoSD) { $args += "--no-sd" }
+        if ($AllowProcedural) { $args += "--allow-procedural" }
         if ($Force) { $args += "--force" }
         if ($Blender) { $args += "--blender" }
         if ($Workers -gt 0) { $args += @("--workers", "$Workers") }

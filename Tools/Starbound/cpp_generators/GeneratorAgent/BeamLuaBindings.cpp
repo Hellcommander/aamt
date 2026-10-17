@@ -1,13 +1,42 @@
 #include "BeamLuaBindings.hpp"
 #include "BeamFactory.hpp"
 #include "BeamTypes.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <map>
 #include <future>
 #include <vector>
 
 namespace MagiTech {
 namespace Beams {
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<BeamFactory>& factorySlot() {
+    static std::shared_ptr<BeamFactory> f;
+    return f;
+}
+} // namespace
+
+void BeamLuaBindings::setFactory(std::shared_ptr<BeamFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<BeamFactory> BeamLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<BeamFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 static std::vector<std::pair<std::future<BeamBundle>, std::string>> pendingBeams;
 
@@ -31,7 +60,7 @@ void BeamLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_beam", [&](BeamParams p) {
-        auto factory = MainPlugin::instance().getBeamFactory();
+        auto factory = BeamLuaBindings::factory();
         auto fut = factory->generateAsync(p);
         pendingBeams.emplace_back(std::move(fut), p.id);
     });

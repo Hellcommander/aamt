@@ -5,245 +5,62 @@
 #include <functional>
 #include <memory>
 #include <atomic>
+#include <chrono>
+#include <cstdint>
 #include <thread>
 #include <future>
 #include <filesystem>
-#ifndef _WIN32
-#include <dlfcn.h>
-#endif
 #include <glm/glm.hpp>
 #include "vendor/json/include/nlohmann/json.hpp"
 #include "vendor/imgui/imgui.h"
 
+// Lua C API state (headers are force-included via core/LuaHeaders.hpp).
+struct lua_State;
+
 namespace MagiTech {
 namespace ColorPicker {
 
-// Plugin interface for color palette providers
-class IColorPalettePlugin {
-public:
-    virtual ~IColorPalettePlugin() = default;
-    
-    // Plugin metadata
-    virtual std::string getName() const = 0;
-    virtual std::string getVersion() const = 0;
-    virtual std::string getAuthor() const = 0;
-    virtual std::string getDescription() const = 0;
-    
-    // Plugin lifecycle
-    virtual bool initialize() = 0;
-    virtual void shutdown() = 0;
-    virtual bool isEnabled() const = 0;
-    
-    // Palette management
-    virtual std::vector<std::string> getAvailablePalettes() const = 0;
-    virtual ColorPalette loadPalette(const std::string& name) = 0;
-    virtual bool savePalette(const ColorPalette& palette) = 0;
-    virtual bool deletePalette(const std::string& name) = 0;
-    
-    // Dynamic palette generation
-    virtual std::vector<ColorPalette> generatePalettes(const std::string& context) = 0;
-    virtual ColorPalette generatePaletteFromMood(const std::string& mood) = 0;
-    virtual ColorPalette generatePaletteFromTheme(const std::string& theme) = 0;
-    
-    // Plugin capabilities
-    virtual bool supportsDynamicGeneration() const = 0;
-    virtual bool supportsMoodBasedGeneration() const = 0;
-    virtual bool supportsThemeBasedGeneration() const = 0;
-    virtual bool supportsRealTimeGeneration() const = 0;
+// Enhanced color picker flags
+enum class ColorPickerFlags {
+    Default = 0,
+    NoAlpha = 1 << 0,
+    NoPreview = 1 << 1,
+    NoInputs = 1 << 2,
+    NoLabel = 1 << 3,
+    NoHarmony = 1 << 4,
+    NoHex = 1 << 5,
+    NoSliders = 1 << 6,
+    NoWheel = 1 << 7,
+    Compact = 1 << 8,
+    Popup = 1 << 9,
+    Advanced = 1 << 10,
+    AISuggestions = 1 << 11,
+    PsychologyPanel = 1 << 12,
+    GradientMode = 1 << 13,
+    LABMode = 1 << 14
 };
 
-// Plugin manager for handling multiple palette plugins
-class ColorPalettePluginManager {
-public:
-    static ColorPalettePluginManager& instance();
-    
-    // Plugin loading and management
-    bool loadPlugin(const std::string& pluginPath);
-    bool loadLuaPlugin(const std::string& scriptPath);
-    bool unloadPlugin(const std::string& pluginName);
-    void unloadAllPlugins();
-    
-    // Plugin discovery
-    void scanForPlugins(const std::string& directory);
-    std::vector<std::string> getLoadedPluginNames() const;
-    std::vector<std::string> getAvailablePluginPaths() const;
-    
-    // Plugin information
-    std::string getPluginInfo(const std::string& pluginName) const;
-    bool isPluginEnabled(const std::string& pluginName) const;
-    void setPluginEnabled(const std::string& pluginName, bool enabled);
-    
-    // Palette access through plugins
-    std::vector<std::string> getAllAvailablePalettes() const;
-    ColorPalette loadPaletteFromPlugin(const std::string& pluginName, const std::string& paletteName);
-    std::vector<ColorPalette> generatePalettesFromPlugin(const std::string& pluginName, const std::string& context);
-    
-    // Plugin capabilities query
-    std::vector<std::string> getPluginsWithCapability(const std::string& capability) const;
-    bool hasPluginWithCapability(const std::string& capability) const;
-    
-    // Plugin hot-reloading
-    void enableHotReloading(bool enable);
-    void checkForPluginUpdates();
-    void reloadModifiedPlugins();
-    
-private:
-    struct PluginInfo {
-        std::string name;
-        std::string path;
-        std::string type; // "cpp" or "lua"
-        void* handle; // For C++ plugins
-        std::shared_ptr<IColorPalettePlugin> plugin;
-        std::chrono::system_clock::time_point lastModified;
-        bool enabled;
-        std::map<std::string, bool> capabilities;
-    };
-    
-    std::map<std::string, PluginInfo> m_plugins;
-    std::atomic<bool> m_hotReloadEnabled{false};
-    std::thread m_hotReloadThread;
-    
-    // Plugin loading helpers
-    bool loadCppPlugin(const std::string& path);
-    bool loadLuaPluginInternal(const std::string& path);
-    void initializePluginCapabilities(PluginInfo& info);
-    
-    // Hot reload helpers
-    void hotReloadWorker();
-    bool hasPluginChanged(const PluginInfo& info) const;
-    void reloadPlugin(const std::string& pluginName);
-};
+// Combine picker flags.
+constexpr ColorPickerFlags operator|(ColorPickerFlags a, ColorPickerFlags b) noexcept {
+    return static_cast<ColorPickerFlags>(static_cast<int>(a) | static_cast<int>(b));
+}
+// Flag test: true when any flag of 'b' is set in 'a' (used as `if (flags & ColorPickerFlags::X)`).
+constexpr bool operator&(ColorPickerFlags a, ColorPickerFlags b) noexcept {
+    return (static_cast<int>(a) & static_cast<int>(b)) != 0;
+}
 
-// Lua plugin interface for color palette generation
-class LuaColorPalettePlugin : public IColorPalettePlugin {
-public:
-    explicit LuaColorPalettePlugin(const std::string& scriptPath);
-    ~LuaColorPalettePlugin() override;
-    
-    // IColorPalettePlugin implementation
-    std::string getName() const override;
-    std::string getVersion() const override;
-    std::string getAuthor() const override;
-    std::string getDescription() const override;
-    
-    bool initialize() override;
-    void shutdown() override;
-    bool isEnabled() const override;
-    
-    std::vector<std::string> getAvailablePalettes() const override;
-    ColorPalette loadPalette(const std::string& name) override;
-    bool savePalette(const ColorPalette& palette) override;
-    bool deletePalette(const std::string& name) override;
-    
-    std::vector<ColorPalette> generatePalettes(const std::string& context) override;
-    ColorPalette generatePaletteFromMood(const std::string& mood) override;
-    ColorPalette generatePaletteFromTheme(const std::string& theme) override;
-    
-    bool supportsDynamicGeneration() const override;
-    bool supportsMoodBasedGeneration() const override;
-    bool supportsThemeBasedGeneration() const override;
-    bool supportsRealTimeGeneration() const override;
-    
-    // Lua-specific methods
-    void reloadScript();
-    bool isScriptValid() const;
-    std::string getLastError() const;
-    
-private:
-    std::string m_scriptPath;
-    std::string m_name;
-    std::string m_version;
-    std::string m_author;
-    std::string m_description;
-    bool m_enabled;
-    bool m_initialized;
-    std::string m_lastError;
-    
-    // Lua state management
-    void* m_luaState; // lua_State*
-    bool initializeLuaState();
-    void cleanupLuaState();
-    
-    // Lua function wrappers
-    bool callLuaFunction(const std::string& functionName);
-    bool callLuaFunctionWithString(const std::string& functionName, const std::string& param);
-    std::string getLuaString(const std::string& variableName);
-    std::vector<std::string> getLuaStringArray(const std::string& variableName);
-    ColorPalette getLuaColorPalette(const std::string& variableName);
-    std::vector<ColorPalette> getLuaColorPaletteArray(const std::string& variableName);
-};
-
-// C++ plugin interface for color palette generation
-class CppColorPalettePlugin : public IColorPalettePlugin {
-public:
-    explicit CppColorPalettePlugin(const std::string& libraryPath);
-    ~CppColorPalettePlugin() override;
-    
-    // IColorPalettePlugin implementation
-    std::string getName() const override;
-    std::string getVersion() const override;
-    std::string getAuthor() const override;
-    std::string getDescription() const override;
-    
-    bool initialize() override;
-    void shutdown() override;
-    bool isEnabled() const override;
-    
-    std::vector<std::string> getAvailablePalettes() const override;
-    ColorPalette loadPalette(const std::string& name) override;
-    bool savePalette(const ColorPalette& palette) override;
-    bool deletePalette(const std::string& name) override;
-    
-    std::vector<ColorPalette> generatePalettes(const std::string& context) override;
-    ColorPalette generatePaletteFromMood(const std::string& mood) override;
-    ColorPalette generatePaletteFromTheme(const std::string& theme) override;
-    
-    bool supportsDynamicGeneration() const override;
-    bool supportsMoodBasedGeneration() const override;
-    bool supportsThemeBasedGeneration() const override;
-    bool supportsRealTimeGeneration() const override;
-    
-private:
-    std::string m_libraryPath;
-    void* m_libraryHandle;
-    bool m_enabled;
-    bool m_initialized;
-    
-    // Function pointers for plugin interface
-    using GetNameFunc = const char* (*)();
-    using GetVersionFunc = const char* (*)();
-    using GetAuthorFunc = const char* (*)();
-    using GetDescriptionFunc = const char* (*)();
-    using InitializeFunc = bool (*)();
-    using ShutdownFunc = void (*)();
-    using IsEnabledFunc = bool (*)();
-    using GetAvailablePalettesFunc = const char** (*)(int* count);
-    using LoadPaletteFunc = bool (*)(const char* name, ColorPalette* palette);
-    using SavePaletteFunc = bool (*)(const ColorPalette* palette);
-    using DeletePaletteFunc = bool (*)(const char* name);
-    using GeneratePalettesFunc = bool (*)(const char* context, ColorPalette* palettes, int* count);
-    using GeneratePaletteFromMoodFunc = bool (*)(const char* mood, ColorPalette* palette);
-    using GeneratePaletteFromThemeFunc = bool (*)(const char* theme, ColorPalette* palette);
-    using SupportsCapabilityFunc = bool (*)(const char* capability);
-    
-    GetNameFunc m_getName;
-    GetVersionFunc m_getVersion;
-    GetAuthorFunc m_getAuthor;
-    GetDescriptionFunc m_getDescription;
-    InitializeFunc m_initialize;
-    ShutdownFunc m_shutdown;
-    IsEnabledFunc m_isEnabled;
-    GetAvailablePalettesFunc m_getAvailablePalettes;
-    LoadPaletteFunc m_loadPalette;
-    SavePaletteFunc m_savePalette;
-    DeletePaletteFunc m_deletePalette;
-    GeneratePalettesFunc m_generatePalettes;
-    GeneratePaletteFromMoodFunc m_generatePaletteFromMood;
-    GeneratePaletteFromThemeFunc m_generatePaletteFromTheme;
-    SupportsCapabilityFunc m_supportsCapability;
-    
-    bool loadFunctionPointers();
-    void cleanupFunctionPointers();
+// Blend modes for color operations
+enum class BlendMode {
+    Normal,
+    Multiply,
+    Screen,
+    Overlay,
+    SoftLight,
+    HardLight,
+    ColorDodge,
+    ColorBurn,
+    Darken,
+    Lighten
 };
 
 // Enhanced color representation with advanced features
@@ -400,6 +217,247 @@ struct ColorTheme {
     nlohmann::json toJson() const;
     static ColorTheme fromJson(const nlohmann::json& json);
 };
+
+// Plugin interface for color palette providers
+class IColorPalettePlugin {
+public:
+    virtual ~IColorPalettePlugin() = default;
+    
+    // Plugin metadata
+    virtual std::string getName() const = 0;
+    virtual std::string getVersion() const = 0;
+    virtual std::string getAuthor() const = 0;
+    virtual std::string getDescription() const = 0;
+    
+    // Plugin lifecycle
+    virtual bool initialize() = 0;
+    virtual void shutdown() = 0;
+    virtual bool isEnabled() const = 0;
+    
+    // Palette management
+    virtual std::vector<std::string> getAvailablePalettes() const = 0;
+    virtual ColorPalette loadPalette(const std::string& name) = 0;
+    virtual bool savePalette(const ColorPalette& palette) = 0;
+    virtual bool deletePalette(const std::string& name) = 0;
+    
+    // Dynamic palette generation
+    virtual std::vector<ColorPalette> generatePalettes(const std::string& context) = 0;
+    virtual ColorPalette generatePaletteFromMood(const std::string& mood) = 0;
+    virtual ColorPalette generatePaletteFromTheme(const std::string& theme) = 0;
+    
+    // Plugin capabilities
+    virtual bool supportsDynamicGeneration() const = 0;
+    virtual bool supportsMoodBasedGeneration() const = 0;
+    virtual bool supportsThemeBasedGeneration() const = 0;
+    virtual bool supportsRealTimeGeneration() const = 0;
+};
+
+// Plugin manager for handling multiple palette plugins
+class ColorPalettePluginManager {
+public:
+    static ColorPalettePluginManager& instance();
+    
+    // Plugin loading and management
+    bool loadPlugin(const std::string& pluginPath);
+    bool loadLuaPlugin(const std::string& scriptPath);
+    bool unloadPlugin(const std::string& pluginName);
+    void unloadAllPlugins();
+    
+    // Plugin discovery
+    void scanForPlugins(const std::string& directory);
+    std::vector<std::string> getLoadedPluginNames() const;
+    std::vector<std::string> getAvailablePluginPaths() const;
+    
+    // Plugin information
+    std::string getPluginInfo(const std::string& pluginName) const;
+    bool isPluginEnabled(const std::string& pluginName) const;
+    void setPluginEnabled(const std::string& pluginName, bool enabled);
+    
+    // Palette access through plugins
+    std::vector<std::string> getAllAvailablePalettes() const;
+    ColorPalette loadPaletteFromPlugin(const std::string& pluginName, const std::string& paletteName);
+    std::vector<ColorPalette> generatePalettesFromPlugin(const std::string& pluginName, const std::string& context);
+    
+    // Plugin capabilities query
+    std::vector<std::string> getPluginsWithCapability(const std::string& capability) const;
+    bool hasPluginWithCapability(const std::string& capability) const;
+    
+    // Plugin hot-reloading
+    void enableHotReloading(bool enable);
+    void checkForPluginUpdates();
+    void reloadModifiedPlugins();
+    
+private:
+    struct PluginInfo {
+        std::string name;
+        std::string path;
+        std::string type; // "cpp" or "lua"
+        void* handle; // For C++ plugins
+        std::shared_ptr<IColorPalettePlugin> plugin;
+        std::filesystem::file_time_type lastModified;
+        bool enabled;
+        std::map<std::string, bool> capabilities;
+    };
+    
+    std::map<std::string, PluginInfo> m_plugins;
+    std::atomic<bool> m_hotReloadEnabled{false};
+    std::thread m_hotReloadThread;
+    
+    // Plugin loading helpers
+    bool loadCppPlugin(const std::string& path);
+    bool loadLuaPluginInternal(const std::string& path);
+    void initializePluginCapabilities(PluginInfo& info);
+    
+    // Hot reload helpers
+    void hotReloadWorker();
+    bool hasPluginChanged(const PluginInfo& info) const;
+    void reloadPlugin(const std::string& pluginName);
+};
+
+// Lua plugin interface for color palette generation
+class LuaColorPalettePlugin : public IColorPalettePlugin {
+public:
+    explicit LuaColorPalettePlugin(const std::string& scriptPath);
+    ~LuaColorPalettePlugin() override;
+    
+    // IColorPalettePlugin implementation
+    std::string getName() const override;
+    std::string getVersion() const override;
+    std::string getAuthor() const override;
+    std::string getDescription() const override;
+    
+    bool initialize() override;
+    void shutdown() override;
+    bool isEnabled() const override;
+    
+    std::vector<std::string> getAvailablePalettes() const override;
+    ColorPalette loadPalette(const std::string& name) override;
+    bool savePalette(const ColorPalette& palette) override;
+    bool deletePalette(const std::string& name) override;
+    
+    std::vector<ColorPalette> generatePalettes(const std::string& context) override;
+    ColorPalette generatePaletteFromMood(const std::string& mood) override;
+    ColorPalette generatePaletteFromTheme(const std::string& theme) override;
+    
+    bool supportsDynamicGeneration() const override;
+    bool supportsMoodBasedGeneration() const override;
+    bool supportsThemeBasedGeneration() const override;
+    bool supportsRealTimeGeneration() const override;
+    
+    // Lua-specific methods
+    void reloadScript();
+    bool isScriptValid() const;
+    std::string getLastError() const;
+    
+private:
+    std::string m_scriptPath;
+    std::string m_name;
+    std::string m_version;
+    std::string m_author;
+    std::string m_description;
+    bool m_enabled;
+    bool m_initialized;
+    mutable std::string m_lastError;
+
+    // Lua state management
+    lua_State* m_luaState;
+    bool initializeLuaState();
+    void cleanupLuaState();
+
+    // Lua function wrappers
+    bool callLuaFunction(const std::string& functionName) const;
+    bool callLuaFunctionWithString(const std::string& functionName, const std::string& param) const;
+    std::string getLuaString(const std::string& variableName) const;
+    std::vector<std::string> getLuaStringArray(const std::string& variableName) const;
+    // Read a palette / palette array from a global Lua variable.
+    ColorPalette getLuaColorPalette(const std::string& variableName);
+    std::vector<ColorPalette> getLuaColorPaletteArray(const std::string& variableName);
+    // Call a global Lua function with one string argument and read the returned
+    // palette (array); fall back to the given global variable when the function
+    // does not exist or does not return a table.
+    ColorPalette callLuaPaletteFunction(const std::string& functionName, const std::string& arg,
+                                        const std::string& fallbackVariable);
+    std::vector<ColorPalette> callLuaPaletteArrayFunction(const std::string& functionName, const std::string& arg,
+                                                          const std::string& fallbackVariable);
+    // Conversion between Lua tables and palettes (operate on the Lua stack).
+    ColorPalette readPaletteAt(int index) const;
+    std::vector<ColorPalette> readPaletteArrayAt(int index) const;
+    void pushPalette(const ColorPalette& palette) const;
+};
+
+// C++ plugin interface for color palette generation
+class CppColorPalettePlugin : public IColorPalettePlugin {
+public:
+    explicit CppColorPalettePlugin(const std::string& libraryPath);
+    ~CppColorPalettePlugin() override;
+    
+    // IColorPalettePlugin implementation
+    std::string getName() const override;
+    std::string getVersion() const override;
+    std::string getAuthor() const override;
+    std::string getDescription() const override;
+    
+    bool initialize() override;
+    void shutdown() override;
+    bool isEnabled() const override;
+    
+    std::vector<std::string> getAvailablePalettes() const override;
+    ColorPalette loadPalette(const std::string& name) override;
+    bool savePalette(const ColorPalette& palette) override;
+    bool deletePalette(const std::string& name) override;
+    
+    std::vector<ColorPalette> generatePalettes(const std::string& context) override;
+    ColorPalette generatePaletteFromMood(const std::string& mood) override;
+    ColorPalette generatePaletteFromTheme(const std::string& theme) override;
+    
+    bool supportsDynamicGeneration() const override;
+    bool supportsMoodBasedGeneration() const override;
+    bool supportsThemeBasedGeneration() const override;
+    bool supportsRealTimeGeneration() const override;
+    
+private:
+    std::string m_libraryPath;
+    void* m_libraryHandle;
+    bool m_enabled;
+    bool m_initialized;
+    
+    // Function pointers for plugin interface
+    using GetNameFunc = const char* (*)();
+    using GetVersionFunc = const char* (*)();
+    using GetAuthorFunc = const char* (*)();
+    using GetDescriptionFunc = const char* (*)();
+    using InitializeFunc = bool (*)();
+    using ShutdownFunc = void (*)();
+    using IsEnabledFunc = bool (*)();
+    using GetAvailablePalettesFunc = const char** (*)(int* count);
+    using LoadPaletteFunc = bool (*)(const char* name, ColorPalette* palette);
+    using SavePaletteFunc = bool (*)(const ColorPalette* palette);
+    using DeletePaletteFunc = bool (*)(const char* name);
+    using GeneratePalettesFunc = bool (*)(const char* context, ColorPalette* palettes, int* count);
+    using GeneratePaletteFromMoodFunc = bool (*)(const char* mood, ColorPalette* palette);
+    using GeneratePaletteFromThemeFunc = bool (*)(const char* theme, ColorPalette* palette);
+    using SupportsCapabilityFunc = bool (*)(const char* capability);
+    
+    GetNameFunc m_getName;
+    GetVersionFunc m_getVersion;
+    GetAuthorFunc m_getAuthor;
+    GetDescriptionFunc m_getDescription;
+    InitializeFunc m_initialize;
+    ShutdownFunc m_shutdown;
+    IsEnabledFunc m_isEnabled;
+    GetAvailablePalettesFunc m_getAvailablePalettes;
+    LoadPaletteFunc m_loadPalette;
+    SavePaletteFunc m_savePalette;
+    DeletePaletteFunc m_deletePalette;
+    GeneratePalettesFunc m_generatePalettes;
+    GeneratePaletteFromMoodFunc m_generatePaletteFromMood;
+    GeneratePaletteFromThemeFunc m_generatePaletteFromTheme;
+    SupportsCapabilityFunc m_supportsCapability;
+    
+    bool loadFunctionPointers();
+    void cleanupFunctionPointers();
+};
+
 
 // Machine learning color assistant
 class ColorAI {
@@ -566,39 +624,6 @@ private:
     void processPluginUpdates();
 };
 
-// Enhanced color picker flags
-enum class ColorPickerFlags {
-    Default = 0,
-    NoAlpha = 1 << 0,
-    NoPreview = 1 << 1,
-    NoInputs = 1 << 2,
-    NoLabel = 1 << 3,
-    NoHarmony = 1 << 4,
-    NoHex = 1 << 5,
-    NoSliders = 1 << 6,
-    NoWheel = 1 << 7,
-    Compact = 1 << 8,
-    Popup = 1 << 9,
-    Advanced = 1 << 10,
-    AISuggestions = 1 << 11,
-    PsychologyPanel = 1 << 12,
-    GradientMode = 1 << 13,
-    LABMode = 1 << 14
-};
-
-// Blend modes for color operations
-enum class BlendMode {
-    Normal,
-    Multiply,
-    Screen,
-    Overlay,
-    SoftLight,
-    HardLight,
-    ColorDodge,
-    ColorBurn,
-    Darken,
-    Lighten
-};
 
 // Enhanced utility functions
 namespace ColorUtils {

@@ -4,7 +4,7 @@
 namespace MagiTech {
 namespace Audio {
 
-#define LOG_AUDIO_GEN(Action, Id) Log::info("AudioGenerator - {}: {}", #Action, Id)
+#define LOG_AUDIO_GEN(Action, Id) Log::info("Audio", "AudioGenerator - {}: {}", #Action, Id)
 
 // Hash function implementations
 uint64_t SoundParams::hashKey() const { /* ... */ return 0; }

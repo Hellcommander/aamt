@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 #include <optional>
@@ -80,9 +81,9 @@ using TextureHandle = uint32_t;
 using MeshHandle = uint32_t;
 
 struct AssetBundle {
-    TextureHandle texHandle;
-    MeshHandle    meshHandle;
-    int           lastUsedFrame;
+    TextureHandle texHandle = 0;
+    MeshHandle    meshHandle = 0;
+    int           lastUsedFrame = 0;
     // other metadata could go here, e.g. animation data handle
 };
 

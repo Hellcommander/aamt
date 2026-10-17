@@ -10,14 +10,16 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
+#include <mutex>
 #include <random>
+#include <unordered_map>
 
 namespace MagiTech {
 namespace AlchemicalLaunchers {
 
 namespace MeshGen {
     MeshHandle buildLauncherBody(const AlchemicalLauncherParams& p) {
-        Log::info("Building launcher mesh for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building launcher mesh for: {}", p.id);
         
         // Create barrel as extruded cylinder
         auto barrel = MeshBuilder::cylinder(p.barrelRadius, p.barrelLength, 24);
@@ -64,17 +66,44 @@ namespace MeshGen {
         auto finalMesh = MeshBuilder::merge({barrel, frame, drum, grip});
         
         // Apply material properties
-        finalMesh.setMetallicness(p.metallicness);
-        finalMesh.setRoughness(p.roughness);
-        finalMesh.setEmissivePower(p.emissivePower);
-        
-        return finalMesh.getHandle();
+        const MeshHandle handle = finalMesh.getHandle();
+        LauncherSurfaceMaterial material;
+        material.metallic = p.metallicness;
+        material.roughness = p.roughness;
+        material.emissivePower = p.emissivePower;
+        setMeshMaterial(handle, material);
+
+        return handle;
+    }
+
+    namespace {
+        std::mutex& materialMutex() {
+            static std::mutex m;
+            return m;
+        }
+        std::unordered_map<MeshHandle, LauncherSurfaceMaterial>& materialTable() {
+            static std::unordered_map<MeshHandle, LauncherSurfaceMaterial> table;
+            return table;
+        }
+    }
+
+    void setMeshMaterial(MeshHandle mesh, const LauncherSurfaceMaterial& material) {
+        if (mesh == 0) return; // empty meshes have no handle
+        std::lock_guard<std::mutex> lock(materialMutex());
+        materialTable()[mesh] = material;
+    }
+
+    std::optional<LauncherSurfaceMaterial> getMeshMaterial(MeshHandle mesh) {
+        std::lock_guard<std::mutex> lock(materialMutex());
+        auto it = materialTable().find(mesh);
+        if (it == materialTable().end()) return std::nullopt;
+        return it->second;
     }
 }
 
 namespace TextureGen {
     TextureHandle buildLauncherTexture(const AlchemicalLauncherParams& p) {
-        Log::info("Building launcher texture for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building launcher texture for: {}", p.id);
         
         // Generate procedural noise for metal surface
         auto metalNoise = TextureBuilder::generateNoise(512, p.noiseScale);
@@ -125,7 +154,7 @@ namespace TextureGen {
 
 namespace ShaderGen {
     ShaderHandle buildLauncherShader(const AlchemicalLauncherParams& p) {
-        Log::info("Building launcher shader for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building launcher shader for: {}", p.id);
         
         auto shader = ShaderBuilder::create("LauncherPBR");
         
@@ -163,7 +192,7 @@ namespace ShaderGen {
 
 namespace ParticleGen {
     ParticleHandle buildMuzzleFlash(const AlchemicalLauncherParams& p) {
-        Log::info("Building muzzle flash for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building muzzle flash for: {}", p.id);
         
         auto emitter = ParticleBuilder::createEmitter(ParticleType::BURST);
         
@@ -190,7 +219,7 @@ namespace ParticleGen {
     }
     
     ParticleHandle buildMuzzleSmoke(const AlchemicalLauncherParams& p) {
-        Log::info("Building muzzle smoke for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building muzzle smoke for: {}", p.id);
         
         auto emitter = ParticleBuilder::createEmitter(ParticleType::BILLBOARD);
         
@@ -215,7 +244,7 @@ namespace ParticleGen {
     }
     
     ParticleHandle buildShellEjection(const AlchemicalLauncherParams& p) {
-        Log::info("Building shell ejection for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building shell ejection for: {}", p.id);
         
         auto emitter = ParticleBuilder::createEmitter(ParticleType::BURST);
         
@@ -245,7 +274,7 @@ namespace ParticleGen {
     }
     
     ParticleHandle buildHeatDistortion(const AlchemicalLauncherParams& p) {
-        Log::info("Building heat distortion for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building heat distortion for: {}", p.id);
         
         auto emitter = ParticleBuilder::createEmitter(ParticleType::CONTINUOUS);
         
@@ -278,7 +307,7 @@ namespace ParticleGen {
 
 namespace PhysGen {
     PhysicsHandle buildRecoil(const AlchemicalLauncherParams& p) {
-        Log::info("Building recoil physics for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building recoil physics for: {}", p.id);
         
         auto physics = PhysicsBuilder::create();
         
@@ -318,7 +347,7 @@ namespace PhysGen {
     }
     
     PhysicsHandle buildMagazinePhysics(const AlchemicalLauncherParams& p) {
-        Log::info("Building magazine physics for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building magazine physics for: {}", p.id);
         
         auto physics = PhysicsBuilder::create();
         
@@ -343,7 +372,7 @@ namespace PhysGen {
 
 namespace AudioGen {
     AudioHandle buildFireSFX(const AlchemicalLauncherParams& p) {
-        Log::info("Building fire SFX for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building fire SFX for: {}", p.id);
         
         auto audio = AudioBuilder::createProcedural();
         
@@ -375,7 +404,7 @@ namespace AudioGen {
     }
     
     AudioHandle buildReloadSFX(const AlchemicalLauncherParams& p) {
-        Log::info("Building reload SFX for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building reload SFX for: {}", p.id);
         
         auto audio = AudioBuilder::createProcedural();
         
@@ -397,7 +426,7 @@ namespace AudioGen {
     }
     
     AudioHandle buildShellEjectSFX(const AlchemicalLauncherParams& p) {
-        Log::info("Building shell eject SFX for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building shell eject SFX for: {}", p.id);
         
         auto audio = AudioBuilder::createProcedural();
         
@@ -419,7 +448,7 @@ namespace AudioGen {
     }
     
     AudioHandle buildHeatDistortionSFX(const AlchemicalLauncherParams& p) {
-        Log::info("Building heat distortion SFX for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building heat distortion SFX for: {}", p.id);
         
         auto audio = AudioBuilder::createProcedural();
         
@@ -443,7 +472,7 @@ namespace AudioGen {
 
 namespace IconGen {
     TextureHandle buildLauncherIcon(const AlchemicalLauncherParams& p, const UIParams& u) {
-        Log::info("Building launcher icon for: {}", p.id);
+        Log::info("AlchemicalLauncher", "Building launcher icon for: {}", p.id);
         
         auto canvas = IconBuilder::createCanvas(u.iconSize, u.iconSize);
         
@@ -471,7 +500,7 @@ namespace IconGen {
         
         // Add glow effect
         if (u.enableGlow) {
-            canvas.addGlow(u.glowColor, u.glowIntensity);
+            canvas.addGlow(glm::vec4(u.glowColor, 1.0f), u.glowIntensity);
         }
         
         // Add pulse effect
@@ -481,7 +510,7 @@ namespace IconGen {
         
         // Add label if specified
         if (u.enableLabel && !u.label.empty()) {
-            canvas.drawText(u.label, u.labelColor, u.labelSize, u.labelFont);
+            canvas.drawText(u.label, glm::vec4(u.labelColor, 1.0f), u.labelSize, u.labelFont);
         }
         
         // Add flash effect for selection

@@ -1,10 +1,39 @@
 #include "FrostNovaLuaBindings.hpp"
 #include "FrostNovaFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <vector>
 
 namespace MagiTech {
 namespace FrostNovas {
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<FrostNovaFactory>& factorySlot() {
+    static std::shared_ptr<FrostNovaFactory> f;
+    return f;
+}
+} // namespace
+
+void FrostNovaLuaBindings::setFactory(std::shared_ptr<FrostNovaFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<FrostNovaFactory> FrostNovaLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<FrostNovaFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 static std::vector<std::pair<std::future<FrostNovaAssetBundle>, std::string>> pendingNovas;
 
@@ -45,14 +74,14 @@ void FrostNovaLuaBindings::bind(sol::state& lua) {
 
     lua.set_function("cast_frost_nova",
         [&](const FrostNovaParams& p) {
-            auto factory = MainPlugin::instance().getFrostNovaFactory();
+            auto factory = FrostNovaLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("cast_frost_nova_async",
         [&](const FrostNovaParams& p) {
-            auto factory = MainPlugin::instance().getFrostNovaFactory();
+            auto factory = FrostNovaLuaBindings::factory();
             pendingNovas.emplace_back(factory->generateAsync(p), p.id);
         }
     );

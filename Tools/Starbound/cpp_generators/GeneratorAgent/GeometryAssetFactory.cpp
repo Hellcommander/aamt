@@ -7,7 +7,7 @@ namespace Geometry {
 
 void GeometryAssetFactory::initialize(size_t cache_size, size_t num_threads) {
     if (m_initialized) return;
-    m_cache.init(cache_size);
+    m_cache.set_capacity(cache_size);
     m_pool.start(num_threads);
     m_initialized = true;
 }
@@ -33,10 +33,10 @@ std::future<GeometryBundle> GeometryAssetFactory::generateAsync(
 {
     uint64_t key = hashCombine(hashRequests(requests), lp.hashKey());
     if (auto hit = m_cache.find(key)) {
-        return std::async(std::launch::deferred, [=]() { return *hit; });
+        return std::async(std::launch::deferred, [hit]() { return *hit; });
     }
 
-    return m_pool.enqueue([=]() {
+    return m_pool.enqueue([=, this]() {
         GeometryBundle bundle;
         for (const auto& req : requests) {
             MeshHandle mesh = std::visit([&](auto&& p) -> MeshHandle {

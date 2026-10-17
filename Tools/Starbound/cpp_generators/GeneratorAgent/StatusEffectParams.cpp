@@ -402,7 +402,7 @@ nlohmann::json toJson(const UIParams& params) {
     return j;
 }
 
-UIParams fromJson(const nlohmann::json& json) {
+UIParams uiParamsFromJson(const nlohmann::json& json) {
     UIParams params;
     
     // Helper functions (same as above)

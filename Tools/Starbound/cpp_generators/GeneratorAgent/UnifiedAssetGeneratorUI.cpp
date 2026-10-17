@@ -7,10 +7,92 @@
 #include <sstream>
 #include <iomanip>
 #include <chrono>
+#include <cstdio>
+#include <cstring>
+#include <cstdint>
+#include <typeinfo>
 #include <nlohmann/json.hpp>
 
 namespace MagiTech {
 namespace AssetGen {
+
+namespace {
+
+nlohmann::json parametersToJson(const std::unordered_map<std::string, std::any>& parameters) {
+    nlohmann::json params = nlohmann::json::object();
+    for (const auto& [key, value] : parameters) {
+        if (!value.has_value()) continue;
+        if (value.type() == typeid(float)) {
+            params[key] = std::any_cast<float>(value);
+        } else if (value.type() == typeid(double)) {
+            params[key] = std::any_cast<double>(value);
+        } else if (value.type() == typeid(int)) {
+            params[key] = std::any_cast<int>(value);
+        } else if (value.type() == typeid(bool)) {
+            params[key] = std::any_cast<bool>(value);
+        } else if (value.type() == typeid(std::string)) {
+            params[key] = std::any_cast<std::string>(value);
+        }
+    }
+    return params;
+}
+
+nlohmann::json assetToJson(const AssetMetadata& asset) {
+    nlohmann::json assetJson;
+    assetJson["name"] = asset.name;
+    assetJson["description"] = asset.description;
+    assetJson["category"] = static_cast<int>(asset.category);
+    assetJson["category_name"] = UIUtils::getCategoryDisplayName(asset.category);
+    assetJson["type"] = static_cast<int>(asset.type);
+    assetJson["type_name"] = UIUtils::getAssetTypeDisplayName(asset.type);
+    assetJson["version"] = asset.version;
+    assetJson["author"] = asset.author;
+    assetJson["tags"] = asset.tags;
+    assetJson["is_generated"] = asset.isGenerated;
+    assetJson["output_path"] = asset.outputPath;
+    assetJson["creation_time"] = std::chrono::duration_cast<std::chrono::seconds>(
+        asset.creationTime.time_since_epoch()).count();
+    assetJson["parameters"] = parametersToJson(asset.parameters);
+    return assetJson;
+}
+
+// Minimal YAML emitter for the JSON shapes produced by assetToJson (objects, arrays, scalars).
+void writeYaml(std::ostringstream& out, const nlohmann::json& value, int indent) {
+    const std::string pad(static_cast<size_t>(indent) * 2, ' ');
+    auto scalar = [](const nlohmann::json& v) -> std::string {
+        if (v.is_string()) {
+            return v.dump();  // JSON string quoting is valid YAML double-quoted style
+        }
+        return v.dump();
+    };
+    if (value.is_object()) {
+        for (const auto& [key, child] : value.items()) {
+            if ((child.is_object() && !child.empty()) || (child.is_array() && !child.empty())) {
+                out << pad << key << ":\n";
+                writeYaml(out, child, indent + 1);
+            } else if (child.is_object()) {
+                out << pad << key << ": {}\n";
+            } else if (child.is_array()) {
+                out << pad << key << ": []\n";
+            } else {
+                out << pad << key << ": " << scalar(child) << "\n";
+            }
+        }
+    } else if (value.is_array()) {
+        for (const auto& child : value) {
+            if (child.is_object() || child.is_array()) {
+                out << pad << "-\n";
+                writeYaml(out, child, indent + 1);
+            } else {
+                out << pad << "- " << scalar(child) << "\n";
+            }
+        }
+    } else {
+        out << pad << scalar(value) << "\n";
+    }
+}
+
+} // namespace
 
 // UnifiedAssetGeneratorUI Implementation
 UnifiedAssetGeneratorUI::UnifiedAssetGeneratorUI() {
@@ -34,11 +116,15 @@ UnifiedAssetGeneratorUI::~UnifiedAssetGeneratorUI() {
 }
 
 void UnifiedAssetGeneratorUI::showMainWindow() {
+    if (!m_mainWindowOpen) {
+        return;
+    }
+
     ImGui::SetNextWindowSize(ImVec2(1200, 800), ImGuiCond_FirstUseEver);
-    
-    ImGui::Begin("MagiTech Asset Generator", nullptr, 
+
+    ImGui::Begin("MagiTech Asset Generator", &m_mainWindowOpen,
                  ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoCollapse);
-    
+
     // Menu bar
     if (ImGui::BeginMenuBar()) {
         if (ImGui::BeginMenu("File")) {
@@ -46,20 +132,40 @@ void UnifiedAssetGeneratorUI::showMainWindow() {
                 // Reset current asset
                 m_currentAsset = AssetMetadata{};
                 m_currentAsset.name = "New Asset";
+                m_currentAsset.version = "1.0.0";
+                m_currentAsset.author = "MagiTech";
+                m_currentAsset.category = m_activeCategory;
+                m_currentAsset.type = m_activeAssetType;
                 m_currentAsset.creationTime = std::chrono::system_clock::now();
             }
             if (ImGui::MenuItem("Open Asset", "Ctrl+O")) {
-                // TODO: Implement asset loading
+                // Reload the asset library and UI state from the settings file
+                if (loadConfiguration(m_settingsPath)) {
+                    if (AssetMetadata* found = findAssetInLibrary(m_currentAsset.name)) {
+                        m_currentAsset = *found;
+                    } else if (!m_assetLibrary.empty()) {
+                        m_currentAsset = m_assetLibrary.back();
+                    }
+                    m_statusMessage = "Loaded " + m_settingsPath;
+                } else {
+                    m_statusMessage = "Could not load " + m_settingsPath;
+                }
             }
             if (ImGui::MenuItem("Save Asset", "Ctrl+S")) {
-                // TODO: Implement asset saving
+                updateAssetInLibrary(m_currentAsset);
+                m_statusMessage = saveConfiguration(m_settingsPath) ? "Saved " + m_settingsPath
+                                                                    : "Could not save " + m_settingsPath;
             }
             if (ImGui::MenuItem("Export Asset", "Ctrl+E")) {
-                // TODO: Implement asset export
+                if (m_currentAsset.outputPath.empty()) {
+                    m_currentAsset.outputPath = generateOutputPath(m_currentAsset);
+                }
+                exportAsset(m_currentAsset, m_currentAsset.outputPath);
             }
             ImGui::Separator();
             if (ImGui::MenuItem("Exit")) {
-                // TODO: Handle exit
+                saveUISettings();
+                m_mainWindowOpen = false;
             }
             ImGui::EndMenu();
         }
@@ -74,11 +180,19 @@ void UnifiedAssetGeneratorUI::showMainWindow() {
         }
         
         if (ImGui::BeginMenu("Tools")) {
-            if (ImGui::MenuItem("Batch Generate")) {
-                // TODO: Implement batch generation
+            if (ImGui::MenuItem("Batch Generate", nullptr, false, !m_activeGenerator.empty())) {
+                // Regenerate every library asset that belongs to the active generator's category
+                std::vector<AssetMetadata> batch;
+                if (IAssetGenerator* generator = getGenerator(m_activeGenerator)) {
+                    for (const auto& asset : m_assetLibrary) {
+                        if (asset.category == generator->getCategory()) batch.push_back(asset);
+                    }
+                }
+                const bool ok = batchGenerateAssets(batch);
+                m_statusMessage = "Batch generated " + std::to_string(batch.size()) + " assets" + (ok ? "" : " (with errors)");
             }
-            if (ImGui::MenuItem("Asset Library")) {
-                // TODO: Show asset library
+            if (ImGui::MenuItem("Asset Library", nullptr, &m_showAssetBrowser)) {
+                // Toggles the asset browser column
             }
             if (ImGui::MenuItem("Settings")) {
                 m_showSettingsPanel = true;
@@ -88,15 +202,41 @@ void UnifiedAssetGeneratorUI::showMainWindow() {
         
         if (ImGui::BeginMenu("Help")) {
             if (ImGui::MenuItem("Documentation")) {
-                // TODO: Show documentation
+                m_showDocsPopup = true;
             }
             if (ImGui::MenuItem("About")) {
-                // TODO: Show about dialog
+                m_showAboutPopup = true;
             }
             ImGui::EndMenu();
         }
-        
+
         ImGui::EndMenuBar();
+    }
+
+    // Help popups
+    if (m_showDocsPopup) {
+        ImGui::OpenPopup("Asset Generator Help");
+        m_showDocsPopup = false;
+    }
+    if (ImGui::BeginPopupModal("Asset Generator Help", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("1. Pick a category tab and a generator.");
+        ImGui::TextUnformatted("2. Choose an asset type and edit its parameters.");
+        ImGui::TextUnformatted("3. Press 'Generate Asset' to run the generator and add it to the library.");
+        ImGui::TextUnformatted("4. Use the Export panel to write the asset (JSON / YAML / MessagePack / CBOR).");
+        ImGui::TextUnformatted("File > Save/Open stores the library and UI state in the settings file.");
+        if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+    if (m_showAboutPopup) {
+        ImGui::OpenPopup("About Asset Generator");
+        m_showAboutPopup = false;
+    }
+    if (ImGui::BeginPopupModal("About Asset Generator", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::Text("MagiTech Unified Asset Generator");
+        ImGui::Text("Registered generators: %zu", m_generators.size());
+        ImGui::Text("Library assets: %zu", m_assetLibrary.size());
+        if (ImGui::Button("Close")) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
     }
     
     // Main content area
@@ -137,11 +277,144 @@ void UnifiedAssetGeneratorUI::showMainWindow() {
     }
     
     ImGui::Columns(1);
-    
+
+    // Settings (toggled from View/Tools menus)
+    if (m_showSettingsPanel) {
+        ImGui::Separator();
+        renderSettingsPanel();
+    }
+
     // Status bar
+    renderQuickActions();
     renderStatusBar();
-    
+
     ImGui::End();
+}
+
+void UnifiedAssetGeneratorUI::showAssetBrowser() {
+    if (!m_showAssetBrowser) return;
+    if (ImGui::Begin("Asset Browser", &m_showAssetBrowser)) {
+        renderAssetBrowser();
+    }
+    ImGui::End();
+}
+
+void UnifiedAssetGeneratorUI::showGeneratorPanel() {
+    if (!m_showGeneratorPanel) return;
+    if (ImGui::Begin("Generator", &m_showGeneratorPanel)) {
+        renderCategoryTabs();
+        renderGeneratorList();
+        renderAssetTypeList();
+        renderParameterPanel();
+    }
+    ImGui::End();
+}
+
+void UnifiedAssetGeneratorUI::showPreviewPanel() {
+    if (!m_showPreviewPanel) return;
+    if (ImGui::Begin("Asset Preview", &m_showPreviewPanel)) {
+        renderPreviewPanel();
+    }
+    ImGui::End();
+}
+
+void UnifiedAssetGeneratorUI::showExportPanel() {
+    if (!m_showExportPanel) return;
+    if (ImGui::Begin("Asset Export", &m_showExportPanel)) {
+        renderExportPanel();
+    }
+    ImGui::End();
+}
+
+void UnifiedAssetGeneratorUI::showSettingsPanel() {
+    if (!m_showSettingsPanel) return;
+    if (ImGui::Begin("Asset Generator Settings", &m_showSettingsPanel)) {
+        renderSettingsPanel();
+    }
+    ImGui::End();
+}
+
+void UnifiedAssetGeneratorUI::renderSettingsPanel() {
+    ImGui::Text("Settings");
+    ImGui::Separator();
+
+    char settingsPath[512];
+    std::snprintf(settingsPath, sizeof(settingsPath), "%s", m_settingsPath.c_str());
+    if (ImGui::InputText("Settings File", settingsPath, sizeof(settingsPath))) {
+        m_settingsPath = settingsPath;
+    }
+    char exportDir[512];
+    std::snprintf(exportDir, sizeof(exportDir), "%s", m_exportDirectory.c_str());
+    if (ImGui::InputText("Export Directory", exportDir, sizeof(exportDir))) {
+        m_exportDirectory = exportDir;
+    }
+
+    ImGui::Checkbox("Show Asset Browser", &m_showAssetBrowser);
+    ImGui::Checkbox("Show Generator Panel", &m_showGeneratorPanel);
+    ImGui::Checkbox("Show Preview Panel", &m_showPreviewPanel);
+    ImGui::Checkbox("Show Export Panel", &m_showExportPanel);
+
+    if (ImGui::Button("Save Settings")) {
+        saveUISettings();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Load Settings")) {
+        loadUISettings();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset to Defaults")) {
+        resetToDefaults();
+    }
+}
+
+void UnifiedAssetGeneratorUI::renderQuickActions() {
+    if (m_recentAssets.empty()) {
+        return;
+    }
+    ImGui::Text("Recent:");
+    const int count = std::min(static_cast<int>(m_recentAssets.size()), MAX_QUICK_ACTIONS);
+    for (int i = 0; i < count; ++i) {
+        ImGui::SameLine();
+        const std::string& name = m_recentAssets[static_cast<size_t>(i)];
+        if (ImGui::SmallButton((name + "##recent" + std::to_string(i)).c_str())) {
+            if (AssetMetadata* asset = findAssetInLibrary(name)) {
+                m_currentAsset = *asset;
+                m_activeAssetType = asset->type;
+                m_activeCategory = asset->category;
+            }
+        }
+    }
+}
+
+void UnifiedAssetGeneratorUI::saveUISettings() {
+    if (!saveConfiguration(m_settingsPath)) {
+        m_statusMessage = "Could not save settings to " + m_settingsPath;
+    } else {
+        m_statusMessage = "Settings saved to " + m_settingsPath;
+    }
+}
+
+void UnifiedAssetGeneratorUI::loadUISettings() {
+    if (!loadConfiguration(m_settingsPath)) {
+        m_statusMessage = "Could not load settings from " + m_settingsPath;
+    } else {
+        m_statusMessage = "Settings loaded from " + m_settingsPath;
+    }
+}
+
+void UnifiedAssetGeneratorUI::resetToDefaults() {
+    m_activeCategory = AssetCategory::MECHS;
+    m_activeGenerator.clear();
+    m_activeAssetType = AssetType::MECH_BASIC;
+    m_showAssetBrowser = true;
+    m_showGeneratorPanel = true;
+    m_showPreviewPanel = true;
+    m_showExportPanel = true;
+    m_showSettingsPanel = false;
+    m_previewZoom = 1.0f;
+    m_exportFormatIndex = 0;
+    m_exportDirectory = "assets/export";
+    m_statusMessage = "Settings reset to defaults";
 }
 
 void UnifiedAssetGeneratorUI::renderCategoryTabs() {
@@ -349,40 +622,77 @@ void UnifiedAssetGeneratorUI::renderPreviewPanel() {
         ImGui::Text("Description: %s", m_currentAsset.description.c_str());
     }
     
-    // Preview area
+    // Preview area: a card in the category colour, scaled by the preview zoom
     ImGui::BeginChild("PreviewArea", ImVec2(0, 200), true);
-    ImGui::TextColored(ImVec4(0.7f, 0.7f, 0.7f, 1.0f), "[Preview Area]");
-    ImGui::Text("Asset Preview");
-    
+    {
+        const ImVec2 areaMin = ImGui::GetCursorScreenPos();
+        const ImVec2 avail = ImGui::GetContentRegionAvail();
+        const float cardW = std::clamp(160.0f * m_previewZoom, 20.0f, std::max(20.0f, avail.x));
+        const float cardH = std::clamp(110.0f * m_previewZoom, 20.0f, std::max(20.0f, avail.y - 30.0f));
+        const ImVec2 cardMin(areaMin.x + (avail.x - cardW) * 0.5f, areaMin.y + 4.0f);
+        const ImVec2 cardMax(cardMin.x + cardW, cardMin.y + cardH);
+        ImDrawList* drawList = ImGui::GetWindowDrawList();
+        const ImVec4 color = UIUtils::getAssetTypeColor(m_currentAsset.type);
+        drawList->AddRectFilled(cardMin, cardMax, ImGui::ColorConvertFloat4ToU32(ImVec4(color.x * 0.4f, color.y * 0.4f, color.z * 0.4f, 1.0f)), 6.0f);
+        drawList->AddRect(cardMin, cardMax, ImGui::ColorConvertFloat4ToU32(color), 6.0f, 0, 2.0f);
+        drawList->AddText(ImVec2(cardMin.x + 8.0f, cardMin.y + 8.0f), IM_COL32(255, 255, 255, 255), m_currentAsset.name.c_str());
+        const std::string typeName = UIUtils::getAssetTypeDisplayName(m_currentAsset.type);
+        drawList->AddText(ImVec2(cardMin.x + 8.0f, cardMin.y + 26.0f), IM_COL32(200, 200, 200, 255), typeName.c_str());
+        const std::string paramInfo = std::to_string(m_currentAsset.parameters.size()) + " parameters" +
+                                      (m_currentAsset.isGenerated ? ", generated" : "");
+        drawList->AddText(ImVec2(cardMin.x + 8.0f, cardMin.y + 44.0f), IM_COL32(180, 180, 180, 255), paramInfo.c_str());
+        ImGui::Dummy(ImVec2(avail.x, cardH + 8.0f));
+    }
+
     // Preview controls
     if (ImGui::Button("Refresh", ImVec2(80, 25))) {
-        // TODO: Refresh preview
+        // Pull the latest stored copy of this asset from the library
+        if (AssetMetadata* stored = findAssetInLibrary(m_currentAsset.name)) {
+            m_currentAsset = *stored;
+        }
     }
     ImGui::SameLine();
     if (ImGui::Button("Zoom In", ImVec2(80, 25))) {
-        // TODO: Zoom in
+        m_previewZoom = std::min(m_previewZoom * 1.25f, 4.0f);
     }
     ImGui::SameLine();
     if (ImGui::Button("Zoom Out", ImVec2(80, 25))) {
-        // TODO: Zoom out
+        m_previewZoom = std::max(m_previewZoom / 1.25f, 0.25f);
     }
-    
+
     ImGui::EndChild();
-    
+
     // Quick actions
     ImGui::Text("Quick Actions");
     ImGui::Separator();
-    
+
     if (ImGui::Button("Duplicate", ImVec2(100, 25))) {
-        // TODO: Duplicate asset
+        AssetMetadata copy = m_currentAsset;
+        std::string name = m_currentAsset.name + "_copy";
+        for (int n = 2; findAssetInLibrary(name) != nullptr; ++n) {
+            name = m_currentAsset.name + "_copy" + std::to_string(n);
+        }
+        copy.name = name;
+        copy.isGenerated = false;
+        copy.outputPath.clear();
+        copy.creationTime = std::chrono::system_clock::now();
+        addAssetToLibrary(copy);
+        m_currentAsset = copy;
     }
     ImGui::SameLine();
     if (ImGui::Button("Export", ImVec2(100, 25))) {
-        // TODO: Export asset
+        if (m_currentAsset.outputPath.empty()) {
+            m_currentAsset.outputPath = generateOutputPath(m_currentAsset);
+        }
+        exportAsset(m_currentAsset, m_currentAsset.outputPath);
     }
     ImGui::SameLine();
     if (ImGui::Button("Delete", ImVec2(100, 25))) {
-        // TODO: Delete asset
+        const std::string name = m_currentAsset.name;
+        removeAssetFromLibrary(name);
+        m_recentAssets.erase(std::remove(m_recentAssets.begin(), m_recentAssets.end(), name), m_recentAssets.end());
+        m_currentAsset = m_assetLibrary.empty() ? AssetMetadata{} : m_assetLibrary.back();
+        m_statusMessage = "Deleted " + name;
     }
 }
 
@@ -403,8 +713,9 @@ void UnifiedAssetGeneratorUI::renderExportPanel() {
     }
     
     ImGui::SameLine();
-    if (ImGui::Button("Browse")) {
-        // TODO: File browser
+    if (ImGui::Button("Default Path")) {
+        // No native file dialog is available in-game: fill in the conventional asset path
+        m_currentAsset.outputPath = generateOutputPath(m_currentAsset);
     }
     
     // Export options
@@ -421,9 +732,8 @@ void UnifiedAssetGeneratorUI::renderExportPanel() {
     
     // Export formats
     ImGui::Text("Export Format");
-    static int formatIndex = 0;
     const char* formats[] = {"JSON", "YAML", "Binary", "Custom"};
-    ImGui::Combo("##Format", &formatIndex, formats, IM_ARRAYSIZE(formats));
+    ImGui::Combo("##Format", &m_exportFormatIndex, formats, IM_ARRAYSIZE(formats));
     
     // Export button
     ImGui::Separator();
@@ -438,11 +748,15 @@ void UnifiedAssetGeneratorUI::renderExportPanel() {
     ImGui::Text("Batch Export");
     
     if (ImGui::Button("Export All", ImVec2(100, 25))) {
-        // TODO: Export all assets
+        exportBatch(m_assetLibrary, m_exportDirectory);
     }
     ImGui::SameLine();
     if (ImGui::Button("Export Category", ImVec2(100, 25))) {
-        // TODO: Export category
+        std::vector<AssetMetadata> categoryAssets;
+        for (const auto& asset : m_assetLibrary) {
+            if (asset.category == m_currentAsset.category) categoryAssets.push_back(asset);
+        }
+        exportBatch(categoryAssets, m_exportDirectory + "/" + UIUtils::getCategoryDisplayName(m_currentAsset.category));
     }
 }
 
@@ -525,6 +839,13 @@ void UnifiedAssetGeneratorUI::renderStatusBar() {
     ImGui::SameLine();
     
     ImGui::Text("Assets: %zu", m_assetLibrary.size());
+
+    if (!m_statusMessage.empty()) {
+        ImGui::SameLine();
+        ImGui::Text(" | ");
+        ImGui::SameLine();
+        ImGui::TextUnformatted(m_statusMessage.c_str());
+    }
 }
 
 // Helper functions
@@ -655,45 +976,31 @@ bool UnifiedAssetGeneratorUI::saveConfiguration(const std::string& filePath) {
             {"show_generator_panel", m_showGeneratorPanel},
             {"show_preview_panel", m_showPreviewPanel},
             {"show_export_panel", m_showExportPanel},
-            {"show_settings_panel", m_showSettingsPanel}
+            {"show_settings_panel", m_showSettingsPanel},
+            {"preview_zoom", m_previewZoom},
+            {"export_format", m_exportFormatIndex},
+            {"export_directory", m_exportDirectory},
+            {"recent_assets", m_recentAssets}
         };
-        
+
         // Save asset library
         nlohmann::json assets = nlohmann::json::array();
         for (const auto& asset : m_assetLibrary) {
-            nlohmann::json assetJson;
-            assetJson["name"] = asset.name;
-            assetJson["description"] = asset.description;
-            assetJson["category"] = static_cast<int>(asset.category);
-            assetJson["type"] = static_cast<int>(asset.type);
-            assetJson["version"] = asset.version;
-            assetJson["author"] = asset.author;
-            assetJson["tags"] = asset.tags;
-            assetJson["is_generated"] = asset.isGenerated;
-            assetJson["output_path"] = asset.outputPath;
-            
-            // Save parameters
-            nlohmann::json params;
-            for (const auto& [key, value] : asset.parameters) {
-                if (value.type() == typeid(float)) {
-                    params[key] = std::any_cast<float>(value);
-                } else if (value.type() == typeid(int)) {
-                    params[key] = std::any_cast<int>(value);
-                } else if (value.type() == typeid(bool)) {
-                    params[key] = std::any_cast<bool>(value);
-                } else if (value.type() == typeid(std::string)) {
-                    params[key] = std::any_cast<std::string>(value);
-                }
-            }
-            assetJson["parameters"] = params;
-            
-            assets.push_back(assetJson);
+            assets.push_back(assetToJson(asset));
         }
         config["asset_library"] = assets;
-        
+
+        const std::filesystem::path parent = std::filesystem::path(filePath).parent_path();
+        if (!parent.empty()) {
+            std::error_code ec;
+            std::filesystem::create_directories(parent, ec);
+        }
         std::ofstream file(filePath);
+        if (!file.is_open()) {
+            return false;
+        }
         file << config.dump(2);
-        return true;
+        return file.good();
         
     } catch (const std::exception& e) {
         return false;
@@ -721,6 +1028,10 @@ bool UnifiedAssetGeneratorUI::loadConfiguration(const std::string& filePath) {
             m_showPreviewPanel = uiState.value("show_preview_panel", true);
             m_showExportPanel = uiState.value("show_export_panel", true);
             m_showSettingsPanel = uiState.value("show_settings_panel", false);
+            m_previewZoom = uiState.value("preview_zoom", 1.0f);
+            m_exportFormatIndex = std::clamp(uiState.value("export_format", 0), 0, 3);
+            m_exportDirectory = uiState.value("export_directory", std::string("assets/export"));
+            m_recentAssets = uiState.value("recent_assets", std::vector<std::string>{});
         }
         
         // Load asset library
@@ -764,13 +1075,79 @@ bool UnifiedAssetGeneratorUI::loadConfiguration(const std::string& filePath) {
 
 // Export management
 bool UnifiedAssetGeneratorUI::exportAsset(const AssetMetadata& metadata, const std::string& outputPath) {
-    // TODO: Implement asset export
-    return true;
+    if (!validateAssetMetadata(metadata) || outputPath.empty()) {
+        m_statusMessage = "Export failed: asset needs a name, version, author and output path";
+        return false;
+    }
+    try {
+        const nlohmann::json j = assetToJson(metadata);
+        std::filesystem::path path(outputPath);
+        static const char* extensions[] = { ".json", ".yaml", ".msgpack", ".cbor" };
+        const int format = std::clamp(m_exportFormatIndex, 0, 3);
+        if (path.extension().empty() || path.extension() == ".json") {
+            path.replace_extension(extensions[format]);
+        }
+        if (!path.parent_path().empty()) {
+            std::error_code ec;
+            std::filesystem::create_directories(path.parent_path(), ec);
+        }
+        std::ofstream out(path, std::ios::binary);
+        if (!out.is_open()) {
+            m_statusMessage = "Export failed: cannot open " + path.string();
+            return false;
+        }
+        switch (format) {
+            case 1: {  // YAML
+                std::ostringstream yaml;
+                writeYaml(yaml, j, 0);
+                out << yaml.str();
+                break;
+            }
+            case 2: {  // Binary (MessagePack)
+                const std::vector<std::uint8_t> bytes = nlohmann::json::to_msgpack(j);
+                out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+                break;
+            }
+            case 3: {  // Custom (CBOR)
+                const std::vector<std::uint8_t> bytes = nlohmann::json::to_cbor(j);
+                out.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+                break;
+            }
+            default:
+                out << j.dump(2);
+                break;
+        }
+        if (!out.good()) {
+            m_statusMessage = "Export failed: write error on " + path.string();
+            return false;
+        }
+        AssetMetadata exported = metadata;
+        exported.outputPath = path.string();
+        updateAssetInLibrary(exported);
+        m_statusMessage = "Exported " + metadata.name + " to " + path.string();
+        return true;
+    } catch (const std::exception& e) {
+        m_statusMessage = std::string("Export failed: ") + e.what();
+        return false;
+    }
 }
 
 bool UnifiedAssetGeneratorUI::exportBatch(const std::vector<AssetMetadata>& assets, const std::string& outputDir) {
-    // TODO: Implement batch export
-    return true;
+    bool success = true;
+    size_t exported = 0;
+    // Copy: exportAsset updates the library, and `assets` may be the library itself
+    const std::vector<AssetMetadata> toExport = assets;
+    for (const auto& asset : toExport) {
+        const std::string fileName = UIUtils::sanitizeAssetName(asset.name.empty() ? generateAssetName(asset.type) : asset.name);
+        const std::string path = (std::filesystem::path(outputDir) / (fileName + ".json")).string();
+        if (exportAsset(asset, path)) {
+            ++exported;
+        } else {
+            success = false;
+        }
+    }
+    m_statusMessage = "Exported " + std::to_string(exported) + "/" + std::to_string(assets.size()) + " assets to " + outputDir;
+    return success;
 }
 
 // Helper functions
@@ -802,6 +1179,13 @@ void UnifiedAssetGeneratorUI::addAssetToLibrary(const AssetMetadata& asset) {
     
     // Add new asset
     m_assetLibrary.push_back(asset);
+
+    // Track it as the most recent asset
+    m_recentAssets.erase(std::remove(m_recentAssets.begin(), m_recentAssets.end(), asset.name), m_recentAssets.end());
+    m_recentAssets.insert(m_recentAssets.begin(), asset.name);
+    if (m_recentAssets.size() > static_cast<size_t>(MAX_RECENT_ASSETS)) {
+        m_recentAssets.resize(static_cast<size_t>(MAX_RECENT_ASSETS));
+    }
 }
 
 void UnifiedAssetGeneratorUI::removeAssetFromLibrary(const std::string& assetName) {

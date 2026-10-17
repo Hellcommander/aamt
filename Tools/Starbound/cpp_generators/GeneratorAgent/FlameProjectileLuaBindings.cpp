@@ -1,14 +1,55 @@
 #include "FlameProjectileLuaBindings.hpp"
 #include "FlameProjectileFactory.hpp"
 #include "FlameProjectileTypes.hpp"
-#include "FlameProjectileGenerators.cpp"
+#include <chrono>
 #include <fstream>
+#include <memory>
+#include <mutex>
 #include <sstream>
+#include <vector>
 
 namespace MagiTech {
 namespace FlameProjectiles {
 
 static std::vector<std::pair<std::future<FlameAssetBundle>, std::string>> pendingFlames;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<FlameProjectileFactory>& factorySlot() {
+    static std::shared_ptr<FlameProjectileFactory> f;
+    return f;
+}
+
+/** Params from a JSON document, falling back to the built-in preset tagged with `failureId`. */
+FlameProjectileParams paramsFromJsonText(const std::string& text, const std::string& failureId) {
+    try {
+        return ParamUtils::fromJson(nlohmann::json::parse(text));
+    } catch (const std::exception&) {
+        FlameProjectileParams params = FlameProjectileFactory::defaultParams();
+        params.id = failureId;
+        return params;
+    }
+}
+} // namespace
+
+void FlameProjectileLuaBindings::setFactory(std::shared_ptr<FlameProjectileFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<FlameProjectileFactory> FlameProjectileLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): use the global instance (not owned, never deleted).
+        g_flameFactory.initialize(64, 4);
+        slot = std::shared_ptr<FlameProjectileFactory>(&g_flameFactory, [](FlameProjectileFactory*) {});
+    }
+    return slot;
+}
 
 void FlameProjectileLuaBindings::bind(sol::state& lua) {
     // Bind enums
@@ -129,7 +170,15 @@ void FlameProjectileLuaBindings::bind(sol::state& lua) {
         // Metadata
         "description", &FlameProjectileParams::description,
         "tags", &FlameProjectileParams::tags,
-        "metadata", &FlameProjectileParams::metadata,
+        // Exposed as a plain Lua table (copy in/out): the vendored sol2 container usertype cannot iterate std::map
+        "metadata", sol::property(
+            [](const FlameProjectileParams& params) { return sol::as_table(params.metadata); },
+            [](FlameProjectileParams& params, sol::table table) {
+                params.metadata.clear();
+                for (const auto& [key, value] : table) {
+                    params.metadata[key.as<std::string>()] = value.as<std::string>();
+                }
+            }),
         
         // Methods
         "hashKey", &FlameProjectileParams::hashKey
@@ -151,71 +200,91 @@ void FlameProjectileLuaBindings::bind(sol::state& lua) {
         "gpuAccelerated", &FlameAssetBundle::gpuAccelerated
     );
 
+    lua.new_usertype<FlameProjectileFactory::PerformanceMetrics>("FlamePerformanceMetrics",
+        "totalGenerations", &FlameProjectileFactory::PerformanceMetrics::totalGenerations,
+        "cacheHits", &FlameProjectileFactory::PerformanceMetrics::cacheHits,
+        "cacheMisses", &FlameProjectileFactory::PerformanceMetrics::cacheMisses,
+        "totalGenerationTime", &FlameProjectileFactory::PerformanceMetrics::totalGenerationTime,
+        "averageGenerationTime", &FlameProjectileFactory::PerformanceMetrics::averageGenerationTime,
+        "getHitRate", &FlameProjectileFactory::PerformanceMetrics::getHitRate
+    );
+
+    // Fully initialized preset to start from (a bare FlameProjectileParams() leaves fields unset)
+    lua.set_function("flame_default_params", []() {
+        return FlameProjectileFactory::defaultParams();
+    });
+
     // Bind factory functions
     lua.set_function("spawn_flame_projectile",
-        [&](const FlameProjectileParams& fp) {
-            auto bundle = g_flameFactory.generateSync(fp);
+        [](const FlameProjectileParams& fp) {
+            auto bundle = FlameProjectileLuaBindings::factory()->generateSync(fp);
             return bundle;
         }
     );
 
+    // Queues generation; the bundle is reported by poll_assets. Returns the tracking id.
     lua.set_function("spawn_flame_projectile_async",
-        [&](const FlameProjectileParams& fp) {
-            auto fut = g_flameFactory.generateAsync(fp);
+        [](const FlameProjectileParams& fp) {
+            auto fut = FlameProjectileLuaBindings::factory()->generateAsync(fp);
             pendingFlames.emplace_back(std::move(fut), fp.id);
-            return fut;
+            return fp.id;
         }
     );
 
     // Bind validation functions
     lua.set_function("validate_flame_params", [](const FlameProjectileParams& params) {
-        return g_flameFactory.validateParams(params);
+        return FlameProjectileLuaBindings::factory()->validateParams(params);
     });
 
     lua.set_function("get_flame_validation_errors", [](const FlameProjectileParams& params) {
-        return g_flameFactory.getValidationErrors(params);
+        return FlameProjectileLuaBindings::factory()->getValidationErrors(params);
     });
 
     // Bind JSON loading functions
+    // Queues generation from a params file; reported by poll_assets under the file path.
     lua.set_function("load_flame_from_json", [](const std::string& jsonPath) {
-        auto fut = g_flameFactory.generateFromJson(jsonPath);
-        pendingFlames.emplace_back(std::move(fut), "json_flame");
-        return fut;
+        auto fut = FlameProjectileLuaBindings::factory()->generateFromJson(jsonPath);
+        pendingFlames.emplace_back(std::move(fut), jsonPath);
+        return jsonPath;
     });
 
-    // Bind batch generation
+    // Bind batch generation: queues every entry (reported by poll_assets), returns how many were queued
     lua.set_function("generate_flame_batch", [](const std::vector<FlameProjectileParams>& params) {
-        return g_flameFactory.generateBatchAsync(params);
+        auto futures = FlameProjectileLuaBindings::factory()->generateBatchAsync(params);
+        for (size_t i = 0; i < futures.size(); ++i) {
+            pendingFlames.emplace_back(std::move(futures[i]), params[i].id);
+        }
+        return futures.size();
     });
 
     // Bind cache management
     lua.set_function("clear_flame_cache", []() {
-        g_flameFactory.clearCache();
+        FlameProjectileLuaBindings::factory()->clearCache();
     });
 
     lua.set_function("get_flame_cache_size", []() {
-        return g_flameFactory.getCacheSize();
+        return FlameProjectileLuaBindings::factory()->getCacheSize();
     });
 
     lua.set_function("get_flame_cache_capacity", []() {
-        return g_flameFactory.getCacheCapacity();
+        return FlameProjectileLuaBindings::factory()->getCacheCapacity();
     });
 
     lua.set_function("get_flame_cache_hit_rate", []() {
-        return g_flameFactory.getCacheHitRate();
+        return FlameProjectileLuaBindings::factory()->getCacheHitRate();
     });
 
     lua.set_function("set_flame_cache_capacity", [](size_t capacity) {
-        g_flameFactory.setCacheCapacity(capacity);
+        FlameProjectileLuaBindings::factory()->setCacheCapacity(capacity);
     });
 
     // Bind performance monitoring
     lua.set_function("get_flame_performance_metrics", []() {
-        return g_flameFactory.getPerformanceMetrics();
+        return FlameProjectileLuaBindings::factory()->getPerformanceMetrics();
     });
 
     lua.set_function("reset_flame_performance_metrics", []() {
-        g_flameFactory.resetPerformanceMetrics();
+        FlameProjectileLuaBindings::factory()->resetPerformanceMetrics();
     });
 
     // Bind utility functions
@@ -266,15 +335,7 @@ void FlameProjectileLuaBindings::bind(sol::state& lua) {
     });
 
     lua.set_function("flame_params_from_json", [](const std::string& jsonStr) {
-        try {
-            auto json = nlohmann::json::parse(jsonStr);
-            return ParamUtils::fromJson(json);
-        } catch (const std::exception& e) {
-            // Return default params on error
-            FlameProjectileParams params;
-            params.id = "error_loading";
-            return params;
-        }
+        return paramsFromJsonText(jsonStr, "error_loading");
     });
 
     // Bind file operations
@@ -288,77 +349,77 @@ void FlameProjectileLuaBindings::bind(sol::state& lua) {
                 return true;
             }
             return false;
-        } catch (const std::exception& e) {
+        } catch (const std::exception&) {
             return false;
         }
     });
 
     lua.set_function("load_flame_params_from_file", [](const std::string& filePath) {
-        try {
-            std::ifstream file(filePath);
-            if (file.is_open()) {
-                std::stringstream buffer;
-                buffer << file.rdbuf();
-                file.close();
-                
-                auto json = nlohmann::json::parse(buffer.str());
-                return ParamUtils::fromJson(json);
-            }
-            // Return default params if file not found
-            FlameProjectileParams params;
+        std::ifstream file(filePath);
+        if (!file.is_open()) {
+            // Default preset tagged so the caller can tell the file was missing
+            FlameProjectileParams params = FlameProjectileFactory::defaultParams();
             params.id = "file_not_found";
             return params;
-        } catch (const std::exception& e) {
-            // Return default params on error
-            FlameProjectileParams params;
-            params.id = "error_loading";
-            return params;
         }
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        return paramsFromJsonText(buffer.str(), "error_loading");
     });
 
     // Create global flame factory table
     lua["FlameFactory"] = lua.create_table_with(
         "getInstance", []() -> FlameProjectileFactory* {
-            return &g_flameFactory;
+            return FlameProjectileLuaBindings::factory().get();
         },
         "initialize", [](size_t cacheSize, size_t numThreads) {
-            g_flameFactory.initialize(cacheSize, numThreads);
+            FlameProjectileLuaBindings::factory()->initialize(cacheSize, numThreads);
         },
         "shutdown", []() {
-            g_flameFactory.shutdown();
+            FlameProjectileLuaBindings::factory()->shutdown();
         },
         "generateSync", [](const FlameProjectileParams& params) {
-            return g_flameFactory.generateSync(params);
+            return FlameProjectileLuaBindings::factory()->generateSync(params);
         },
+        // Async variants queue into poll_assets and return the tracking id
         "generateAsync", [](const FlameProjectileParams& params) {
-            return g_flameFactory.generateAsync(params);
+            pendingFlames.emplace_back(FlameProjectileLuaBindings::factory()->generateAsync(params), params.id);
+            return params.id;
         },
         "generateFromJson", [](const std::string& jsonPath) {
-            return g_flameFactory.generateFromJson(jsonPath);
+            pendingFlames.emplace_back(FlameProjectileLuaBindings::factory()->generateFromJson(jsonPath), jsonPath);
+            return jsonPath;
         },
+        // Generates the whole batch in parallel and returns the finished bundles
         "generateBatch", [](const std::vector<FlameProjectileParams>& params) {
-            return g_flameFactory.generateBatchAsync(params);
+            auto futures = FlameProjectileLuaBindings::factory()->generateBatchAsync(params);
+            std::vector<FlameAssetBundle> bundles;
+            bundles.reserve(futures.size());
+            for (auto& fut : futures) {
+                bundles.push_back(fut.get());
+            }
+            return bundles;
         },
         "validateParams", [](const FlameProjectileParams& params) {
-            return g_flameFactory.validateParams(params);
+            return FlameProjectileLuaBindings::factory()->validateParams(params);
         },
         "getValidationErrors", [](const FlameProjectileParams& params) {
-            return g_flameFactory.getValidationErrors(params);
+            return FlameProjectileLuaBindings::factory()->getValidationErrors(params);
         },
         "clearCache", []() {
-            g_flameFactory.clearCache();
+            FlameProjectileLuaBindings::factory()->clearCache();
         },
         "getCacheSize", []() {
-            return g_flameFactory.getCacheSize();
+            return FlameProjectileLuaBindings::factory()->getCacheSize();
         },
         "getCacheHitRate", []() {
-            return g_flameFactory.getCacheHitRate();
+            return FlameProjectileLuaBindings::factory()->getCacheHitRate();
         },
         "getPerformanceMetrics", []() {
-            return g_flameFactory.getPerformanceMetrics();
+            return FlameProjectileLuaBindings::factory()->getPerformanceMetrics();
         },
         "resetPerformanceMetrics", []() {
-            g_flameFactory.resetPerformanceMetrics();
+            FlameProjectileLuaBindings::factory()->resetPerformanceMetrics();
         }
     );
 }

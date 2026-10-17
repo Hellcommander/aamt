@@ -9,7 +9,7 @@ Per spell produces:
   - staged copies under Starfield ArcaneConduit/assets/ElinExport/spell_art/
 
   python elin_unique_spell_art.py catalog          # write spell_art_catalog.json
-  python elin_unique_spell_art.py generate         # SD or procedural unique icons+concepts
+  python elin_unique_spell_art.py generate         # SD unique icons+concepts (aborts if SD fails; --allow-procedural to override)
   python elin_unique_spell_art.py generate --icons-only --backend procedural
   python elin_unique_spell_art.py export-starfield  # stage catalog + jobs for overnight
   python elin_unique_spell_art.py overnight         # full SD pass (starts when you run it)
@@ -35,6 +35,8 @@ from PIL import Image
 _ELIN = Path(__file__).resolve().parent
 sys.path.insert(0, str(_ELIN))
 sys.path.insert(0, str(_ELIN.parent / "Shared"))
+
+from sd_policy import procedural_fallback  # noqa: E402
 
 _CATALOG_CFG = _ELIN / "elin_asset_catalog.json"
 _SPELL_ART_CAT = _ELIN / "spell_art_catalog.json"
@@ -386,43 +388,44 @@ def _procedural_icon(sp: Dict[str, Any], size: int = 48) -> Image.Image:
     return finalize_rgba(render_rich_icon(size, spec, seed=seed))
 
 
-def _sd_render(prompt: str, negative: str, size: int, seed: int) -> Optional[Image.Image]:
+def _sd_render(prompt: str, negative: str, size: int, seed: int, attempts: int = 3) -> Optional[Image.Image]:
+    """SD render via the Shared client, retrying with a new seed. None if every attempt failed."""
+    import os
+    import tempfile
+
     try:
-        import elin_sd
         from sd_http_client import generate_image, detect_server
     except Exception as exc:
         print(f"[sd] import fail: {exc}")
         return None
-    if not elin_sd.sd_enabled() and not detect_server():
+    api = os.environ.get("ELIN_SD_API_URL") or detect_server()
+    if not api:
+        print("[sd] no SD server detected on :1338")
         return None
-    try:
-        # Use elin_sd path when possible
-        spec = {
-            "description": prompt,
-            "theme": prompt[:80],
-            "palette": [],
-            "style": "stylized fantasy",
-            "seed": seed,
-        }
-        img = elin_sd.render_from_spec("spell_asset", spec, target_size=size)
-        if img is not None:
-            return img
-    except Exception as exc:
-        print(f"[sd] elin_sd fail: {exc}")
-    try:
-        from sd_http_client import generate_image
-
-        path = generate_image(
-            prompt=prompt,
-            negative_prompt=negative,
-            width=max(512, size),
-            height=max(512, size),
-            seed=seed,
-        )
-        if path and Path(path).is_file():
-            return Image.open(path).convert("RGBA")
-    except Exception as exc:
-        print(f"[sd] generate_image fail: {exc}")
+    for attempt in range(attempts):
+        s = seed + attempt * 1009
+        tmp = Path(tempfile.gettempdir()) / f"elin_unique_{abs(s) % 10_000_000}_{size}.png"
+        try:
+            generate_image(
+                prompt=prompt,
+                output_path=tmp,
+                api_url=api,
+                negative_prompt=negative,
+                width=max(512, size),
+                height=max(512, size),
+                seed=s,
+            )
+            if tmp.is_file():
+                img = Image.open(tmp).convert("RGBA")
+                img.load()
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
+                return img
+            print(f"[sd] attempt {attempt + 1}/{attempts}: no image written")
+        except Exception as exc:
+            print(f"[sd] attempt {attempt + 1}/{attempts} generate_image fail: {exc}")
     return None
 
 
@@ -439,8 +442,11 @@ def generate(
     icons_only: bool = False,
     limit: int = 0,
     force: bool = False,
+    allow_procedural: bool = False,
 ) -> Dict[str, int]:
-    stats = {"icon_sd": 0, "icon_proc": 0, "concept_sd": 0, "concept_proc": 0, "skipped": 0, "fail": 0}
+    # backend: sd = SD only; procedural = explicit procedural; auto = SD required, and a
+    # procedural stand-in only if allow_procedural / AAMT_SD_STRICT=0 (see sd_policy).
+    stats ={"icon_sd": 0, "icon_proc": 0, "concept_sd": 0, "concept_proc": 0, "skipped": 0, "fail": 0}
     work = spells[:limit] if limit else spells
     for i, sp in enumerate(work, 1):
         act_path = Path(sp["paths"]["act"])
@@ -455,6 +461,8 @@ def generate(
                 img = _sd_render(sp["icon_prompt"], sp["negative"], 512, sp["seed"])
                 if img is not None:
                     stats["icon_sd"] += 1
+            if img is None and backend == "auto":
+                procedural_fallback(f"SD icon render failed for {sp['act']}", allow=allow_procedural)
             if img is None and backend in ("auto", "procedural"):
                 img = _procedural_icon(sp, 48)
                 stats["icon_proc"] += 1
@@ -484,6 +492,8 @@ def generate(
                 cimg = _sd_render(sp["concept_prompt"], sp["negative"], 1024, sp["seed"] + 17)
                 if cimg is not None:
                     stats["concept_sd"] += 1
+            if cimg is None and backend == "auto":
+                procedural_fallback(f"SD concept render failed for {sp['act']}", allow=allow_procedural)
             if cimg is None and backend in ("auto", "procedural"):
                 # Procedural stand-in: larger unique emblem (not cinematic, but unique)
                 cimg = _procedural_icon(sp, 256).resize((512, 512), Image.Resampling.NEAREST)
@@ -727,7 +737,10 @@ def main() -> int:
         "cmd",
         choices=("catalog", "generate", "export-starfield", "overnight", "all", "fix-deploy"),
     )
-    ap.add_argument("--backend", default="auto", choices=("auto", "sd", "procedural"))
+    ap.add_argument("--backend", default="auto", choices=("auto", "sd", "procedural"),
+                    help="auto/sd = Stable Diffusion (auto aborts if SD fails); procedural = explicit PIL art")
+    ap.add_argument("--allow-procedural", action="store_true",
+                    help="with --backend auto: accept procedural stand-ins when SD fails (AAMT_SD_STRICT=0)")
     ap.add_argument("--icons-only", action="store_true")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--force", action="store_true", help="regenerate even if files exist")
@@ -753,6 +766,7 @@ def main() -> int:
             icons_only=args.icons_only,
             limit=args.limit,
             force=args.force,
+            allow_procedural=args.allow_procedural,
         )
         print("generate", stats)
 

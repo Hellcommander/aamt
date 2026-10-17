@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Generate sprites for ALL mod content: spell ingredients, items, projectiles, objects, and monsters.
@@ -24,6 +24,11 @@
     
 .PARAMETER SkipExisting
     Skip sprites that already exist
+
+.PARAMETER AllowProcedural
+    All sprites are Stable Diffusion art and the run fails an asset when SD cannot deliver.
+    With -AllowProcedural (or AAMT_SD_STRICT=0) the downstream generators may fall back to
+    their old procedural drawing after an SD failure.
 #>
 
 param(
@@ -47,10 +52,24 @@ param(
     
     [Parameter(Mandatory=$false)]
     [ValidateSet("fast", "mechanical", "full")]
-    [string]$QualityAssessmentDepth = "fast"  # Quality assessment depth: "fast" (sanity only), "mechanical" (Qwen3-VL-8B), "full" (both models)
+    [string]$QualityAssessmentDepth = "fast",  # Quality assessment depth: "fast" (sanity only), "mechanical" (Qwen3-VL-8B), "full" (both models)
+
+    [Parameter(Mandatory=$false)]
+    [switch]$AllowProcedural  # Permit the sub-generators' procedural drawing as a fallback after an SD failure
 )
 
 $ErrorActionPreference = "Continue"  # Changed from "Stop" to continue on errors and report them
+
+# Art policy: every sprite is Stable Diffusion art (StarboundOllamaAssetGenerator.ps1 ->
+# StarboundAssetGenerator.ps1 -> StarboundSdArt.psm1) and an SD failure fails the asset.
+# -AllowProcedural lets the downstream generators fall back to procedural drawing after an SD
+# failure. The ~40 sub-generator scripts this script launches do not all take the switch, so the
+# permission is handed down through AAMT_SD_STRICT=0 (restored at the end of the run).
+$script:PreviousSdStrict = $env:AAMT_SD_STRICT
+if ($AllowProcedural) {
+    $env:AAMT_SD_STRICT = "0"
+    Write-Host "[WARN] -AllowProcedural: procedural placeholder art is permitted as an SD fallback" -ForegroundColor Yellow
+}
 
 # Validate ModPath is not null or empty FIRST
 if ([string]::IsNullOrWhiteSpace($ModPath)) {
@@ -347,14 +366,14 @@ function Generate-Sprite {
 }
 
 # ============================================================
-# 1. SPELLSTONES (Procedural Assets - Default Generation)
+# 1. SPELLSTONES (default set, Stable Diffusion art)
 # ============================================================
 Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Yellow
-Write-Host "  Generating Spellstone Sprites (Procedural)" -ForegroundColor Yellow
+Write-Host "  Generating Spellstone Sprites" -ForegroundColor Yellow
 Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Yellow
 Write-Host ""
 
-# Spellstones are procedural assets - generate default set
+# Default spellstone set (art comes from Stable Diffusion like every other sprite)
 $spellstoneDefaults = @(
     # Base cores by rarity
     @{
@@ -440,7 +459,7 @@ $spellstoneDefaults = @(
     }
 )
 
-Write-Host "Generating default procedural spellstone assets..." -ForegroundColor Cyan
+Write-Host "Generating default spellstone assets..." -ForegroundColor Cyan
 
 foreach ($spellstone in $spellstoneDefaults) {
     # Validate ItemId is not empty before generating
@@ -473,7 +492,7 @@ foreach ($spellstone in $spellstoneDefaults) {
         -OutputDir $spellstoneOutputDir
 }
 
-Write-Host "  [OK] Generated $($spellstoneDefaults.Count) default spellstone sprites" -ForegroundColor Green
+Write-Host "  [OK] Processed $($spellstoneDefaults.Count) default spellstone sprites" -ForegroundColor Green
 
 # ============================================================
 # 2. SPELL INGREDIENTS
@@ -2987,4 +3006,9 @@ if (Get-Command Unload-OllamaModel -ErrorAction SilentlyContinue) {
     }
     Write-Host "  VRAM freed" -ForegroundColor Green
     Write-Host ""
+}
+
+# Restore the SD strictness the caller had before -AllowProcedural.
+if ($AllowProcedural) {
+    if ($null -eq $script:PreviousSdStrict) { Remove-Item Env:\AAMT_SD_STRICT -ErrorAction SilentlyContinue } else { $env:AAMT_SD_STRICT = $script:PreviousSdStrict }
 }

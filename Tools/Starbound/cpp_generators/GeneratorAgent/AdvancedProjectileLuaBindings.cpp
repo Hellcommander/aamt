@@ -1,24 +1,115 @@
 #include "AdvancedProjectileLuaBindings.hpp"
 #include "core/Log.hpp"
 #include <chrono>
+#include <exception>
+#include <format>
+#include <mutex>
+#include <optional>
 
 namespace MagiTech {
 namespace AdvancedProjectiles {
 
 // Static member initialization
-std::unique_ptr<AdvancedProjectileManager> AdvancedProjectileLuaBindings::g_manager;
 std::vector<std::pair<std::future<MissileBundle>, std::string>> AdvancedProjectileLuaBindings::pendingMissiles;
 std::vector<std::pair<std::future<ShardBundle>, std::string>> AdvancedProjectileLuaBindings::pendingGrenades;
 std::vector<std::pair<std::future<BeamBundle>, std::string>> AdvancedProjectileLuaBindings::pendingBeams;
 std::vector<std::pair<std::future<BoomerangBundle>, std::string>> AdvancedProjectileLuaBindings::pendingBoomerangs;
 std::vector<std::pair<std::future<GrapnelBundle>, std::string>> AdvancedProjectileLuaBindings::pendingGrapnels;
 
-void AdvancedProjectileLuaBindings::bind(sol::state& lua) {
-    // Initialize manager if not already done
-    if (!g_manager) {
-        g_manager = std::make_unique<AdvancedProjectileManager>();
-        g_manager->initialize(4); // 4 threads for asset generation
+namespace {
+
+constexpr const char* kLogCategory = "AdvancedProjectile";
+constexpr size_t kDefaultGeneratorThreads = 4;
+
+std::mutex& managerMutex() {
+    static std::mutex m;
+    return m;
+}
+
+std::shared_ptr<AdvancedProjectileManager>& managerSlot() {
+    static std::shared_ptr<AdvancedProjectileManager> manager;
+    return manager;
+}
+
+/** Calls an optional Lua callback; a missing callback is skipped and Lua errors are logged, not thrown. */
+template <typename... Args>
+void invokeLuaCallback(sol::state& lua, const char* name, Args&&... args) {
+    sol::protected_function callback = lua[name];
+    if (!callback.valid()) return;
+    sol::protected_function_result result = callback(std::forward<Args>(args)...);
+    if (!result.valid()) {
+        sol::error err = result;
+        Log::error(kLogCategory, "Lua callback {} failed: {}", name, err.what());
     }
+}
+
+/**
+ * Moves every finished generation out of `pending` first and only then runs
+ * the Lua callbacks, so a callback that spawns a new projectile (and appends
+ * to `pending`) cannot invalidate the iteration.
+ */
+template <typename Bundle, typename Describe>
+void drainCompleted(sol::state& lua,
+                    std::vector<std::pair<std::future<Bundle>, std::string>>& pending,
+                    const char* kind,
+                    const char* readyCallback,
+                    const char* errorCallback,
+                    Describe describe) {
+    struct Completed {
+        std::string tag;
+        std::optional<Bundle> bundle;
+        std::string error;
+    };
+
+    std::vector<Completed> completed;
+    for (auto it = pending.begin(); it != pending.end();) {
+        if (it->first.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+            ++it;
+            continue;
+        }
+        Completed done;
+        done.tag = std::move(it->second);
+        try {
+            done.bundle = it->first.get();
+        } catch (const std::exception& e) {
+            done.error = e.what();
+        }
+        completed.push_back(std::move(done));
+        it = pending.erase(it);
+    }
+
+    for (auto& done : completed) {
+        if (done.bundle) {
+            Log::info(kLogCategory, "{} ready: {} ({})", kind, done.tag, describe(*done.bundle));
+            invokeLuaCallback(lua, readyCallback, done.tag, *done.bundle);
+        } else {
+            Log::error(kLogCategory, "{} generation failed for {}: {}", kind, done.tag, done.error);
+            invokeLuaCallback(lua, errorCallback, done.tag, done.error);
+        }
+    }
+}
+
+} // namespace
+
+void AdvancedProjectileLuaBindings::setManager(std::shared_ptr<AdvancedProjectileManager> manager) {
+    std::lock_guard<std::mutex> lock(managerMutex());
+    managerSlot() = std::move(manager);
+}
+
+std::shared_ptr<AdvancedProjectileManager> AdvancedProjectileLuaBindings::manager() {
+    std::lock_guard<std::mutex> lock(managerMutex());
+    auto& slot = managerSlot();
+    if (!slot) {
+        // No manager injected by the host: create a default one.
+        slot = std::make_shared<AdvancedProjectileManager>();
+        slot->initialize(kDefaultGeneratorThreads);
+    }
+    return slot;
+}
+
+void AdvancedProjectileLuaBindings::bind(sol::state& lua) {
+    // Make sure the generator threads are running before Lua can spawn anything
+    manager();
 
     // ============================================================================
     // GUIDED MISSILE BINDINGS
@@ -152,91 +243,91 @@ void AdvancedProjectileLuaBindings::bind(sol::state& lua) {
     // ============================================================================
     
     // Guided Missile Generation
-    lua.set_function("spawn_guided_missile", [&](const GuidanceParams& guidance, 
-                                                 const PropulsionParams& propulsion,
-                                                 const TargetParams& target) -> bool {
+    lua.set_function("spawn_guided_missile", [](const GuidanceParams& guidance,
+                                                const PropulsionParams& propulsion,
+                                                const TargetParams& target) -> bool {
         if (!validateGuidanceParams(guidance) || !validatePropulsionParams(propulsion) || !validateTargetParams(target)) {
             return false;
         }
-        
+
         try {
-            auto factory = g_manager->getMissileFactory();
-            pendingMissiles.emplace_back(factory->generateAsync(guidance, propulsion, target), target.targetTag);
-            Log::info("Guided missile generation started: {}", target.targetTag);
+            auto mgr = manager();
+            pendingMissiles.emplace_back(mgr->getMissileFactory()->generateAsync(guidance, propulsion, target), target.targetTag);
+            Log::info(kLogCategory, "Guided missile generation started: {}", target.targetTag);
             return true;
         } catch (const std::exception& e) {
-            Log::error("Failed to spawn guided missile: {}", e.what());
+            Log::error(kLogCategory, "Failed to spawn guided missile: {}", e.what());
             return false;
         }
     });
 
     // Shard Grenade Generation
-    lua.set_function("spawn_shard_grenade", [&](const GrenadeParams& grenade, 
-                                                const ShardParams& shard) -> bool {
+    lua.set_function("spawn_shard_grenade", [](const GrenadeParams& grenade,
+                                               const ShardParams& shard) -> bool {
         if (!validateGrenadeParams(grenade) || !validateShardParams(shard)) {
             return false;
         }
-        
+
         try {
-            auto factory = g_manager->getGrenadeFactory();
-            pendingGrenades.emplace_back(factory->generateAsync(grenade, shard), "grenade_" + std::to_string(grenade.shardCount));
-            Log::info("Shard grenade generation started with {} shards", grenade.shardCount);
+            auto mgr = manager();
+            pendingGrenades.emplace_back(mgr->getGrenadeFactory()->generateAsync(grenade, shard), "grenade_" + std::to_string(grenade.shardCount));
+            Log::info(kLogCategory, "Shard grenade generation started with {} shards", grenade.shardCount);
             return true;
         } catch (const std::exception& e) {
-            Log::error("Failed to spawn shard grenade: {}", e.what());
+            Log::error(kLogCategory, "Failed to spawn shard grenade: {}", e.what());
             return false;
         }
     });
 
     // Arc Beam Generation
-    lua.set_function("spawn_arc_beam", [&](const BeamParams& beam, 
-                                           const GlowParams& glow) -> bool {
+    lua.set_function("spawn_arc_beam", [](const BeamParams& beam,
+                                          const GlowParams& glow) -> bool {
         if (!validateBeamParams(beam) || !validateGlowParams(glow)) {
             return false;
         }
-        
+
         try {
-            auto factory = g_manager->getBeamFactory();
-            pendingBeams.emplace_back(factory->generateAsync(beam, glow), "beam_" + std::to_string(beam.segmentCount));
-            Log::info("Arc beam generation started with {} segments", beam.segmentCount);
+            auto mgr = manager();
+            pendingBeams.emplace_back(mgr->getBeamFactory()->generateAsync(beam, glow), "beam_" + std::to_string(beam.segmentCount));
+            Log::info(kLogCategory, "Arc beam generation started with {} segments", beam.segmentCount);
             return true;
         } catch (const std::exception& e) {
-            Log::error("Failed to spawn arc beam: {}", e.what());
+            Log::error(kLogCategory, "Failed to spawn arc beam: {}", e.what());
             return false;
         }
     });
 
     // Boomerang Generation
-    lua.set_function("spawn_boomerang", [&](const BoomerangParams& params) -> bool {
+    lua.set_function("spawn_boomerang", [](const BoomerangParams& params) -> bool {
         if (!validateBoomerangParams(params)) {
             return false;
         }
-        
+
         try {
-            auto factory = g_manager->getBoomerangFactory();
-            pendingBoomerangs.emplace_back(factory->generateAsync(params), "boomerang_" + std::to_string(static_cast<int>(params.returnSpeed)));
-            Log::info("Boomerang generation started with return speed: {}", params.returnSpeed);
+            auto mgr = manager();
+            pendingBoomerangs.emplace_back(mgr->getBoomerangFactory()->generateAsync(params), "boomerang_" + std::to_string(static_cast<int>(params.returnSpeed)));
+            Log::info(kLogCategory, "Boomerang generation started with return speed: {}", params.returnSpeed);
             return true;
         } catch (const std::exception& e) {
-            Log::error("Failed to spawn boomerang: {}", e.what());
+            Log::error(kLogCategory, "Failed to spawn boomerang: {}", e.what());
             return false;
         }
     });
 
     // Grapnel Generation
-    lua.set_function("spawn_grapnel", [&](const GrapnelParams& grapnel, 
-                                          const HookParams& hook) -> bool {
+    lua.set_function("spawn_grapnel", [](const GrapnelParams& grapnel,
+                                         const HookParams& hook) -> bool {
         if (!validateGrapnelParams(grapnel) || !validateHookParams(hook)) {
             return false;
         }
-        
+
         try {
-            auto factory = g_manager->getGrapnelFactory();
-            pendingGrapnels.emplace_back(factory->generateAsync(grapnel, hook), "grapnel_" + std::to_string(static_cast<int>(grapnel.maxRange)));
-            Log::info("Grapnel generation started with max range: {}", grapnel.maxRange);
+            auto mgr = manager();
+            pendingGrapnels.emplace_back(mgr->getGrapnelFactory()->generateAsync(grapnel, hook), "grapnel_" + std::to_string(static_cast<int>(grapnel.maxRange)));
+            Log::info(kLogCategory, "Grapnel generation started with max range: {}", grapnel.maxRange);
             return true;
         } catch (const std::exception& e) {
-            Log::error("Failed to spawn grapnel: {}", e.what());
+            Log::error(kLogCategory, "Failed to spawn grapnel: {}", e.what());
             return false;
         }
     });
@@ -258,8 +349,9 @@ void AdvancedProjectileLuaBindings::bind(sol::state& lua) {
     lua.set_function("create_default_hook", &createDefaultHook);
 
     // Status and management functions
-    lua.set_function("get_advanced_pending_count", []() -> sol::table {
-        sol::table result = lua.create_table();
+    lua.set_function("get_advanced_pending_count", [](sol::this_state ts) -> sol::table {
+        sol::state_view state(ts);
+        sol::table result = state.create_table();
         result["missiles"] = pendingMissiles.size();
         result["grenades"] = pendingGrenades.size();
         result["beams"] = pendingBeams.size();
@@ -274,90 +366,41 @@ void AdvancedProjectileLuaBindings::bind(sol::state& lua) {
         pendingBeams.clear();
         pendingBoomerangs.clear();
         pendingGrapnels.clear();
-        Log::info("Cleared all pending advanced projectile generations");
+        Log::info(kLogCategory, "Cleared all pending advanced projectile generations");
     });
 }
 
 void AdvancedProjectileLuaBindings::poll_assets(sol::state& lua) {
     // Process completed missiles
-    for (auto it = pendingMissiles.begin(); it != pendingMissiles.end();) {
-        if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            try {
-                auto bundle = it->first.get();
-                Log::info("Guided missile ready: {} (mesh: {}, guidance: {}, thrust: {})", 
-                    it->second, bundle.mesh, bundle.guidanceSim, bundle.thrustSim);
-                lua["on_missile_ready"](it->second, bundle);
-            } catch (const std::exception& e) {
-                Log::error("Missile generation failed for {}: {}", it->second, e.what());
-                lua["on_missile_error"](it->second, e.what());
-            }
-            it = pendingMissiles.erase(it);
-        } else { ++it; }
-    }
-    
+    drainCompleted(lua, pendingMissiles, "Guided missile", "on_missile_ready", "on_missile_error",
+        [](const MissileBundle& b) {
+            return std::format("mesh: {}, guidance: {}, thrust: {}", b.mesh, b.guidanceSim, b.thrustSim);
+        });
+
     // Process completed grenades
-    for (auto it = pendingGrenades.begin(); it != pendingGrenades.end();) {
-        if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            try {
-                auto bundle = it->first.get();
-                Log::info("Shard grenade ready: {} (body: {}, shards: {}, timer: {})", 
-                    it->second, bundle.bodyMesh, bundle.shards.size(), bundle.timerSim);
-                lua["on_grenade_ready"](it->second, bundle);
-            } catch (const std::exception& e) {
-                Log::error("Grenade generation failed for {}: {}", it->second, e.what());
-                lua["on_grenade_error"](it->second, e.what());
-            }
-            it = pendingGrenades.erase(it);
-        } else { ++it; }
-    }
-    
+    drainCompleted(lua, pendingGrenades, "Shard grenade", "on_grenade_ready", "on_grenade_error",
+        [](const ShardBundle& b) {
+            return std::format("body: {}, shards: {}, timer: {}", b.bodyMesh, b.shards.size(), b.timerSim);
+        });
+
     // Process completed beams
-    for (auto it = pendingBeams.begin(); it != pendingBeams.end();) {
-        if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            try {
-                auto bundle = it->first.get();
-                Log::info("Arc beam ready: {} (mesh: {}, wave: {}, shader: {})", 
-                    it->second, bundle.beamMesh, bundle.waveSim, bundle.shader);
-                lua["on_beam_ready"](it->second, bundle);
-            } catch (const std::exception& e) {
-                Log::error("Beam generation failed for {}: {}", it->second, e.what());
-                lua["on_beam_error"](it->second, e.what());
-            }
-            it = pendingBeams.erase(it);
-        } else { ++it; }
-    }
-    
+    drainCompleted(lua, pendingBeams, "Arc beam", "on_beam_ready", "on_beam_error",
+        [](const BeamBundle& b) {
+            return std::format("mesh: {}, wave: {}, shader: {}", b.beamMesh, b.waveSim, b.shader);
+        });
+
     // Process completed boomerangs
-    for (auto it = pendingBoomerangs.begin(); it != pendingBoomerangs.end();) {
-        if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            try {
-                auto bundle = it->first.get();
-                Log::info("Boomerang ready: {} (mesh: {}, flight: {}, audio: {})", 
-                    it->second, bundle.mesh, bundle.flightSim, bundle.whooshAudio);
-                lua["on_boomerang_ready"](it->second, bundle);
-            } catch (const std::exception& e) {
-                Log::error("Boomerang generation failed for {}: {}", it->second, e.what());
-                lua["on_boomerang_error"](it->second, e.what());
-            }
-            it = pendingBoomerangs.erase(it);
-        } else { ++it; }
-    }
-    
+    drainCompleted(lua, pendingBoomerangs, "Boomerang", "on_boomerang_ready", "on_boomerang_error",
+        [](const BoomerangBundle& b) {
+            return std::format("mesh: {}, flight: {}, audio: {}", b.mesh, b.flightSim, b.whooshAudio);
+        });
+
     // Process completed grapnels
-    for (auto it = pendingGrapnels.begin(); it != pendingGrapnels.end();) {
-        if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            try {
-                auto bundle = it->first.get();
-                Log::info("Grapnel ready: {} (hook: {}, tether: {}, launch: {}, retract: {})", 
-                    it->second, bundle.hookMesh, bundle.tether, bundle.launchSim, bundle.retractSim);
-                lua["on_grapnel_ready"](it->second, bundle);
-            } catch (const std::exception& e) {
-                Log::error("Grapnel generation failed for {}: {}", it->second, e.what());
-                lua["on_grapnel_error"](it->second, e.what());
-            }
-            it = pendingGrapnels.erase(it);
-        } else { ++it; }
-    }
+    drainCompleted(lua, pendingGrapnels, "Grapnel", "on_grapnel_ready", "on_grapnel_error",
+        [](const GrapnelBundle& b) {
+            return std::format("hook: {}, tether: {}, launch: {}, retract: {}",
+                               b.hookMesh, b.tether, b.launchSim, b.retractSim);
+        });
 }
 
 // ============================================================================

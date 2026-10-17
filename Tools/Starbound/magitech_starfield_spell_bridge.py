@@ -32,13 +32,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 _MOD = Path(r"F:\Games\OpenStarbound\mods\Magi-Tech Arcane Alchemy and Sorcery")
-_SF_CATALOG = Path(
-    r"F:\SteamLibrary\steamapps\common\Starfield\ArcaneConduit\spells\catalog.json"
-)
+_SF_ROOT = Path(r"D:\games\Steam\steamapps\common\Starfield")
+_SF_CATALOG = _SF_ROOT / "ArcaneConduit" / "spells" / "catalog.json"
 _SF_SPELLS = _SF_CATALOG.parent
-_EXPORT = Path(
-    r"F:\SteamLibrary\steamapps\common\Starfield\ArcaneConduit\assets\MagiTechExport"
-)
+_EXPORT = _SF_ROOT / "ArcaneConduit" / "assets" / "MagiTechExport"
 
 # Magi-Tech originals — not warped fireball/ice/lightning clones.
 UNIQUE_SHAPE_IDS = {
@@ -974,9 +971,7 @@ def collect(available: Set[str], existing: Set[str]) -> Tuple[List[Dict[str, Any
     return catalog, modifiers
 
 
-_SF_PLUGIN_JSON = Path(
-    r"F:\SteamLibrary\steamapps\common\Starfield\Data\SFSE\Plugins\MadScience"
-)
+_SF_PLUGIN_JSON = _SF_ROOT / "Data" / "SFSE" / "Plugins" / "MadScience"
 
 
 def _write_json(path: Path, data: Any) -> None:
@@ -1308,7 +1303,7 @@ def _write_export(catalog: List[Dict[str, Any]], modifiers: List[Dict[str, Any]]
                 "Havok primitive collision, scale/lifeScale morph, material, and "
                 "optional NiNode modules — it cannot rewrite .mesh hulls."
             ),
-            "backend": str(_MOD / "cpp_backend"),
+            "backend": str(_MOD.parent.parent / "dev" / "Magi-Tech" / "cpp_backend"),
             "tool": "Tools/Starbound/magitech_starfield_spell_bridge.py",
             "unique": sum(1 for m in modifiers if m["kind"] == "unique"),
             "modifiers": sum(1 for m in modifiers if m["kind"] == "modifier"),

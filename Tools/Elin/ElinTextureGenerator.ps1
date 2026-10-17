@@ -82,8 +82,23 @@ param(
 
     # Additional metadata
     [Parameter(Mandatory=$false)]
-    [string]$Description = ""
+    [string]$Description = "",
+
+    # Accept a procedural (GDI) placeholder when local Stable Diffusion is down or fails.
+    # Default: abort. (AAMT_SD_STRICT=0 in the environment does the same.)
+    [Parameter(Mandatory=$false)]
+    [switch]$AllowProcedural
 )
+
+# SD policy: procedural placeholder art is never a silent fallback.
+$sdStrict = (-not $AllowProcedural) -and ($env:AAMT_SD_STRICT -ne '0')
+function Assert-ProceduralAllowed {
+    param([Parameter(Mandatory)][string]$What)
+    if ($sdStrict) {
+        throw "$What. Refusing procedural placeholder art - start the SD server (:1338) and retry, or pass -AllowProcedural / set AAMT_SD_STRICT=0."
+    }
+    Write-Host "[Warn] $What; using procedural placeholder (explicitly allowed)" -ForegroundColor Yellow
+}
 
 # Import unified tool detection and integration
 $sharedPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "..\Shared"
@@ -276,6 +291,9 @@ function New-PlaceholderTexture {
     $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
     if (-not $pythonCmd) { $pythonCmd = Get-Command python3 -ErrorAction SilentlyContinue }
 
+    $allowArgs = if ($sdStrict) { @() } else { @("--allow-procedural") }
+    $sdFailure = $null
+
     if ((Test-Path $pythonScript) -and $pythonCmd) {
         try {
             $spec = @{
@@ -305,12 +323,15 @@ function New-PlaceholderTexture {
                     $frameSpec.seed = $frame * 31
                     $json = $frameSpec | ConvertTo-Json -Depth 6
                     [System.IO.File]::WriteAllText($tempSpec, $json, (New-Object System.Text.UTF8Encoding $false))
-                    & $pythonCmd.Source $pythonScript --spec $tempSpec --output $framePath --type texture --size $Width 2>$null
+                    $frameOut = & $pythonCmd.Source $pythonScript --spec $tempSpec --output $framePath --type texture --size $Width @allowArgs 2>&1
                     if (Test-Path $framePath) {
                         $frameBmp = [System.Drawing.Image]::FromFile($framePath)
                         $g.DrawImage($frameBmp, $frame * $Width, 0, $Width, $Height)
                         $frameBmp.Dispose()
                         Remove-Item $framePath -Force -ErrorAction SilentlyContinue
+                    } else {
+                        $g.Dispose(); $strip.Dispose()
+                        throw "SD texture frame $frame failed: $(($frameOut | Select-Object -Last 3) -join ' | ')"
                     }
                 }
                 $g.Dispose()
@@ -318,7 +339,8 @@ function New-PlaceholderTexture {
                 $strip.Dispose()
             }
             else {
-                & $pythonCmd.Source $pythonScript --spec $tempSpec --output $OutputPath --type texture --size $Width 2>$null
+                $texOut = & $pythonCmd.Source $pythonScript --spec $tempSpec --output $OutputPath --type texture --size $Width @allowArgs 2>&1
+                if (-not (Test-Path $OutputPath)) { $sdFailure = ($texOut | Select-Object -Last 3) -join ' | ' }
             }
 
             Remove-Item $tempSpec -Force -ErrorAction SilentlyContinue
@@ -327,9 +349,15 @@ function New-PlaceholderTexture {
             }
         }
         catch {
-            Write-Host "[Info] Python procedural texture fallback: $_" -ForegroundColor Gray
+            $sdFailure = "$_"
+            Remove-Item $tempSpec -Force -ErrorAction SilentlyContinue
         }
     }
+
+    # SD (via generate_asset_image.py) did not produce the texture; the GDI shapes below are
+    # procedural placeholders, so they are only drawn when explicitly allowed.
+    $why = if ($sdFailure) { $sdFailure } elseif (-not $pythonCmd) { "python not found" } else { "generate_asset_image.py missing or produced no file" }
+    Assert-ProceduralAllowed "Local SD texture generation failed for $OutputPath ($why)"
 
     try {
         Add-Type -AssemblyName System.Drawing

@@ -2,6 +2,7 @@
 #include <future>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "BoomerangDiscTypes.hpp"
 
 namespace MagiTech {
@@ -34,7 +35,8 @@ public:
 
     void initialize(size_t cache_size, size_t num_threads) {
         if (m_initialized) return;
-        m_cache.set_capacity(cache_size);
+        m_boomerangCache.set_capacity(cache_size);
+        m_discCache.set_capacity(cache_size);
         m_pool.start(num_threads);
         m_initialized = true;
     }
@@ -83,7 +85,7 @@ public:
 private:
     ConcurrentLRUCache<uint64_t, BoomerangAssetBundle> m_boomerangCache;
     ConcurrentLRUCache<uint64_t, DiscAssetBundle> m_discCache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
 };
 

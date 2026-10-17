@@ -10,7 +10,7 @@
 namespace MagiTech {
 namespace Cockpits {
 
-#define LOG_GEN(Asset, Id) Log::info("Building Cockpit {}: {}", #Asset, Id)
+#define LOG_GEN(Asset, Id) Log::info("Cockpit", "Building Cockpit {}: {}", #Asset, Id)
 
 namespace MeshGen {
     MeshHandle buildSeat(const CockpitParams& p) {

@@ -1,12 +1,40 @@
 #include "SnakeSpellLuaBindings.hpp"
 #include "SnakeSpellFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include <vector>
 
 namespace MagiTech {
 namespace SnakeSpells {
 
 static std::vector<std::pair<std::future<SnakeBundle>, std::string>> pendingSpells;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<SnakeSpellFactory>& factorySlot() {
+    static std::shared_ptr<SnakeSpellFactory> f;
+    return f;
+}
+} // namespace
+
+void SnakeSpellLuaBindings::setFactory(std::shared_ptr<SnakeSpellFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<SnakeSpellFactory> SnakeSpellLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No instance injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<SnakeSpellFactory>();
+        slot->initialize(4);
+    }
+    return slot;
+}
 
 void SnakeSpellLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<SnakeBodyParams>("SnakeBodyParams", sol::constructors<SnakeBodyParams()>(),
@@ -37,7 +65,7 @@ void SnakeSpellLuaBindings::bind(sol::state& lua) {
         "particles", &SnakeBundle::particles, "audio", &SnakeBundle::audio, "collider", &SnakeBundle::collider);
 
     // Convenience functions for common snake spell types
-    lua.set_function("create_venom_snake", [](float length = 4.0f, int segments = 12) {
+    auto create_venom_snake = [](float length, int segments) {
         SnakeBodyParams body;
         body.segmentCount = segments;
         body.totalLength = length;
@@ -79,9 +107,12 @@ void SnakeSpellLuaBindings::bind(sol::state& lua) {
         collision.enableCCD = true;
         
         return std::make_tuple(body, motion, vfx, particles, audio, collision);
+    };
+    lua.set_function("create_venom_snake", [create_venom_snake](sol::optional<float> length, sol::optional<int> segments) {
+        return create_venom_snake(length.value_or(4.0f), segments.value_or(12));
     });
 
-    lua.set_function("create_fire_snake", [](float length = 4.0f, int segments = 12) {
+    auto create_fire_snake = [](float length, int segments) {
         SnakeBodyParams body;
         body.segmentCount = segments;
         body.totalLength = length;
@@ -123,9 +154,12 @@ void SnakeSpellLuaBindings::bind(sol::state& lua) {
         collision.enableCCD = true;
         
         return std::make_tuple(body, motion, vfx, particles, audio, collision);
+    };
+    lua.set_function("create_fire_snake", [create_fire_snake](sol::optional<float> length, sol::optional<int> segments) {
+        return create_fire_snake(length.value_or(4.0f), segments.value_or(12));
     });
 
-    lua.set_function("create_ice_snake", [](float length = 4.0f, int segments = 12) {
+    auto create_ice_snake = [](float length, int segments) {
         SnakeBodyParams body;
         body.segmentCount = segments;
         body.totalLength = length;
@@ -167,9 +201,12 @@ void SnakeSpellLuaBindings::bind(sol::state& lua) {
         collision.enableCCD = true;
         
         return std::make_tuple(body, motion, vfx, particles, audio, collision);
+    };
+    lua.set_function("create_ice_snake", [create_ice_snake](sol::optional<float> length, sol::optional<int> segments) {
+        return create_ice_snake(length.value_or(4.0f), segments.value_or(12));
     });
 
-    lua.set_function("create_lightning_snake", [](float length = 4.0f, int segments = 12) {
+    auto create_lightning_snake = [](float length, int segments) {
         SnakeBodyParams body;
         body.segmentCount = segments;
         body.totalLength = length;
@@ -211,6 +248,9 @@ void SnakeSpellLuaBindings::bind(sol::state& lua) {
         collision.enableCCD = true;
         
         return std::make_tuple(body, motion, vfx, particles, audio, collision);
+    };
+    lua.set_function("create_lightning_snake", [create_lightning_snake](sol::optional<float> length, sol::optional<int> segments) {
+        return create_lightning_snake(length.value_or(4.0f), segments.value_or(12));
     });
 
     // Utility functions for parameter creation
@@ -273,32 +313,31 @@ void SnakeSpellLuaBindings::bind(sol::state& lua) {
     });
 
     // Main snake spell generation function
-    lua.set_function("spawn_snake_spell",
-        [&](const SnakeBodyParams& b, const MotionParams& m, const ScaleVFXParams& v,
-            const ParticleParams& p, const AudioParams& a, const CollisionParams& c) {
-            auto factory = MainPlugin::instance().getSnakeSpellFactory();
-            pendingSpells.emplace_back(factory->generateAsync(b, m, v, p, a, c), b.scaleMaterial);
-        }
-    );
+    auto spawn_snake_spell = [](const SnakeBodyParams& b, const MotionParams& m, const ScaleVFXParams& v,
+                                const ParticleParams& p, const AudioParams& a, const CollisionParams& c) {
+        auto factory = SnakeSpellLuaBindings::factory();
+        pendingSpells.emplace_back(factory->generateAsync(b, m, v, p, a, c), b.scaleMaterial);
+    };
+    lua.set_function("spawn_snake_spell", spawn_snake_spell);
 
     // Convenience functions for spawning predefined snakes
-    lua.set_function("spawn_venom_snake", [&](float length = 4.0f, int segments = 12) {
-        auto [body, motion, vfx, particles, audio, collision] = create_venom_snake(length, segments);
+    lua.set_function("spawn_venom_snake", [create_venom_snake, spawn_snake_spell](sol::optional<float> length, sol::optional<int> segments) {
+        auto [body, motion, vfx, particles, audio, collision] = create_venom_snake(length.value_or(4.0f), segments.value_or(12));
         spawn_snake_spell(body, motion, vfx, particles, audio, collision);
     });
 
-    lua.set_function("spawn_fire_snake", [&](float length = 4.0f, int segments = 12) {
-        auto [body, motion, vfx, particles, audio, collision] = create_fire_snake(length, segments);
+    lua.set_function("spawn_fire_snake", [create_fire_snake, spawn_snake_spell](sol::optional<float> length, sol::optional<int> segments) {
+        auto [body, motion, vfx, particles, audio, collision] = create_fire_snake(length.value_or(4.0f), segments.value_or(12));
         spawn_snake_spell(body, motion, vfx, particles, audio, collision);
     });
 
-    lua.set_function("spawn_ice_snake", [&](float length = 4.0f, int segments = 12) {
-        auto [body, motion, vfx, particles, audio, collision] = create_ice_snake(length, segments);
+    lua.set_function("spawn_ice_snake", [create_ice_snake, spawn_snake_spell](sol::optional<float> length, sol::optional<int> segments) {
+        auto [body, motion, vfx, particles, audio, collision] = create_ice_snake(length.value_or(4.0f), segments.value_or(12));
         spawn_snake_spell(body, motion, vfx, particles, audio, collision);
     });
 
-    lua.set_function("spawn_lightning_snake", [&](float length = 4.0f, int segments = 12) {
-        auto [body, motion, vfx, particles, audio, collision] = create_lightning_snake(length, segments);
+    lua.set_function("spawn_lightning_snake", [create_lightning_snake, spawn_snake_spell](sol::optional<float> length, sol::optional<int> segments) {
+        auto [body, motion, vfx, particles, audio, collision] = create_lightning_snake(length.value_or(4.0f), segments.value_or(12));
         spawn_snake_spell(body, motion, vfx, particles, audio, collision);
     });
 }

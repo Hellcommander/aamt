@@ -20,7 +20,6 @@ That copies tracked `*.example` files to gitignored local settings:
 | `AssetGenerationSettings.example.ps1` | `AssetGenerationSettings.ps1` |
 | `TranscendenceTools.ini.example` | `TranscendenceTools.ini` |
 | `Qud/settings.example.json` | `Qud/settings.json` |
-| `HfTokenProfiles.example.ps1` | `HfTokenProfiles.local.ps1` |
 
 Optional third-party clones (not in git): `.\Fetch-ThirdParty.ps1`  
 Qud Lab private sim (access-gated): `.\Qud\QudLab\Fetch-PrivatePack.ps1`

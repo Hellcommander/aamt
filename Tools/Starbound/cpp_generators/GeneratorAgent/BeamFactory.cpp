@@ -30,7 +30,7 @@ std::future<BeamBundle> BeamFactory::generateAsync(const BeamParams& p) {
         return std::async(std::launch::deferred, [existing]{ return *existing; });
     }
 
-    return m_pool.enqueue([p, this] {
+    return m_pool.enqueue([p, key, this] {
         BeamBundle b;
         b.ribbonMesh = MeshGen::buildBeamRibbon(p);
         b.beamTex    = TextureGen::buildBeamTexture(p);

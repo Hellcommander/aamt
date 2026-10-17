@@ -200,7 +200,7 @@ void AlchemicalGrenadeLuaBindings::bind(sol::state& lua) {
         
         auto fut = factory->generateAsync(g, u);
         pendingGrenades.emplace_back(std::move(fut), g.id);
-        Log::info("Queued grenade generation for: {}", g.id);
+        Log::info("AlchemicalGrenade", "Queued grenade generation for: {}", g.id);
         
         // Return the future result
         return fut.get();
@@ -456,11 +456,11 @@ void AlchemicalGrenadeLuaBindings::poll_assets(sol::state& lua) {
                     lua["on_grenade_ready"](it->second, bundle);
                 }
                 
-                Log::info("Grenade ready: {}", it->second);
+                Log::info("AlchemicalGrenade", "Grenade ready: {}", it->second);
                 it = pendingGrenades.erase(it);
             }
             catch (const std::exception& e) {
-                Log::error("Failed to load grenade {}: {}", it->second, e.what());
+                Log::error("AlchemicalGrenade", "Failed to load grenade {}: {}", it->second, e.what());
                 it = pendingGrenades.erase(it);
             }
         } else {

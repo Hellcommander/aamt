@@ -1,12 +1,32 @@
 #include "ShaderAssetLuaBindings.hpp"
 #include "ShaderAssetFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include "core/Log.hpp"
+#include <chrono>
+#include <mutex>
 #include <vector>
 
 namespace MagiTech {
 namespace ShaderAssets {
 
 static std::vector<std::pair<std::future<ShaderAssetBundle>, std::string>> pendingAssets;
+static std::mutex pendingAssetsMutex;
+
+static std::mutex factoryMutex;
+static std::shared_ptr<ShaderAssetFactory> sharedFactory;
+
+void ShaderAssetLuaBindings::setFactory(std::shared_ptr<ShaderAssetFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex);
+    sharedFactory = std::move(factory);
+}
+
+std::shared_ptr<ShaderAssetFactory> ShaderAssetLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex);
+    if (!sharedFactory) {
+        sharedFactory = std::make_shared<ShaderAssetFactory>();
+        sharedFactory->initialize(128, 4);
+    }
+    return sharedFactory;
+}
 
 CompileTarget stringToCompileTarget(const std::string& s) {
     if (s == "SPIRV") return CompileTarget::SPIRV;
@@ -31,7 +51,7 @@ void ShaderAssetLuaBindings::bind(sol::state& lua) {
         "MSL", ShaderLang::MSL,
         "ESSL", ShaderLang::ESSL
     );
-    
+
     lua.new_usertype<ShaderParams>("ShaderParams",
         sol::constructors<ShaderParams()>(),
         "id", &ShaderParams::id,
@@ -46,7 +66,7 @@ void ShaderAssetLuaBindings::bind(sol::state& lua) {
         sol::constructors<PipelineParams()>(),
         "id", &PipelineParams::id,
         "stages", &PipelineParams::stages
-        // Other fields are pointers or complex types, omitted for this stub
+        // Descriptor/state fields are raw pointers or opaque descriptor types and are not exposed to Lua
     );
 
     lua.new_usertype<ShaderAssetBundle>("ShaderAssetBundle",
@@ -56,22 +76,26 @@ void ShaderAssetLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_shader_asset",
-        [&](const ShaderParams& sp, sol::optional<PipelineParams> pp, sol::optional<std::string> tgt) {
-            auto factory = MainPlugin::instance().getShaderAssetFactory();
+        [](const ShaderParams& sp, sol::optional<PipelineParams> pp, sol::optional<std::string> tgt) {
             auto target = tgt ? stringToCompileTarget(*tgt) : CompileTarget::SPIRV;
-            pendingAssets.emplace_back(factory->generateAsync(sp, pp, target), sp.id);
+            std::optional<PipelineParams> pipeline;
+            if (pp) pipeline = *pp;
+            auto future = factory()->generateAsync(sp, std::move(pipeline), target);
+            std::lock_guard<std::mutex> lock(pendingAssetsMutex);
+            pendingAssets.emplace_back(std::move(future), sp.id);
         }
     );
 }
 
 void ShaderAssetLuaBindings::poll_assets(sol::state& lua) {
+    std::lock_guard<std::mutex> lock(pendingAssetsMutex);
     for (auto it = pendingAssets.begin(); it != pendingAssets.end();) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             try {
                 auto b = it->first.get();
                 lua["print"]("Shader asset ready: " + it->second);
             } catch (const std::exception& e) {
-                // log error
+                Log::error("ShaderAssets", "Shader asset generation failed for {}: {}", it->second, e.what());
             }
             it = pendingAssets.erase(it);
         } else {

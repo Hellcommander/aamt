@@ -21,7 +21,7 @@ CometProjectileFactory g_cometFactory;
 
 namespace MeshGen {
     MeshHandle buildCometCore(const CometProjectileParams& p) {
-        Log::info("Building comet core mesh for: {} (type: {}, shape: {})", 
+        Log::info("CometProjectile", "Building comet core mesh for: {} (type: {}, shape: {})", 
                   p.id, cometTypeToString(p.cometType), cometShapeToString(p.cometShape));
         
         // Generate base icosphere with appropriate detail level
@@ -66,11 +66,11 @@ namespace MeshGen {
         }
         
         Log::info("Comet core mesh parameters:");
-        Log::info("  - Core radius: {}", p.coreRadius);
-        Log::info("  - Irregularity: {}", p.irregularity);
-        Log::info("  - Mass: {}", p.mass);
-        Log::info("  - Collision radius: {}", p.collisionRadius);
-        Log::info("  - Detail level: {}", detailLevel);
+        Log::info("CometProjectile", "  - Core radius: {}", p.coreRadius);
+        Log::info("CometProjectile", "  - Irregularity: {}", p.irregularity);
+        Log::info("CometProjectile", "  - Mass: {}", p.mass);
+        Log::info("CometProjectile", "  - Collision radius: {}", p.collisionRadius);
+        Log::info("CometProjectile", "  - Detail level: {}", detailLevel);
         
         return baseMesh;
     }
@@ -80,7 +80,7 @@ namespace MeshGen {
             return 0; // No trail
         }
         
-        Log::info("Building comet trail mesh for: {} (type: {}, length: {}, width: {})", 
+        Log::info("CometProjectile", "Building comet trail mesh for: {} (type: {}, length: {}, width: {})", 
                   p.id, trailTypeToString(p.trailType), p.trailLength, p.trailWidth);
         
         // Create ribbon mesh for trail with appropriate segments
@@ -95,21 +95,21 @@ namespace MeshGen {
         }
         
         Log::info("Comet trail mesh parameters:");
-        Log::info("  - Trail type: {}", trailTypeToString(p.trailType));
-        Log::info("  - Trail length: {}", p.trailLength);
-        Log::info("  - Trail width: {}", p.trailWidth);
-        Log::info("  - Trail opacity: {}", p.trailOpacity);
-        Log::info("  - Enable trail fade: {}", p.enableTrailFade);
-        Log::info("  - Trail fade speed: {}", p.trailFadeSpeed);
-        Log::info("  - Enable trail distortion: {}", p.enableTrailDistortion);
-        Log::info("  - Trail distortion strength: {}", p.trailDistortionStrength);
-        Log::info("  - Segment count: {}", segmentCount);
+        Log::info("CometProjectile", "  - Trail type: {}", trailTypeToString(p.trailType));
+        Log::info("CometProjectile", "  - Trail length: {}", p.trailLength);
+        Log::info("CometProjectile", "  - Trail width: {}", p.trailWidth);
+        Log::info("CometProjectile", "  - Trail opacity: {}", p.trailOpacity);
+        Log::info("CometProjectile", "  - Enable trail fade: {}", p.enableTrailFade);
+        Log::info("CometProjectile", "  - Trail fade speed: {}", p.trailFadeSpeed);
+        Log::info("CometProjectile", "  - Enable trail distortion: {}", p.enableTrailDistortion);
+        Log::info("CometProjectile", "  - Trail distortion strength: {}", p.trailDistortionStrength);
+        Log::info("CometProjectile", "  - Segment count: {}", segmentCount);
         
         return trailMesh;
     }
     
     MeshHandle generateIcoSphere(float radius, int detail) {
-        Log::info("Generating icosphere: radius={}, detail={}", radius, detail);
+        Log::info("CometProjectile", "Generating icosphere: radius={}, detail={}", radius, detail);
         
         // Create icosphere using subdivision
         std::vector<glm::vec3> vertices;
@@ -124,13 +124,13 @@ namespace MeshGen {
         MeshHandle handle = createMeshHandle();
         uploadMeshData(handle, vertices, normals, uvs, indices);
         
-        Log::info("Generated icosphere with {} vertices, {} triangles", vertices.size(), indices.size() / 3);
+        Log::info("CometProjectile", "Generated icosphere with {} vertices, {} triangles", vertices.size(), indices.size() / 3);
         
         return handle;
     }
     
     MeshHandle applyVertexNoise(MeshHandle mesh, float irregularity) {
-        Log::info("Applying vertex noise: irregularity={}", irregularity);
+        Log::info("CometProjectile", "Applying vertex noise: irregularity={}", irregularity);
         
         // Get mesh data
         std::vector<glm::vec3> vertices, normals;
@@ -151,13 +151,13 @@ namespace MeshGen {
         // Upload modified mesh data
         uploadMeshData(mesh, vertices, normals, uvs, indices);
         
-        Log::info("Applied vertex noise to {} vertices", vertices.size());
+        Log::info("CometProjectile", "Applied vertex noise to {} vertices", vertices.size());
         
         return mesh;
     }
     
     MeshHandle applyCrystallineNoise(MeshHandle mesh, float irregularity) {
-        Log::info("Applying crystalline noise: irregularity={}", irregularity);
+        Log::info("CometProjectile", "Applying crystalline noise: irregularity={}", irregularity);
         
         // Get mesh data
         std::vector<glm::vec3> vertices, normals;
@@ -187,7 +187,7 @@ namespace MeshGen {
     }
     
     MeshHandle applyPhysicsDeformation(MeshHandle mesh, float mass, float speed) {
-        Log::info("Applying physics deformation: mass={}, speed={}", mass, speed);
+        Log::info("CometProjectile", "Applying physics deformation: mass={}, speed={}", mass, speed);
         
         // Get mesh data
         std::vector<glm::vec3> vertices, normals;
@@ -215,7 +215,7 @@ namespace MeshGen {
     }
     
     MeshHandle createRibbonMesh(float length, float speed, int segmentCount) {
-        Log::info("Creating ribbon mesh: length={}, speed={}, segments={}", length, speed, segmentCount);
+        Log::info("CometProjectile", "Creating ribbon mesh: length={}, speed={}, segments={}", length, speed, segmentCount);
         
         std::vector<glm::vec3> vertices;
         std::vector<glm::vec3> normals;
@@ -263,13 +263,13 @@ namespace MeshGen {
         MeshHandle handle = createMeshHandle();
         uploadMeshData(handle, vertices, normals, uvs, indices);
         
-        Log::info("Created ribbon mesh with {} vertices, {} triangles", vertices.size(), indices.size() / 3);
+        Log::info("CometProjectile", "Created ribbon mesh with {} vertices, {} triangles", vertices.size(), indices.size() / 3);
         
         return handle;
     }
     
     MeshHandle applyTrailDistortion(MeshHandle mesh, float strength, float scale, float speed) {
-        Log::info("Applying trail distortion: strength={}, scale={}, speed={}", strength, scale, speed);
+        Log::info("CometProjectile", "Applying trail distortion: strength={}, scale={}, speed={}", strength, scale, speed);
         
         // Get mesh data
         std::vector<glm::vec3> vertices, normals;
@@ -298,7 +298,7 @@ namespace MeshGen {
             return 0; // No fragments
         }
         
-        Log::info("Building comet fragments for: {} (count: {}, size factor: {})", 
+        Log::info("CometProjectile", "Building comet fragments for: {} (count: {}, size factor: {})", 
                   p.id, p.fragmentationCount, p.fragmentSizeFactor);
         
         // Create fragment meshes
@@ -355,14 +355,14 @@ namespace MeshGen {
         uploadMeshData(handle, allVertices, allNormals, allUVs, allIndices);
         
         Log::info("Fragment parameters:");
-        Log::info("  - Fragmentation type: {}", fragmentationTypeToString(p.fragmentationType));
-        Log::info("  - Fragment count: {}", p.fragmentationCount);
-        Log::info("  - Fragment size factor: {}", p.fragmentSizeFactor);
-        Log::info("  - Fragment spread: {}", p.fragmentSpread);
-        Log::info("  - Fragment velocity: {}", p.fragmentVelocity);
-        Log::info("  - Enable fragment physics: {}", p.enableFragmentPhysics);
-        Log::info("  - Fragment lifetime: {}", p.fragmentLifetime);
-        Log::info("  - Total fragment vertices: {}", allVertices.size());
+        Log::info("CometProjectile", "  - Fragmentation type: {}", fragmentationTypeToString(p.fragmentationType));
+        Log::info("CometProjectile", "  - Fragment count: {}", p.fragmentationCount);
+        Log::info("CometProjectile", "  - Fragment size factor: {}", p.fragmentSizeFactor);
+        Log::info("CometProjectile", "  - Fragment spread: {}", p.fragmentSpread);
+        Log::info("CometProjectile", "  - Fragment velocity: {}", p.fragmentVelocity);
+        Log::info("CometProjectile", "  - Enable fragment physics: {}", p.enableFragmentPhysics);
+        Log::info("CometProjectile", "  - Fragment lifetime: {}", p.fragmentLifetime);
+        Log::info("CometProjectile", "  - Total fragment vertices: {}", allVertices.size());
         
         return handle;
     }
@@ -370,7 +370,7 @@ namespace MeshGen {
 
 namespace ShaderGen {
     ShaderHandle buildCometShader(const CometProjectileParams& p) {
-        Log::info("Building comet shader for: {} (blend: {}, noise: {})", 
+        Log::info("CometProjectile", "Building comet shader for: {} (blend: {}, noise: {})", 
                   p.id, blendModeToString(p.blendMode), noiseTypeToString(p.noiseType));
         
         // Create shader based on parameters
@@ -429,18 +429,18 @@ namespace ShaderGen {
         ShaderHandle handle = builder.compile();
         
         Log::info("Compiling comet shader with parameters:");
-        Log::info("  - Shader type: {}", p.shaderType);
-        Log::info("  - Shader intensity: {}", p.shaderIntensity);
-        Log::info("  - Glow intensity: {}", p.glowIntensity);
-        Log::info("  - Emissive power: {}", p.emissivePower);
-        Log::info("  - Core opacity: {}", p.coreOpacity);
-        Log::info("  - Trail opacity: {}", p.trailOpacity);
-        Log::info("  - Enable core glow: {}", p.enableCoreGlow);
-        Log::info("  - Enable trail glow: {}", p.enableTrailGlow);
-        Log::info("  - Enable distortion: {}", p.enableDistortion);
-        Log::info("  - Distortion strength: {}", p.distortionStrength);
-        Log::info("  - Enable blur: {}", p.enableBlur);
-        Log::info("  - Blur strength: {}", p.blurStrength);
+        Log::info("CometProjectile", "  - Shader type: {}", p.shaderType);
+        Log::info("CometProjectile", "  - Shader intensity: {}", p.shaderIntensity);
+        Log::info("CometProjectile", "  - Glow intensity: {}", p.glowIntensity);
+        Log::info("CometProjectile", "  - Emissive power: {}", p.emissivePower);
+        Log::info("CometProjectile", "  - Core opacity: {}", p.coreOpacity);
+        Log::info("CometProjectile", "  - Trail opacity: {}", p.trailOpacity);
+        Log::info("CometProjectile", "  - Enable core glow: {}", p.enableCoreGlow);
+        Log::info("CometProjectile", "  - Enable trail glow: {}", p.enableTrailGlow);
+        Log::info("CometProjectile", "  - Enable distortion: {}", p.enableDistortion);
+        Log::info("CometProjectile", "  - Distortion strength: {}", p.distortionStrength);
+        Log::info("CometProjectile", "  - Enable blur: {}", p.enableBlur);
+        Log::info("CometProjectile", "  - Blur strength: {}", p.blurStrength);
         
         return handle;
     }
@@ -450,7 +450,7 @@ namespace ShaderGen {
             return 0; // No heat distortion
         }
         
-        Log::info("Building heat distortion shader for: {} (strength: {})", 
+        Log::info("CometProjectile", "Building heat distortion shader for: {} (strength: {})", 
                   p.id, p.heatDistortionStrength);
         
         ShaderBuilder builder;
@@ -644,7 +644,7 @@ namespace ShaderGen {
 
 namespace TextureGen {
     TextureHandle buildCometTexture(const CometProjectileParams& p) {
-        Log::info("Building comet texture for: {} (noise: {}, heat: ({},{},{}), burn: ({},{},{}))", 
+        Log::info("CometProjectile", "Building comet texture for: {} (noise: {}, heat: ({},{},{}), burn: ({},{},{}))", 
                   p.id, noiseTypeToString(p.noiseType),
                   p.heatColor.x, p.heatColor.y, p.heatColor.z,
                   p.burnColor.x, p.burnColor.y, p.burnColor.z);
@@ -683,7 +683,7 @@ namespace TextureGen {
     }
     
     TextureHandle buildRockTexture(float frequency) {
-        Log::info("Building rock texture: frequency={}", frequency);
+        Log::info("CometProjectile", "Building rock texture: frequency={}", frequency);
         
         const int width = 512;
         const int height = 512;
@@ -719,7 +719,7 @@ namespace TextureGen {
     }
     
     TextureHandle buildColorMap(const glm::vec3& heatColor, const glm::vec3& burnColor) {
-        Log::info("Building color map: heat=({},{},{}), burn=({},{},{})", 
+        Log::info("CometProjectile", "Building color map: heat=({},{},{}), burn=({},{},{})", 
                   heatColor.x, heatColor.y, heatColor.z,
                   burnColor.x, burnColor.y, burnColor.z);
         
@@ -797,7 +797,7 @@ namespace ParticleGen {
             return 0; // No dust trail
         }
         
-        Log::info("Building dust trail particles for: {} (count: {}, lifetime: {}, size: {})", 
+        Log::info("CometProjectile", "Building dust trail particles for: {} (count: {}, lifetime: {}, size: {})", 
                   p.id, p.dustParticleCount, p.dustLifetime, p.dustSize);
         
         // Create particle emitter description
@@ -819,20 +819,20 @@ namespace ParticleGen {
         ParticleHandle handle = createParticleEmitter(desc);
         
         Log::info("Dust trail particle parameters:");
-        Log::info("  - Count: {}", p.dustParticleCount);
-        Log::info("  - Lifetime: {}", p.dustLifetime);
-        Log::info("  - Size: {}", p.dustSize);
-        Log::info("  - Speed: {}", p.dustSpeed);
-        Log::info("  - Color: ({},{},{},{})", 
+        Log::info("CometProjectile", "  - Count: {}", p.dustParticleCount);
+        Log::info("CometProjectile", "  - Lifetime: {}", p.dustLifetime);
+        Log::info("CometProjectile", "  - Size: {}", p.dustSize);
+        Log::info("CometProjectile", "  - Speed: {}", p.dustSpeed);
+        Log::info("CometProjectile", "  - Color: ({},{},{},{})", 
                   p.dustColor.x, p.dustColor.y, p.dustColor.z, p.dustColor.w);
-        Log::info("  - Enable fade: {}", p.enableDustFade);
-        Log::info("  - Fade speed: {}", p.dustFadeSpeed);
+        Log::info("CometProjectile", "  - Enable fade: {}", p.enableDustFade);
+        Log::info("CometProjectile", "  - Fade speed: {}", p.dustFadeSpeed);
         
         return handle;
     }
     
     ParticleHandle buildSparks(const CometProjectileParams& p) {
-        Log::info("Building spark particles for: {} (count: {}, lifetime: {}, size: {})", 
+        Log::info("CometProjectile", "Building spark particles for: {} (count: {}, lifetime: {}, size: {})", 
                   p.id, p.sparkParticleCount, p.sparkLifetime, p.sparkSize);
         
         // Create particle emitter description
@@ -854,14 +854,14 @@ namespace ParticleGen {
         ParticleHandle handle = createParticleEmitter(desc);
         
         Log::info("Spark particle parameters:");
-        Log::info("  - Count: {}", p.sparkParticleCount);
-        Log::info("  - Lifetime: {}", p.sparkLifetime);
-        Log::info("  - Size: {}", p.sparkSize);
-        Log::info("  - Speed: {}", p.sparkSpeed);
-        Log::info("  - Color: ({},{},{},{})", 
+        Log::info("CometProjectile", "  - Count: {}", p.sparkParticleCount);
+        Log::info("CometProjectile", "  - Lifetime: {}", p.sparkLifetime);
+        Log::info("CometProjectile", "  - Size: {}", p.sparkSize);
+        Log::info("CometProjectile", "  - Speed: {}", p.sparkSpeed);
+        Log::info("CometProjectile", "  - Color: ({},{},{},{})", 
                   p.sparkColor.x, p.sparkColor.y, p.sparkColor.z, p.sparkColor.w);
-        Log::info("  - Enable fade: {}", p.enableSparkFade);
-        Log::info("  - Fade speed: {}", p.sparkFadeSpeed);
+        Log::info("CometProjectile", "  - Enable fade: {}", p.enableSparkFade);
+        Log::info("CometProjectile", "  - Fade speed: {}", p.sparkFadeSpeed);
         
         return handle;
     }
@@ -871,7 +871,7 @@ namespace ParticleGen {
             return 0; // No fragments
         }
         
-        Log::info("Building fragment particles for: {} (count: {}, lifetime: {})", 
+        Log::info("CometProjectile", "Building fragment particles for: {} (count: {}, lifetime: {})", 
                   p.id, p.fragmentationCount, p.fragmentLifetime);
         
         // Create particle emitter description for fragments
@@ -893,12 +893,12 @@ namespace ParticleGen {
         ParticleHandle handle = createParticleEmitter(desc);
         
         Log::info("Fragment particle parameters:");
-        Log::info("  - Count: {}", p.fragmentationCount);
-        Log::info("  - Size factor: {}", p.fragmentSizeFactor);
-        Log::info("  - Spread: {}", p.fragmentSpread);
-        Log::info("  - Velocity: {}", p.fragmentVelocity);
-        Log::info("  - Lifetime: {}", p.fragmentLifetime);
-        Log::info("  - Enable physics: {}", p.enableFragmentPhysics);
+        Log::info("CometProjectile", "  - Count: {}", p.fragmentationCount);
+        Log::info("CometProjectile", "  - Size factor: {}", p.fragmentSizeFactor);
+        Log::info("CometProjectile", "  - Spread: {}", p.fragmentSpread);
+        Log::info("CometProjectile", "  - Velocity: {}", p.fragmentVelocity);
+        Log::info("CometProjectile", "  - Lifetime: {}", p.fragmentLifetime);
+        Log::info("CometProjectile", "  - Enable physics: {}", p.enableFragmentPhysics);
         
         return handle;
     }

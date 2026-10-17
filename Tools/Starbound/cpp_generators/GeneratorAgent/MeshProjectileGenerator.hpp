@@ -2,6 +2,7 @@
 
 #include "core/Log.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "core/graphics/Mesh.hpp"
 #include "core/graphics/Material.hpp"
 #include <string>
@@ -141,7 +142,7 @@ public:
     bool isCached(const std::string& key) const;
 
 private:
-    std::unique_ptr<ThreadPool> pool;
+    std::unique_ptr<GeneratorTaskPool> pool;
     std::unordered_map<std::string, MeshOutput> meshCache;
     
     // Utility functions

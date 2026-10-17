@@ -3,6 +3,7 @@
 #include "MechTypes.hpp"
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include <future>
 #include <string>
 #include <vector>
@@ -200,7 +201,7 @@ public:
 
 private:
     ConcurrentLRUCache<uint64_t, MechBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized = false;
     
     // Enhanced features

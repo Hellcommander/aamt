@@ -1,10 +1,39 @@
 #include "SnakeMechLuaBindings.hpp"
 #include "SnakeMechFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <vector>
 
 namespace MagiTech {
 namespace SnakeMechs {
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<SnakeMechFactory>& factorySlot() {
+    static std::shared_ptr<SnakeMechFactory> f;
+    return f;
+}
+} // namespace
+
+void SnakeMechLuaBindings::setFactory(std::shared_ptr<SnakeMechFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<SnakeMechFactory> SnakeMechLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<SnakeMechFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 static std::vector<std::pair<std::future<SnakeMechAssetBundle>, std::string>> pendingMechs;
 
@@ -50,14 +79,14 @@ void SnakeMechLuaBindings::bind(sol::state& lua) {
 
     lua.set_function("spawn_snake_mech",
         [&](const SnakeMechParams& p) {
-            auto factory = MainPlugin::instance().getSnakeMechFactory();
+            auto factory = SnakeMechLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("spawn_snake_mech_async",
         [&](const SnakeMechParams& p) {
-            auto factory = MainPlugin::instance().getSnakeMechFactory();
+            auto factory = SnakeMechLuaBindings::factory();
             pendingMechs.emplace_back(factory->generateAsync(p), p.id);
         }
     );

@@ -18,7 +18,7 @@ void AtlasAssetFactory::shutdown() {
     m_initialized = false;
 }
 
-uint64_t hashSprites(const std::vector<SpriteParams>& sprites) {
+static uint64_t hashSprites(const std::vector<SpriteParams>& sprites) {
     XXH64_state_t s; XXH64_reset(&s, 0);
     for(const auto& p : sprites) {
         auto h = p.hashKey();
@@ -33,9 +33,9 @@ std::future<AtlasBundle> AtlasAssetFactory::generateAsync(
     const MaterialParams& mp,
     const LODParams& lp)
 {
-    uint64_t key = hashCombine(hashSprites(sprites), ap.hashKey(), mp.hashKey(), lp.hashKey());
+    uint64_t key = ud::hash::hash_combine(hashSprites(sprites), ap.hashKey(), mp.hashKey(), lp.hashKey());
     if (auto hit = m_cache.find(key)) {
-        return std::async(std::launch::deferred, [=]() { return *hit; });
+        return std::async(std::launch::deferred, [b = *hit]() { return b; });
     }
 
     return m_pool.enqueue([=]() {

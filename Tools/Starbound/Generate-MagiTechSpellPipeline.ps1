@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Magi-Tech Starbound spell/projectile pipeline:
@@ -294,14 +294,15 @@ if (-not $IconsOnly -and $FrameCount -gt 1) {
     $sheetScript = Join-Path $commonPath "CrossGameSpritesheet.ps1"
     $frameStaging = Join-Path $sourceDir "frames"
     New-Item -ItemType Directory -Path $frameStaging -Force | Out-Null
-    $py = (Get-Command python -ErrorAction SilentlyContinue).Source
-    if ($py) {
-        & $py (Join-Path $PSScriptRoot "generate_magitech_spell_assets.py") `
-            --mod-path $ModPath --asset-id $AssetId `
-            --draft $draftPath --final $finalPath `
-            --frame-count $FrameCount --tile-size $TileSize `
-            --stage-frames $frameStaging
-    }
+    $py = if ($env:AAMT_PYTHON -and (Test-Path -LiteralPath $env:AAMT_PYTHON)) { $env:AAMT_PYTHON } else { (Get-Command python -ErrorAction SilentlyContinue).Source }
+    # Frames are staged from the SD final; without Python there would be no sheet at all - fail loudly.
+    if (-not $py) { throw "Python not found: cannot stage the $FrameCount animation frames for $AssetId (set AAMT_PYTHON or use -IconsOnly)." }
+    & $py (Join-Path $PSScriptRoot "generate_magitech_spell_assets.py") `
+        --mod-path $ModPath --asset-id $AssetId `
+        --draft $draftPath --final $finalPath `
+        --frame-count $FrameCount --tile-size $TileSize `
+        --stage-frames $frameStaging
+    if ($LASTEXITCODE -ne 0) { throw "Frame staging failed (exit $LASTEXITCODE) for $AssetId." }
     if (Test-Path $sheetScript) {
         & $sheetScript -InputDir $frameStaging -OutputDir $outDir -GameFormat Starbound `
             -TileSize $TileSize -SpritesheetName $AssetId -ErrorAction SilentlyContinue
