@@ -1,0 +1,445 @@
+{
+  "name": "local-agent-bridge",
+  "displayName": "Local Agent Bridge",
+  "description": "CortexIDE coding agent on local models (vLLM / Ollama) with file, search and shell tools, SKILL.md skills, .canvas.tsx canvases, and chat import (including Cursor exports).",
+  "version": "2.1.0",
+  "publisher": "arend",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCustomEditor:localAgentBridge.canvasPreview",
+    "onView:localAgentBridge.agent"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "localAgentBridge.openAgent",
+        "title": "Open Agent",
+        "icon": "$(hubot)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.askAgentAboutSelection",
+        "title": "Ask Agent About Selection",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.agentPickModel",
+        "title": "Agent: Pick Backend & Model",
+        "icon": "$(server-process)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.agentNewChat",
+        "title": "Agent: New Chat",
+        "icon": "$(add)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.agentStop",
+        "title": "Agent: Stop",
+        "icon": "$(debug-stop)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.agentProgress",
+        "title": "Agent: Open Progress Index",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.sync",
+        "title": "Sync Skills & Canvases",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.showCatalog",
+        "title": "Show Skill & Canvas Catalog",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.openSkill",
+        "title": "Open Skill",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.openCanvas",
+        "title": "Open Canvas",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.openCanvasFolder",
+        "title": "Open Workspace Canvas Folder",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.openCanvasSource",
+        "title": "Open Canvas Source",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.importChat",
+        "title": "Import Chat (.md / .jsonl export)",
+        "icon": "$(cloud-download)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.continueImportedChat",
+        "title": "Continue Imported Chat in Agent",
+        "category": "Local Agent Bridge"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "localAgentBridge.importChat"
+        },
+        {
+          "command": "localAgentBridge.continueImportedChat"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "localAgentBridge.openCanvasSource",
+          "when": "activeCustomEditorId == localAgentBridge.canvasPreview",
+          "group": "navigation"
+        },
+        {
+          "command": "localAgentBridge.importChat",
+          "when": "resourceExtname == .md || resourceExtname == .jsonl",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "localAgentBridge.askAgentAboutSelection",
+          "when": "editorHasSelection",
+          "group": "navigation"
+        },
+        {
+          "command": "localAgentBridge.importChat",
+          "when": "resourceExtname == .md || resourceExtname == .jsonl || resourceExtname == .json",
+          "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "localAgentBridge.openCanvas",
+          "when": "resourceFilename =~ /\\.canvas\\.tsx$/",
+          "group": "navigation"
+        },
+        {
+          "command": "localAgentBridge.openCanvasSource",
+          "when": "resourceFilename =~ /\\.canvas\\.tsx$/",
+          "group": "navigation"
+        },
+        {
+          "command": "localAgentBridge.importChat",
+          "when": "resourceExtname == .md || resourceExtname == .jsonl || resourceExtname == .json",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "localAgentBridge.importChat",
+          "when": "view == localAgentBridge.chats",
+          "group": "navigation"
+        },
+        {
+          "command": "localAgentBridge.agentPickModel",
+          "when": "view == localAgentBridge.agent",
+          "group": "navigation@1"
+        },
+        {
+          "command": "localAgentBridge.importChat",
+          "when": "view == localAgentBridge.agent",
+          "group": "navigation@2"
+        },
+        {
+          "command": "localAgentBridge.agentNewChat",
+          "when": "view == localAgentBridge.agent",
+          "group": "navigation@3"
+        }
+      ],
+      "chat/title": [
+        {
+          "command": "localAgentBridge.importChat",
+          "group": "navigation"
+        }
+      ],
+      "chat/input": [
+        {
+          "command": "localAgentBridge.importChat",
+          "group": "inline@1"
+        }
+      ]
+    },
+    "customEditors": [
+      {
+        "viewType": "localAgentBridge.canvasPreview",
+        "displayName": "Canvas Preview",
+        "selector": [
+          {
+            "filenamePattern": "*.canvas.tsx"
+          }
+        ],
+        "priority": "default"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "local-agent-bridge",
+          "title": "Local Agent",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "local-agent-bridge": [
+        {
+          "type": "webview",
+          "id": "localAgentBridge.agent",
+          "name": "Agent"
+        },
+        {
+          "id": "localAgentBridge.skills",
+          "name": "Skills"
+        },
+        {
+          "id": "localAgentBridge.canvases",
+          "name": "Canvases"
+        },
+        {
+          "id": "localAgentBridge.chats",
+          "name": "Imported Chats"
+        }
+      ]
+    },
+    "chatParticipants": [
+      {
+        "id": "local-agent-bridge.agent",
+        "name": "local-agent",
+        "fullName": "Local Agent",
+        "description": "Coding agent that reads SKILL.md files and canvases",
+        "isSticky": true,
+        "commands": [
+          {
+            "name": "import",
+            "description": "Import a chat export (.md, e.g. from Cursor) and continue as an agent"
+          }
+        ],
+        "disambiguation": [
+          {
+            "categoryName": "Skills and canvases",
+            "description": "The user wants an agent that follows SKILL.md skills, writes canvases, or does multi-step coding work with tools.",
+            "examples": [
+              "Follow the canvas skill and write a dashboard",
+              "Act as a coding agent and edit the codebase",
+              "Use my create-rule skill"
+            ]
+          }
+        ]
+      }
+    ],
+    "languageModelTools": [
+      {
+        "name": "list_skills",
+        "displayName": "List skills",
+        "toolReferenceName": "list_skills",
+        "modelDescription": "List SKILL.md skills with name, description, and path.",
+        "userDescription": "List bridged skills",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": { "type": "object", "properties": {} }
+      },
+      {
+        "name": "read_skill",
+        "displayName": "Read skill",
+        "toolReferenceName": "read_skill",
+        "modelDescription": "Read the full SKILL.md body for a skill by name. Call before following a skill.",
+        "userDescription": "Read a skill",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": { "name": { "type": "string" } },
+          "required": ["name"]
+        }
+      },
+      {
+        "name": "match_skills",
+        "displayName": "Match skills",
+        "toolReferenceName": "match_skills",
+        "modelDescription": "Find skills matching a task query.",
+        "userDescription": "Match skills to a task",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": { "type": "string" },
+            "limit": { "type": "number" }
+          },
+          "required": ["query"]
+        }
+      },
+      {
+        "name": "list_canvases",
+        "displayName": "List canvases",
+        "toolReferenceName": "list_canvases",
+        "modelDescription": "List .canvas.tsx canvases.",
+        "userDescription": "List canvases",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": { "type": "object", "properties": {} }
+      },
+      {
+        "name": "read_canvas",
+        "displayName": "Read canvas",
+        "toolReferenceName": "read_canvas",
+        "modelDescription": "Read a .canvas.tsx canvas by name or path.",
+        "userDescription": "Read a canvas",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": { "name": { "type": "string" } },
+          "required": ["name"]
+        }
+      },
+      {
+        "name": "import_cursor_chat",
+        "displayName": "Import chat",
+        "toolReferenceName": "import_cursor_chat",
+        "modelDescription": "Import a Cursor chat export (.md) or agent transcript (.jsonl) into .cortexide/imported-chats and return an Agent-mode continuation prompt.",
+        "userDescription": "Import a Cursor chat and continue as an agent",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": {
+          "type": "object",
+          "properties": { "path": { "type": "string", "description": "Absolute path to a Cursor export .md or .jsonl" } },
+          "required": ["path"]
+        }
+      },
+      {
+        "name": "list_imported_chats",
+        "displayName": "List imported chats",
+        "toolReferenceName": "list_imported_chats",
+        "modelDescription": "List chats imported into .cortexide/imported-chats.",
+        "userDescription": "List imported chats",
+        "canBeReferencedInPrompt": true,
+        "inputSchema": { "type": "object", "properties": {} }
+      }
+    ],
+    "configuration": {
+      "title": "Local Agent Bridge",
+      "properties": {
+        "localAgentBridge.syncOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Sync SKILL.md skills into .cortexide/skills and rewrite agent/canvas rules when CortexIDE starts."
+        },
+        "localAgentBridge.includeBuiltInSkills": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include ~/.cursor/skills-cursor (Cursor built-in skills such as canvas)."
+        },
+        "localAgentBridge.includePluginSkills": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also scan ~/.cursor/plugins/cache for SKILL.md files."
+        },
+        "localAgentBridge.extraSkillRoots": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Extra directories to scan for SKILL.md files."
+        },
+        "localAgentBridge.maxSkills": {
+          "type": "number",
+          "default": 64,
+          "description": "CortexIDE only loads 64 slash-command skills. Extra catalog entries stay in the rule file and MCP tools."
+        },
+        "localAgentBridge.writeWorkspaceFiles": {
+          "type": "boolean",
+          "default": true,
+          "description": "Write .cortexide/skills, .cortexide/agents, .cortexide/rules, and a managed .voidrules section."
+        },
+        "localAgentBridge.agent.provider": {
+          "type": "string",
+          "enum": ["auto", "vllm", "ollama", "openai"],
+          "enumDescriptions": [
+            "vLLM / SGLang router if running, otherwise Ollama",
+            "vLLM or the Qud Lab SGLang router (:30000, then :8000)",
+            "Ollama (:11434), using its native API so num_ctx is honoured",
+            "Any OpenAI-compatible URL set in localAgentBridge.agent.baseUrl"
+          ],
+          "default": "auto",
+          "description": "Model backend for the Agent panel."
+        },
+        "localAgentBridge.agent.baseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Override the backend URL (ending in /v1). Empty = provider defaults."
+        },
+        "localAgentBridge.agent.model": {
+          "type": "string",
+          "default": "",
+          "description": "Model id. Empty = first preferred model the backend serves."
+        },
+        "localAgentBridge.agent.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Bearer key for the backend. Empty = %LOCALAPPDATA%\\QudLab\\vllm-proxy-key.txt for vLLM."
+        },
+        "localAgentBridge.agent.contextTokens": {
+          "type": "number",
+          "default": 0,
+          "description": "Context window to plan for. 0 = read max_model_len from the backend (Ollama: min(model limit, ollamaNumCtx))."
+        },
+        "localAgentBridge.agent.ollamaNumCtx": {
+          "type": "number",
+          "default": 16384,
+          "description": "num_ctx sent to Ollama. Higher = more VRAM."
+        },
+        "localAgentBridge.agent.maxOutputTokens": {
+          "type": "number",
+          "default": 2048,
+          "description": "Max tokens per model reply."
+        },
+        "localAgentBridge.agent.maxRounds": {
+          "type": "number",
+          "default": 30,
+          "description": "Max model↔tool rounds per request before the agent is asked to wrap up."
+        },
+        "localAgentBridge.agent.temperature": {
+          "type": "number",
+          "default": 0.2
+        },
+        "localAgentBridge.agent.shell": {
+          "type": "string",
+          "enum": ["auto", "confirm", "off"],
+          "default": "auto",
+          "description": "Shell tool: run without asking, ask for each command, or disabled. Obviously destructive commands are always blocked."
+        },
+        "localAgentBridge.agent.shellTimeoutSec": {
+          "type": "number",
+          "default": 120
+        },
+        "localAgentBridge.agent.writableRoots": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Folders outside the open workspace that the agent may edit and run commands in (e.g. a game's Mods folder)."
+        },
+        "localAgentBridge.agent.readAnywhere": {
+          "type": "boolean",
+          "default": true,
+          "description": "Let the agent read files outside the workspace (writes stay limited to workspace + writableRoots)."
+        }
+      }
+    }
+  }
+}

@@ -24,6 +24,7 @@ access-gated. See `Tools/Qud/QudLab/Fetch-PrivatePack.ps1`.
 | `Tools/Logs/pixelorama/pxo_src` | Do **not** vendor. Install Pixelorama. | MIT (Orama Interactive) | Install to `D:\tools\Orama Interactive\Pixelorama` |
 | `Tools/Transcendence/_x64_workspace` | Official TranscendenceDev tree | Kronosaur (non-commercial; keep notice) | `Prepare-X64Workspace.py --api-root <official>` |
 | `Tools/ReferenceAssets` | Optional art/reference packs | Each pack's own file | Copy locally; never required to run tools |
+| `Tools/CortexIDE/local-agent-bridge/media/react*.production.min.js` | React 18.3.1 UMD builds (https://unpkg.com/react@18.3.1, `react-dom@18.3.1`) | MIT (Meta) | `Tools/CortexIDE/local-agent-bridge/Build-Vsix.ps1` (SHA-256 pinned; shipped inside the built `.vsix`) |
 
 MPL-2.0 (TES5Edit) is file-level copyleft. Do not copy `.pas` definitions into
 AAMT C# and relicense them as MIT. Read them; wrap them.
