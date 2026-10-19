@@ -73,14 +73,14 @@ void FrostNovaLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("cast_frost_nova",
-        [&](const FrostNovaParams& p) {
+        [](const FrostNovaParams& p) {
             auto factory = FrostNovaLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("cast_frost_nova_async",
-        [&](const FrostNovaParams& p) {
+        [](const FrostNovaParams& p) {
             auto factory = FrostNovaLuaBindings::factory();
             pendingNovas.emplace_back(factory->generateAsync(p), p.id);
         }
@@ -94,7 +94,7 @@ void FrostNovaLuaBindings::poll_assets(sol::state& lua) {
                 auto b = it->first.get();
                 lua["print"]("Frost nova ready: " + it->second);
             } catch (const std::exception& e) {
-                // log error
+                Log::error("FrostNovas", "Asset generation failed for {}: {}", it->second, e.what());
             }
             it = pendingNovas.erase(it);
         } else {

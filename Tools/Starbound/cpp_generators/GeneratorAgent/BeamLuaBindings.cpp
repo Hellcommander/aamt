@@ -59,7 +59,7 @@ void BeamLuaBindings::bind(sol::state& lua) {
         "detailLevel", &BeamParams::detailLevel
     );
 
-    lua.set_function("spawn_beam", [&](BeamParams p) {
+    lua.set_function("spawn_beam", [](BeamParams p) {
         auto factory = BeamLuaBindings::factory();
         auto fut = factory->generateAsync(p);
         pendingBeams.emplace_back(std::move(fut), p.id);
@@ -69,10 +69,12 @@ void BeamLuaBindings::bind(sol::state& lua) {
 void BeamLuaBindings::poll_assets(sol::state& lua) {
     for (auto it = pendingBeams.begin(); it != pendingBeams.end();) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            auto b = it->first.get();
-            // This would call a Lua function to spawn the beam.
-            // For now, we'll just print a message.
-            lua["print"]("Beam ready: " + it->second);
+            try {
+                auto b = it->first.get();
+                lua["print"]("Beam ready: " + it->second);
+            } catch (const std::exception& e) {
+                Log::error("Beams", "Asset generation failed for {}: {}", it->second, e.what());
+            }
             it = pendingBeams.erase(it);
         } else {
             ++it;

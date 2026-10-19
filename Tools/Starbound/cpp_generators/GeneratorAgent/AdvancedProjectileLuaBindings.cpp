@@ -173,7 +173,7 @@ void AdvancedProjectileLuaBindings::bind(sol::state& lua) {
     // ARC BEAM BINDINGS
     // ============================================================================
     
-    lua.new_usertype<BeamParams>("BeamParams", sol::constructors<BeamParams()>(),
+    lua.new_usertype<BeamParams>("AdvancedBeamParams", sol::constructors<BeamParams()>(),
         "duration", &BeamParams::duration,
         "maxRange", &BeamParams::maxRange,
         "thickness", &BeamParams::thickness,
@@ -198,7 +198,7 @@ void AdvancedProjectileLuaBindings::bind(sol::state& lua) {
     // BOOMERANG BINDINGS
     // ============================================================================
     
-    lua.new_usertype<BoomerangParams>("BoomerangParams", sol::constructors<BoomerangParams()>(),
+    lua.new_usertype<BoomerangParams>("AdvancedBoomerangParams", sol::constructors<BoomerangParams()>(),
         "returnDelay", &BoomerangParams::returnDelay,
         "returnSpeed", &BoomerangParams::returnSpeed,
         "liftCoefficient", &BoomerangParams::liftCoefficient,
@@ -224,7 +224,7 @@ void AdvancedProjectileLuaBindings::bind(sol::state& lua) {
         "springConstant", &GrapnelParams::springConstant,
         "validate", [](GrapnelParams& p) -> bool { return validateGrapnelParams(p); });
 
-    lua.new_usertype<HookParams>("HookParams", sol::constructors<HookParams()>(),
+    lua.new_usertype<HookParams>("AdvancedHookParams", sol::constructors<HookParams()>(),
         "meshType", &HookParams::meshType,
         "materialType", &HookParams::materialType,
         "autoDetach", &HookParams::autoDetach,

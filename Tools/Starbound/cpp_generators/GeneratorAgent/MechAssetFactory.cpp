@@ -6,6 +6,7 @@
 #include <chrono>
 #include <thread>
 #include <filesystem>
+#include <unordered_set>
 #include "vendor/xxhash/xxhash.h"
 
 namespace MagiTech {
@@ -69,14 +70,26 @@ MechHandle MechAssetFactory::createMech(const MechDefinitionParams& params) {
         uint64_t cacheKey = asset->hashKey();
         {
             std::lock_guard<std::mutex> lock(cacheMutex_);
+            auto previous = assetCache_.find(cacheKey);
+            if (previous != assetCache_.end() && previous->second != asset) {
+                // Same definition rebuilt: the old copy is replaced.
+                auto old = previous->second;
+                assetCache_.erase(previous);
+                handleToAsset_.erase(old->handle);
+                releaseIfUnreferenced(old);
+            }
             assetCache_[cacheKey] = asset;
             handleToAsset_[asset->handle] = asset;
             
-            // Enforce cache size limit
-            if (assetCache_.size() > maxCacheSize_) {
-                auto oldest = assetCache_.begin();
-                handleToAsset_.erase(oldest->second->handle);
-                assetCache_.erase(oldest);
+            // Enforce cache size limit (never evicting the asset just created)
+            while (assetCache_.size() > maxCacheSize_) {
+                auto victim = std::find_if(assetCache_.begin(), assetCache_.end(),
+                                           [&](const auto& entry) { return entry.second != asset; });
+                if (victim == assetCache_.end()) break;
+                auto evicted = victim->second;
+                assetCache_.erase(victim);
+                handleToAsset_.erase(evicted->handle);
+                releaseIfUnreferenced(evicted);
             }
         }
         
@@ -153,10 +166,13 @@ bool MechAssetFactory::unloadMech(MechHandle handle) {
             return false;
         }
         
-        // Remove from both caches
-        uint64_t assetHash = it->second->hashKey();
-        assetCache_.erase(assetHash);
+        // Remove from both caches (load and create use different cache keys)
+        auto asset = it->second;
         handleToAsset_.erase(it);
+        for (auto entry = assetCache_.begin(); entry != assetCache_.end();) {
+            entry = entry->second == asset ? assetCache_.erase(entry) : std::next(entry);
+        }
+        releaseIfUnreferenced(asset);
         
         return true;
         
@@ -383,6 +399,13 @@ void MechAssetFactory::processHotReloads() {
 void MechAssetFactory::clearCache() {
     try {
         std::lock_guard<std::mutex> lock(cacheMutex_);
+        std::unordered_set<MechAsset*> released;
+        for (const auto& [key, asset] : assetCache_) {
+            if (released.insert(asset.get()).second) releaseMechAssetResources(*asset);
+        }
+        for (const auto& [handle, asset] : handleToAsset_) {
+            if (released.insert(asset.get()).second) releaseMechAssetResources(*asset);
+        }
         assetCache_.clear();
         handleToAsset_.clear();
     } catch (const std::exception& e) {
@@ -416,6 +439,14 @@ bool MechAssetFactory::isCached(const std::string& name) const {
 }
 
 // Private implementation methods
+void MechAssetFactory::releaseIfUnreferenced(const std::shared_ptr<MechAsset>& asset) {
+    // Caller holds cacheMutex_.
+    if (!asset) return;
+    for (const auto& [key, cached] : assetCache_) if (cached == asset) return;
+    for (const auto& [handle, cached] : handleToAsset_) if (cached == asset) return;
+    releaseMechAssetResources(*asset);
+}
+
 uint64_t MechAssetFactory::generateCacheKey(const std::string& name, LODQuality quality) const {
     XXH64_state_t hash_state;
     XXH64_reset(&hash_state, 0);
@@ -432,30 +463,33 @@ std::shared_ptr<MechAsset> MechAssetFactory::buildAsset(const MechDefinitionPara
         asset->gpuAccelerated = gpuAccelerationEnabled_;
         
         // Generate unique handle
-        static MechHandle nextHandle = 1;
-        asset->handle = nextHandle++;
+        asset->handle = allocateMechAssetHandle();
         
         // Assemble modules
         if (!assembler_->assembleModules(params.modules, params.skeletonTemplate, *asset)) {
             std::cerr << "MechAssetFactory: Failed to assemble modules for " << params.name << std::endl;
+            releaseMechAssetResources(*asset);
             return nullptr;
         }
         
         // Generate morph targets
         if (!morphGen_->generateMorphTargets(params.morphProfiles, asset->modules, *asset)) {
             std::cerr << "MechAssetFactory: Failed to generate morph targets for " << params.name << std::endl;
+            releaseMechAssetResources(*asset);
             return nullptr;
         }
         
         // Build physics rig
         if (!physicsBuilder_->buildPhysicsRig(params.physicsRig, asset->modules, *asset)) {
             std::cerr << "MechAssetFactory: Failed to build physics rig for " << params.name << std::endl;
+            releaseMechAssetResources(*asset);
             return nullptr;
         }
         
         // Generate LODs
         if (!lodBuilder_->generateLODs(params.lods, asset->modules, *asset)) {
             std::cerr << "MechAssetFactory: Failed to generate LODs for " << params.name << std::endl;
+            releaseMechAssetResources(*asset);
             return nullptr;
         }
         
@@ -480,13 +514,11 @@ std::shared_ptr<MechAsset> MechAssetFactory::loadFromPack(const std::string& nam
             std::cerr << "MechAssetFactory: Failed to read mech pack: " << packPath << std::endl;
             return nullptr;
         }
+        asset->handle = allocateMechAssetHandle();
+        asset->gpuAccelerated = asset->gpuAccelerated && gpuAccelerationEnabled_;
         
-        // Filter LODs based on quality
-        asset->lods.erase(
-            std::remove_if(asset->lods.begin(), asset->lods.end(),
-                          [quality](const LODDefinition& lod) { return lod.quality != quality; }),
-            asset->lods.end()
-        );
+        // Keep only the LODs (and LOD meshes) of the requested quality
+        filterMechAssetLODs(*asset, quality);
         
         return asset;
         
@@ -561,7 +593,9 @@ bool MechAssetFactory::rebuildAsset(const std::string& mechName) {
         std::lock_guard<std::mutex> lock(cacheMutex_);
         for (auto& pair : assetCache_) {
             if (pair.second->name == mechName) {
-                // Update existing asset
+                // Update existing asset in place so its handle stays valid
+                releaseMechAssetResources(*pair.second);
+                newAsset->handle = pair.second->handle;
                 *pair.second = *newAsset;
                 pair.second->creationTime = std::chrono::system_clock::now();
                 return true;

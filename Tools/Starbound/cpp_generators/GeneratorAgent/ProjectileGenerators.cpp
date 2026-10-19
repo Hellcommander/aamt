@@ -1,9 +1,14 @@
 #include "ProjectileGenerators.hpp"
+#include "ProjectileAssets.hpp"
 #include "core/Log.hpp"
-#include "core/mesh/Mesh.hpp"
+#include "core/rendering/Shader.hpp"
 #include "core/rendering/Primitives.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/transform.hpp>
+#include <algorithm>
+#include <cmath>
+#include <string>
+#include <vector>
 
 namespace MagiTech {
 namespace Projectiles {
@@ -68,7 +73,10 @@ namespace MeshGen {
         }
         
         mesh.optimize();
-        return mesh.upload();
+        if (mesh.isEmpty()) {
+            Log::warn("Projectile", "Unknown projectile type '{}' for {}; no mesh generated", p.projType, p.id);
+        }
+        return storeProjectileMesh(mesh);
     }
 }
 
@@ -76,7 +84,7 @@ namespace TextureGen {
     TextureHandle buildTexture(const ProjectileParams& p) {
         Log::info("Projectile", "Building projectile texture for: {}", p.id);
         
-        int W = 128 << p.shapeDetail, H = W;
+        int W = 128 << std::clamp(p.shapeDetail, 0, 3), H = W;
         std::vector<glm::u8vec4> pixels(W * H);
         
         // Simple gradient-based texture generation
@@ -89,7 +97,7 @@ namespace TextureGen {
                 d = glm::smoothstep(1.0f, 0.0f, d);
                 
                 // Add some noise variation
-                float noise = (sin(u * 20.0f) * sin(v * 20.0f)) * 0.1f;
+                float noise = (std::sin(u * 20.0f) * std::sin(v * 20.0f)) * 0.1f;
                 
                 glm::vec3 col = glm::mix(p.colorEdge, p.colorCore, d) + noise;
                 col = glm::clamp(col, 0.0f, 1.0f);
@@ -103,7 +111,7 @@ namespace TextureGen {
             }
         }
         
-        return Texture::upload(W, H, pixels.data());
+        return storeProjectileTexture(W, H, std::move(pixels));
     }
 }
 
@@ -117,7 +125,7 @@ namespace ShaderGen {
         
         s.setUniform("uCoreCol", p.colorCore);
         s.setUniform("uEdgeCol", p.colorEdge);
-        s.addDefine("SHAPE_DETAIL", std::to_string(p.shapeDetail));
+        s.addDefine("SHAPE_DETAIL=" + std::to_string(p.shapeDetail));
         
         if (p.projType == "laser") {
             s.addDefine("USE_ADDITIVE");
@@ -139,7 +147,7 @@ namespace EffectsGen {
             return 0; // No trail effect
         }
         
-        Effect e;
+        ProjectileEffect e;
         e.addParticleSystem(p.trailEffect, {
             {"duration", p.trailLength},
             {"colorCore", p.colorCore},
@@ -157,7 +165,7 @@ namespace EffectsGen {
             return 0; // No impact effect
         }
         
-        Effect e;
+        ProjectileEffect e;
         e.addParticleSystem(p.impactEffect, {
             {"damageType", p.damageType},
             {"fragmentCount", p.fragmentationCount},

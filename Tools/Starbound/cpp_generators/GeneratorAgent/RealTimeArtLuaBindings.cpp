@@ -2,6 +2,7 @@
 #include "CrossbowAssetGenerator.hpp"
 #include "core/Log.hpp"
 #include <sol/sol.hpp>
+#include <random>
 
 namespace MagiTech {
 namespace RealTimeArt {
@@ -55,7 +56,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
     // Create ArtGen table
     lua["ArtGen"] = lua.create_table_with(
         // Main generation functions
-        "generate", [&](const RealTimeArtGenerator::GenDef& def, sol::function callback) {
+        "generate", [](const RealTimeArtGenerator::GenDef& def, sol::function callback) {
             if (!g_realTimeArtGenerator) {
                 Log::error("Real-time art generator not initialized");
                 return;
@@ -65,7 +66,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
             });
         },
 
-        "generateCrossbow", [&](const CrossbowParams& params, const RealTimeArtGenerator::GenDef& def, sol::function callback) {
+        "generateCrossbow", [](const CrossbowParams& params, const RealTimeArtGenerator::GenDef& def, sol::function callback) {
             if (!g_realTimeArtGenerator) {
                 Log::error("Real-time art generator not initialized");
                 return;
@@ -75,7 +76,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
             });
         },
 
-        "generateBolt", [&](const BoltParams& params, const RealTimeArtGenerator::GenDef& def, sol::function callback) {
+        "generateBolt", [](const BoltParams& params, const RealTimeArtGenerator::GenDef& def, sol::function callback) {
             if (!g_realTimeArtGenerator) {
                 Log::error("Real-time art generator not initialized");
                 return;
@@ -85,7 +86,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
             });
         },
 
-        "generateArrow", [&](const ArrowParams& params, const RealTimeArtGenerator::GenDef& def, sol::function callback) {
+        "generateArrow", [](const ArrowParams& params, const RealTimeArtGenerator::GenDef& def, sol::function callback) {
             if (!g_realTimeArtGenerator) {
                 Log::error("Real-time art generator not initialized");
                 return;
@@ -96,7 +97,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
         },
 
         // Damage editing functions
-        "editDamage", [&](const RealTimeArtGenerator::DamageParams& params, sol::function callback) {
+        "editDamage", [](const RealTimeArtGenerator::DamageParams& params, sol::function callback) {
             if (!g_realTimeArtGenerator) {
                 Log::error("Real-time art generator not initialized");
                 return;
@@ -106,7 +107,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
             });
         },
 
-        "addBulletHole", [&](uint32_t baseTexId, float x, float y, float intensity, sol::function callback) {
+        "addBulletHole", [](uint32_t baseTexId, float x, float y, float intensity, sol::function callback) {
             if (!g_realTimeArtGenerator) {
                 Log::error("Real-time art generator not initialized");
                 return;
@@ -116,7 +117,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
             });
         },
 
-        "addCrack", [&](uint32_t baseTexId, float x, float y, float intensity, sol::function callback) {
+        "addCrack", [](uint32_t baseTexId, float x, float y, float intensity, sol::function callback) {
             if (!g_realTimeArtGenerator) {
                 Log::error("Real-time art generator not initialized");
                 return;
@@ -126,7 +127,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
             });
         },
 
-        "addBurn", [&](uint32_t baseTexId, float x, float y, float intensity, sol::function callback) {
+        "addBurn", [](uint32_t baseTexId, float x, float y, float intensity, sol::function callback) {
             if (!g_realTimeArtGenerator) {
                 Log::error("Real-time art generator not initialized");
                 return;
@@ -137,7 +138,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
         },
 
         // Batch generation
-        "generateBatch", [&](const std::vector<RealTimeArtGenerator::GenDef>& defs, sol::function callback) {
+        "generateBatch", [](const std::vector<RealTimeArtGenerator::GenDef>& defs, sol::function callback) {
             if (!g_realTimeArtGenerator) {
                 Log::error("Real-time art generator not initialized");
                 return;
@@ -147,7 +148,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
             });
         },
 
-        "generateCrossbowBatch", [&](const std::vector<std::pair<CrossbowParams, RealTimeArtGenerator::GenDef>>& items, sol::function callback) {
+        "generateCrossbowBatch", [](const std::vector<std::pair<CrossbowParams, RealTimeArtGenerator::GenDef>>& items, sol::function callback) {
             if (!g_realTimeArtGenerator) {
                 Log::error("Real-time art generator not initialized");
                 return;
@@ -158,33 +159,33 @@ void bindRealTimeArtGenerator(sol::state& lua) {
         },
 
         // Utility functions
-        "update", [&]() {
+        "update", []() {
             if (g_realTimeArtGenerator) {
                 g_realTimeArtGenerator->update();
             }
         },
 
-        "clearCache", [&]() {
+        "clearCache", []() {
             if (g_realTimeArtGenerator) {
                 g_realTimeArtGenerator->clearCache();
             }
         },
 
-        "getCacheSize", [&]() -> size_t {
+        "getCacheSize", []() -> size_t {
             return g_realTimeArtGenerator ? g_realTimeArtGenerator->getCacheSize() : 0;
         },
 
-        "getStats", [&]() -> RealTimeArtGenerator::Stats {
+        "getStats", []() -> RealTimeArtGenerator::Stats {
             return g_realTimeArtGenerator ? g_realTimeArtGenerator->getStats() : RealTimeArtGenerator::Stats{};
         },
 
-        "isInitialized", [&]() -> bool {
+        "isInitialized", []() -> bool {
             return g_realTimeArtGenerator != nullptr;
         }
     );
 
     // Create convenience functions for common weapon types
-    lua["createLaserRifle"] = [&](sol::function callback) {
+    lua["createLaserRifle"] = [](sol::function callback) {
         RealTimeArtGenerator::GenDef def;
         def.prompt = "pixel-art 64x64 laser rifle, side view, neon blue highlights";
         def.outW = 64;
@@ -202,7 +203,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
         }
     };
 
-    lua["createIceStaff"] = [&](sol::function callback) {
+    lua["createIceStaff"] = [](sol::function callback) {
         RealTimeArtGenerator::GenDef def;
         def.prompt = "pixel-art 64x64 ice staff, top-down, frost theme";
         def.outW = 64;
@@ -220,7 +221,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
         }
     };
 
-    lua["createPlasmaPistol"] = [&](sol::function callback) {
+    lua["createPlasmaPistol"] = [](sol::function callback) {
         RealTimeArtGenerator::GenDef def;
         def.prompt = "pixel-art 64x64 plasma pistol, 8 directions, clean linework, neon green";
         def.outW = 64;
@@ -240,7 +241,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
 
     // Create damage editing convenience functions
     lua["Damage"] = lua.create_table_with(
-        "edit", [&](const RealTimeArtGenerator::DamageParams& params, sol::function callback) {
+        "edit", [](const RealTimeArtGenerator::DamageParams& params, sol::function callback) {
             if (g_realTimeArtGenerator) {
                 g_realTimeArtGenerator->editDamage(params, [callback](RealTimeArtGenerator::TextureHandle tex) {
                     callback(tex);
@@ -248,7 +249,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
             }
         },
 
-        "addBulletHole", [&](uint32_t baseTexId, float x, float y, float intensity, sol::function callback) {
+        "addBulletHole", [](uint32_t baseTexId, float x, float y, float intensity, sol::function callback) {
             if (g_realTimeArtGenerator) {
                 g_realTimeArtGenerator->addBulletHole(baseTexId, x, y, intensity, [callback](RealTimeArtGenerator::TextureHandle tex) {
                     callback(tex);
@@ -256,7 +257,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
             }
         },
 
-        "addCrack", [&](uint32_t baseTexId, float x, float y, float intensity, sol::function callback) {
+        "addCrack", [](uint32_t baseTexId, float x, float y, float intensity, sol::function callback) {
             if (g_realTimeArtGenerator) {
                 g_realTimeArtGenerator->addCrack(baseTexId, x, y, intensity, [callback](RealTimeArtGenerator::TextureHandle tex) {
                     callback(tex);
@@ -264,7 +265,7 @@ void bindRealTimeArtGenerator(sol::state& lua) {
             }
         },
 
-        "addBurn", [&](uint32_t baseTexId, float x, float y, float intensity, sol::function callback) {
+        "addBurn", [](uint32_t baseTexId, float x, float y, float intensity, sol::function callback) {
             if (g_realTimeArtGenerator) {
                 g_realTimeArtGenerator->addBurn(baseTexId, x, y, intensity, [callback](RealTimeArtGenerator::TextureHandle tex) {
                     callback(tex);

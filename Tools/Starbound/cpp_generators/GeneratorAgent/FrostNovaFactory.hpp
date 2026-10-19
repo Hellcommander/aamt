@@ -48,7 +48,7 @@ public:
         if (auto hit = m_cache.find(key)) {
             return std::async(std::launch::deferred, [=] { return *hit; });
         }
-        return m_pool.enqueue([=]() {
+        return m_pool.enqueue([=, this]() {
             FrostNovaAssetBundle b;
             b.ringMesh = MeshGen::buildNovaRing(p);
             b.shardMesh = MeshGen::buildIceShard(p);

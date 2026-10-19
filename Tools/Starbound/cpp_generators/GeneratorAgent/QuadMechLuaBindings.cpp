@@ -124,7 +124,7 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
     );
     
     // Bind module definition
-    lua.new_usertype<ModuleDefinition>("ModuleDefinition",
+    lua.new_usertype<ModuleDefinition>("QuadMechModuleDefinition",
         sol::constructors<ModuleDefinition()>(),
         "id", &ModuleDefinition::id,
         "type", &ModuleDefinition::type,
@@ -140,7 +140,7 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
     );
     
     // Bind cockpit definition
-    lua.new_usertype<CockpitDefinition>("CockpitDefinition",
+    lua.new_usertype<CockpitDefinition>("QuadMechCockpitDefinition",
         sol::constructors<CockpitDefinition()>(),
         "seatPosition", &CockpitDefinition::seatPosition,
         "canopyTint", &CockpitDefinition::canopyTint,
@@ -184,7 +184,7 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
         "hashKey", &CanopyMaterial::hashKey
     );
     
-    lua.new_usertype<MagitechMaterials>("MagitechMaterials",
+    lua.new_usertype<MagitechMaterials>("QuadMechMagitechMaterials",
         sol::constructors<MagitechMaterials()>(),
         "energyRunes", &MagitechMaterials::energyRunes,
         "energyCore", &MagitechMaterials::energyCore,
@@ -193,7 +193,7 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
     );
     
     // Bind animation definition
-    lua.new_usertype<AnimationDefinition>("AnimationDefinition",
+    lua.new_usertype<AnimationDefinition>("QuadMechAnimationDefinition",
         sol::constructors<AnimationDefinition()>(),
         "id", &AnimationDefinition::id,
         "type", &AnimationDefinition::type,
@@ -217,7 +217,7 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
         "hashKey", &JointLimit::hashKey
     );
     
-    lua.new_usertype<PhysicsDefinition>("PhysicsDefinition",
+    lua.new_usertype<PhysicsDefinition>("QuadMechPhysicsDefinition",
         sol::constructors<PhysicsDefinition()>(),
         "totalMass", &PhysicsDefinition::totalMass,
         // Maps are exposed as plain Lua tables (copied on get, replaced on set);
@@ -250,7 +250,7 @@ void QuadMechLuaBindings::bind(sol::state& lua) {
     );
     
     // Bind LOD definition
-    lua.new_usertype<LODDefinition>("LODDefinition",
+    lua.new_usertype<LODDefinition>("QuadMechLODDefinition",
         sol::constructors<LODDefinition()>(),
         "quality", &LODDefinition::quality,
         "meshDecimate", &LODDefinition::meshDecimate,

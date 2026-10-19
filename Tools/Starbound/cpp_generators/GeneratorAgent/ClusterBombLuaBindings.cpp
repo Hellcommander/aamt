@@ -70,14 +70,14 @@ void ClusterBombLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_cluster_bomb",
-        [&](const ClusterBombParams& p) {
+        [](const ClusterBombParams& p) {
             auto factory = ClusterBombLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("spawn_cluster_bomb_async",
-        [&](const ClusterBombParams& p) {
+        [](const ClusterBombParams& p) {
             auto factory = ClusterBombLuaBindings::factory();
             pendingBombs.emplace_back(factory->generateAsync(p), p.id);
         }
@@ -91,7 +91,7 @@ void ClusterBombLuaBindings::poll_assets(sol::state& lua) {
                 auto b = it->first.get();
                 lua["print"]("Cluster bomb ready: " + it->second);
             } catch (const std::exception& e) {
-                // log error
+                Log::error("ClusterBombs", "Asset generation failed for {}: {}", it->second, e.what());
             }
             it = pendingBombs.erase(it);
         } else {

@@ -9,6 +9,7 @@
 #include "core/simulation/Simulation.hpp"
 #include <future>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <cstdint>
@@ -30,10 +31,10 @@ struct MaterialSet {
 // Parameter Schemas
 struct CrossbowParams {
     std::string    id;                  
-    float          drawLength;          // max string pull distance
-    float          drawWeight;          // launch force (N)
-    bool           autoReload;          // reload on fire
-    float          reloadTime;          // seconds
+    float          drawLength = 0.6f;          // max string pull distance
+    float          drawWeight = 800.0f;          // launch force (N)
+    bool           autoReload = false;          // reload on fire
+    float          reloadTime = 1.5f;          // seconds
     std::string    stockMaterial;       // e.g., WoodOak, MetalSteel
     std::string    limbMaterial;        // e.g., Fiberglass
     std::string    stringMaterial;      // e.g., Hemp, Synthetic
@@ -43,44 +44,44 @@ struct CrossbowParams {
 
 struct BoltParams {
     std::string    id;
-    float          length;              // total length
-    float          shaftRadius;
-    bool           useFletching;        
+    float          length = 0.4f;              // total length
+    float          shaftRadius = 0.005f;
+    bool           useFletching = true;        
     std::string    fletchMaterial;      // e.g., Feather, Plastic
-    float          fletchLength;
-    float          tipMass;             // tip weight influences balance
-    bool           barbedTip;          
+    float          fletchLength = 0.05f;
+    float          tipMass = 0.02f;             // tip weight influences balance
+    bool           barbedTip = false;          
     
     uint64_t hashKey() const;
 };
 
 struct ArrowParams {
     std::string    id;
-    float          shaftLength;         
-    float          shaftDiameter;
-    int            spineRating;         // stiffness factor
-    bool           useFletching;        
+    float          shaftLength = 0.75f;         
+    float          shaftDiameter = 0.008f;
+    int            spineRating = 400;         // stiffness factor
+    bool           useFletching = true;        
     std::string    fletchStyle;         // Parabolic, Shield, Flu-Flu
-    float          nockSize;            
-    float          tipMass;
+    float          nockSize = 0.006f;            
+    float          tipMass = 0.02f;
     
     uint64_t hashKey() const;
 };
 
 // Bundle structures for generated assets
 struct CrossbowBundle {
-    MeshHandle mesh;
-    MeshHandle string;
-    AnimationHandle reloadAnim;
+    MeshHandle mesh = 0;
+    MeshHandle string = 0;
+    AnimationHandle reloadAnim = 0;
     MaterialSet materials;
 };
 
 struct ProjectileBundle {
-    MeshHandle mesh;
-    MaterialHandle material;
-    MeshHandle vfxTrail;
-    SimulationHandle flightSim;
-    ColliderHandle collider;
+    MeshHandle mesh = 0;
+    MaterialHandle material = 0;
+    MeshHandle vfxTrail = 0;
+    SimulationHandle flightSim = 0;
+    ColliderHandle collider = 0;
 };
 
 // Combined Factory for Weapons and Projectiles
@@ -88,12 +89,14 @@ class CrossbowAssetFactory {
     std::unique_ptr<GeneratorTaskPool> pool;
     std::unordered_map<uint64_t, CrossbowBundle> crossbowCache;
     std::unordered_map<uint64_t, ProjectileBundle> projectileCache;
+    mutable std::mutex cacheMutex;
 
 public:
     CrossbowAssetFactory();
     ~CrossbowAssetFactory();
     
     void initialize(size_t threadCount = 4);
+    void shutdown();
     
     std::future<CrossbowBundle> generateCrossbowAsync(const CrossbowParams& p);
     std::future<ProjectileBundle> generateBoltAsync(const BoltParams& p);

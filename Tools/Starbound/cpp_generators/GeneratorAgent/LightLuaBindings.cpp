@@ -176,7 +176,7 @@ void LightLuaBindings::bind(sol::state& lua) {
         "amplitude", vec2Property(&FlickerParams::amplitude),
         "pattern", &FlickerParams::pattern);
 
-    lua.new_usertype<LODParams>("LODParams",
+    lua.new_usertype<LODParams>("LightLODParams",
         sol::constructors<LODParams()>(),
         "screenSizes", listProperty(&LODParams::screenSizes),
         "shadowRes", listProperty(&LODParams::shadowRes),

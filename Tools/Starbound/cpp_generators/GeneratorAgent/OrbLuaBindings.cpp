@@ -56,7 +56,7 @@ void OrbLuaBindings::bind(sol::state& lua) {
         "detailLevel", &OrbParams::detailLevel
     );
 
-    lua.set_function("spawn_orb", [&](OrbParams p) {
+    lua.set_function("spawn_orb", [](OrbParams p) {
         auto factory = OrbLuaBindings::factory();
         auto fut = factory->generateAsync(p);
         pendingOrbs.emplace_back(std::move(fut), p.id);
@@ -66,10 +66,12 @@ void OrbLuaBindings::bind(sol::state& lua) {
 void OrbLuaBindings::poll_assets(sol::state& lua) {
     for (auto it = pendingOrbs.begin(); it != pendingOrbs.end();) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            auto b = it->first.get();
-            // This would call a Lua function to spawn the orb.
-            // For now, we'll just print a message.
-            lua["print"]("Orb ready: " + it->second);
+            try {
+                auto b = it->first.get();
+                lua["print"]("Orb ready: " + it->second);
+            } catch (const std::exception& e) {
+                Log::error("Orbs", "Asset generation failed for {}: {}", it->second, e.what());
+            }
             it = pendingOrbs.erase(it);
         } else {
             ++it;

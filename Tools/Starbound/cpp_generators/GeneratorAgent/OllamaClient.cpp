@@ -4,8 +4,14 @@
 #include <fstream>
 #include <thread>
 #include <chrono>
+#include <algorithm>
+#include <optional>
+#include <vector>
 
 #ifdef _WIN32
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
     #include <windows.h>
     #include <winhttp.h>
     #pragma comment(lib, "winhttp.lib")
@@ -227,221 +233,155 @@ OllamaClient::ExtractedParameters OllamaClient::parseExtractedParameters(
 }
 
 #ifdef _WIN32
-// Windows implementation using WinHTTP
+// Windows implementation using WinHTTP (wide-character API only)
+namespace {
+
+std::wstring widen(const std::string& s) {
+    if (s.empty()) return {};
+    const int len = MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), nullptr, 0);
+    std::wstring out(static_cast<size_t>(len), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, s.data(), static_cast<int>(s.size()), out.data(), len);
+    return out;
+}
+
+// Closes a WinHTTP handle when it goes out of scope
+struct WinHttpHandle {
+    HINTERNET handle = nullptr;
+    WinHttpHandle() = default;
+    explicit WinHttpHandle(HINTERNET h) : handle(h) {}
+    WinHttpHandle(const WinHttpHandle&) = delete;
+    WinHttpHandle& operator=(const WinHttpHandle&) = delete;
+    ~WinHttpHandle() { if (handle) WinHttpCloseHandle(handle); }
+    explicit operator bool() const { return handle != nullptr; }
+};
+
+struct ParsedUrl {
+    std::wstring host;
+    std::wstring path;
+    INTERNET_PORT port = 80;
+    bool secure = false;
+};
+
+std::optional<ParsedUrl> crackUrl(const std::string& url) {
+    std::wstring wUrl = widen(url);
+    URL_COMPONENTS comp{};
+    comp.dwStructSize = sizeof(comp);
+    comp.dwSchemeLength = static_cast<DWORD>(-1);
+    comp.dwHostNameLength = static_cast<DWORD>(-1);
+    comp.dwUrlPathLength = static_cast<DWORD>(-1);
+    comp.dwExtraInfoLength = static_cast<DWORD>(-1);
+    if (!WinHttpCrackUrl(wUrl.c_str(), static_cast<DWORD>(wUrl.size()), 0, &comp)) {
+        return std::nullopt;
+    }
+    ParsedUrl parsed;
+    parsed.host.assign(comp.lpszHostName, comp.dwHostNameLength);
+    parsed.path.assign(comp.lpszUrlPath, comp.dwUrlPathLength);
+    if (comp.lpszExtraInfo && comp.dwExtraInfoLength > 0) {
+        parsed.path.append(comp.lpszExtraInfo, comp.dwExtraInfoLength);
+    }
+    if (parsed.path.empty()) parsed.path = L"/";
+    parsed.secure = comp.nScheme == INTERNET_SCHEME_HTTPS;
+    parsed.port = comp.nPort != 0 ? comp.nPort
+                                  : static_cast<INTERNET_PORT>(parsed.secure ? INTERNET_DEFAULT_HTTPS_PORT
+                                                                             : INTERNET_DEFAULT_HTTP_PORT);
+    return parsed;
+}
+
+// Opens session/connection/request for `verb` on `url` with the configured timeout
+bool openRequest(const std::string& url, const wchar_t* verb, int timeoutSeconds,
+                 WinHttpHandle& session, WinHttpHandle& connect, WinHttpHandle& request) {
+    auto parsed = crackUrl(url);
+    if (!parsed) return false;
+
+    session.handle = WinHttpOpen(L"OllamaClient/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                 WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!session) return false;
+
+    const int timeoutMs = std::max(1, timeoutSeconds) * 1000;
+    WinHttpSetTimeouts(session.handle, timeoutMs, timeoutMs, timeoutMs, timeoutMs);
+
+    connect.handle = WinHttpConnect(session.handle, parsed->host.c_str(), parsed->port, 0);
+    if (!connect) return false;
+
+    request.handle = WinHttpOpenRequest(connect.handle, verb, parsed->path.c_str(), nullptr,
+                                        WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
+                                        parsed->secure ? WINHTTP_FLAG_SECURE : 0);
+    return static_cast<bool>(request);
+}
+
+DWORD statusCode(HINTERNET request) {
+    DWORD code = 0;
+    DWORD size = sizeof(code);
+    if (!WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                             WINHTTP_HEADER_NAME_BY_INDEX, &code, &size, WINHTTP_NO_HEADER_INDEX)) {
+        return 0;
+    }
+    return code;
+}
+
+} // namespace
+
 std::string OllamaClient::httpPost(const std::string& url, const std::string& body) const {
-    HINTERNET hSession = nullptr;
-    HINTERNET hConnect = nullptr;
-    HINTERNET hRequest = nullptr;
-    
-    try {
-        // Parse URL
-        URL_COMPONENTSA urlComp;
-        ZeroMemory(&urlComp, sizeof(urlComp));
-        urlComp.dwStructSize = sizeof(urlComp);
-        urlComp.dwSchemeLength = -1;
-        urlComp.dwHostNameLength = -1;
-        urlComp.dwUrlPathLength = -1;
-        
-        std::vector<char> urlBuf(url.begin(), url.end());
-        urlBuf.push_back('\0');
-        
-        if (!WinHttpCrackUrlA(urlBuf.data(), urlBuf.size() - 1, 0, &urlComp)) {
-            return "";
-        }
-        
-        std::string host(urlComp.lpszHostName, urlComp.dwHostNameLength);
-        std::string path(urlComp.lpszUrlPath, urlComp.dwUrlPathLength);
-        if (urlComp.lpszExtraInfo) {
-            path += std::string(urlComp.lpszExtraInfo, urlComp.dwExtraInfoLength);
-        }
-        
-        int port = (urlComp.nScheme == INTERNET_SCHEME_HTTPS) ? 443 : 80;
-        if (urlComp.nPort != 0) {
-            port = urlComp.nPort;
-        }
-        
-        // Open session
-        hSession = WinHttpOpen(L"OllamaClient/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-                               WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-        if (!hSession) {
-            return "";
-        }
-        
-        // Connect
-        std::wstring wHost(host.begin(), host.end());
-        hConnect = WinHttpConnect(hSession, wHost.c_str(), port, 0);
-        if (!hConnect) {
-            WinHttpCloseHandle(hSession);
-            return "";
-        }
-        
-        // Open request
-        std::wstring wPath(path.begin(), path.end());
-        hRequest = WinHttpOpenRequest(hConnect, L"POST", wPath.c_str(), nullptr,
-                                      WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-                                      (urlComp.nScheme == INTERNET_SCHEME_HTTPS) ? WINHTTP_FLAG_SECURE : 0);
-        if (!hRequest) {
-            WinHttpCloseHandle(hConnect);
-            WinHttpCloseHandle(hSession);
-            return "";
-        }
-        
-        // Set headers
-        std::string headers = "Content-Type: application/json\r\n";
-        std::wstring wHeaders(headers.begin(), headers.end());
-        
-        if (!WinHttpAddRequestHeaders(hRequest, wHeaders.c_str(), -1, WINHTTP_ADDREQ_FLAG_ADD)) {
-            WinHttpCloseHandle(hRequest);
-            WinHttpCloseHandle(hConnect);
-            WinHttpCloseHandle(hSession);
-            return "";
-        }
-        
-        // Send request
-        std::vector<BYTE> bodyData(body.begin(), body.end());
-        if (!WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
-                                bodyData.data(), bodyData.size(), bodyData.size(), 0)) {
-            WinHttpCloseHandle(hRequest);
-            WinHttpCloseHandle(hConnect);
-            WinHttpCloseHandle(hSession);
-            return "";
-        }
-        
-        // Receive response
-        if (!WinHttpReceiveResponse(hRequest, nullptr)) {
-            WinHttpCloseHandle(hRequest);
-            WinHttpCloseHandle(hConnect);
-            WinHttpCloseHandle(hSession);
-            return "";
-        }
-        
-        // Read response
-        std::string response;
-        DWORD bytesAvailable = 0;
-        DWORD bytesRead = 0;
-        
-        do {
-            if (!WinHttpQueryDataAvailable(hRequest, &bytesAvailable)) {
-                break;
-            }
-            
-            if (bytesAvailable == 0) {
-                break;
-            }
-            
-            std::vector<char> buffer(bytesAvailable);
-            if (!WinHttpReadData(hRequest, buffer.data(), bytesAvailable, &bytesRead)) {
-                break;
-            }
-            
-            response.append(buffer.data(), bytesRead);
-        } while (bytesRead > 0);
-        
-        WinHttpCloseHandle(hRequest);
-        WinHttpCloseHandle(hConnect);
-        WinHttpCloseHandle(hSession);
-        
-        return response;
-    } catch (...) {
-        if (hRequest) WinHttpCloseHandle(hRequest);
-        if (hConnect) WinHttpCloseHandle(hConnect);
-        if (hSession) WinHttpCloseHandle(hSession);
+    WinHttpHandle session, connect, request;
+    if (!openRequest(url, L"POST", m_config.timeoutSeconds, session, connect, request)) {
         return "";
     }
+
+    static const wchar_t kHeaders[] = L"Content-Type: application/json\r\n";
+    if (!WinHttpAddRequestHeaders(request.handle, kHeaders, static_cast<DWORD>(-1), WINHTTP_ADDREQ_FLAG_ADD)) {
+        return "";
+    }
+
+    if (!WinHttpSendRequest(request.handle, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                            const_cast<char*>(body.data()), static_cast<DWORD>(body.size()),
+                            static_cast<DWORD>(body.size()), 0)) {
+        return "";
+    }
+
+    if (!WinHttpReceiveResponse(request.handle, nullptr)) {
+        return "";
+    }
+
+    const DWORD code = statusCode(request.handle);
+    if (code < 200 || code >= 300) {
+        std::cerr << "OllamaClient::httpPost: HTTP " << code << " from " << url << std::endl;
+        return "";
+    }
+
+    // Read response
+    std::string response;
+    for (;;) {
+        DWORD bytesAvailable = 0;
+        if (!WinHttpQueryDataAvailable(request.handle, &bytesAvailable) || bytesAvailable == 0) {
+            break;
+        }
+        std::vector<char> buffer(bytesAvailable);
+        DWORD bytesRead = 0;
+        if (!WinHttpReadData(request.handle, buffer.data(), bytesAvailable, &bytesRead) || bytesRead == 0) {
+            break;
+        }
+        response.append(buffer.data(), bytesRead);
+    }
+    return response;
 }
 
 bool OllamaClient::httpGet(const std::string& url) const {
-    HINTERNET hSession = nullptr;
-    HINTERNET hConnect = nullptr;
-    HINTERNET hRequest = nullptr;
-    
-    try {
-        // Parse URL (similar to httpPost)
-        URL_COMPONENTSA urlComp;
-        ZeroMemory(&urlComp, sizeof(urlComp));
-        urlComp.dwStructSize = sizeof(urlComp);
-        urlComp.dwSchemeLength = -1;
-        urlComp.dwHostNameLength = -1;
-        urlComp.dwUrlPathLength = -1;
-        
-        std::vector<char> urlBuf(url.begin(), url.end());
-        urlBuf.push_back('\0');
-        
-        if (!WinHttpCrackUrlA(urlBuf.data(), urlBuf.size() - 1, 0, &urlComp)) {
-            return false;
-        }
-        
-        std::string host(urlComp.lpszHostName, urlComp.dwHostNameLength);
-        std::string path(urlComp.lpszUrlPath, urlComp.dwUrlPathLength);
-        if (urlComp.lpszExtraInfo) {
-            path += std::string(urlComp.lpszExtraInfo, urlComp.dwExtraInfoLength);
-        }
-        
-        int port = (urlComp.nScheme == INTERNET_SCHEME_HTTPS) ? 443 : 80;
-        if (urlComp.nPort != 0) {
-            port = urlComp.nPort;
-        }
-        
-        hSession = WinHttpOpen(L"OllamaClient/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
-                               WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-        if (!hSession) {
-            return false;
-        }
-        
-        std::wstring wHost(host.begin(), host.end());
-        hConnect = WinHttpConnect(hSession, wHost.c_str(), port, 0);
-        if (!hConnect) {
-            WinHttpCloseHandle(hSession);
-            return false;
-        }
-        
-        std::wstring wPath(path.begin(), path.end());
-        hRequest = WinHttpOpenRequest(hConnect, L"GET", wPath.c_str(), nullptr,
-                                      WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES,
-                                      (urlComp.nScheme == INTERNET_SCHEME_HTTPS) ? WINHTTP_FLAG_SECURE : 0);
-        if (!hRequest) {
-            WinHttpCloseHandle(hConnect);
-            WinHttpCloseHandle(hSession);
-            return false;
-        }
-        
-        if (!WinHttpSendRequest(hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
-                                WINHTTP_NO_REQUEST_DATA, 0, 0, 0)) {
-            WinHttpCloseHandle(hRequest);
-            WinHttpCloseHandle(hConnect);
-            WinHttpCloseHandle(hSession);
-            return false;
-        }
-        
-        if (!WinHttpReceiveResponse(hRequest, nullptr)) {
-            WinHttpCloseHandle(hRequest);
-            WinHttpCloseHandle(hConnect);
-            WinHttpCloseHandle(hSession);
-            return false;
-        }
-        
-        DWORD statusCode = 0;
-        DWORD statusCodeSize = sizeof(statusCode);
-        if (WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-                                 WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusCodeSize,
-                                 WINHTTP_NO_HEADER_INDEX)) {
-            bool success = (statusCode >= 200 && statusCode < 300);
-            WinHttpCloseHandle(hRequest);
-            WinHttpCloseHandle(hConnect);
-            WinHttpCloseHandle(hSession);
-            return success;
-        }
-        
-        WinHttpCloseHandle(hRequest);
-        WinHttpCloseHandle(hConnect);
-        WinHttpCloseHandle(hSession);
-        return false;
-    } catch (...) {
-        if (hRequest) WinHttpCloseHandle(hRequest);
-        if (hConnect) WinHttpCloseHandle(hConnect);
-        if (hSession) WinHttpCloseHandle(hSession);
+    WinHttpHandle session, connect, request;
+    if (!openRequest(url, L"GET", m_config.timeoutSeconds, session, connect, request)) {
         return false;
     }
+
+    if (!WinHttpSendRequest(request.handle, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                            WINHTTP_NO_REQUEST_DATA, 0, 0, 0)) {
+        return false;
+    }
+
+    if (!WinHttpReceiveResponse(request.handle, nullptr)) {
+        return false;
+    }
+
+    const DWORD code = statusCode(request.handle);
+    return code >= 200 && code < 300;
 }
 #else
 // Linux/Mac implementation using libcurl
@@ -455,11 +395,15 @@ std::string OllamaClient::httpPost(const std::string& url, const std::string& bo
     
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, [](void* contents, size_t size, size_t nmemb, std::string* data) {
-        size_t totalSize = size * nmemb;
-        data->append((char*)contents, totalSize);
+    // curl_easy_setopt is variadic: pass a real function pointer, not a lambda object
+    using WriteCallback = size_t (*)(char*, size_t, size_t, void*);
+    WriteCallback writeCallback = [](char* contents, size_t size, size_t nmemb, void* userdata) -> size_t {
+        const size_t totalSize = size * nmemb;
+        static_cast<std::string*>(userdata)->append(contents, totalSize);
         return totalSize;
-    });
+    };
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, static_cast<long>(m_config.timeoutSeconds));
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
     
     struct curl_slist* headers = nullptr;

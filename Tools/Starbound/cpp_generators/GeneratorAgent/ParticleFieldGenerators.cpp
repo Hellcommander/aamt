@@ -1,76 +1,88 @@
+// Parameter hashing for the particle field generator family.
+//
+// The generator implementations (NoiseGen / ColorGen / LODGen / ShaderGen /
+// FieldGen / SimGen) live in ParticleFieldAssetFactory.cpp; this file used to
+// carry placeholder copies of them, which duplicated those definitions.
 #include "ParticleFieldAssetFactory.hpp"
-#include "core/Log.hpp"
 
 namespace MagiTech {
 namespace ParticleFields {
 
-#define LOG_FIELD_GEN(Action, Id) Log::info("ParticleField", "ParticleFieldGen - {}: {}", #Action, Id)
+namespace {
 
-// Hash function implementations
+// Field-wise hashing (the structs contain strings and vectors, so they must not be
+// hashed as raw memory).
+template <typename T>
+void hashPod(XXH64_state_t& s, const T& v) {
+    XXH64_update(&s, &v, sizeof(T));
+}
+
+void hashString(XXH64_state_t& s, const std::string& v) {
+    const uint64_t n = v.size();
+    hashPod(s, n);
+    XXH64_update(&s, v.data(), v.size());
+}
+
+template <typename T>
+void hashVector(XXH64_state_t& s, const std::vector<T>& v) {
+    const uint64_t n = v.size();
+    hashPod(s, n);
+    if (!v.empty()) XXH64_update(&s, v.data(), v.size() * sizeof(T));
+}
+
+} // namespace
+
 uint64_t LODParams::hashKey() const {
     XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, screenSizes.data(), screenSizes.size() * sizeof(float));
-    XXH64_update(&s, densityScales.data(), densityScales.size() * sizeof(float));
+    hashVector(s, screenSizes);
+    hashVector(s, densityScales);
     return XXH64_digest(&s);
 }
 
 uint64_t ParticleFieldParams::hashKey() const {
     XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(ParticleFieldParams) - sizeof(std::string) - sizeof(LODParams));
-    XXH64_update(&s, id.c_str(), id.length());
-    XXH64_update(&s, &lod, sizeof(LODParams));
+    hashString(s, id);
+    hashPod(s, boundsMin);
+    hashPod(s, boundsMax);
+    hashPod(s, density);
+    hashPod(s, useVolume);
+    hashPod(s, gpuDriven);
+    hashPod(s, seed);
+    hashPod(s, lod.hashKey());
     return XXH64_digest(&s);
 }
 
 uint64_t NoiseParams::hashKey() const {
     XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(NoiseParams) - sizeof(std::string));
-    XXH64_update(&s, noiseType.c_str(), noiseType.length());
+    hashString(s, noiseType);
+    hashPod(s, octaves);
+    hashPod(s, frequency);
+    hashPod(s, lacunarity);
+    hashPod(s, gain);
+    hashPod(s, warp);
     return XXH64_digest(&s);
 }
 
 uint64_t ColorRampParams::hashKey() const {
     XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(ColorRampParams) - sizeof(std::vector<std::pair<float, glm::vec4>>));
-    XXH64_update(&s, stops.data(), stops.size() * sizeof(std::pair<float, glm::vec4>));
+    const uint64_t n = stops.size();
+    hashPod(s, n);
+    for (const auto& [position, color] : stops) {
+        hashPod(s, position);
+        hashPod(s, color);
+    }
+    hashPod(s, cyclic);
+    hashPod(s, resolution);
     return XXH64_digest(&s);
 }
 
-uint64_t ParticleParams::hashKey() const { return XXH64(this, sizeof(ParticleParams), 0); }
-
-// Generator stubs
-namespace NoiseGen {
-    TextureHandle buildVolume(const NoiseParams& np, const glm::vec3& min, const glm::vec3& max) {
-        LOG_FIELD_GEN(BuildingNoiseVolume, np.noiseType);
-        static uint32_t nextHandle = 1; return nextHandle++;
-    }
-}
-namespace ColorGen {
-    TextureHandle buildRamp(const ColorRampParams& cr) {
-        LOG_FIELD_GEN(BuildingColorRamp, cr.resolution);
-        static uint32_t nextHandle = 1; return nextHandle++;
-    }
-}
-namespace LODGen {
-    LODData compute(const LODParams& lp) {
-        LOG_FIELD_GEN(ComputingLODs, lp.screenSizes.size());
-        LODData d;
-        d.thresholds = lp.screenSizes;
-        d.scales = lp.densityScales;
-        return d;
-    }
-}
-namespace ShaderGen {
-    ShaderHandle buildFieldShader(const ParticleFieldParams& fp, const NoiseParams& np, const ColorRampParams& cr, const ParticleParams& pp) {
-        LOG_FIELD_GEN(BuildingFieldShader, fp.id);
-        static uint32_t nextHandle = 1; return nextHandle++;
-    }
-}
-namespace FieldGen {
-    ParticleSystemHandle spawnField(const ParticleFieldParams& fp, const NoiseParams& np, const ParticleParams& pp, const TextureHandle& ramp) {
-        LOG_FIELD_GEN(SpawningField, fp.id);
-        static uint32_t nextHandle = 1; return nextHandle++;
-    }
+uint64_t ParticleParams::hashKey() const {
+    XXH64_state_t s; XXH64_reset(&s, 0);
+    hashPod(s, sizeRange);
+    hashPod(s, lifeTimeRange);
+    hashPod(s, speedRange);
+    hashPod(s, alignToCamera);
+    return XXH64_digest(&s);
 }
 
 } // namespace ParticleFields

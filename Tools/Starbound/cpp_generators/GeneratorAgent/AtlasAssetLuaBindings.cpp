@@ -36,10 +36,10 @@ void AtlasAssetLuaBindings::bind(sol::state& lua) {
         "id", &AtlasParams::id, "maxWidth", &AtlasParams::maxWidth, "maxHeight", &AtlasParams::maxHeight, "padding", &AtlasParams::padding,
         "allowRotation", &AtlasParams::allowRotation, "generateMipmaps", &AtlasParams::generateMipmaps, "mipLevels", &AtlasParams::mipLevels);
 
-    lua.new_usertype<MaterialParams>("MaterialParams", sol::constructors<MaterialParams()>(),
+    lua.new_usertype<MaterialParams>("AtlasMaterialParams", sol::constructors<MaterialParams()>(),
         "shader", &MaterialParams::shader, "alphaTest", &MaterialParams::alphaTest, "alphaThreshold", &MaterialParams::alphaThreshold);
 
-    lua.new_usertype<LODParams>("LODParams", sol::constructors<LODParams()>(),
+    lua.new_usertype<LODParams>("AtlasLODParams", sol::constructors<LODParams()>(),
         "screenSizes", &LODParams::screenSizes, "atlasResolutions", &LODParams::atlasResolutions);
 
     lua.new_usertype<LODData>("AtlasLODData", sol::no_constructor,

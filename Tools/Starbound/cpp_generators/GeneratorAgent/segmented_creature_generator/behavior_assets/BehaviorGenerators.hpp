@@ -1,23 +1,30 @@
 #pragma once
 
+// Behaviour generation for segmented creatures. The behaviour tree itself is built
+// by the canonical AIGen::build(BehaviorParams) (ProceduralFactory.hpp, which replaced
+// the former AIGen<BehaviorParams> template specialisation); this layer derives
+// parameters from behaviour archetypes and builds the multi-tree bundle.
+
 #include "BehaviorTypes.hpp"
-#include "core/modules/segmented_creature_generator/ProceduralFactory.hpp"
+#include "ProceduralFactory.hpp"
 
 namespace MagiTech {
 namespace SegmentedCreatures {
 
-// AI is generated from behavior, not creature params
-template<>
-struct AIGen<BehaviorParams> {
-    static AIHandle build(const BehaviorParams& p);
-};
+/** Behaviour parameters for an archetype / movement pattern / combat style combination. */
+BehaviorParams makeBehaviorParams(BehaviorType type,
+                                  MovementPattern movement = MovementPattern::SLITHER,
+                                  CombatStyle combat = CombatStyle::MELEE);
 
-// Other generators are not used for behavior params
-template<> struct MeshGen<BehaviorParams> { static MeshHandle build(const BehaviorParams& p) { return 0; } };
-template<> struct TextureGen<BehaviorParams> { static TextureHandle build(const BehaviorParams& p) { return 0; } };
-template<> struct RigGen<BehaviorParams> { static SkeletonHandle build(const BehaviorParams& p) { return 0; } };
-template<> struct AnimGen<BehaviorParams> { static AnimationHandle build(const BehaviorParams& p) { return 0; } };
+/**
+ * Builds the main behaviour tree and the focused movement / combat / social /
+ * environmental trees for `params` (all stored in CreatureAssets::AssetStore) and
+ * fills the bundle statistics. Never throws; failures are reported in result.
+ */
+BehaviorAssetBundle buildBehaviorAssets(const BehaviorParams& params);
 
+/** Releases every behaviour tree referenced by the bundle from the asset store. */
+void releaseBehaviorAssets(const BehaviorAssetBundle& bundle);
 
 } // namespace SegmentedCreatures
 } // namespace MagiTech

@@ -5,7 +5,7 @@ namespace MagiTech {
 namespace Ingredients {
 namespace Gen {
 
-#define LOG_GEN(Type, Asset, Id) Log::info("Generating {} for {} ingredient: {}", #Asset, #Type, Id)
+#define LOG_GEN(Type, Asset, Id) Log::info("Ingredients", "Generating {} for {} ingredient: {}", #Asset, #Type, Id)
 
     // --- Herb Generators ---
     namespace Herb {

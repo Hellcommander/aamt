@@ -5,57 +5,84 @@
 #include <array>
 #include <map>
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include "vendor/json/include/nlohmann/json.hpp"
 
 namespace MagiTech {
 namespace SegmentedCreatures {
 
-// Enums for creature parameters
+// Enums for creature parameters (new values are appended so existing numeric values stay stable)
 enum class TaperProfile {
     NONE,
     LINEAR,
     EXPONENTIAL,
-    CUSTOM_CURVE
+    CUSTOM_CURVE,
+    BELL_CURVE,     // thickest in the middle
+    STEPPED,        // radius drops in discrete steps
+    IRREGULAR       // seeded random variation around a linear taper
 };
 
 enum class SegmentType {
     CYLINDER,
     BOX,
     HEXAGON,
-    CUSTOM_MESH
+    CUSTOM_MESH,
+    SPHERE,
+    CAPSULE,
+    PRISM,          // triangular prism
+    IRREGULAR       // noise-deformed cylinder
 };
 
 enum class HeadType {
     SIMPLE,
     MANDIBLE,
     MULTI_EYE,
-    HORNED
+    HORNED,
+    FANGED,
+    TENTACLED,
+    CRYSTAL,
+    MECHANICAL
 };
 
 enum class TailType {
     NONE,
     SPIKE,
-    FLARED
+    FLARED,
+    TENTACLE,
+    CRYSTAL,
+    MECHANICAL,
+    BIOLUMINESCENT,
+    VENOMOUS
 };
 
 enum class AnimationProfile {
     SLITHER,
     CRAWL,
     COIL,
-    CUSTOM
+    CUSTOM,
+    BURROW,
+    SWIM,
+    FLY,
+    CLIMB,
+    WAVE_SLITHER = SLITHER   // alias used by the former creature_assets types
 };
 
 enum class AIProfile {
     PASSIVE,
     NEUTRAL,
     PREDATOR,
-    SWARM
+    SWARM,
+    BURROWER,
+    CLIMBER,
+    AMBUSHER,
+    GUARDIAN
 };
 
 // SegmentedCreatureParams structure
 struct SegmentedCreatureParams {
     std::string id;
+    std::string name;
     int segmentCount = 20;
     float segmentLength = 0.5f;
     TaperProfile taperProfile = TaperProfile::LINEAR;
@@ -73,31 +100,66 @@ struct SegmentedCreatureParams {
     float materialMetallic = 0.8f;
     AnimationProfile animationProfile = AnimationProfile::SLITHER;
     AIProfile aiProfile = AIProfile::PREDATOR;
-    
+
     // Custom curve for taper profile
     std::vector<float> customTaperCurve;
-    
+
     // Additional parameters
     float segmentSpacing = 0.1f;
     bool enableJoints = true;
     float jointFlexibility = 0.5f;
     bool enableArmor = true;
-    float armorThickness = 0.05f;
+    float armorThickness = 0.05f;          // armour plate thickness (JSON/Lua alias: plateThickness)
     bool enableSpikes = false;
     int spikeCount = 0;
     float spikeLength = 0.1f;
-    
+
+    // Head and tail configuration
+    float headScale = 1.2f;                // head size multiplier
+    float tailScale = 0.8f;                // tail size multiplier
+    int headSegmentCount = 1;              // head/neck segments
+    int tailSegmentCount = 1;              // tail segments
+
+    // Articulation and physics
+    float jointLimit = 45.0f;              // maximum joint angle in degrees
+    float segmentMass = 1.0f;              // mass per segment
+    float segmentDensity = 1.0f;           // material density
+    float segmentFriction = 0.5f;          // surface friction
+    float segmentRestitution = 0.3f;       // bounce factor
+
+    // Visual appearance
+    std::array<float, 3> colorAccent = {0.8f, 0.8f, 0.8f};
+    float colorVariation = 0.1f;           // random colour variation
+    float materialEmissive = 0.0f;         // glow intensity
+    float materialTransparency = 0.0f;     // transparency factor
+
+    // Armour plate layout
+    float plateSpacing = 0.1f;             // gap between consecutive plates (fraction of segment length)
+    bool plateOverlap = false;             // plates extend over the segment gap and overlap
+
+    // Advanced features
+    bool gpuAccelerated = true;            // execution hint for hosts with a GPU path
+    bool simdEnabled = true;               // execution hint for SIMD code paths
+    bool adaptiveLOD = true;               // hint: runtime may pick lower detail for distant creatures
+    bool proceduralVariation = true;       // seeded per-segment variation
+    bool dynamicSegments = false;          // segment count may change at runtime
+    bool damageableSegments = false;       // individual segments can be damaged / severed
+
+    // Generation settings
+    uint32_t seed = 0;                     // random seed (0 = derived from id)
+    float generationQuality = 1.0f;        // tessellation / texture quality multiplier (0..2]
+
     // Metadata
     std::string description;
     std::vector<std::string> tags;
     std::map<std::string, std::string> metadata;
-    
+
     // Performance settings
-    bool enableCaching = true;
+    bool enableCaching = true;             // JSON/Lua alias: cacheEnabled
     bool enableHotReload = true;
     bool enableParallelProcessing = true;
-    
-    // Hash function for caching
+
+    // Hash function for caching (every field that changes the generated assets)
     uint64_t hashKey() const {
         uint64_t hash = 0;
         hash = hashCombine(hash, std::hash<std::string>{}(id));
@@ -112,12 +174,8 @@ struct SegmentedCreatureParams {
         hash = hashCombine(hash, std::hash<float>{}(noiseDetail));
         hash = hashCombine(hash, std::hash<bool>{}(armorPlates));
         hash = hashCombine(hash, std::hash<int>{}(plateDetailLevel));
-        hash = hashCombine(hash, std::hash<float>{}(colorPrimary[0]));
-        hash = hashCombine(hash, std::hash<float>{}(colorPrimary[1]));
-        hash = hashCombine(hash, std::hash<float>{}(colorPrimary[2]));
-        hash = hashCombine(hash, std::hash<float>{}(colorSecondary[0]));
-        hash = hashCombine(hash, std::hash<float>{}(colorSecondary[1]));
-        hash = hashCombine(hash, std::hash<float>{}(colorSecondary[2]));
+        for (float c : colorPrimary) hash = hashCombine(hash, std::hash<float>{}(c));
+        for (float c : colorSecondary) hash = hashCombine(hash, std::hash<float>{}(c));
         hash = hashCombine(hash, std::hash<float>{}(materialRoughness));
         hash = hashCombine(hash, std::hash<float>{}(materialMetallic));
         hash = hashCombine(hash, std::hash<int>{}(static_cast<int>(animationProfile)));
@@ -131,18 +189,71 @@ struct SegmentedCreatureParams {
         hash = hashCombine(hash, std::hash<bool>{}(enableSpikes));
         hash = hashCombine(hash, std::hash<int>{}(spikeCount));
         hash = hashCombine(hash, std::hash<float>{}(spikeLength));
+        hash = hashCombine(hash, std::hash<float>{}(headScale));
+        hash = hashCombine(hash, std::hash<float>{}(tailScale));
+        hash = hashCombine(hash, std::hash<int>{}(headSegmentCount));
+        hash = hashCombine(hash, std::hash<int>{}(tailSegmentCount));
+        hash = hashCombine(hash, std::hash<float>{}(jointLimit));
+        hash = hashCombine(hash, std::hash<float>{}(segmentMass));
+        hash = hashCombine(hash, std::hash<float>{}(segmentDensity));
+        hash = hashCombine(hash, std::hash<float>{}(segmentFriction));
+        hash = hashCombine(hash, std::hash<float>{}(segmentRestitution));
+        for (float c : colorAccent) hash = hashCombine(hash, std::hash<float>{}(c));
+        hash = hashCombine(hash, std::hash<float>{}(colorVariation));
+        hash = hashCombine(hash, std::hash<float>{}(materialEmissive));
+        hash = hashCombine(hash, std::hash<float>{}(materialTransparency));
+        hash = hashCombine(hash, std::hash<float>{}(plateSpacing));
+        hash = hashCombine(hash, std::hash<bool>{}(plateOverlap));
+        hash = hashCombine(hash, std::hash<bool>{}(proceduralVariation));
+        hash = hashCombine(hash, std::hash<bool>{}(dynamicSegments));
+        hash = hashCombine(hash, std::hash<bool>{}(damageableSegments));
+        hash = hashCombine(hash, std::hash<uint32_t>{}(seed));
+        hash = hashCombine(hash, std::hash<float>{}(generationQuality));
+        hash = hashCombine(hash, std::hash<std::string>{}(name));
         for (const auto& [key, value] : metadata) {
             hash = hashCombine(hash, std::hash<std::string>{}(key));
             hash = hashCombine(hash, std::hash<std::string>{}(value));
         }
         return hash;
     }
-    
+
+    bool isValid() const {
+        return !id.empty() &&
+               segmentCount > 0 && segmentCount <= 1000 &&
+               segmentLength > 0.0f && segmentLength <= 10.0f &&
+               segmentRadius > 0.0f && segmentRadius <= 5.0f &&
+               articulationStiffness >= 0.0f && articulationStiffness <= 1.0f &&
+               headSegmentCount >= 1 && tailSegmentCount >= 1 &&
+               headScale > 0.0f && tailScale > 0.0f &&
+               generationQuality > 0.0f && generationQuality <= 2.0f;
+    }
+
+    std::string toString() const {
+        return "SegmentedCreatureParams{id='" + id + "', segmentCount=" + std::to_string(segmentCount) +
+               ", segmentLength=" + std::to_string(segmentLength) + ", segmentRadius=" + std::to_string(segmentRadius) + "}";
+    }
+
 private:
     template<typename T>
     static uint64_t hashCombine(uint64_t seed, const T& value) {
         return seed ^ (std::hash<T>{}(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
     }
+};
+
+// Segmented creature generation statistics (filled by the factory into AssetBundle::result)
+struct SegmentedCreatureGenerationResult {
+    bool success = false;
+    std::string errorMessage;
+    float generationTime = 0.0f;       // seconds
+    size_t memoryUsage = 0;            // bytes of generated CPU data
+    uint32_t vertexCount = 0;
+    uint32_t triangleCount = 0;
+    uint32_t textureSize = 0;
+    uint32_t animationFrameCount = 0;
+    uint32_t segmentCount = 0;
+    uint32_t boneCount = 0;
+
+    explicit operator bool() const { return success; }
 };
 
 // BehaviorParams structure
@@ -154,7 +265,7 @@ struct BehaviorParams {
     int packSize = 1;
     float burrowDepth = 2.0f;
     bool climbAbility = true;
-    
+
     // Additional behavior parameters
     float patrolRadius = 10.0f;
     float idleTime = 2.0f;
@@ -165,7 +276,7 @@ struct BehaviorParams {
     bool nocturnal = false;
     bool territorial = false;
     float territorySize = 20.0f;
-    
+
     // Combat parameters
     float attackDamage = 10.0f;
     float attackCooldown = 1.0f;
@@ -173,13 +284,13 @@ struct BehaviorParams {
     float rangedAttackRange = 5.0f;
     bool canUseAbilities = false;
     std::vector<std::string> abilities;
-    
+
     // Social parameters
     bool packHunting = false;
     float packCohesion = 0.8f;
     bool hierarchical = false;
     int dominanceRank = 0;
-    
+
     // Environmental parameters
     bool burrower = false;
     bool climber = false;
@@ -187,13 +298,13 @@ struct BehaviorParams {
     bool flyer = false;
     float preferredTemperature = 20.0f;
     float temperatureTolerance = 10.0f;
-    
+
     // Metadata
     std::string behaviorName;
     std::string description;
     std::vector<std::string> tags;
     std::map<std::string, std::string> metadata;
-    
+
     // Hash function for caching
     uint64_t hashKey() const {
         uint64_t hash = 0;
@@ -232,7 +343,7 @@ struct BehaviorParams {
         hash = hashCombine(hash, std::hash<std::string>{}(behaviorName));
         return hash;
     }
-    
+
 private:
     template<typename T>
     static uint64_t hashCombine(uint64_t seed, const T& value) {
@@ -249,7 +360,7 @@ namespace ParamUtils {
     TailType parseTailType(const std::string& str);
     AnimationProfile parseAnimationProfile(const std::string& str);
     AIProfile parseAIProfile(const std::string& str);
-    
+
     // Convert enum to string
     std::string taperProfileToString(TaperProfile profile);
     std::string segmentTypeToString(SegmentType type);
@@ -257,14 +368,14 @@ namespace ParamUtils {
     std::string tailTypeToString(TailType type);
     std::string animationProfileToString(AnimationProfile profile);
     std::string aiProfileToString(AIProfile profile);
-    
+
     // JSON serialization
     nlohmann::json toJson(const SegmentedCreatureParams& params);
     SegmentedCreatureParams creatureFromJson(const nlohmann::json& json);
-    
+
     nlohmann::json toJson(const BehaviorParams& params);
     BehaviorParams behaviorFromJson(const nlohmann::json& json);
 }
 
 } // namespace SegmentedCreatures
-} // namespace MagiTech 
+} // namespace MagiTech

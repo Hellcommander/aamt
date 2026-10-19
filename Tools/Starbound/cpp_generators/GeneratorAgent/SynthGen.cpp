@@ -12,11 +12,6 @@
 #include <mutex>
 #include "vendor/json/include/nlohmann/json.hpp"
 
-// YAML-CPP include (if available)
-#ifdef HAS_YAML_CPP
-#include <yaml-cpp/yaml.h>
-#endif
-
 namespace MagiTech {
 namespace Audio {
 
@@ -357,26 +352,12 @@ namespace {
         buffer << file.rdbuf();
         std::string content = buffer.str();
         
-        // Try JSON first
+        // Instrument definitions are JSON documents (yaml-cpp is not vendored with the backend)
         try {
             nlohmann::json j = nlohmann::json::parse(content);
             return parseInstrumentDefinition(j);
         } catch (const nlohmann::json::exception& e) {
-            // If JSON parsing fails, try YAML (if available)
-#ifdef HAS_YAML_CPP
-            try {
-                YAML::Node yamlNode = YAML::Load(content);
-                // Convert YAML to JSON for unified parsing
-                // This is a simplified conversion - in a full implementation,
-                // you'd want a proper YAML to JSON converter
-                nlohmann::json j = nlohmann::json::object(); // Placeholder
-                return parseInstrumentDefinition(j);
-            } catch (const YAML::Exception& e) {
-                throw std::runtime_error("Failed to parse instrument file as JSON or YAML: " + std::string(e.what()));
-            }
-#else
             throw std::runtime_error("Failed to parse instrument file as JSON: " + std::string(e.what()));
-#endif
         }
     }
 }

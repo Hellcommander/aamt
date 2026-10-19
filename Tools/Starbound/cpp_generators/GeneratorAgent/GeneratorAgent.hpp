@@ -6,8 +6,16 @@
 #include "vendor/json/include/nlohmann/json.hpp"
 #include <sol/sol.hpp>
 #include "SpellStoneAPI.h"
+#include "core/ShapeTypes.hpp"
+#include <chrono>
+#include <expected>
+#include <filesystem>
 #include <memory>
+#include <mutex>
+#include <random>
+#include <shared_mutex>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <unordered_map>
 #include <functional>
@@ -263,16 +271,15 @@ private:
     nlohmann::json m_aiParams;
     std::vector<SpellDefinition> m_trainingData;
     
-    // Spell Generation Module Integration
-    std::unique_ptr<BalancedSpellFactory> m_balancedSpellFactory;
-    std::unique_ptr<ShapeWeightManager> m_shapeWeightManager;
-    std::unique_ptr<SpellBalanceSimulator> m_spellBalanceSimulator;
-    std::unique_ptr<SpellEvolutionManager> m_spellEvolutionManager;
-    std::unique_ptr<SpellShapeBalanceConfigManager> m_spellShapeBalanceConfigManager;
-    std::unique_ptr<SpellShapeCacheManager> m_spellShapeCacheManager;
-    std::unique_ptr<SpellShapeCostManager> m_spellShapeCostManager;
-    std::unique_ptr<SpellShapeDefinitionManager> m_spellShapeDefinitionManager;
-    
+    // Synthesis goals, grammar rules and custom pattern matchers registered at runtime
+    std::unordered_map<std::string, SynthesisGoal> m_synthesisGoals;
+    std::vector<std::pair<std::string, std::string>> m_grammarRules;
+    std::unordered_map<std::string, std::function<bool(const std::string&)>> m_patternMatchers;
+    mutable std::mutex m_registryMutex;
+
+    // Balanced shape generation (ShapeDef from core/ShapeTypes.hpp)
+    mutable std::mt19937 m_shapeRng{std::random_device{}()};
+
     // Balance parameters
     float m_powerThreshold = 1.0f;
     float m_costThreshold = 1.0f;
@@ -282,7 +289,7 @@ private:
     
     // SpellStone generation
     std::unordered_map<std::string, std::vector<std::string>> m_spellStoneRecipes;
-    std::mutex m_spellStoneRecipesMutex;
+    mutable std::mutex m_spellStoneRecipesMutex;
 
     // Performance monitoring
     std::chrono::high_resolution_clock::time_point m_lastMetricsTime;
@@ -309,6 +316,8 @@ private:
     void setupLuaBindings(sol::state& lua);
     void setupAdvancedFeatures();
     void cleanupAdvancedFeatures();
+    ShapeDef buildShape(::ShapeType type, float budget) const;
+    ::ShapeType pickShapeType(const std::vector<::ShapeType>& candidates) const;
 };
 
 } // namespace MagiTech::GeneratorAgent 

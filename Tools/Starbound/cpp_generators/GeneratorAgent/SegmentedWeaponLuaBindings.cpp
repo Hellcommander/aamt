@@ -142,7 +142,7 @@ void SegmentedWeaponLuaBindings::bindParameterStructs(sol::state& lua) {
     );
 
     // Bind PhysicsParams
-    lua.new_usertype<PhysicsParams>("PhysicsParams",
+    lua.new_usertype<PhysicsParams>("SegmentedWeaponPhysicsParams",
         sol::constructors<PhysicsParams()>(),
         
         // Basic properties

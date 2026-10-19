@@ -71,7 +71,7 @@ void DriftingOrbitalsLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_drifting_orbitals",
-        [&](const DriftingOrbitalParams& p) {
+        [](const DriftingOrbitalParams& p) {
             auto factory = DriftingOrbitalsLuaBindings::factory();
             pendingAssets.emplace_back(factory->generateAsync(p), p.id);
         }
@@ -84,7 +84,7 @@ void DriftingOrbitalsLuaBindings::poll_assets(sol::state& lua) {
             try {
                 auto b = it->first.get();
                 lua["print"]("Drifting orbital asset ready: " + it->second);
-            } catch (const std::exception& e) { /* log error */ }
+            } catch (const std::exception& e) { Log::error("DriftingOrbitals", "Asset generation failed for {}: {}", it->second, e.what()); }
             it = pendingAssets.erase(it);
         } else { ++it; }
     }

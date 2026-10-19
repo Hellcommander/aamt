@@ -1,525 +1,615 @@
-#include "core/animation/MeshToSpritePipeline.hpp"
-#include <iostream>
-#include <iomanip>
+// MeshToSpriteExample.cpp
+// Demonstrates the mesh-to-sprite workflow: camera setup, animation capture and sprite
+// sheet export, ending with Starbound .animation / .projectile files.
+//
+// The example is self-contained: it writes a procedural mech mesh (.obj) and a set of
+// root-motion clips (.bvh) to disk and loads them through the pipeline's real loaders,
+// so every step below renders actual geometry with the software rasterizer.
+
+#include "MeshToSpriteExample.hpp"
+#include "MeshToSpritePipeline.hpp"
+#include "core/Log.hpp"
+
+#include <algorithm>
 #include <chrono>
-#include <thread>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <exception>
+#include <filesystem>
+#include <fstream>
+#include <functional>
+#include <iomanip>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 
-using namespace MagiTech::Animation;
+namespace MagiTech {
+namespace Animation {
+namespace Examples {
 
-/**
- * @brief Example demonstrating comprehensive mesh-to-sprite pipeline
- * 
- * Shows conversion of 3D mech animations to 2D sprite sheets with
- * multiple camera angles, lighting setups, and Starbound integration.
- */
-class MeshToSpriteExample {
-public:
-    MeshToSpriteExample() {
-        // Configure pipeline
-        MeshToSpritePipeline::PipelineConfig config;
-        
-        // Render settings
-        config.backend = MeshToSpritePipeline::RenderBackend::OPENGL;
-        config.render.frame_width = 128;
-        config.render.frame_height = 128;
-        config.render.samples = 4; // 4x MSAA
-        config.render.enable_alpha = true;
-        config.render.enable_depth_test = true;
-        config.render.background_color = glm::vec4(0, 0, 0, 0); // Transparent
-        
-        // Camera settings
-        config.camera.type = MeshToSpritePipeline::CameraType::ISOMETRIC;
-        config.camera.position = glm::vec3(5, 5, 5);
-        config.camera.target = glm::vec3(0, 0, 0);
-        config.camera.up = glm::vec3(0, 1, 0);
-        config.camera.ortho_size = 3.0f;
-        config.camera.auto_fit_bounds = true;
-        
-        // Lighting settings
-        config.lighting.mode = MeshToSpritePipeline::LightingMode::DIRECTIONAL;
-        config.lighting.ambient_color = glm::vec3(0.3f, 0.3f, 0.3f);
-        config.lighting.directional_direction = glm::vec3(-1, -1, -1);
-        config.lighting.directional_color = glm::vec3(1.0f, 1.0f, 1.0f);
-        config.lighting.directional_intensity = 1.2f;
-        config.lighting.cast_shadows = false; // Disable for performance
-        
-        // Output settings
-        config.output_format = MeshToSpritePipeline::OutputFormat::PNG;
-        config.output_directory = "./sprite_output";
-        config.asset_prefix = "mech";
-        config.generate_sprite_sheets = true;
-        config.generate_individual_frames = false;
-        config.generate_animation_json = true;
-        config.generate_starbound_files = true;
-        
-        // Sprite sheet settings
-        config.max_sheet_width = 2048;
-        config.max_sheet_height = 2048;
-        config.sprite_padding = 2.0f;
-        config.power_of_two_sheets = true;
-        config.optimize_empty_space = true;
-        
-        // Performance settings
-        config.enable_multithreading = true;
-        config.enable_progressive_capture = false;
-        
-        // Initialize pipeline
-        pipeline_ = std::make_unique<MeshToSpritePipeline>();
-        if (!pipeline_->initialize(config)) {
-            throw std::runtime_error("Failed to initialize mesh-to-sprite pipeline");
-        }
-        
-        // Set progress callback
-        pipeline_->set_progress_callback([this](float progress, const std::string& status) {
-            this->on_progress_update(progress, status);
-        });
-        
-        std::cout << "=== Mesh-to-Sprite Pipeline Example ===" << std::endl;
-        std::cout << "Converting 3D mech animations to 2D sprite sheets" << std::endl;
-        std::cout << "=============================================" << std::endl << std::endl;
-        
-        std::cout << "Configuration:" << std::endl;
-        std::cout << "  Render Resolution: " << config.render.frame_width << "x" << config.render.frame_height << std::endl;
-        std::cout << "  Camera Type: Isometric" << std::endl;
-        std::cout << "  Lighting: Directional with shadows" << std::endl;
-        std::cout << "  Output Format: PNG" << std::endl;
-        std::cout << "  Max Sheet Size: " << config.max_sheet_width << "x" << config.max_sheet_height << std::endl;
-        std::cout << "  Starbound Integration: Enabled" << std::endl << std::endl;
-    }
-    
-    ~MeshToSpriteExample() {
-        if (pipeline_) {
-            pipeline_->shutdown();
-        }
-    }
-    
-    void run_demonstration() {
-        std::cout << "Starting mesh-to-sprite conversion demonstration..." << std::endl << std::endl;
-        
-        // Step 1: Load mesh and animations
-        demonstrate_mesh_loading();
-        
-        // Step 2: Setup multiple camera angles
-        demonstrate_camera_setups();
-        
-        // Step 3: Capture single animation
-        demonstrate_single_animation_capture();
-        
-        // Step 4: Capture directional set
-        demonstrate_directional_capture();
-        
-        // Step 5: Batch processing
-        demonstrate_batch_processing();
-        
-        // Step 6: Starbound integration
-        demonstrate_starbound_integration();
-        
-        // Step 7: Performance analysis
-        demonstrate_performance_analysis();
-        
-        print_final_summary();
-    }
-    
-private:
-    std::unique_ptr<MeshToSpritePipeline> pipeline_;
-    
-    void demonstrate_mesh_loading() {
-        std::cout << "=== Demonstrating Mesh and Animation Loading ===" << std::endl;
-        
-        // For this example, we'll simulate loading since we don't have actual files
-        std::cout << "Loading 3D mech mesh..." << std::endl;
-        
-        // In a real scenario, you would load actual mesh files:
-        // bool success = pipeline_->load_mesh("./assets/mech_body.obj");
-        
-        // For demonstration, we'll create a simple procedural mesh
-        bool mesh_loaded = create_demo_mesh();
-        
-        if (mesh_loaded) {
-            std::cout << "✓ Mesh loaded successfully" << std::endl;
-        } else {
-            std::cout << "✗ Failed to load mesh" << std::endl;
-            return;
-        }
-        
-        std::cout << "Loading animation clips..." << std::endl;
-        
-        // Load various animation clips
-        std::vector<std::string> animation_names = {
-            "idle", "walk", "run", "attack", "damaged", "destroyed"
-        };
-        
-        for (const auto& anim_name : animation_names) {
-            // In a real scenario: pipeline_->load_animation_clip(anim_name, "./assets/" + anim_name + ".bvh");
-            
-            // For demonstration, create placeholder animations
-            bool anim_loaded = create_demo_animation(anim_name);
-            
-            if (anim_loaded) {
-                std::cout << "✓ Animation '" << anim_name << "' loaded" << std::endl;
-            } else {
-                std::cout << "✗ Failed to load animation: " << anim_name << std::endl;
-            }
-        }
-        
-        // Auto-fit camera to mesh bounds
-        pipeline_->auto_fit_camera_to_mesh();
-        std::cout << "✓ Camera auto-fitted to mesh bounds" << std::endl;
-        
-        std::cout << std::endl;
-    }
-    
-    void demonstrate_camera_setups() {
-        std::cout << "=== Demonstrating Camera Configurations ===" << std::endl;
-        
-        // Test different camera presets
-        std::vector<std::pair<std::string, std::function<CameraConfig()>>> camera_presets = {
-            {"Isometric", []() { return MeshToSpriteUtils::CreateIsometricCamera(6.0f); }},
-            {"Top-Down", []() { return MechToSpriteUtils::CreateTopDownCamera(8.0f); }},
-            {"Side View", []() { return MeshToSpriteUtils::CreateSideViewCamera(6.0f); }}
-        };
-        
-        for (const auto& [name, create_camera] : camera_presets) {
-            std::cout << "Testing " << name << " camera..." << std::endl;
-            
-            auto camera_config = create_camera();
-            pipeline_->setup_camera(camera_config);
-            
-            // Render a test frame to verify camera setup
-            auto test_frame = pipeline_->render_single_frame("idle", 0.0f);
-            
-            if (!test_frame.pixel_data.empty()) {
-                std::cout << "✓ " << name << " camera setup successful" << std::endl;
-            } else {
-                std::cout << "✗ " << name << " camera setup failed" << std::endl;
-            }
-        }
-        
-        // Reset to isometric for remaining demonstrations
-        pipeline_->setup_camera(MeshToSpriteUtils::CreateIsometricCamera(6.0f));
-        
-        std::cout << std::endl;
-    }
-    
-    void demonstrate_single_animation_capture() {
-        std::cout << "=== Demonstrating Single Animation Capture ===" << std::endl;
-        
-        // Capture the idle animation
-        AnimationCapture capture_config;
-        capture_config.animation_name = "idle";
-        capture_config.start_time = 0.0f;
-        capture_config.end_time = 2.0f;
-        capture_config.fps = 24.0f;
-        capture_config.loop = true;
-        
-        std::cout << "Capturing 'idle' animation..." << std::endl;
-        std::cout << "  Duration: " << capture_config.end_time << " seconds" << std::endl;
-        std::cout << "  FPS: " << capture_config.fps << std::endl;
-        std::cout << "  Expected frames: " << static_cast<int>(capture_config.end_time * capture_config.fps) << std::endl;
-        
-        auto start_time = std::chrono::high_resolution_clock::now();
-        
-        bool success = pipeline_->capture_animation(capture_config);
-        
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-        
-        if (success) {
-            std::cout << "✓ Animation captured successfully in " << duration.count() << "ms" << std::endl;
-            std::cout << "  Output files:" << std::endl;
-            std::cout << "    - idle.png (sprite sheet)" << std::endl;
-            std::cout << "    - idle.frames (frame data)" << std::endl;
-            std::cout << "    - idle.animation (animation definition)" << std::endl;
-        } else {
-            std::cout << "✗ Animation capture failed" << std::endl;
-        }
-        
-        std::cout << std::endl;
-    }
-    
-    void demonstrate_directional_capture() {
-        std::cout << "=== Demonstrating Directional Animation Capture ===" << std::endl;
-        
-        // Create 8-directional capture set
-        auto directional_set = MeshToSpriteUtils::Create8DirectionalSet(6.0f);
-        
-        std::cout << "Capturing 'walk' animation from 8 directions..." << std::endl;
-        std::cout << "Directions: ";
-        for (const auto& direction : directional_set) {
-            std::cout << direction.direction_name << " ";
-        }
-        std::cout << std::endl;
-        
-        auto start_time = std::chrono::high_resolution_clock::now();
-        
-        bool success = pipeline_->capture_directional_set("walk", directional_set);
-        
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-        
-        if (success) {
-            std::cout << "✓ Directional capture completed in " << duration.count() << "ms" << std::endl;
-            std::cout << "  Generated " << directional_set.size() << " directional sprite sheets" << std::endl;
-            
-            for (const auto& direction : directional_set) {
-                std::cout << "    - walk_" << direction.direction_name << ".png" << std::endl;
-            }
-        } else {
-            std::cout << "✗ Directional capture failed" << std::endl;
-        }
-        
-        std::cout << std::endl;
-    }
-    
-    void demonstrate_batch_processing() {
-        std::cout << "=== Demonstrating Batch Processing ===" << std::endl;
-        
-        // Create animation capture configurations for batch processing
-        std::vector<std::string> batch_animations = {"attack", "damaged", "destroyed"};
-        auto capture_configs = MeshToSpriteUtils::CreateCaptureSet(batch_animations);
-        
-        // Modify configurations for different durations and framerates
-        capture_configs[0].end_time = 1.5f;  // attack: 1.5 seconds
-        capture_configs[0].fps = 30.0f;      // higher framerate for smooth attack
-        
-        capture_configs[1].end_time = 0.5f;  // damaged: 0.5 seconds
-        capture_configs[1].fps = 20.0f;      // lower framerate for damage effect
-        capture_configs[1].loop = false;     // one-shot animation
-        
-        capture_configs[2].end_time = 3.0f;  // destroyed: 3 seconds
-        capture_configs[2].fps = 15.0f;      // lower framerate for destruction
-        capture_configs[2].loop = false;     // one-shot animation
-        
-        std::cout << "Processing " << capture_configs.size() << " animations in batch..." << std::endl;
-        
-        auto start_time = std::chrono::high_resolution_clock::now();
-        
-        bool all_success = true;
-        for (const auto& config : capture_configs) {
-            std::cout << "Processing '" << config.animation_name << "'..." << std::endl;
-            
-            if (!pipeline_->capture_animation(config)) {
-                std::cout << "✗ Failed to process: " << config.animation_name << std::endl;
-                all_success = false;
-            } else {
-                std::cout << "✓ Completed: " << config.animation_name << std::endl;
-            }
-        }
-        
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-        
-        if (all_success) {
-            std::cout << "✓ Batch processing completed successfully in " << duration.count() << "ms" << std::endl;
-            std::cout << "  Average time per animation: " << (duration.count() / capture_configs.size()) << "ms" << std::endl;
-        } else {
-            std::cout << "⚠️  Batch processing completed with some failures" << std::endl;
-        }
-        
-        std::cout << std::endl;
-    }
-    
-    void demonstrate_starbound_integration() {
-        std::cout << "=== Demonstrating Starbound Integration ===" << std::endl;
-        
-        // Create animation definitions for Starbound
-        std::vector<AnimationDefinition> starbound_animations;
-        
-        auto available_animations = pipeline_->get_available_animations();
-        std::cout << "Converting " << available_animations.size() << " animations for Starbound..." << std::endl;
-        
-        for (const auto& anim_name : available_animations) {
-            AnimationDefinition def;
-            def.animation_name = anim_name;
-            def.duration = 2.0f; // Default duration
-            def.fps = 24.0f;
-            def.loop = (anim_name == "idle" || anim_name == "walk" || anim_name == "run");
-            
-            // Generate frame sequence
-            int total_frames = static_cast<int>(def.duration * def.fps);
-            for (int i = 0; i < total_frames; ++i) {
-                def.frame_sequence.push_back(i);
-                def.frame_times.push_back(i / def.fps);
-            }
-            
-            starbound_animations.push_back(def);
-            
-            // Export individual animation
-            if (pipeline_->export_starbound_animation(def)) {
-                std::cout << "✓ Exported Starbound animation: " << anim_name << ".animation" << std::endl;
-            }
-        }
-        
-        // Create projectile configuration
-        std::string projectile_name = "mech_energy_blast";
-        if (pipeline_->export_starbound_projectile(projectile_name, starbound_animations)) {
-            std::cout << "✓ Exported Starbound projectile: " << projectile_name << ".projectile" << std::endl;
-        }
-        
-        // Generate comprehensive Starbound config
-        std::cout << "Generated Starbound integration files:" << std::endl;
-        std::cout << "  - Individual .animation files for each animation" << std::endl;
-        std::cout << "  - .projectile file for projectile integration" << std::endl;
-        std::cout << "  - Sprite sheets with proper frame data" << std::endl;
-        std::cout << "  - Compatible with Starbound modding framework" << std::endl;
-        
-        std::cout << std::endl;
-    }
-    
-    void demonstrate_performance_analysis() {
-        std::cout << "=== Performance Analysis ===" << std::endl;
-        
-        auto stats = pipeline_->get_performance_stats();
-        
-        std::cout << "Pipeline Performance Statistics:" << std::endl;
-        std::cout << "  Frames Rendered: " << stats.frames_rendered << std::endl;
-        std::cout << "  Sprites Packed: " << stats.sprites_packed << std::endl;
-        std::cout << "  Animations Generated: " << stats.animations_generated << std::endl;
-        
-        std::cout << "Timing Performance:" << std::endl;
-        std::cout << "  Total Render Time: " << std::fixed << std::setprecision(3) 
-                  << stats.total_render_time << "s" << std::endl;
-        std::cout << "  Total Packing Time: " << std::fixed << std::setprecision(3) 
-                  << stats.total_packing_time << "s" << std::endl;
-        std::cout << "  Average Frame Render Time: " << std::fixed << std::setprecision(3) 
-                  << (stats.avg_frame_render_time * 1000) << "ms" << std::endl;
-        std::cout << "  Average Packing Time: " << std::fixed << std::setprecision(3) 
-                  << (stats.avg_packing_time * 1000) << "ms" << std::endl;
-        
-        std::cout << "Output Statistics:" << std::endl;
-        std::cout << "  Total Output Size: " << std::fixed << std::setprecision(1) 
-                  << (stats.total_output_size / (1024.0 * 1024.0)) << " MB" << std::endl;
-        
-        if (stats.compressed_size > 0) {
-            std::cout << "  Compressed Size: " << std::fixed << std::setprecision(1) 
-                      << (stats.compressed_size / (1024.0 * 1024.0)) << " MB" << std::endl;
-            std::cout << "  Compression Ratio: " << std::fixed << std::setprecision(2) 
-                      << stats.compression_ratio << std::endl;
-        }
-        
-        // Calculate performance metrics
-        double frames_per_second = 0.0;
-        if (stats.total_render_time > 0) {
-            frames_per_second = stats.frames_rendered / stats.total_render_time;
-        }
-        
-        double throughput_mbps = 0.0;
-        if (stats.total_render_time > 0) {
-            throughput_mbps = (stats.total_output_size / (1024.0 * 1024.0)) / stats.total_render_time;
-        }
-        
-        std::cout << "Performance Metrics:" << std::endl;
-        std::cout << "  Render Throughput: " << std::fixed << std::setprecision(1) 
-                  << frames_per_second << " FPS" << std::endl;
-        std::cout << "  Data Throughput: " << std::fixed << std::setprecision(1) 
-                  << throughput_mbps << " MB/s" << std::endl;
-        
-        // Recommend optimizations if performance is low
-        if (stats.avg_frame_render_time > 0.1) { // More than 100ms per frame
-            std::cout << "Performance Recommendations:" << std::endl;
-            std::cout << "  ⚠️  Frame render time is high - consider reducing resolution or MSAA" << std::endl;
-        }
-        
-        if (stats.compression_ratio > 0.8) { // Low compression
-            std::cout << "  ⚠️  Low compression ratio - consider different formats or settings" << std::endl;
-        }
-        
-        std::cout << std::endl;
-    }
-    
-    void print_final_summary() {
-        std::cout << "=== Mesh-to-Sprite Pipeline Demonstration Complete ===" << std::endl;
-        
-        auto stats = pipeline_->get_performance_stats();
-        
-        std::cout << "Summary of Results:" << std::endl;
-        std::cout << "  ✓ Successfully converted 3D mesh animations to 2D sprites" << std::endl;
-        std::cout << "  ✓ Generated " << stats.sprites_packed << " sprite sheets" << std::endl;
-        std::cout << "  ✓ Processed " << stats.frames_rendered << " individual frames" << std::endl;
-        std::cout << "  ✓ Created " << stats.animations_generated << " animation definitions" << std::endl;
-        std::cout << "  ✓ Generated Starbound-compatible files" << std::endl;
-        
-        std::cout << "Key Features Demonstrated:" << std::endl;
-        std::cout << "  ✓ Multiple camera angles (isometric, top-down, side-view)" << std::endl;
-        std::cout << "  ✓ Directional sprite generation (8-direction support)" << std::endl;
-        std::cout << "  ✓ Batch processing for multiple animations" << std::endl;
-        std::cout << "  ✓ Automatic sprite sheet packing and optimization" << std::endl;
-        std::cout << "  ✓ JSON metadata generation for frame data" << std::endl;
-        std::cout << "  ✓ Starbound modding integration" << std::endl;
-        std::cout << "  ✓ Performance monitoring and optimization" << std::endl;
-        
-        std::cout << "Output Files Generated:" << std::endl;
-        std::cout << "  - Sprite sheets (.png files)" << std::endl;
-        std::cout << "  - Frame data (.frames JSON files)" << std::endl;
-        std::cout << "  - Animation definitions (.animation files)" << std::endl;
-        std::cout << "  - Starbound projectile configurations" << std::endl;
-        
-        std::cout << "Total Processing Time: " << std::fixed << std::setprecision(2) 
-                  << (stats.total_render_time + stats.total_packing_time) << " seconds" << std::endl;
-        
-        std::cout << std::endl;
-        std::cout << "The pipeline successfully demonstrates a complete workflow for" << std::endl;
-        std::cout << "converting complex 3D mech animations into optimized 2D sprites" << std::endl;
-        std::cout << "ready for integration with Starbound or other 2D game engines!" << std::endl;
-    }
-    
-    void on_progress_update(float progress, const std::string& status) {
-        // Update progress display
-        int bar_width = 50;
-        int filled_width = static_cast<int>(progress * bar_width);
-        
-        std::cout << "\r[";
-        for (int i = 0; i < bar_width; ++i) {
-            if (i < filled_width) {
-                std::cout << "=";
-            } else if (i == filled_width) {
-                std::cout << ">";
-            } else {
-                std::cout << " ";
-            }
-        }
-        std::cout << "] " << std::fixed << std::setprecision(1) << (progress * 100) << "% - " << status;
-        std::cout.flush();
-        
-        if (progress >= 1.0f) {
-            std::cout << std::endl;
-        }
-    }
-    
-    // Helper methods for creating demo content
-    bool create_demo_mesh() {
-        // In a real implementation, this would load an actual mesh file
-        // For demonstration, we'll simulate a successful mesh load
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Simulate loading time
-        return true;
-    }
-    
-    bool create_demo_animation(const std::string& animation_name) {
-        // In a real implementation, this would load actual animation data
-        // For demonstration, we'll simulate successful animation loading
-        
-        // Different loading times for different animations
-        if (animation_name == "idle") {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        } else if (animation_name == "walk" || animation_name == "run") {
-            std::this_thread::sleep_for(std::chrono::milliseconds(75));
-        } else {
-            std::this_thread::sleep_for(std::chrono::milliseconds(60));
-        }
-        
-        return true;
-    }
+namespace {
+
+constexpr const char* kLogCategory = "MeshToSprite";
+constexpr float kPi = 3.14159265358979323846f;
+
+using Pipeline = MeshToSpritePipeline;
+using Clock = std::chrono::steady_clock;
+
+long long elapsedMs(Clock::time_point start) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - start).count();
+}
+
+// ---------------------------------------------------------------------------------------
+// Procedural source assets
+// ---------------------------------------------------------------------------------------
+
+// Axis-aligned box written as six flat-shaded quads (one normal per face).
+struct MeshBox {
+    glm::vec3 center;
+    glm::vec3 halfExtents;
 };
 
-int main() {
+void appendBox(std::ostringstream& obj, const MeshBox& box, int& vertexBase, int& normalBase) {
+    const glm::vec3 lo = box.center - box.halfExtents;
+    const glm::vec3 hi = box.center + box.halfExtents;
+    const glm::vec3 corners[8] = {
+        {lo.x, lo.y, lo.z}, {hi.x, lo.y, lo.z}, {hi.x, hi.y, lo.z}, {lo.x, hi.y, lo.z},
+        {lo.x, lo.y, hi.z}, {hi.x, lo.y, hi.z}, {hi.x, hi.y, hi.z}, {lo.x, hi.y, hi.z},
+    };
+    for (const auto& c : corners) {
+        obj << "v " << c.x << ' ' << c.y << ' ' << c.z << '\n';
+    }
+
+    // Counter-clockwise when seen from outside, paired with the outward face normal.
+    struct Face { int idx[4]; glm::vec3 normal; };
+    const Face faces[6] = {
+        {{0, 3, 2, 1}, {0, 0, -1}},
+        {{4, 5, 6, 7}, {0, 0, 1}},
+        {{0, 4, 7, 3}, {-1, 0, 0}},
+        {{1, 2, 6, 5}, {1, 0, 0}},
+        {{0, 1, 5, 4}, {0, -1, 0}},
+        {{3, 7, 6, 2}, {0, 1, 0}},
+    };
+    for (const auto& face : faces) {
+        obj << "vn " << face.normal.x << ' ' << face.normal.y << ' ' << face.normal.z << '\n';
+    }
+    for (int f = 0; f < 6; ++f) {
+        obj << 'f';
+        for (int corner : faces[f].idx) {
+            obj << ' ' << (vertexBase + corner + 1) << "//" << (normalBase + f + 1);
+        }
+        obj << '\n';
+    }
+    vertexBase += 8;
+    normalBase += 6;
+}
+
+// A blocky bipedal mech centred on the origin (y up, facing +z), about 2.3 units tall.
+bool writeDemoMechObj(const std::filesystem::path& path) {
+    const std::vector<MeshBox> parts = {
+        {{0.00f, 0.35f, 0.00f}, {0.45f, 0.40f, 0.30f}},   // torso
+        {{0.00f, 0.95f, 0.05f}, {0.25f, 0.20f, 0.22f}},   // cockpit
+        {{0.00f, 0.45f, -0.40f}, {0.30f, 0.30f, 0.12f}},  // reactor pack
+        {{-0.25f, -0.55f, 0.00f}, {0.14f, 0.50f, 0.16f}}, // left leg
+        {{0.25f, -0.55f, 0.00f}, {0.14f, 0.50f, 0.16f}},  // right leg
+        {{-0.25f, -1.10f, 0.08f}, {0.18f, 0.06f, 0.25f}}, // left foot
+        {{0.25f, -1.10f, 0.08f}, {0.18f, 0.06f, 0.25f}},  // right foot
+        {{-0.62f, 0.35f, 0.00f}, {0.12f, 0.38f, 0.14f}},  // left arm
+        {{0.62f, 0.40f, 0.15f}, {0.12f, 0.12f, 0.45f}},   // right arm cannon
+    };
+
+    std::ostringstream obj;
+    obj << std::fixed << std::setprecision(4);
+    obj << "# Procedural demo mech generated by MeshToSpriteExample\n";
+    obj << "o demo_mech\n";
+    obj << "usemtl mech_hull\n";
+    int vertexBase = 0;
+    int normalBase = 0;
+    for (const auto& part : parts) {
+        appendBox(obj, part, vertexBase, normalBase);
+    }
+
+    std::ofstream file(path, std::ios::trunc);
+    if (!file) {
+        return false;
+    }
+    file << obj.str();
+    return static_cast<bool>(file);
+}
+
+// Root transform of the mech at one instant (positions in mesh units, rotations in degrees).
+struct RootPose {
+    glm::vec3 position{0.0f};
+    glm::vec3 rotationDegrees{0.0f};
+};
+
+struct MotionClipSpec {
+    std::string name;
+    float duration = 1.0f;
+    float fps = 24.0f;
+    bool loop = true;
+    std::function<RootPose(float)> sample;
+};
+
+float smoothstep01(float x) {
+    const float t = std::clamp(x, 0.0f, 1.0f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
+std::vector<MotionClipSpec> makeDemoMotionClips() {
+    std::vector<MotionClipSpec> clips;
+
+    clips.push_back({"idle", 2.0f, 24.0f, true, [](float t) {
+        const float phase = 2.0f * kPi * t / 2.0f;
+        RootPose pose;
+        pose.position.y = 0.04f * std::sin(phase);
+        pose.rotationDegrees.z = 1.5f * std::sin(phase);
+        return pose;
+    }});
+    clips.push_back({"walk", 1.0f, 24.0f, true, [](float t) {
+        const float phase = 2.0f * kPi * t;
+        RootPose pose;
+        pose.position.y = 0.06f * std::fabs(std::sin(phase));
+        pose.rotationDegrees.y = 6.0f * std::sin(phase);
+        pose.rotationDegrees.z = 3.0f * std::sin(phase);
+        return pose;
+    }});
+    clips.push_back({"run", 0.6f, 24.0f, true, [](float t) {
+        const float phase = 2.0f * kPi * t / 0.6f;
+        RootPose pose;
+        pose.position.y = 0.12f * std::fabs(std::sin(phase));
+        pose.rotationDegrees.x = 8.0f;
+        pose.rotationDegrees.y = 4.0f * std::sin(phase);
+        return pose;
+    }});
+    clips.push_back({"attack", 1.5f, 30.0f, false, [](float t) {
+        const float lunge = std::sin(kPi * t / 1.5f);
+        RootPose pose;
+        pose.position.z = 0.3f * lunge;
+        pose.rotationDegrees.x = 15.0f * lunge;
+        return pose;
+    }});
+    clips.push_back({"damaged", 0.5f, 20.0f, false, [](float t) {
+        const float shake = std::sin(2.0f * kPi * 8.0f * t) * (1.0f - t / 0.5f);
+        RootPose pose;
+        pose.position.x = 0.08f * shake;
+        pose.rotationDegrees.z = 6.0f * shake;
+        return pose;
+    }});
+    clips.push_back({"destroyed", 3.0f, 15.0f, false, [](float t) {
+        const float fall = smoothstep01(t / 3.0f);
+        RootPose pose;
+        pose.position.y = -0.6f * fall;
+        pose.rotationDegrees.z = 90.0f * fall;
+        return pose;
+    }});
+
+    return clips;
+}
+
+// Single-joint BVH whose root channels carry the clip's rigid motion.
+bool writeDemoBvh(const std::filesystem::path& path, const MotionClipSpec& spec) {
+    const int frameCount = std::max(1, static_cast<int>(std::lround(spec.duration * spec.fps)));
+    const float frameTime = 1.0f / spec.fps;
+
+    std::ostringstream bvh;
+    bvh << std::fixed << std::setprecision(6);
+    bvh << "HIERARCHY\n"
+        << "ROOT Hips\n"
+        << "{\n"
+        << "\tOFFSET 0.0 0.0 0.0\n"
+        << "\tCHANNELS 6 Xposition Yposition Zposition Zrotation Xrotation Yrotation\n"
+        << "\tEnd Site\n"
+        << "\t{\n"
+        << "\t\tOFFSET 0.0 1.0 0.0\n"
+        << "\t}\n"
+        << "}\n"
+        << "MOTION\n"
+        << "Frames: " << frameCount << '\n'
+        << "Frame Time: " << frameTime << '\n';
+
+    for (int frame = 0; frame < frameCount; ++frame) {
+        const RootPose pose = spec.sample(static_cast<float>(frame) * frameTime);
+        bvh << pose.position.x << ' ' << pose.position.y << ' ' << pose.position.z << ' '
+            << pose.rotationDegrees.z << ' ' << pose.rotationDegrees.x << ' ' << pose.rotationDegrees.y << '\n';
+    }
+
+    std::ofstream file(path, std::ios::trunc);
+    if (!file) {
+        return false;
+    }
+    file << bvh.str();
+    return static_cast<bool>(file);
+}
+
+size_t countCoveredPixels(const Pipeline::SpriteFrame& frame) {
+    size_t covered = 0;
+    for (size_t i = 3; i < frame.pixel_data.size(); i += 4) {
+        if (frame.pixel_data[i] != 0) {
+            ++covered;
+        }
+    }
+    return covered;
+}
+
+// ---------------------------------------------------------------------------------------
+// Workflow steps
+// ---------------------------------------------------------------------------------------
+
+Pipeline::PipelineConfig makePipelineConfig(const std::string& outputDirectory) {
+    Pipeline::PipelineConfig config;
+
+    // Render settings
+    config.backend = Pipeline::RenderBackend::SOFTWARE_RASTERIZER;
+    config.render.frame_width = 128;
+    config.render.frame_height = 128;
+    config.render.samples = 4;
+    config.render.enable_alpha = true;
+    config.render.enable_depth_test = true;
+    config.render.background_color = glm::vec4(0, 0, 0, 0);  // transparent
+
+    // Camera settings (replaced by the preset demonstration below)
+    config.camera.type = Pipeline::CameraType::ISOMETRIC;
+    config.camera.position = glm::vec3(5, 5, 5);
+    config.camera.target = glm::vec3(0, 0, 0);
+    config.camera.up = glm::vec3(0, 1, 0);
+    config.camera.ortho_size = 3.0f;
+    config.camera.auto_fit_bounds = true;
+
+    // Lighting settings
+    config.lighting = MeshToSpriteUtils::CreateBasicLighting();
+    config.lighting.directional_intensity = 1.2f;
+
+    // Output settings
+    config.output_format = Pipeline::OutputFormat::PNG;
+    config.output_directory = outputDirectory;
+    config.asset_prefix = "mech";
+    config.generate_sprite_sheets = true;
+    config.generate_individual_frames = false;
+    config.generate_animation_json = true;
+    config.generate_starbound_files = true;
+
+    // Sprite sheet settings
+    config.max_sheet_width = 2048;
+    config.max_sheet_height = 2048;
+    config.sprite_padding = 2.0f;
+    config.power_of_two_sheets = true;
+    config.optimize_empty_space = true;
+
+    config.enable_multithreading = true;
+    config.enable_progressive_capture = false;
+    return config;
+}
+
+bool loadDemoAssets(Pipeline& pipeline, const std::filesystem::path& sourceDir,
+                    const std::vector<MotionClipSpec>& clips) {
+    Log::info(kLogCategory, "=== Mesh and animation loading ===");
+
+    std::error_code ec;
+    std::filesystem::create_directories(sourceDir, ec);
+    if (ec) {
+        Log::error(kLogCategory, "Cannot create source directory {}: {}", sourceDir.string(), ec.message());
+        return false;
+    }
+
+    const std::filesystem::path meshPath = sourceDir / "demo_mech.obj";
+    if (!writeDemoMechObj(meshPath)) {
+        Log::error(kLogCategory, "Cannot write demo mesh {}", meshPath.string());
+        return false;
+    }
+    if (!pipeline.load_mesh(meshPath.string())) {
+        Log::error(kLogCategory, "Pipeline rejected mesh {}", meshPath.string());
+        return false;
+    }
+    const glm::vec3 bounds = pipeline.calculate_mesh_bounds();
+    Log::info(kLogCategory, "Loaded mesh {} (bounds {:.2f} x {:.2f} x {:.2f})",
+              meshPath.filename().string(), bounds.x, bounds.y, bounds.z);
+
+    bool allLoaded = true;
+    for (const auto& clip : clips) {
+        const std::filesystem::path clipPath = sourceDir / (clip.name + ".bvh");
+        if (!writeDemoBvh(clipPath, clip)) {
+            Log::error(kLogCategory, "Cannot write motion clip {}", clipPath.string());
+            allLoaded = false;
+            continue;
+        }
+        if (!pipeline.load_animation_clip(clip.name, clipPath.string())) {
+            Log::error(kLogCategory, "Pipeline rejected motion clip {}", clipPath.string());
+            allLoaded = false;
+            continue;
+        }
+        Log::info(kLogCategory, "Loaded animation '{}' ({:.2f}s @ {} fps)", clip.name, clip.duration, clip.fps);
+    }
+
+    pipeline.auto_fit_camera_to_mesh();
+    Log::info(kLogCategory, "Camera auto-fitted to mesh bounds");
+    return allLoaded;
+}
+
+bool demonstrateCameraSetups(Pipeline& pipeline) {
+    Log::info(kLogCategory, "=== Camera configurations ===");
+
+    const std::vector<std::pair<std::string, Pipeline::CameraConfig>> presets = {
+        {"Isometric", MeshToSpriteUtils::CreateIsometricCamera(6.0f)},
+        {"Top-Down", MeshToSpriteUtils::CreateTopDownCamera(8.0f)},
+        {"Side View", MeshToSpriteUtils::CreateSideViewCamera(6.0f)},
+    };
+
+    bool allVisible = true;
+    for (const auto& [name, camera] : presets) {
+        pipeline.setup_camera(camera);
+        const Pipeline::SpriteFrame frame = pipeline.render_single_frame("idle", 0.0f);
+        const size_t covered = countCoveredPixels(frame);
+        if (covered > 0) {
+            Log::info(kLogCategory, "{} camera: mech covers {} of {} pixels", name, covered,
+                      static_cast<size_t>(frame.size.x) * static_cast<size_t>(frame.size.y));
+        } else {
+            Log::warn(kLogCategory, "{} camera: rendered frame is empty", name);
+            allVisible = false;
+        }
+    }
+
+    // Isometric for the remaining captures
+    pipeline.setup_camera(MeshToSpriteUtils::CreateIsometricCamera(6.0f));
+    pipeline.auto_fit_camera_to_mesh();
+    return allVisible;
+}
+
+bool demonstrateSingleCapture(Pipeline& pipeline) {
+    Log::info(kLogCategory, "=== Single animation capture ===");
+
+    Pipeline::AnimationCapture capture;
+    capture.animation_name = "idle";
+    capture.start_time = 0.0f;
+    capture.end_time = 2.0f;
+    capture.fps = 24.0f;
+    capture.loop = true;
+    capture.captured_angles = {"isometric"};
+
+    Log::info(kLogCategory, "Capturing '{}': {:.1f}s at {} fps ({} frames)", capture.animation_name,
+              capture.end_time - capture.start_time, capture.fps,
+              static_cast<int>(std::lround((capture.end_time - capture.start_time) * capture.fps)));
+
+    const auto start = Clock::now();
+    if (!pipeline.capture_animation(capture)) {
+        Log::error(kLogCategory, "Capture of '{}' failed", capture.animation_name);
+        return false;
+    }
+    Log::info(kLogCategory, "Captured '{}' in {} ms -> idle.png, idle.frames, idle.animation",
+              capture.animation_name, elapsedMs(start));
+    return true;
+}
+
+bool demonstrateDirectionalCapture(Pipeline& pipeline) {
+    Log::info(kLogCategory, "=== Directional animation capture ===");
+
+    const auto directions = MeshToSpriteUtils::Create8DirectionalSet(6.0f);
+    std::string names;
+    for (const auto& direction : directions) {
+        if (!names.empty()) names += ", ";
+        names += direction.direction_name;
+    }
+    Log::info(kLogCategory, "Capturing 'walk' from {} directions: {}", directions.size(), names);
+
+    const auto start = Clock::now();
+    if (!pipeline.capture_directional_set("walk", directions)) {
+        Log::error(kLogCategory, "Directional capture of 'walk' failed");
+        return false;
+    }
+    Log::info(kLogCategory, "Directional capture finished in {} ms ({} sheets named walk_<direction>.png)",
+              elapsedMs(start), directions.size());
+    return true;
+}
+
+bool demonstrateBatchCapture(Pipeline& pipeline, const std::vector<MotionClipSpec>& clips) {
+    Log::info(kLogCategory, "=== Batch capture ===");
+
+    const std::vector<std::string> batchNames = {"attack", "damaged", "destroyed"};
+    std::vector<Pipeline::AnimationCapture> captures = MeshToSpriteUtils::CreateCaptureSet(batchNames);
+
+    // Match each capture to the clip it records (duration, frame rate, looping)
+    for (auto& capture : captures) {
+        const auto clip = std::find_if(clips.begin(), clips.end(),
+                                       [&](const MotionClipSpec& c) { return c.name == capture.animation_name; });
+        if (clip != clips.end()) {
+            capture.end_time = clip->duration;
+            capture.fps = clip->fps;
+            capture.loop = clip->loop;
+        }
+    }
+
+    const auto start = Clock::now();
+    bool allCaptured = true;
+    for (const auto& capture : captures) {
+        if (pipeline.capture_animation(capture)) {
+            Log::info(kLogCategory, "Captured '{}' ({:.1f}s @ {} fps, {})", capture.animation_name,
+                      capture.end_time, capture.fps, capture.loop ? "looping" : "one-shot");
+        } else {
+            Log::error(kLogCategory, "Capture of '{}' failed", capture.animation_name);
+            allCaptured = false;
+        }
+    }
+
+    const long long totalMs = elapsedMs(start);
+    Log::info(kLogCategory, "Batch of {} captures finished in {} ms (avg {} ms)", captures.size(), totalMs,
+              captures.empty() ? 0LL : totalMs / static_cast<long long>(captures.size()));
+    return allCaptured;
+}
+
+bool demonstrateSpriteSheetExport(Pipeline& pipeline) {
+    Log::info(kLogCategory, "=== Explicit sprite sheet packing and export ===");
+
+    const std::vector<Pipeline::SpriteFrame> frames = pipeline.render_animation_frames("run");
+    if (frames.empty()) {
+        Log::error(kLogCategory, "No frames rendered for 'run'");
+        return false;
+    }
+
+    Pipeline::SpriteSheet sheet = pipeline.pack_frames_to_sheet(frames, "run_sheet");
+    if (sheet.packed_data.empty()) {
+        Log::error(kLogCategory, "Packing {} 'run' frames failed", frames.size());
+        return false;
+    }
+
+    // Drop identical frames, then repack so the texture and frame data stay consistent
+    if (pipeline.optimize_sprite_sheet(sheet)) {
+        sheet = pipeline.pack_frames_to_sheet(sheet.frames, sheet.name);
+        if (sheet.packed_data.empty()) {
+            Log::error(kLogCategory, "Repacking the optimized 'run' sheet failed");
+            return false;
+        }
+    }
+
+    if (!pipeline.export_sprite_sheet(sheet) || !pipeline.export_frames_json(sheet)) {
+        Log::error(kLogCategory, "Exporting sheet '{}' failed", sheet.name);
+        return false;
+    }
+    Log::info(kLogCategory, "Exported {} ({}x{}, {} frames) and {}.frames", sheet.texture_filename, sheet.width,
+              sheet.height, sheet.frames.size(), sheet.name);
+    return true;
+}
+
+bool demonstrateStarboundIntegration(Pipeline& pipeline, const std::vector<MotionClipSpec>& clips,
+                                     const std::filesystem::path& outputDir) {
+    Log::info(kLogCategory, "=== Starbound integration ===");
+
+    std::vector<Pipeline::AnimationDefinition> definitions;
+    bool allExported = true;
+    for (const auto& name : pipeline.get_available_animations()) {
+        const auto clip = std::find_if(clips.begin(), clips.end(),
+                                       [&](const MotionClipSpec& c) { return c.name == name; });
+        if (clip == clips.end()) {
+            continue;
+        }
+
+        Pipeline::AnimationDefinition def;
+        def.animation_name = name;
+        def.duration = clip->duration;
+        def.fps = clip->fps;
+        def.loop = clip->loop;
+        const int frameCount = std::max(1, static_cast<int>(std::lround(def.duration * def.fps)));
+        for (int i = 0; i < frameCount; ++i) {
+            def.frame_sequence.push_back(static_cast<uint32_t>(i));
+            def.frame_times.push_back(static_cast<float>(i) / def.fps);
+        }
+
+        if (pipeline.export_starbound_animation(def)) {
+            Log::info(kLogCategory, "Exported Starbound animation {}.animation ({} frames)", name, frameCount);
+        } else {
+            Log::error(kLogCategory, "Exporting Starbound animation '{}' failed", name);
+            allExported = false;
+        }
+        definitions.push_back(std::move(def));
+    }
+
+    const std::string projectileName = "mech_energy_blast";
+    if (pipeline.export_starbound_projectile(projectileName, definitions)) {
+        Log::info(kLogCategory, "Exported Starbound projectile {}.projectile ({} animations)", projectileName,
+                  definitions.size());
+    } else {
+        Log::error(kLogCategory, "Exporting Starbound projectile '{}' failed", projectileName);
+        allExported = false;
+    }
+
+    // Stand-alone projectile config bound to the explicitly exported run sheet
+    const auto run = std::find_if(definitions.begin(), definitions.end(),
+                                  [](const Pipeline::AnimationDefinition& d) { return d.animation_name == "run"; });
+    if (run != definitions.end()) {
+        const std::filesystem::path configPath = outputDir / "mech_run_trail.projectile";
+        std::ofstream file(configPath, std::ios::trunc);
+        file << MeshToSpriteUtils::GenerateStarboundProjectileConfig("mech_run_trail", "run_sheet.png", *run);
+        if (file) {
+            Log::info(kLogCategory, "Wrote {}", configPath.string());
+        } else {
+            Log::error(kLogCategory, "Cannot write {}", configPath.string());
+            allExported = false;
+        }
+    }
+    return allExported;
+}
+
+void reportPerformance(const Pipeline& pipeline) {
+    Log::info(kLogCategory, "=== Performance ===");
+    const Pipeline::PerformanceStats& stats = pipeline.get_performance_stats();
+
+    Log::info(kLogCategory, "Frames rendered: {}, sheets packed: {}, animations generated: {}",
+              stats.frames_rendered, stats.sprites_packed, stats.animations_generated);
+    Log::info(kLogCategory, "Render time {:.3f}s (avg {:.3f} ms/frame), packing time {:.3f}s (avg {:.3f} ms)",
+              stats.total_render_time, stats.avg_frame_render_time * 1000.0, stats.total_packing_time,
+              stats.avg_packing_time * 1000.0);
+
+    const double rawMb = static_cast<double>(stats.total_output_size) / (1024.0 * 1024.0);
+    const double fileMb = static_cast<double>(stats.compressed_size) / (1024.0 * 1024.0);
+    Log::info(kLogCategory, "Output: {:.2f} MB raw RGBA, {:.2f} MB on disk (ratio {:.2f})", rawMb, fileMb,
+              stats.compression_ratio);
+
+    if (stats.total_render_time > 0.0) {
+        Log::info(kLogCategory, "Render throughput: {:.1f} frames/s",
+                  static_cast<double>(stats.frames_rendered) / stats.total_render_time);
+    }
+    if (stats.avg_frame_render_time > 0.1) {
+        Log::warn(kLogCategory, "Frame render time exceeds 100 ms; consider a smaller frame size or fewer MSAA samples");
+    }
+}
+
+} // namespace
+
+int runMeshToSpriteExample(const std::string& outputDirectory) {
     try {
-        MeshToSpriteExample example;
-        example.run_demonstration();
-        
-        std::cout << "Mesh-to-Sprite pipeline example completed successfully!" << std::endl;
+        const std::filesystem::path outputDir(outputDirectory);
+        const std::filesystem::path sourceDir = outputDir / "source";
+        const std::vector<MotionClipSpec> clips = makeDemoMotionClips();
+
+        // Progress is reported per frame; log once per quarter of each capture.
+        // Declared before the pipeline so it outlives the callback that references it.
+        int lastQuarter = -1;
+
+        Pipeline pipeline;
+        const Pipeline::PipelineConfig config = makePipelineConfig(outputDir.string());
+        if (!pipeline.initialize(config)) {
+            Log::error(kLogCategory, "Failed to initialize the mesh-to-sprite pipeline");
+            return 1;
+        }
+        pipeline.set_progress_callback([&lastQuarter](float progress, const std::string& status) {
+            const int quarter = std::clamp(static_cast<int>(progress * 4.0f), 0, 4);
+            if (quarter != lastQuarter) {
+                lastQuarter = quarter;
+                Log::debug(kLogCategory, "{:5.1f}% {}", progress * 100.0f, status);
+            }
+        });
+
+        Log::info(kLogCategory, "Mesh-to-sprite example: {}x{} frames, PNG sheets up to {}x{}, output {}",
+                  config.render.frame_width, config.render.frame_height, config.max_sheet_width,
+                  config.max_sheet_height, outputDir.string());
+
+        bool ok = loadDemoAssets(pipeline, sourceDir, clips);
+        if (ok) {
+            ok = demonstrateCameraSetups(pipeline) && ok;
+            ok = demonstrateSingleCapture(pipeline) && ok;
+            ok = demonstrateDirectionalCapture(pipeline) && ok;
+            ok = demonstrateBatchCapture(pipeline, clips) && ok;
+            ok = demonstrateSpriteSheetExport(pipeline) && ok;
+            ok = demonstrateStarboundIntegration(pipeline, clips, outputDir) && ok;
+            reportPerformance(pipeline);
+        }
+
+        pipeline.shutdown();
+
+        if (!ok) {
+            Log::error(kLogCategory, "Mesh-to-sprite example finished with failures");
+            return 1;
+        }
+        Log::info(kLogCategory, "Mesh-to-sprite example completed: sheets, .frames, .animation and .projectile "
+                                "files are in {}", outputDir.string());
         return 0;
     } catch (const std::exception& e) {
-        std::cerr << "Error in mesh-to-sprite example: " << e.what() << std::endl;
+        Log::error(kLogCategory, "Mesh-to-sprite example threw: {}", e.what());
         return 1;
     }
 }
+
+} // namespace Examples
+} // namespace Animation
+} // namespace MagiTech

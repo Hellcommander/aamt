@@ -1,6 +1,5 @@
 #pragma once
 #include <future>
-#include "core/threading/ThreadPool.hpp"
 #include "GeneratorConcurrency.hpp"
 #include "BarbedExplosiveProjectileTypes.hpp"
 

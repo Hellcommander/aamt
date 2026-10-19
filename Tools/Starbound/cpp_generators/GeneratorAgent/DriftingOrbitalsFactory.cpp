@@ -22,7 +22,7 @@ std::future<DriftingOrbitalsAssetBundle> DriftingOrbitalsFactory::generateAsync(
         return std::async(std::launch::deferred, [=] { return *hit; });
     }
 
-    return m_pool.enqueue([=]() {
+    return m_pool.enqueue([=, this]() {
         DriftingOrbitalsAssetBundle b;
 
         b.orbitalMeshes.reserve(p.orbCount);

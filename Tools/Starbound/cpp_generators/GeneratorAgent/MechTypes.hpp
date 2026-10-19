@@ -437,6 +437,8 @@ struct SegmentedMechInstanceState {
 
     // Runtime state
     std::vector<SegmentHandle> segments;
+    std::vector<std::unordered_map<std::string, float>> segmentOverrides;   // per-segment property overrides
+    std::vector<uint32_t> ownedAssets;   // assets generated for this instance only (released on destroy)
     int currentSegmentCount = 0;
     bool isActive = true;
 
@@ -608,6 +610,7 @@ struct CentipedeMechInstanceState {
     std::vector<glm::vec3> legPositions;
     std::vector<glm::quat> legRotations;
     std::vector<int> segmentLegCounts;   // legs currently mounted on each segment
+    std::vector<uint32_t> ownedAssets;   // assets generated for this instance only (released on destroy)
     bool isActive = true;
 
     // Transform

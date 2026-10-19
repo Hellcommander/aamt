@@ -41,7 +41,7 @@ std::shared_ptr<DynamicAssetManager> DynamicAssetLuaBindings::manager() {
 static std::vector<sol::function> callbacks;
 
 void DynamicAssetLuaBindings::bind(sol::state& lua) {
-    lua.new_usertype<SpellstoneParams>("SpellstoneParams",
+    lua.new_usertype<SpellstoneParams>("DynamicSpellstoneParams",
         "id",            &SpellstoneParams::id,
         "hueStart",      &SpellstoneParams::hueStart,
         "hueEnd",        &SpellstoneParams::hueEnd,

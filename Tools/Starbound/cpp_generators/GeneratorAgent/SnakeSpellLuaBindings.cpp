@@ -49,15 +49,15 @@ void SnakeSpellLuaBindings::bind(sol::state& lua) {
         "enableGlow", &ScaleVFXParams::enableGlow, "glowColor", &ScaleVFXParams::glowColor,
         "glowIntensity", &ScaleVFXParams::glowIntensity, "pulsate", &ScaleVFXParams::pulsate, "pulsateSpeed", &ScaleVFXParams::pulsateSpeed);
 
-    lua.new_usertype<ParticleParams>("ParticleParams", sol::constructors<ParticleParams()>(),
+    lua.new_usertype<ParticleParams>("SnakeParticleParams", sol::constructors<ParticleParams()>(),
         "venomDrip", &ParticleParams::venomDrip, "dripRate", &ParticleParams::dripRate,
         "venomColor", &ParticleParams::venomColor, "smokeTrail", &ParticleParams::smokeTrail, "smokeDensity", &ParticleParams::smokeDensity);
 
-    lua.new_usertype<AudioParams>("AudioParams", sol::constructors<AudioParams()>(),
+    lua.new_usertype<AudioParams>("SnakeAudioParams", sol::constructors<AudioParams()>(),
         "hissOnLaunch", &AudioParams::hissOnLaunch, "hissFile", &AudioParams::hissFile,
         "hissVolume", &AudioParams::hissVolume, "rattleOnImpact", &AudioParams::rattleOnImpact, "rattleFile", &AudioParams::rattleFile);
 
-    lua.new_usertype<CollisionParams>("CollisionParams", sol::constructors<CollisionParams()>(),
+    lua.new_usertype<CollisionParams>("SnakeCollisionParams", sol::constructors<CollisionParams()>(),
         "capsuleSegments", &CollisionParams::capsuleSegments, "capsuleRadius", &CollisionParams::capsuleRadius, "enableCCD", &CollisionParams::enableCCD);
 
     lua.new_usertype<SnakeBundle>("SnakeBundle", sol::no_constructor,

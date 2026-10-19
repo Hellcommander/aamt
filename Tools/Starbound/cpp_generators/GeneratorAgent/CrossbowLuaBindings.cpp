@@ -1,135 +1,232 @@
 #include "CrossbowLuaBindings.hpp"
 #include "CrossbowAssetFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include "CrossbowAssetGenerator.hpp"
 #include "core/Log.hpp"
-#include <vector>
+#include <chrono>
 #include <memory>
+#include <mutex>
+#include <vector>
 
 namespace MagiTech {
 namespace Crossbows {
 
 static std::vector<std::pair<std::future<CrossbowBundle>, std::string>> pendingCrossbows;
 static std::vector<std::pair<std::future<ProjectileBundle>, std::string>> pendingProjectiles;
-static std::unique_ptr<CrossbowAssetFactory> g_factory;
+static std::mutex pendingMutex;
+
+static std::mutex factoryMutex;
+static std::shared_ptr<CrossbowAssetFactory> g_factory;
+
+void CrossbowLuaBindings::setFactory(std::shared_ptr<CrossbowAssetFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex);
+    g_factory = std::move(factory);
+}
+
+std::shared_ptr<CrossbowAssetFactory> CrossbowLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex);
+    if (!g_factory) {
+        g_factory = std::make_shared<CrossbowAssetFactory>();
+        g_factory->initialize(4); // 4 threads for asset generation
+    }
+    return g_factory;
+}
+
+namespace {
+
+// The OpenStarbound asset writer (g_assetGenerator), created on first use.
+CrossbowAssetGenerator& assetGenerator() {
+    static std::mutex generatorMutex;
+    std::lock_guard<std::mutex> lock(generatorMutex);
+    if (!g_assetGenerator) {
+        g_assetGenerator = std::make_unique<CrossbowAssetGenerator>();
+    }
+    return *g_assetGenerator;
+}
+
+bool validateCrossbow(const CrossbowParams& p) {
+    if (p.id.empty()) {
+        Log::error("CrossbowParams: id cannot be empty");
+        return false;
+    }
+    if (p.drawLength <= 0.0f || p.drawLength > 2.0f) {
+        Log::error("CrossbowParams: drawLength must be in (0, 2.0]");
+        return false;
+    }
+    if (p.drawWeight <= 0.0f || p.drawWeight > 1000.0f) {
+        Log::error("CrossbowParams: drawWeight must be in (0, 1000]");
+        return false;
+    }
+    if (p.reloadTime <= 0.0f || p.reloadTime > 10.0f) {
+        Log::error("CrossbowParams: reloadTime must be in (0, 10.0]");
+        return false;
+    }
+    return true;
+}
+
+bool validateBolt(const BoltParams& p) {
+    if (p.id.empty()) {
+        Log::error("BoltParams: id cannot be empty");
+        return false;
+    }
+    if (p.length <= 0.0f || p.length > 1.0f) {
+        Log::error("BoltParams: length must be in (0, 1.0]");
+        return false;
+    }
+    if (p.shaftRadius <= 0.0f || p.shaftRadius > 0.02f) {
+        Log::error("BoltParams: shaftRadius must be in (0, 0.02]");
+        return false;
+    }
+    if (p.tipMass <= 0.0f || p.tipMass > 0.1f) {
+        Log::error("BoltParams: tipMass must be in (0, 0.1]");
+        return false;
+    }
+    return true;
+}
+
+bool validateArrow(const ArrowParams& p) {
+    if (p.id.empty()) {
+        Log::error("ArrowParams: id cannot be empty");
+        return false;
+    }
+    if (p.shaftLength <= 0.0f || p.shaftLength > 2.0f) {
+        Log::error("ArrowParams: shaftLength must be in (0, 2.0]");
+        return false;
+    }
+    if (p.shaftDiameter <= 0.0f || p.shaftDiameter > 0.02f) {
+        Log::error("ArrowParams: shaftDiameter must be in (0, 0.02]");
+        return false;
+    }
+    if (p.spineRating <= 0 || p.spineRating > 2000) {
+        Log::error("ArrowParams: spineRating must be in (0, 2000]");
+        return false;
+    }
+    if (p.tipMass <= 0.0f || p.tipMass > 0.05f) {
+        Log::error("ArrowParams: tipMass must be in (0, 0.05]");
+        return false;
+    }
+    return true;
+}
+
+std::vector<std::string> stringList(const sol::table& config, const char* key) {
+    std::vector<std::string> out;
+    sol::optional<sol::table> list = config[key];
+    if (list) {
+        for (const auto& [k, v] : *list) {
+            if (v.is<std::string>()) out.push_back(v.as<std::string>());
+        }
+    }
+    return out;
+}
+
+// Builds an ItemConfig from a Lua table; `defaults` supplies the per-asset defaults.
+CrossbowAssetGenerator::ItemConfig readItemConfig(const sol::table& config,
+                                                  const std::string& defaultName,
+                                                  const std::string& defaultCategory,
+                                                  float defaultDamage,
+                                                  const std::string& defaultAbility) {
+    CrossbowAssetGenerator::ItemConfig itemConfig;
+    itemConfig.itemName = config.get_or("itemName", defaultName);
+    itemConfig.description = config.get_or("description", std::string());
+    itemConfig.rarity = config.get_or("rarity", std::string("Common"));
+    itemConfig.category = config.get_or("category", defaultCategory);
+    itemConfig.level = config.get_or("level", std::string("1"));
+    itemConfig.damageType = config.get_or("damageType", std::string("physical"));
+    itemConfig.damage = config.get_or("damage", defaultDamage);
+    itemConfig.fireRate = config.get_or("fireRate", 1.0f);
+    itemConfig.abilityType = config.get_or("abilityType", defaultAbility);
+    itemConfig.behaviorSystem = config.get_or("behaviorSystem", std::string("hybrid"));
+    itemConfig.effectSystem = config.get_or("effectSystem", std::string("projectile"));
+    itemConfig.materialSystem = config.get_or("materialSystem", std::string("magitech"));
+    itemConfig.useAIArt = config.get_or("useAIArt", false);
+    itemConfig.artStyle = config.get_or("artStyle", std::string("pixel-art"));
+    itemConfig.colorPalette = config.get_or("colorPalette", std::string("starbound"));
+    itemConfig.projectileTypes = stringList(config, "projectileTypes");
+    itemConfig.specialEffects = stringList(config, "specialEffects");
+    itemConfig.artEffects = stringList(config, "artEffects");
+    return itemConfig;
+}
+
+// Calls an optional Lua callback; errors inside it are logged, not propagated.
+template <typename... Args>
+void notifyLua(sol::state& lua, const char* name, Args&&... args) {
+    sol::protected_function callback = lua[name];
+    if (!callback.valid()) return;
+    auto result = callback(std::forward<Args>(args)...);
+    if (!result.valid()) {
+        sol::error err = result;
+        Log::error("Crossbow", "Lua callback {} failed: {}", name, err.what());
+    }
+}
+
+} // namespace
 
 void CrossbowLuaBindings::bind(sol::state& lua) {
     // Initialize factory if not already done
-    if (!g_factory) {
-        g_factory = std::make_unique<CrossbowAssetFactory>();
-        g_factory->initialize(4); // 4 threads for asset generation
-    }
+    factory();
 
     // Parameter type bindings with validation
     lua.new_usertype<CrossbowParams>("CrossbowParams", sol::constructors<CrossbowParams()>(),
-        "id", &CrossbowParams::id, 
-        "drawLength", &CrossbowParams::drawLength, 
+        "id", &CrossbowParams::id,
+        "drawLength", &CrossbowParams::drawLength,
         "drawWeight", &CrossbowParams::drawWeight,
-        "autoReload", &CrossbowParams::autoReload, 
-        "reloadTime", &CrossbowParams::reloadTime, 
+        "autoReload", &CrossbowParams::autoReload,
+        "reloadTime", &CrossbowParams::reloadTime,
         "stockMaterial", &CrossbowParams::stockMaterial,
-        "limbMaterial", &CrossbowParams::limbMaterial, 
+        "limbMaterial", &CrossbowParams::limbMaterial,
         "stringMaterial", &CrossbowParams::stringMaterial,
-        "validate", [](CrossbowParams& p) -> bool {
-            if (p.id.empty()) {
-                Log::error("CrossbowParams: id cannot be empty");
-                return false;
-            }
-            if (p.drawLength <= 0.0f || p.drawLength > 2.0f) {
-                Log::error("CrossbowParams: drawLength must be between 0.1 and 2.0");
-                return false;
-            }
-            if (p.drawWeight <= 0.0f || p.drawWeight > 1000.0f) {
-                Log::error("CrossbowParams: drawWeight must be between 10 and 1000");
-                return false;
-            }
-            if (p.reloadTime <= 0.0f || p.reloadTime > 10.0f) {
-                Log::error("CrossbowParams: reloadTime must be between 0.1 and 10.0");
-                return false;
-            }
-            return true;
-        });
+        "validate", [](const CrossbowParams& p) { return validateCrossbow(p); });
 
     lua.new_usertype<BoltParams>("BoltParams", sol::constructors<BoltParams()>(),
-        "id", &BoltParams::id, 
-        "length", &BoltParams::length, 
+        "id", &BoltParams::id,
+        "length", &BoltParams::length,
         "shaftRadius", &BoltParams::shaftRadius,
-        "useFletching", &BoltParams::useFletching, 
-        "fletchMaterial", &BoltParams::fletchMaterial, 
+        "useFletching", &BoltParams::useFletching,
+        "fletchMaterial", &BoltParams::fletchMaterial,
         "fletchLength", &BoltParams::fletchLength,
-        "tipMass", &BoltParams::tipMass, 
+        "tipMass", &BoltParams::tipMass,
         "barbedTip", &BoltParams::barbedTip,
-        "validate", [](BoltParams& p) -> bool {
-            if (p.id.empty()) {
-                Log::error("BoltParams: id cannot be empty");
-                return false;
-            }
-            if (p.length <= 0.0f || p.length > 1.0f) {
-                Log::error("BoltParams: length must be between 0.1 and 1.0");
-                return false;
-            }
-            if (p.shaftRadius <= 0.0f || p.shaftRadius > 0.02f) {
-                Log::error("BoltParams: shaftRadius must be between 0.001 and 0.02");
-                return false;
-            }
-            if (p.tipMass <= 0.0f || p.tipMass > 0.1f) {
-                Log::error("BoltParams: tipMass must be between 0.001 and 0.1");
-                return false;
-            }
-            return true;
-        });
+        "validate", [](const BoltParams& p) { return validateBolt(p); });
 
     lua.new_usertype<ArrowParams>("ArrowParams", sol::constructors<ArrowParams()>(),
-        "id", &ArrowParams::id, 
-        "shaftLength", &ArrowParams::shaftLength, 
+        "id", &ArrowParams::id,
+        "shaftLength", &ArrowParams::shaftLength,
         "shaftDiameter", &ArrowParams::shaftDiameter,
-        "spineRating", &ArrowParams::spineRating, 
-        "useFletching", &ArrowParams::useFletching, 
+        "spineRating", &ArrowParams::spineRating,
+        "useFletching", &ArrowParams::useFletching,
         "fletchStyle", &ArrowParams::fletchStyle,
-        "nockSize", &ArrowParams::nockSize, 
+        "nockSize", &ArrowParams::nockSize,
         "tipMass", &ArrowParams::tipMass,
-        "validate", [](ArrowParams& p) -> bool {
-            if (p.id.empty()) {
-                Log::error("ArrowParams: id cannot be empty");
-                return false;
-            }
-            if (p.shaftLength <= 0.0f || p.shaftLength > 2.0f) {
-                Log::error("ArrowParams: shaftLength must be between 0.5 and 2.0");
-                return false;
-            }
-            if (p.shaftDiameter <= 0.0f || p.shaftDiameter > 0.02f) {
-                Log::error("ArrowParams: shaftDiameter must be between 0.002 and 0.02");
-                return false;
-            }
-            if (p.spineRating <= 0 || p.spineRating > 2000) {
-                Log::error("ArrowParams: spineRating must be between 100 and 2000");
-                return false;
-            }
-            if (p.tipMass <= 0.0f || p.tipMass > 0.05f) {
-                Log::error("ArrowParams: tipMass must be between 0.005 and 0.05");
-                return false;
-            }
-            return true;
-        });
-        
+        "validate", [](const ArrowParams& p) { return validateArrow(p); });
+
     lua.new_usertype<CrossbowBundle>("CrossbowBundle", sol::no_constructor,
-        "mesh", &CrossbowBundle::mesh, 
-        "string", &CrossbowBundle::string, 
-        "reloadAnim", &CrossbowBundle::reloadAnim, 
-        "materials", &CrossbowBundle::materials);
+        "mesh", &CrossbowBundle::mesh,
+        "string", &CrossbowBundle::string,
+        "reloadAnim", &CrossbowBundle::reloadAnim,
+        "materials", sol::readonly_property([](const CrossbowBundle& b, sol::this_state ts) {
+            // { [slot] = materialHandle }
+            sol::state_view view(ts);
+            sol::table out = view.create_table();
+            for (const auto& [slot, handle] : b.materials.materials) out[slot] = handle;
+            return out;
+        }));
 
     lua.new_usertype<ProjectileBundle>("ProjectileBundle", sol::no_constructor,
-        "mesh", &ProjectileBundle::mesh, 
-        "material", &ProjectileBundle::material, 
+        "mesh", &ProjectileBundle::mesh,
+        "material", &ProjectileBundle::material,
         "vfxTrail", &ProjectileBundle::vfxTrail,
-        "flightSim", &ProjectileBundle::flightSim, 
+        "flightSim", &ProjectileBundle::flightSim,
         "collider", &ProjectileBundle::collider);
 
     // Main generation functions with validation (Async)
-    lua.set_function("spawn_crossbow", [&](const CrossbowParams& p) -> bool {
-        if (!p.validate()) return false;
-        
+    lua.set_function("spawn_crossbow", [](const CrossbowParams& p) -> bool {
+        if (!validateCrossbow(p)) return false;
+
         try {
-            pendingCrossbows.emplace_back(g_factory->generateCrossbowAsync(p), p.id);
+            auto future = factory()->generateCrossbowAsync(p);
+            {
+                std::lock_guard<std::mutex> lock(pendingMutex);
+                pendingCrossbows.emplace_back(std::move(future), p.id);
+            }
             Log::info("Crossbow", "Crossbow generation started: {}", p.id);
             return true;
         } catch (const std::exception& e) {
@@ -138,11 +235,15 @@ void CrossbowLuaBindings::bind(sol::state& lua) {
         }
     });
 
-    lua.set_function("spawn_bolt", [&](const BoltParams& p) -> bool {
-        if (!p.validate()) return false;
-        
+    lua.set_function("spawn_bolt", [](const BoltParams& p) -> bool {
+        if (!validateBolt(p)) return false;
+
         try {
-            pendingProjectiles.emplace_back(g_factory->generateBoltAsync(p), p.id);
+            auto future = factory()->generateBoltAsync(p);
+            {
+                std::lock_guard<std::mutex> lock(pendingMutex);
+                pendingProjectiles.emplace_back(std::move(future), p.id);
+            }
             Log::info("Crossbow", "Bolt generation started: {}", p.id);
             return true;
         } catch (const std::exception& e) {
@@ -151,11 +252,15 @@ void CrossbowLuaBindings::bind(sol::state& lua) {
         }
     });
 
-    lua.set_function("spawn_arrow", [&](const ArrowParams& p) -> bool {
-        if (!p.validate()) return false;
-        
+    lua.set_function("spawn_arrow", [](const ArrowParams& p) -> bool {
+        if (!validateArrow(p)) return false;
+
         try {
-            pendingProjectiles.emplace_back(g_factory->generateArrowAsync(p), p.id);
+            auto future = factory()->generateArrowAsync(p);
+            {
+                std::lock_guard<std::mutex> lock(pendingMutex);
+                pendingProjectiles.emplace_back(std::move(future), p.id);
+            }
             Log::info("Crossbow", "Arrow generation started: {}", p.id);
             return true;
         } catch (const std::exception& e) {
@@ -165,42 +270,42 @@ void CrossbowLuaBindings::bind(sol::state& lua) {
     });
 
     // Synchronous factory methods for immediate access
-    lua.set_function("generate_crossbow", [&](const CrossbowParams& p) -> CrossbowBundle {
-        if (!p.validate()) {
+    lua.set_function("generate_crossbow", [](const CrossbowParams& p) -> CrossbowBundle {
+        if (!validateCrossbow(p)) {
             Log::error("Crossbow", "Invalid crossbow parameters for {}", p.id);
             return CrossbowBundle{};
         }
-        
+
         try {
-            return g_factory->generateCrossbow(p);
+            return factory()->generateCrossbow(p);
         } catch (const std::exception& e) {
             Log::error("Crossbow", "Failed to generate crossbow {}: {}", p.id, e.what());
             return CrossbowBundle{};
         }
     });
 
-    lua.set_function("generate_bolt", [&](const BoltParams& p) -> ProjectileBundle {
-        if (!p.validate()) {
+    lua.set_function("generate_bolt", [](const BoltParams& p) -> ProjectileBundle {
+        if (!validateBolt(p)) {
             Log::error("Crossbow", "Invalid bolt parameters for {}", p.id);
             return ProjectileBundle{};
         }
-        
+
         try {
-            return g_factory->generateBolt(p);
+            return factory()->generateBolt(p);
         } catch (const std::exception& e) {
             Log::error("Crossbow", "Failed to generate bolt {}: {}", p.id, e.what());
             return ProjectileBundle{};
         }
     });
 
-    lua.set_function("generate_arrow", [&](const ArrowParams& p) -> ProjectileBundle {
-        if (!p.validate()) {
+    lua.set_function("generate_arrow", [](const ArrowParams& p) -> ProjectileBundle {
+        if (!validateArrow(p)) {
             Log::error("Crossbow", "Invalid arrow parameters for {}", p.id);
             return ProjectileBundle{};
         }
-        
+
         try {
-            return g_factory->generateArrow(p);
+            return factory()->generateArrow(p);
         } catch (const std::exception& e) {
             Log::error("Crossbow", "Failed to generate arrow {}: {}", p.id, e.what());
             return ProjectileBundle{};
@@ -208,13 +313,13 @@ void CrossbowLuaBindings::bind(sol::state& lua) {
     });
 
     // Cache management functions
-    lua.set_function("clear_crossbow_cache", [&]() {
-        g_factory->clearCache();
+    lua.set_function("clear_crossbow_cache", []() {
+        factory()->clearCache();
         Log::info("Cleared crossbow asset cache");
     });
 
-    lua.set_function("get_cache_size", [&]() -> size_t {
-        return g_factory->getCacheSize();
+    lua.set_function("get_cache_size", []() -> size_t {
+        return factory()->getCacheSize();
     });
 
     // Utility functions for common configurations
@@ -269,220 +374,157 @@ void CrossbowLuaBindings::bind(sol::state& lua) {
     });
 
     // Status and management functions
-    lua.set_function("get_pending_count", []() -> sol::table {
-        sol::table result = lua.create_table();
+    lua.set_function("get_pending_count", [](sol::this_state ts) -> sol::table {
+        sol::state_view view(ts);
+        sol::table result = view.create_table();
+        std::lock_guard<std::mutex> lock(pendingMutex);
         result["crossbows"] = pendingCrossbows.size();
         result["projectiles"] = pendingProjectiles.size();
         return result;
     });
 
     lua.set_function("clear_pending", []() {
+        std::lock_guard<std::mutex> lock(pendingMutex);
         pendingCrossbows.clear();
         pendingProjectiles.clear();
         Log::info("Cleared all pending asset generations");
     });
 
     // Asset generation functions for complete OpenStarbound assets
-    lua.set_function("generate_crossbow_assets", [&](const CrossbowParams& p, const sol::table& config) -> sol::table {
-        if (!p.validate()) {
-            Log::error("Invalid crossbow parameters for asset generation");
-            return lua.create_table();
+    lua.set_function("generate_crossbow_assets", [](const CrossbowParams& p, const sol::table& config, sol::this_state ts) -> sol::table {
+        sol::state_view view(ts);
+        if (!validateCrossbow(p)) {
+            Log::error("Crossbow", "Invalid crossbow parameters for {}", p.id);
+            return view.create_table();
         }
-        
+
         try {
-            // Convert Lua table to ItemConfig
-            CrossbowAssetGenerator::ItemConfig itemConfig;
-            itemConfig.itemName = config.get<std::string>("itemName", "Crossbow");
-            itemConfig.description = config.get<std::string>("description", "");
-            itemConfig.rarity = config.get<std::string>("rarity", "Common");
-            itemConfig.category = config.get<std::string>("category", "weapon");
-            itemConfig.level = config.get<std::string>("level", "1");
-            itemConfig.damageType = config.get<std::string>("damageType", "physical");
-            itemConfig.damage = config.get<float>("damage", 10.0f);
-            itemConfig.fireRate = config.get<float>("fireRate", 1.0f);
-            itemConfig.abilityType = config.get<std::string>("abilityType", "crossbow");
-            itemConfig.behaviorSystem = config.get<std::string>("behaviorSystem", "hybrid");
-            itemConfig.effectSystem = config.get<std::string>("effectSystem", "projectile");
-            itemConfig.materialSystem = config.get<std::string>("materialSystem", "magitech");
-            
-            // Get projectile types
-            if (config.get_type() == sol::type::table) {
-                auto projectileTypes = config.get<sol::table>("projectileTypes");
-                if (projectileTypes.valid()) {
-                    for (const auto& pair : projectileTypes) {
-                        itemConfig.projectileTypes.push_back(pair.second.as<std::string>());
-                    }
-                }
-            }
-            
-            // Get special effects
-            if (config.get_type() == sol::type::table) {
-                auto specialEffects = config.get<sol::table>("specialEffects");
-                if (specialEffects.valid()) {
-                    for (const auto& pair : specialEffects) {
-                        itemConfig.specialEffects.push_back(pair.second.as<std::string>());
-                    }
-                }
-            }
-            
-            // Generate assets
-            auto output = g_assetGenerator->generateCrossbowAssets(p, itemConfig);
-            
+            auto itemConfig = readItemConfig(config, "Crossbow", "weapon", 10.0f, "crossbow");
+            auto output = assetGenerator().generateCrossbowAssets(p, itemConfig);
+
             // Return results as Lua table
-            sol::table result = lua.create_table();
+            sol::table result = view.create_table();
             result["itemFile"] = output.itemFile;
             result["framesFile"] = output.framesFile;
             result["spriteFile"] = output.spriteFile;
             result["iconFile"] = output.iconFile;
             result["behaviorFile"] = output.behaviorFile;
             result["effectFile"] = output.effectFile;
-            
+            result["metadataFile"] = output.metadataFile;
+
             Log::info("Crossbow", "Generated crossbow assets: {}", p.id);
             return result;
-            
+
         } catch (const std::exception& e) {
             Log::error("Crossbow", "Failed to generate crossbow assets for {}: {}", p.id, e.what());
-            return lua.create_table();
+            return view.create_table();
         }
     });
 
-    lua.set_function("generate_bolt_assets", [&](const BoltParams& p, const sol::table& config) -> sol::table {
-        if (!p.validate()) {
-            Log::error("Invalid bolt parameters for asset generation");
-            return lua.create_table();
+    lua.set_function("generate_bolt_assets", [](const BoltParams& p, const sol::table& config, sol::this_state ts) -> sol::table {
+        sol::state_view view(ts);
+        if (!validateBolt(p)) {
+            Log::error("Crossbow", "Invalid bolt parameters for {}", p.id);
+            return view.create_table();
         }
-        
+
         try {
-            // Convert Lua table to ItemConfig
-            CrossbowAssetGenerator::ItemConfig itemConfig;
-            itemConfig.itemName = config.get<std::string>("itemName", "Bolt");
-            itemConfig.description = config.get<std::string>("description", "");
-            itemConfig.rarity = config.get<std::string>("rarity", "Common");
-            itemConfig.category = config.get<std::string>("category", "ammo");
-            itemConfig.level = config.get<std::string>("level", "1");
-            itemConfig.damageType = config.get<std::string>("damageType", "physical");
-            itemConfig.damage = config.get<float>("damage", 5.0f);
-            itemConfig.fireRate = config.get<float>("fireRate", 1.0f);
-            itemConfig.abilityType = config.get<std::string>("abilityType", "projectile");
-            itemConfig.effectSystem = config.get<std::string>("effectSystem", "projectile");
-            
-            // Get special effects
-            if (config.get_type() == sol::type::table) {
-                auto specialEffects = config.get<sol::table>("specialEffects");
-                if (specialEffects.valid()) {
-                    for (const auto& pair : specialEffects) {
-                        itemConfig.specialEffects.push_back(pair.second.as<std::string>());
-                    }
-                }
-            }
-            
-            // Generate assets
-            auto output = g_assetGenerator->generateBoltAssets(p, itemConfig);
-            
+            auto itemConfig = readItemConfig(config, "Bolt", "ammo", 5.0f, "projectile");
+            auto output = assetGenerator().generateBoltAssets(p, itemConfig);
+
             // Return results as Lua table
-            sol::table result = lua.create_table();
+            sol::table result = view.create_table();
             result["projectileFile"] = output.projectileFile;
             result["spriteFile"] = output.spriteFile;
             result["iconFile"] = output.iconFile;
             result["effectFile"] = output.effectFile;
-            
+            result["metadataFile"] = output.metadataFile;
+
             Log::info("Crossbow", "Generated bolt assets: {}", p.id);
             return result;
-            
+
         } catch (const std::exception& e) {
             Log::error("Crossbow", "Failed to generate bolt assets for {}: {}", p.id, e.what());
-            return lua.create_table();
+            return view.create_table();
         }
     });
 
-    lua.set_function("generate_arrow_assets", [&](const ArrowParams& p, const sol::table& config) -> sol::table {
-        if (!p.validate()) {
-            Log::error("Invalid arrow parameters for asset generation");
-            return lua.create_table();
+    lua.set_function("generate_arrow_assets", [](const ArrowParams& p, const sol::table& config, sol::this_state ts) -> sol::table {
+        sol::state_view view(ts);
+        if (!validateArrow(p)) {
+            Log::error("Crossbow", "Invalid arrow parameters for {}", p.id);
+            return view.create_table();
         }
-        
+
         try {
-            // Convert Lua table to ItemConfig
-            CrossbowAssetGenerator::ItemConfig itemConfig;
-            itemConfig.itemName = config.get<std::string>("itemName", "Arrow");
-            itemConfig.description = config.get<std::string>("description", "");
-            itemConfig.rarity = config.get<std::string>("rarity", "Common");
-            itemConfig.category = config.get<std::string>("category", "ammo");
-            itemConfig.level = config.get<std::string>("level", "1");
-            itemConfig.damageType = config.get<std::string>("damageType", "physical");
-            itemConfig.damage = config.get<float>("damage", 4.0f);
-            itemConfig.fireRate = config.get<float>("fireRate", 1.0f);
-            itemConfig.abilityType = config.get<std::string>("abilityType", "projectile");
-            itemConfig.effectSystem = config.get<std::string>("effectSystem", "projectile");
-            
-            // Get special effects
-            if (config.get_type() == sol::type::table) {
-                auto specialEffects = config.get<sol::table>("specialEffects");
-                if (specialEffects.valid()) {
-                    for (const auto& pair : specialEffects) {
-                        itemConfig.specialEffects.push_back(pair.second.as<std::string>());
-                    }
-                }
-            }
-            
-            // Generate assets
-            auto output = g_assetGenerator->generateArrowAssets(p, itemConfig);
-            
+            auto itemConfig = readItemConfig(config, "Arrow", "ammo", 4.0f, "projectile");
+            auto output = assetGenerator().generateArrowAssets(p, itemConfig);
+
             // Return results as Lua table
-            sol::table result = lua.create_table();
+            sol::table result = view.create_table();
             result["projectileFile"] = output.projectileFile;
             result["spriteFile"] = output.spriteFile;
             result["iconFile"] = output.iconFile;
             result["effectFile"] = output.effectFile;
-            
+            result["metadataFile"] = output.metadataFile;
+
             Log::info("Crossbow", "Generated arrow assets: {}", p.id);
             return result;
-            
+
         } catch (const std::exception& e) {
             Log::error("Crossbow", "Failed to generate arrow assets for {}: {}", p.id, e.what());
-            return lua.create_table();
+            return view.create_table();
         }
     });
 }
 
 void CrossbowLuaBindings::poll_assets(sol::state& lua) {
-    // Process completed crossbows
-    for (auto it = pendingCrossbows.begin(); it != pendingCrossbows.end();) {
-        if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            try {
-                auto bundle = it->first.get();
-                Log::info("Crossbow", "Crossbow asset ready: {} (mesh: {}, string: {}, anim: {})", 
-                    it->second, bundle.mesh, bundle.string, bundle.reloadAnim);
-                
-                // Notify Lua about completion
-                lua["on_crossbow_ready"](it->second, bundle);
-            } catch (const std::exception& e) {
-                Log::error("Crossbow", "Crossbow generation failed for {}: {}", it->second, e.what());
-                lua["on_crossbow_error"](it->second, e.what());
+    // Take finished futures out under the lock; Lua callbacks run without it
+    std::vector<std::pair<std::future<CrossbowBundle>, std::string>> readyCrossbows;
+    std::vector<std::pair<std::future<ProjectileBundle>, std::string>> readyProjectiles;
+    {
+        std::lock_guard<std::mutex> lock(pendingMutex);
+        for (auto it = pendingCrossbows.begin(); it != pendingCrossbows.end();) {
+            if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                readyCrossbows.push_back(std::move(*it));
+                it = pendingCrossbows.erase(it);
+            } else {
+                ++it;
             }
-            it = pendingCrossbows.erase(it);
-        } else { 
-            ++it; 
+        }
+        for (auto it = pendingProjectiles.begin(); it != pendingProjectiles.end();) {
+            if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                readyProjectiles.push_back(std::move(*it));
+                it = pendingProjectiles.erase(it);
+            } else {
+                ++it;
+            }
         }
     }
-    
+
+    // Process completed crossbows
+    for (auto& [future, id] : readyCrossbows) {
+        try {
+            auto bundle = future.get();
+            Log::info("Crossbow", "Crossbow asset ready: {} (mesh: {}, string: {}, anim: {})",
+                id, bundle.mesh, bundle.string, bundle.reloadAnim);
+            notifyLua(lua, "on_crossbow_ready", id, bundle);
+        } catch (const std::exception& e) {
+            Log::error("Crossbow", "Crossbow generation failed for {}: {}", id, e.what());
+            notifyLua(lua, "on_crossbow_error", id, std::string(e.what()));
+        }
+    }
+
     // Process completed projectiles
-    for (auto it = pendingProjectiles.begin(); it != pendingProjectiles.end();) {
-        if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            try {
-                auto bundle = it->first.get();
-                Log::info("Crossbow", "Projectile asset ready: {} (mesh: {}, material: {}, sim: {})", 
-                    it->second, bundle.mesh, bundle.material, bundle.flightSim);
-                
-                // Notify Lua about completion
-                lua["on_projectile_ready"](it->second, bundle);
-            } catch (const std::exception& e) {
-                Log::error("Crossbow", "Projectile generation failed for {}: {}", it->second, e.what());
-                lua["on_projectile_error"](it->second, e.what());
-            }
-            it = pendingProjectiles.erase(it);
-        } else { 
-            ++it; 
+    for (auto& [future, id] : readyProjectiles) {
+        try {
+            auto bundle = future.get();
+            Log::info("Crossbow", "Projectile asset ready: {} (mesh: {}, material: {}, sim: {})",
+                id, bundle.mesh, bundle.material, bundle.flightSim);
+            notifyLua(lua, "on_projectile_ready", id, bundle);
+        } catch (const std::exception& e) {
+            Log::error("Crossbow", "Projectile generation failed for {}: {}", id, e.what());
+            notifyLua(lua, "on_projectile_error", id, std::string(e.what()));
         }
     }
 }

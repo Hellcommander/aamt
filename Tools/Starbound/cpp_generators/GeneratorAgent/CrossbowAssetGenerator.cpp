@@ -1,10 +1,16 @@
 #include "CrossbowAssetGenerator.hpp"
 #include "CrossbowAssetFactory.hpp"
 #include "core/Log.hpp"
+#include "vendor/json/include/nlohmann/json.hpp"
+#include <stb_image_write.h>
+#include <algorithm>
+#include <cctype>
+#include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <sstream>
 #include <iomanip>
+#include <sstream>
 
 namespace MagiTech {
 namespace Crossbows {
@@ -12,412 +18,577 @@ namespace Crossbows {
 // Global asset generator instance
 std::unique_ptr<CrossbowAssetGenerator> g_assetGenerator;
 
+namespace {
+
+// ---------------------------------------------------------------------------
+// Minimal RGBA canvas for the procedural fallback sprites
+struct Canvas {
+    int width;
+    int height;
+    std::vector<uint8_t> pixels;
+
+    Canvas(int w, int h) : width(w), height(h), pixels(static_cast<size_t>(w) * h * 4, 0) {}
+
+    void set(int x, int y, uint32_t rgba) {
+        if (x < 0 || y < 0 || x >= width || y >= height) return;
+        uint8_t* p = &pixels[(static_cast<size_t>(y) * width + x) * 4];
+        p[0] = static_cast<uint8_t>(rgba >> 24);
+        p[1] = static_cast<uint8_t>(rgba >> 16);
+        p[2] = static_cast<uint8_t>(rgba >> 8);
+        p[3] = static_cast<uint8_t>(rgba);
+    }
+
+    void line(float x0, float y0, float x1, float y1, uint32_t rgba, int thickness = 1) {
+        const int steps = static_cast<int>(std::max(std::abs(x1 - x0), std::abs(y1 - y0))) + 1;
+        for (int i = 0; i <= steps; ++i) {
+            const float t = steps == 0 ? 0.0f : static_cast<float>(i) / static_cast<float>(steps);
+            const int x = static_cast<int>(std::lround(x0 + (x1 - x0) * t));
+            const int y = static_cast<int>(std::lround(y0 + (y1 - y0) * t));
+            for (int dy = 0; dy < thickness; ++dy)
+                for (int dx = 0; dx < thickness; ++dx) set(x + dx, y + dy, rgba);
+        }
+    }
+
+    void rect(int x0, int y0, int x1, int y1, uint32_t rgba) {
+        for (int y = y0; y <= y1; ++y)
+            for (int x = x0; x <= x1; ++x) set(x, y, rgba);
+    }
+
+    bool savePng(const std::string& path) const {
+        return stbi_write_png(path.c_str(), width, height, 4, pixels.data(), width * 4) != 0;
+    }
+};
+
+// Colour picked from a material name (wood/metal/fiberglass/synthetic/feather...)
+uint32_t materialColor(const std::string& material) {
+    std::string m;
+    for (unsigned char c : material) m.push_back(static_cast<char>(std::tolower(c)));
+    if (m.find("wood") != std::string::npos || m.find("oak") != std::string::npos) return 0x8B5A2BFF;
+    if (m.find("steel") != std::string::npos || m.find("metal") != std::string::npos) return 0x9AA4B0FF;
+    if (m.find("carbon") != std::string::npos) return 0x2B2B30FF;
+    if (m.find("fiberglass") != std::string::npos) return 0xD8D2B0FF;
+    if (m.find("feather") != std::string::npos) return 0xF2F2F2FF;
+    if (m.find("plastic") != std::string::npos) return 0xC83C3CFF;
+    if (m.find("hemp") != std::string::npos) return 0xC8B48CFF;
+    if (m.find("synthetic") != std::string::npos || m.find("kevlar") != std::string::npos) return 0xE6D25AFF;
+    return 0xB4B4B4FF;
+}
+
+// Draws one crossbow frame (side view) into the canvas at horizontal offset `ox`; `draw` in [0,1]
+void drawCrossbowFrame(Canvas& c, int ox, const CrossbowParams& p, float draw) {
+    const uint32_t stock = materialColor(p.stockMaterial);
+    const uint32_t limb = materialColor(p.limbMaterial);
+    const uint32_t string = materialColor(p.stringMaterial);
+    // Stock: horizontal bar
+    c.rect(ox + 4, 15, ox + 26, 17, stock);
+    c.rect(ox + 4, 18, ox + 9, 21, stock);          // grip
+    // Limbs: arc at the front, bending more when drawn
+    const float bend = 2.0f + 3.0f * draw;
+    c.line(ox + 24.0f, 16.0f, ox + 26.0f - bend, 5.0f, limb, 2);
+    c.line(ox + 24.0f, 16.0f, ox + 26.0f - bend, 27.0f, limb, 2);
+    // String from limb tips to the nocking point
+    const float nock = 24.0f - 12.0f * draw;
+    c.line(ox + 26.0f - bend, 5.0f, ox + nock, 16.0f, string);
+    c.line(ox + 26.0f - bend, 27.0f, ox + nock, 16.0f, string);
+}
+
+void drawProjectile(Canvas& c, float length01, uint32_t shaft, uint32_t fletch, bool fletched, bool barbed) {
+    const int w = c.width, h = c.height;
+    const int y = h / 2;
+    const int x0 = static_cast<int>(w * (1.0f - length01) * 0.5f);
+    const int x1 = w - 1 - x0;
+    c.rect(x0, y, x1 - 4, y, shaft);
+    // Tip
+    c.line(static_cast<float>(x1 - 4), static_cast<float>(y - 2), static_cast<float>(x1), static_cast<float>(y), 0xD0D0D8FF);
+    c.line(static_cast<float>(x1 - 4), static_cast<float>(y + 2), static_cast<float>(x1), static_cast<float>(y), 0xD0D0D8FF);
+    if (barbed) {
+        c.line(static_cast<float>(x1 - 5), static_cast<float>(y - 3), static_cast<float>(x1 - 3), static_cast<float>(y - 1), 0xA0A0A8FF);
+        c.line(static_cast<float>(x1 - 5), static_cast<float>(y + 3), static_cast<float>(x1 - 3), static_cast<float>(y + 1), 0xA0A0A8FF);
+    }
+    if (fletched) {
+        c.line(static_cast<float>(x0), static_cast<float>(y - 3), static_cast<float>(x0 + 4), static_cast<float>(y), fletch);
+        c.line(static_cast<float>(x0), static_cast<float>(y + 3), static_cast<float>(x0 + 4), static_cast<float>(y), fletch);
+    }
+}
+
+bool copyIfPresent(const std::string& from, const std::string& to) {
+    std::error_code ec;
+    if (from.empty() || !std::filesystem::exists(from, ec) || std::filesystem::file_size(from, ec) == 0) return false;
+    std::filesystem::copy_file(from, to, std::filesystem::copy_options::overwrite_existing, ec);
+    return !ec;
+}
+
+nlohmann::json levelValue(const std::string& level) {
+    try {
+        size_t used = 0;
+        const double v = std::stod(level, &used);
+        if (used == level.size()) return v;
+    } catch (const std::exception&) {
+    }
+    return level;
+}
+
+} // namespace
+
 CrossbowAssetGenerator::CrossbowAssetGenerator() {
     outputBasePath = "items/active/weapons/crossbow/";
 }
 
-CrossbowAssetGenerator::~CrossbowAssetGenerator() = default;
+void CrossbowAssetGenerator::initialize(std::shared_ptr<AIArt::AIArtGenerator> generator) {
+    aiGenerator = std::move(generator);
+}
 
 CrossbowAssetGenerator::AssetOutput CrossbowAssetGenerator::generateCrossbowAssets(
     const CrossbowParams& params, const ItemConfig& config) {
-    
+
     AssetOutput output;
     std::string baseName = sanitizeFilename(params.id);
-    
+
     // Create output directory
     std::string outputDir = outputBasePath + baseName + "/";
     createDirectory(outputDir);
-    
+
     // Generate all asset files
     output.itemFile = outputDir + baseName + ".activeitem";
-    output.framesFile = outputDir + baseName + "full.frames";
-    output.spriteFile = outputDir + baseName + "full.png";
-    output.iconFile = outputDir + baseName + "icon.png";
+    output.framesFile = outputDir + generateAssetName(baseName, "full.frames");
+    output.spriteFile = outputDir + generateAssetName(baseName, "full.png");
+    output.iconFile = outputDir + generateAssetName(baseName, "icon.png");
     output.behaviorFile = outputDir + baseName + ".lua";
     output.effectFile = outputDir + baseName + "_effects.json";
-    
-    // Generate JSON files
-    std::string activeItemJSON = generateActiveItemJSON(params, config);
-    std::string framesJSON = generateFramesJSON(baseName + "full", 8); // 8 animation frames
-    std::string behaviorScript = generateBehaviorScript(params, config);
-    std::string effectConfig = generateEffectConfig(params, config);
-    
-    writeFile(output.itemFile, activeItemJSON);
-    writeFile(output.framesFile, framesJSON);
-    writeFile(output.behaviorFile, behaviorScript);
-    writeFile(output.effectFile, effectConfig);
-    
-    // Generate sprite files (placeholder - would integrate with image generation)
-    generateSprite(output.spriteFile, params);
-    generateIcon(output.iconFile, config.itemName);
-    
+
+    writeFile(output.itemFile, generateActiveItemJSON(params, config));
+    writeFile(output.framesFile, generateFramesJSON(baseName + "full", 8)); // 8 draw frames
+    writeFile(output.behaviorFile, generateBehaviorScript(params, config));
+    writeFile(output.effectFile, generateEffectConfig(params, config));
+
+    // Sprites: AI art when enabled and available, procedural fallback otherwise
+    bool haveArt = false;
+    if (config.useAIArt && aiGenerator) {
+        AIArt::ArtOutput art = generateCrossbowArt(params, config);
+        if (art.success) {
+            haveArt = copyIfPresent(art.spriteFile, output.spriteFile) && copyIfPresent(art.iconFile, output.iconFile);
+            output.metadataFile = art.metadataFile;
+        } else {
+            Log::warn("CrossbowAsset", "AI art failed for {}: {}", params.id, art.errorMessage);
+        }
+    }
+    if (!haveArt) {
+        generateFallbackSprite(output.spriteFile, params);
+        generateFallbackIcon(output.iconFile, config.itemName);
+    }
+
     Log::info("CrossbowAsset", "Generated crossbow assets for: {}", params.id);
     return output;
 }
 
 CrossbowAssetGenerator::AssetOutput CrossbowAssetGenerator::generateBoltAssets(
     const BoltParams& params, const ItemConfig& config) {
-    
+
     AssetOutput output;
     std::string baseName = sanitizeFilename(params.id);
-    
+
     // Create output directory
     std::string outputDir = outputBasePath + "ammo/" + baseName + "/";
     createDirectory(outputDir);
-    
+
     // Generate projectile file
     output.projectileFile = outputDir + baseName + ".projectile";
     output.effectFile = outputDir + baseName + "_effects.json";
-    
-    std::string projectileJSON = generateProjectileJSON(params, config);
-    std::string effectConfig = generateEffectConfig(params, config);
-    
-    writeFile(output.projectileFile, projectileJSON);
-    writeFile(output.effectFile, effectConfig);
-    
+
+    writeFile(output.projectileFile, generateProjectileJSON(params, config));
+    writeFile(output.effectFile, generateEffectConfig(params, config));
+
     // Generate sprite files
     output.spriteFile = outputDir + baseName + ".png";
-    output.iconFile = outputDir + baseName + "icon.png";
-    
-    generateSprite(output.spriteFile, params);
-    generateIcon(output.iconFile, config.itemName);
-    
+    output.iconFile = outputDir + generateAssetName(baseName, "icon.png");
+
+    bool haveArt = false;
+    if (config.useAIArt && aiGenerator) {
+        AIArt::ArtOutput art = generateBoltArt(params, config);
+        if (art.success) {
+            haveArt = copyIfPresent(art.spriteFile, output.spriteFile) && copyIfPresent(art.iconFile, output.iconFile);
+            output.metadataFile = art.metadataFile;
+        } else {
+            Log::warn("CrossbowAsset", "AI art failed for {}: {}", params.id, art.errorMessage);
+        }
+    }
+    if (!haveArt) {
+        generateFallbackSprite(output.spriteFile, params);
+        generateFallbackIcon(output.iconFile, config.itemName);
+    }
+
     Log::info("CrossbowAsset", "Generated bolt assets for: {}", params.id);
     return output;
 }
 
 CrossbowAssetGenerator::AssetOutput CrossbowAssetGenerator::generateArrowAssets(
     const ArrowParams& params, const ItemConfig& config) {
-    
+
     AssetOutput output;
     std::string baseName = sanitizeFilename(params.id);
-    
+
     // Create output directory
     std::string outputDir = outputBasePath + "ammo/" + baseName + "/";
     createDirectory(outputDir);
-    
+
     // Generate projectile file
     output.projectileFile = outputDir + baseName + ".projectile";
     output.effectFile = outputDir + baseName + "_effects.json";
-    
-    std::string projectileJSON = generateProjectileJSON(params, config);
-    std::string effectConfig = generateEffectConfig(params, config);
-    
-    writeFile(output.projectileFile, projectileJSON);
-    writeFile(output.effectFile, effectConfig);
-    
+
+    writeFile(output.projectileFile, generateProjectileJSON(params, config));
+    writeFile(output.effectFile, generateEffectConfig(params, config));
+
     // Generate sprite files
     output.spriteFile = outputDir + baseName + ".png";
-    output.iconFile = outputDir + baseName + "icon.png";
-    
-    generateSprite(output.spriteFile, params);
-    generateIcon(output.iconFile, config.itemName);
-    
+    output.iconFile = outputDir + generateAssetName(baseName, "icon.png");
+
+    bool haveArt = false;
+    if (config.useAIArt && aiGenerator) {
+        AIArt::ArtOutput art = generateArrowArt(params, config);
+        if (art.success) {
+            haveArt = copyIfPresent(art.spriteFile, output.spriteFile) && copyIfPresent(art.iconFile, output.iconFile);
+            output.metadataFile = art.metadataFile;
+        } else {
+            Log::warn("CrossbowAsset", "AI art failed for {}: {}", params.id, art.errorMessage);
+        }
+    }
+    if (!haveArt) {
+        generateFallbackSprite(output.spriteFile, params);
+        generateFallbackIcon(output.iconFile, config.itemName);
+    }
+
     Log::info("CrossbowAsset", "Generated arrow assets for: {}", params.id);
     return output;
 }
 
 std::string CrossbowAssetGenerator::generateActiveItemJSON(const CrossbowParams& params, const ItemConfig& config) {
-    std::ostringstream json;
-    
-    json << "{\n";
-    json << "  \"itemName\" : \"" << config.itemName << "\",\n";
-    json << "  \"description\" : \"" << generateDescription(params) << "\",\n";
-    json << "  \"rarity\" : \"" << config.rarity << "\",\n";
-    json << "  \"category\" : \"" << config.category << "\",\n";
-    json << "  \"level\" : " << config.level << ",\n";
-    json << "  \"price\" : 0,\n";
-    json << "  \"twoHanded\" : true,\n";
-    json << "  \"itemTags\" : [\"weapon\", \"ranged\", \"crossbow\"],\n";
-    json << "  \"inventoryIcon\" : \"" << sanitizeFilename(params.id) << "icon.png\",\n";
-    json << "  \"animation\" : \"" << sanitizeFilename(params.id) << ".animation\",\n";
-    json << "  \"animationParts\" : {\n";
-    json << "    \"bow\" : \"" << sanitizeFilename(params.id) << "full.png\"\n";
-    json << "  },\n";
-    json << "  \"scripts\" : {\n";
-    json << "    \"init\" : [\"/items/active/weapons/crossbow/" << sanitizeFilename(params.id) << ".lua\"],\n";
-    json << "    \"update\" : [\"/items/active/weapons/crossbow/" << sanitizeFilename(params.id) << ".lua\"]\n";
-    json << "  },\n";
-    json << "  \"primaryAbility\" : {\n";
-    json << "    \"abilityType\" : \"" << config.abilityType << "\",\n";
-    json << "    \"damageConfig\" : {\n";
-    json << "      \"damageKind\" : \"" << config.damageType << "\",\n";
-    json << "      \"damage\" : " << std::fixed << std::setprecision(1) << config.damage << "\n";
-    json << "    },\n";
-    json << "    \"fireTime\" : " << std::fixed << std::setprecision(2) << (1.0f / config.fireRate) << ",\n";
-    json << "    \"projectileParameters\" : {\n";
-    json << "      \"power\" : " << (params.drawWeight * 0.01f) << "\n";
-    json << "    },\n";
-    json << "    \"projectileType\" : \"" << config.projectileTypes[0] << "\"\n";
-    json << "  },\n";
-    json << "  \"crossbowData\" : {\n";
-    json << "    \"drawLength\" : " << std::fixed << std::setprecision(2) << params.drawLength << ",\n";
-    json << "    \"drawWeight\" : " << std::fixed << std::setprecision(1) << params.drawWeight << ",\n";
-    json << "    \"autoReload\" : " << (params.autoReload ? "true" : "false") << ",\n";
-    json << "    \"reloadTime\" : " << std::fixed << std::setprecision(2) << params.reloadTime << ",\n";
-    json << "    \"stockMaterial\" : \"" << params.stockMaterial << "\",\n";
-    json << "    \"limbMaterial\" : \"" << params.limbMaterial << "\",\n";
-    json << "    \"stringMaterial\" : \"" << params.stringMaterial << "\"\n";
-    json << "  },\n";
-    json << "  \"magitechIntegration\" : {\n";
-    json << "    \"behaviorSystem\" : \"" << config.behaviorSystem << "\",\n";
-    json << "    \"effectSystem\" : \"" << config.effectSystem << "\",\n";
-    json << "    \"materialSystem\" : \"" << config.materialSystem << "\",\n";
-    json << "    \"specialEffects\" : [";
-    for (size_t i = 0; i < config.specialEffects.size(); ++i) {
-        json << "\"" << config.specialEffects[i] << "\"";
-        if (i < config.specialEffects.size() - 1) json << ", ";
-    }
-    json << "]\n";
-    json << "  }\n";
-    json << "}";
-    
-    return json.str();
+    const std::string base = sanitizeFilename(params.id);
+    const std::string scriptPath = "/" + outputBasePath + base + "/" + base + ".lua";
+
+    nlohmann::json item = nlohmann::json::parse(getCrossbowItemTemplate());
+    item["itemName"] = config.itemName.empty() ? base : config.itemName;
+    item["description"] = config.description.empty() ? generateDescription(params) : config.description;
+    item["rarity"] = config.rarity.empty() ? "Common" : config.rarity;
+    item["category"] = config.category.empty() ? "crossbow" : config.category;
+    item["level"] = levelValue(config.level);
+    item["inventoryIcon"] = generateAssetName(base, "icon.png");
+    item["animation"] = base + ".animation";
+    item["animationParts"]["bow"] = generateAssetName(base, "full.png");
+    item["scripts"] = nlohmann::json::array({scriptPath});
+
+    auto& ability = item["primaryAbility"];
+    ability["abilityType"] = config.abilityType;
+    ability["damageConfig"]["damageKind"] = config.damageType;
+    ability["damageConfig"]["damage"] = config.damage;
+    ability["fireTime"] = config.fireRate > 0.0f ? 1.0f / config.fireRate : 1.0f;
+    ability["projectileParameters"]["power"] = params.drawWeight * 0.01f;
+    ability["projectileType"] = config.projectileTypes.empty() ? std::string("crossbowbolt") : config.projectileTypes.front();
+
+    item["crossbowData"] = {
+        {"drawLength", params.drawLength},
+        {"drawWeight", params.drawWeight},
+        {"autoReload", params.autoReload},
+        {"reloadTime", params.reloadTime},
+        {"stockMaterial", params.stockMaterial},
+        {"limbMaterial", params.limbMaterial},
+        {"stringMaterial", params.stringMaterial}
+    };
+    item["magitechIntegration"] = {
+        {"behaviorSystem", config.behaviorSystem},
+        {"behaviorModule", integrateWithBehaviorSystem(config)},
+        {"effectSystem", config.effectSystem},
+        {"effectModule", integrateWithEffectSystem(config)},
+        {"materialSystem", config.materialSystem},
+        {"materialModule", integrateWithMaterialSystem(config)},
+        {"specialEffects", config.specialEffects}
+    };
+    return item.dump(2);
 }
 
 std::string CrossbowAssetGenerator::generateProjectileJSON(const BoltParams& params, const ItemConfig& config) {
-    std::ostringstream json;
-    
-    json << "{\n";
-    json << "  \"projectileName\" : \"" << config.itemName << "\",\n";
-    json << "  \"projectileType\" : \"bolt\",\n";
-    json << "  \"damageKind\" : \"" << config.damageType << "\",\n";
-    json << "  \"damage\" : " << std::fixed << std::setprecision(1) << config.damage << ",\n";
-    json << "  \"speed\" : " << (params.length * 100.0f) << ",\n";
-    json << "  \"knockback\" : 10,\n";
-    json << "  \"piercing\" : " << (params.barbedTip ? "true" : "false") << ",\n";
-    json << "  \"timeToLive\" : 2.0,\n";
-    json << "  \"actionOnReap\" : [\n";
-    json << "    {\n";
-    json << "      \"action\" : \"projectile\",\n";
-    json << "      \"type\" : \"damage\",\n";
-    json << "      \"damage\" : " << (config.damage * 0.5f) << "\n";
-    json << "    }\n";
-    json << "  ],\n";
-    json << "  \"boltData\" : {\n";
-    json << "    \"length\" : " << std::fixed << std::setprecision(3) << params.length << ",\n";
-    json << "    \"shaftRadius\" : " << std::fixed << std::setprecision(4) << params.shaftRadius << ",\n";
-    json << "    \"useFletching\" : " << (params.useFletching ? "true" : "false") << ",\n";
-    json << "    \"fletchMaterial\" : \"" << params.fletchMaterial << "\",\n";
-    json << "    \"fletchLength\" : " << std::fixed << std::setprecision(3) << params.fletchLength << ",\n";
-    json << "    \"tipMass\" : " << std::fixed << std::setprecision(4) << params.tipMass << ",\n";
-    json << "    \"barbedTip\" : " << (params.barbedTip ? "true" : "false") << "\n";
-    json << "  },\n";
-    json << "  \"magitechIntegration\" : {\n";
-    json << "    \"effectSystem\" : \"" << config.effectSystem << "\",\n";
-    json << "    \"specialEffects\" : [";
-    for (size_t i = 0; i < config.specialEffects.size(); ++i) {
-        json << "\"" << config.specialEffects[i] << "\"";
-        if (i < config.specialEffects.size() - 1) json << ", ";
-    }
-    json << "]\n";
-    json << "  }\n";
-    json << "}";
-    
-    return json.str();
+    nlohmann::json projectile = nlohmann::json::parse(getProjectileTemplate());
+    projectile["projectileName"] = config.itemName.empty() ? sanitizeFilename(params.id) : config.itemName;
+    projectile["projectileType"] = "bolt";
+    projectile["damageKind"] = config.damageType;
+    projectile["damage"] = config.damage;
+    projectile["speed"] = params.length * 100.0f;
+    projectile["knockback"] = 10;
+    projectile["piercing"] = params.barbedTip;
+    projectile["timeToLive"] = 2.0;
+    projectile["image"] = sanitizeFilename(params.id) + ".png";
+    projectile["actionOnReap"] = nlohmann::json::array({
+        {{"action", "projectile"}, {"type", "damage"}, {"damage", config.damage * 0.5f}}
+    });
+    projectile["boltData"] = {
+        {"length", params.length},
+        {"shaftRadius", params.shaftRadius},
+        {"useFletching", params.useFletching},
+        {"fletchMaterial", params.fletchMaterial},
+        {"fletchLength", params.fletchLength},
+        {"tipMass", params.tipMass},
+        {"barbedTip", params.barbedTip}
+    };
+    projectile["magitechIntegration"] = {
+        {"effectSystem", config.effectSystem},
+        {"specialEffects", config.specialEffects}
+    };
+    return projectile.dump(2);
 }
 
 std::string CrossbowAssetGenerator::generateProjectileJSON(const ArrowParams& params, const ItemConfig& config) {
-    std::ostringstream json;
-    
-    json << "{\n";
-    json << "  \"projectileName\" : \"" << config.itemName << "\",\n";
-    json << "  \"projectileType\" : \"arrow\",\n";
-    json << "  \"damageKind\" : \"" << config.damageType << "\",\n";
-    json << "  \"damage\" : " << std::fixed << std::setprecision(1) << config.damage << ",\n";
-    json << "  \"speed\" : " << (params.shaftLength * 80.0f) << ",\n";
-    json << "  \"knockback\" : 8,\n";
-    json << "  \"piercing\" : false,\n";
-    json << "  \"timeToLive\" : 3.0,\n";
-    json << "  \"actionOnReap\" : [\n";
-    json << "    {\n";
-    json << "      \"action\" : \"projectile\",\n";
-    json << "      \"type\" : \"damage\",\n";
-    json << "      \"damage\" : " << (config.damage * 0.3f) << "\n";
-    json << "    }\n";
-    json << "  ],\n";
-    json << "  \"arrowData\" : {\n";
-    json << "    \"shaftLength\" : " << std::fixed << std::setprecision(3) << params.shaftLength << ",\n";
-    json << "    \"shaftDiameter\" : " << std::fixed << std::setprecision(4) << params.shaftDiameter << ",\n";
-    json << "    \"spineRating\" : " << params.spineRating << ",\n";
-    json << "    \"useFletching\" : " << (params.useFletching ? "true" : "false") << ",\n";
-    json << "    \"fletchStyle\" : \"" << params.fletchStyle << "\",\n";
-    json << "    \"nockSize\" : " << std::fixed << std::setprecision(4) << params.nockSize << ",\n";
-    json << "    \"tipMass\" : " << std::fixed << std::setprecision(4) << params.tipMass << "\n";
-    json << "  },\n";
-    json << "  \"magitechIntegration\" : {\n";
-    json << "    \"effectSystem\" : \"" << config.effectSystem << "\",\n";
-    json << "    \"specialEffects\" : [";
-    for (size_t i = 0; i < config.specialEffects.size(); ++i) {
-        json << "\"" << config.specialEffects[i] << "\"";
-        if (i < config.specialEffects.size() - 1) json << ", ";
-    }
-    json << "]\n";
-    json << "  }\n";
-    json << "}";
-    
-    return json.str();
+    nlohmann::json projectile = nlohmann::json::parse(getProjectileTemplate());
+    projectile["projectileName"] = config.itemName.empty() ? sanitizeFilename(params.id) : config.itemName;
+    projectile["projectileType"] = "arrow";
+    projectile["damageKind"] = config.damageType;
+    projectile["damage"] = config.damage;
+    projectile["speed"] = params.shaftLength * 80.0f;
+    projectile["knockback"] = 8;
+    projectile["piercing"] = false;
+    projectile["timeToLive"] = 3.0;
+    projectile["image"] = sanitizeFilename(params.id) + ".png";
+    projectile["actionOnReap"] = nlohmann::json::array({
+        {{"action", "projectile"}, {"type", "damage"}, {"damage", config.damage * 0.3f}}
+    });
+    projectile["arrowData"] = {
+        {"shaftLength", params.shaftLength},
+        {"shaftDiameter", params.shaftDiameter},
+        {"spineRating", params.spineRating},
+        {"useFletching", params.useFletching},
+        {"fletchStyle", params.fletchStyle},
+        {"nockSize", params.nockSize},
+        {"tipMass", params.tipMass}
+    };
+    projectile["magitechIntegration"] = {
+        {"effectSystem", config.effectSystem},
+        {"specialEffects", config.specialEffects}
+    };
+    return projectile.dump(2);
 }
 
 std::string CrossbowAssetGenerator::generateBehaviorScript(const CrossbowParams& params, const ItemConfig& config) {
-    std::ostringstream lua;
-    
-    lua << "-- Crossbow behavior script for " << params.id << "\n";
-    lua << "-- Generated by Magi-Tech Crossbow Asset Generator\n\n";
-    
-    lua << "require \"/scripts/util.lua\"\n";
-    lua << "require \"/scripts/vec2.lua\"\n";
-    lua << "require \"/items/active/weapons/weapon.lua\"\n";
-    lua << "require \"/items/active/weapons/crossbow/crossbow.lua\"\n\n";
-    
-    lua << "function init()\n";
-    lua << "  -- Initialize base crossbow behavior\n";
-    lua << "  CrossbowInit()\n\n";
-    
-    lua << "  -- Magi-Tech integration\n";
-    lua << "  self.magitechData = {\n";
-    lua << "    behaviorSystem = \"" << config.behaviorSystem << "\",\n";
-    lua << "    effectSystem = \"" << config.effectSystem << "\",\n";
-    lua << "    materialSystem = \"" << config.materialSystem << "\",\n";
-    lua << "    specialEffects = {";
+    std::string script = getBehaviorTemplate();
+
+    // Effect set as a Lua table literal: { ["explosive"] = true, ... }
+    std::ostringstream effects;
+    effects << "{";
     for (size_t i = 0; i < config.specialEffects.size(); ++i) {
-        lua << "\"" << config.specialEffects[i] << "\"";
-        if (i < config.specialEffects.size() - 1) lua << ", ";
+        effects << (i ? ", " : " ") << "[\"" << config.specialEffects[i] << "\"] = true";
     }
-    lua << "}\n";
-    lua << "  }\n\n";
-    
-    lua << "  -- Initialize special effects\n";
-    for (const auto& effect : config.specialEffects) {
-        lua << "  if self.magitechData.specialEffects[\"" << effect << "\"] then\n";
-        lua << "    init" << effect << "Effect()\n";
-        lua << "  end\n";
-    }
-    lua << "end\n\n";
-    
-    lua << "function update(dt, fireMode, shiftHeld)\n";
-    lua << "  -- Update base crossbow behavior\n";
-    lua << "  CrossbowUpdate(dt, fireMode, shiftHeld)\n\n";
-    
-    lua << "  -- Update special effects\n";
-    for (const auto& effect : config.specialEffects) {
-        lua << "  if self.magitechData.specialEffects[\"" << effect << "\"] then\n";
-        lua << "    update" << effect << "Effect(dt)\n";
-        lua << "  end\n";
-    }
-    lua << "end\n\n";
-    
-    lua << "function uninit()\n";
-    lua << "  CrossbowUninit()\n";
-    lua << "end\n";
-    
-    return lua.str();
+    effects << (config.specialEffects.empty() ? "}" : " }");
+
+    auto replaceAll = [&script](const std::string& key, const std::string& value) {
+        for (size_t pos = script.find(key); pos != std::string::npos; pos = script.find(key, pos + value.size())) {
+            script.replace(pos, key.size(), value);
+        }
+    };
+    replaceAll("%ID%", params.id);
+    replaceAll("%BEHAVIOR_SYSTEM%", config.behaviorSystem);
+    replaceAll("%EFFECT_SYSTEM%", config.effectSystem);
+    replaceAll("%MATERIAL_SYSTEM%", config.materialSystem);
+    replaceAll("%SPECIAL_EFFECTS%", effects.str());
+    return script;
 }
 
 std::string CrossbowAssetGenerator::generateEffectConfig(const CrossbowParams& params, const ItemConfig& config) {
-    std::ostringstream json;
-    
-    json << "{\n";
-    json << "  \"crossbowId\" : \"" << params.id << "\",\n";
-    json << "  \"effectSystem\" : \"" << config.effectSystem << "\",\n";
-    json << "  \"specialEffects\" : [";
-    for (size_t i = 0; i < config.specialEffects.size(); ++i) {
-        json << "\"" << config.specialEffects[i] << "\"";
-        if (i < config.specialEffects.size() - 1) json << ", ";
-    }
-    json << "],\n";
-    json << "  \"materialEffects\" : {\n";
-    json << "    \"stock\" : \"" << params.stockMaterial << "\",\n";
-    json << "    \"limb\" : \"" << params.limbMaterial << "\",\n";
-    json << "    \"string\" : \"" << params.stringMaterial << "\"\n";
-    json << "  },\n";
-    json << "  \"crossbowData\" : {\n";
-    json << "    \"drawLength\" : " << std::fixed << std::setprecision(2) << params.drawLength << ",\n";
-    json << "    \"drawWeight\" : " << std::fixed << std::setprecision(1) << params.drawWeight << ",\n";
-    json << "    \"autoReload\" : " << (params.autoReload ? "true" : "false") << ",\n";
-    json << "    \"reloadTime\" : " << std::fixed << std::setprecision(2) << params.reloadTime << "\n";
-    json << "  }\n";
-    json << "}";
-    
-    return json.str();
+    nlohmann::json effect = nlohmann::json::parse(getEffectTemplate());
+    effect["crossbowId"] = params.id;
+    effect["effectSystem"] = config.effectSystem;
+    effect["specialEffects"] = config.specialEffects;
+    effect["materialEffects"] = {
+        {"stock", params.stockMaterial},
+        {"limb", params.limbMaterial},
+        {"string", params.stringMaterial}
+    };
+    effect["crossbowData"] = {
+        {"drawLength", params.drawLength},
+        {"drawWeight", params.drawWeight},
+        {"autoReload", params.autoReload},
+        {"reloadTime", params.reloadTime}
+    };
+    return effect.dump(2);
+}
+
+std::string CrossbowAssetGenerator::generateEffectConfig(const BoltParams& params, const ItemConfig& config) {
+    nlohmann::json effect = nlohmann::json::parse(getEffectTemplate());
+    effect["projectileId"] = params.id;
+    effect["projectileKind"] = "bolt";
+    effect["effectSystem"] = config.effectSystem;
+    effect["specialEffects"] = config.specialEffects;
+    effect["materialEffects"] = {{"fletching", params.fletchMaterial}};
+    effect["projectileData"] = {
+        {"length", params.length},
+        {"tipMass", params.tipMass},
+        {"barbedTip", params.barbedTip}
+    };
+    return effect.dump(2);
+}
+
+std::string CrossbowAssetGenerator::generateEffectConfig(const ArrowParams& params, const ItemConfig& config) {
+    nlohmann::json effect = nlohmann::json::parse(getEffectTemplate());
+    effect["projectileId"] = params.id;
+    effect["projectileKind"] = "arrow";
+    effect["effectSystem"] = config.effectSystem;
+    effect["specialEffects"] = config.specialEffects;
+    effect["materialEffects"] = {{"fletching", params.fletchStyle}};
+    effect["projectileData"] = {
+        {"shaftLength", params.shaftLength},
+        {"spineRating", params.spineRating},
+        {"tipMass", params.tipMass}
+    };
+    return effect.dump(2);
 }
 
 std::string CrossbowAssetGenerator::generateFramesJSON(const std::string& spriteName, int frameCount) {
-    std::ostringstream json;
-    
-    json << "{\n";
-    json << "  \"" << spriteName << "\" : {\n";
-    json << "    \"frameGrid\" : {\n";
-    json << "      \"size\" : [32, 32],\n";
-    json << "      \"dimensions\" : [" << frameCount << ", 1]\n";
-    json << "    },\n";
-    json << "    \"frames\" : [\n";
-    
+    // Starbound .frames format: a grid of 32x32 cells named <sprite>.<index>
+    nlohmann::json frames = nlohmann::json::parse(getFramesTemplate());
+    nlohmann::json names = nlohmann::json::array();
     for (int i = 0; i < frameCount; ++i) {
-        json << "      {\n";
-        json << "        \"name\" : \"frame" << i << "\",\n";
-        json << "        \"position\" : [" << (i * 32) << ", 0]\n";
-        json << "      }";
-        if (i < frameCount - 1) json << ",";
-        json << "\n";
+        names.push_back(spriteName + "." + std::to_string(i));
     }
-    
-    json << "    ]\n";
-    json << "  }\n";
-    json << "}";
-    
-    return json.str();
+    frames["frameGrid"]["dimensions"] = {frameCount, 1};
+    frames["frameGrid"]["names"] = nlohmann::json::array({names});
+    return frames.dump(2);
 }
 
-bool CrossbowAssetGenerator::generateSprite(const std::string& outputPath, const CrossbowParams& params) {
-    // This would integrate with the existing image generation system
-    // For now, create a placeholder sprite file
-    std::ofstream file(outputPath, std::ios::binary);
-    if (file.is_open()) {
-        // Create a simple 256x256 PNG placeholder
-        // In a real implementation, this would use the mesh data to generate a sprite
-        file.close();
-        Log::info("CrossbowAsset", "Generated crossbow sprite: {}", outputPath);
-        return true;
+// ---------------------------------------------------------------------------
+// AI art integration
+
+AIArt::ArtOutput CrossbowAssetGenerator::generateCrossbowArt(const CrossbowParams& params, const ItemConfig& config) {
+    if (!aiGenerator) {
+        AIArt::ArtOutput out{};
+        out.success = false;
+        out.errorMessage = "No AI art generator attached";
+        return out;
     }
-    return false;
+    return aiGenerator->generateCrossbowSprite(params, createCrossbowArtPrompt(params, config));
 }
 
-bool CrossbowAssetGenerator::generateSprite(const std::string& outputPath, const BoltParams& params) {
-    // Generate bolt sprite
-    std::ofstream file(outputPath, std::ios::binary);
-    if (file.is_open()) {
-        // Create a simple 32x32 PNG placeholder for bolt
-        file.close();
-        Log::info("CrossbowAsset", "Generated bolt sprite: {}", outputPath);
-        return true;
+AIArt::ArtOutput CrossbowAssetGenerator::generateBoltArt(const BoltParams& params, const ItemConfig& config) {
+    if (!aiGenerator) {
+        AIArt::ArtOutput out{};
+        out.success = false;
+        out.errorMessage = "No AI art generator attached";
+        return out;
     }
-    return false;
+    return aiGenerator->generateBoltSprite(params, createBoltArtPrompt(params, config));
 }
 
-bool CrossbowAssetGenerator::generateSprite(const std::string& outputPath, const ArrowParams& params) {
-    // Generate arrow sprite
-    std::ofstream file(outputPath, std::ios::binary);
-    if (file.is_open()) {
-        // Create a simple 32x64 PNG placeholder for arrow
-        file.close();
-        Log::info("CrossbowAsset", "Generated arrow sprite: {}", outputPath);
-        return true;
+AIArt::ArtOutput CrossbowAssetGenerator::generateArrowArt(const ArrowParams& params, const ItemConfig& config) {
+    if (!aiGenerator) {
+        AIArt::ArtOutput out{};
+        out.success = false;
+        out.errorMessage = "No AI art generator attached";
+        return out;
     }
-    return false;
+    return aiGenerator->generateArrowSprite(params, createArrowArtPrompt(params, config));
 }
 
-bool CrossbowAssetGenerator::generateIcon(const std::string& outputPath, const std::string& itemName) {
-    // Generate inventory icon
-    std::ofstream file(outputPath, std::ios::binary);
-    if (file.is_open()) {
-        // Create a simple 32x32 PNG placeholder icon
-        file.close();
-        Log::info("CrossbowAsset", "Generated icon: {}", outputPath);
-        return true;
-    }
-    return false;
+AIArt::ArtPrompt CrossbowAssetGenerator::createCrossbowArtPrompt(const CrossbowParams& params, const ItemConfig& config) {
+    AIArt::ArtPrompt prompt{};
+    prompt.description = config.itemName + ", " + generateDescription(params);
+    prompt.style = config.artStyle;
+    prompt.colorPalette = config.colorPalette;
+    prompt.resolution = 32;
+    prompt.frameCount = 8;
+    prompt.direction = "single";
+    prompt.useAlpha = true;
+    prompt.specialEffects = config.artEffects;
+    prompt.specialEffects.insert(prompt.specialEffects.end(), config.specialEffects.begin(), config.specialEffects.end());
+    return prompt;
 }
+
+AIArt::ArtPrompt CrossbowAssetGenerator::createBoltArtPrompt(const BoltParams& params, const ItemConfig& config) {
+    AIArt::ArtPrompt prompt{};
+    prompt.description = config.itemName + ", " + generateDescription(params);
+    prompt.style = config.artStyle;
+    prompt.colorPalette = config.colorPalette;
+    prompt.resolution = 32;
+    prompt.frameCount = 1;
+    prompt.direction = "single";
+    prompt.useAlpha = true;
+    prompt.specialEffects = config.artEffects;
+    prompt.specialEffects.insert(prompt.specialEffects.end(), config.specialEffects.begin(), config.specialEffects.end());
+    return prompt;
+}
+
+AIArt::ArtPrompt CrossbowAssetGenerator::createArrowArtPrompt(const ArrowParams& params, const ItemConfig& config) {
+    AIArt::ArtPrompt prompt{};
+    prompt.description = config.itemName + ", " + generateDescription(params);
+    prompt.style = config.artStyle;
+    prompt.colorPalette = config.colorPalette;
+    prompt.resolution = 32;
+    prompt.frameCount = 1;
+    prompt.direction = "single";
+    prompt.useAlpha = true;
+    prompt.specialEffects = config.artEffects;
+    prompt.specialEffects.insert(prompt.specialEffects.end(), config.specialEffects.begin(), config.specialEffects.end());
+    return prompt;
+}
+
+// ---------------------------------------------------------------------------
+// Procedural fallback sprites (PNG via stb_image_write)
+
+bool CrossbowAssetGenerator::generateFallbackSprite(const std::string& outputPath, const CrossbowParams& params) {
+    // 8 frames of 32x32: string drawn from rest to full and released at the end
+    Canvas canvas(32 * 8, 32);
+    for (int frame = 0; frame < 8; ++frame) {
+        const float draw = frame < 7 ? static_cast<float>(frame) / 6.0f : 0.0f;
+        drawCrossbowFrame(canvas, frame * 32, params, draw);
+    }
+    if (!canvas.savePng(outputPath)) {
+        Log::error("CrossbowAsset", "Failed to write crossbow sprite: {}", outputPath);
+        return false;
+    }
+    Log::info("CrossbowAsset", "Generated crossbow sprite: {}", outputPath);
+    return true;
+}
+
+bool CrossbowAssetGenerator::generateFallbackSprite(const std::string& outputPath, const BoltParams& params) {
+    Canvas canvas(32, 32);
+    drawProjectile(canvas, std::clamp(params.length / 0.6f, 0.4f, 0.95f), 0x8B6B4AFF,
+                   materialColor(params.fletchMaterial), params.useFletching, params.barbedTip);
+    if (!canvas.savePng(outputPath)) {
+        Log::error("CrossbowAsset", "Failed to write bolt sprite: {}", outputPath);
+        return false;
+    }
+    Log::info("CrossbowAsset", "Generated bolt sprite: {}", outputPath);
+    return true;
+}
+
+bool CrossbowAssetGenerator::generateFallbackSprite(const std::string& outputPath, const ArrowParams& params) {
+    Canvas canvas(64, 32);
+    drawProjectile(canvas, std::clamp(params.shaftLength / 1.0f, 0.5f, 0.95f), 0xA07850FF,
+                   params.fletchStyle == "Flu-Flu" ? 0xF2F2F2FF : 0xC83C3CFF, params.useFletching, false);
+    if (!canvas.savePng(outputPath)) {
+        Log::error("CrossbowAsset", "Failed to write arrow sprite: {}", outputPath);
+        return false;
+    }
+    Log::info("CrossbowAsset", "Generated arrow sprite: {}", outputPath);
+    return true;
+}
+
+bool CrossbowAssetGenerator::generateFallbackIcon(const std::string& outputPath, const std::string& itemName) {
+    // 16x16 icon: framed diagonal glyph tinted from the item name
+    Canvas canvas(16, 16);
+    uint32_t hash = 2166136261u;
+    for (unsigned char c : itemName) hash = (hash ^ c) * 16777619u;
+    const uint32_t tint = ((hash & 0xFFFFFF00u) | 0xFFu) | 0x40404000u;
+    canvas.rect(0, 0, 15, 0, 0x3C3C46FF);
+    canvas.rect(0, 15, 15, 15, 0x3C3C46FF);
+    canvas.rect(0, 0, 0, 15, 0x3C3C46FF);
+    canvas.rect(15, 0, 15, 15, 0x3C3C46FF);
+    canvas.line(3.0f, 12.0f, 12.0f, 3.0f, tint, 2);
+    canvas.line(3.0f, 3.0f, 5.0f, 5.0f, 0xE6E6E6FF);
+    if (!canvas.savePng(outputPath)) {
+        Log::error("CrossbowAsset", "Failed to write icon: {}", outputPath);
+        return false;
+    }
+    Log::info("CrossbowAsset", "Generated icon: {}", outputPath);
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// File system helpers
 
 bool CrossbowAssetGenerator::createDirectory(const std::string& path) {
     try {
@@ -450,9 +621,126 @@ std::string CrossbowAssetGenerator::sanitizeFilename(const std::string& name) {
     // Replace spaces with underscores
     std::replace(sanitized.begin(), sanitized.end(), ' ', '_');
     // Remove special characters
-    sanitized.erase(std::remove_if(sanitized.begin(), sanitized.end(), 
-        [](char c) { return !std::isalnum(c) && c != '_' && c != '-'; }), sanitized.end());
+    sanitized.erase(std::remove_if(sanitized.begin(), sanitized.end(),
+        [](char c) { return !std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '-'; }), sanitized.end());
     return sanitized;
+}
+
+// ---------------------------------------------------------------------------
+// Templates
+
+std::string CrossbowAssetGenerator::getCrossbowItemTemplate() {
+    return R"({
+  "itemName": "",
+  "description": "",
+  "rarity": "Common",
+  "category": "crossbow",
+  "level": 1,
+  "price": 0,
+  "twoHanded": true,
+  "itemTags": ["weapon", "ranged", "crossbow"],
+  "inventoryIcon": "",
+  "animation": "",
+  "animationParts": {},
+  "scripts": [],
+  "primaryAbility": {
+    "abilityType": "crossbowshot",
+    "damageConfig": {},
+    "fireTime": 1.0,
+    "projectileParameters": {},
+    "projectileType": ""
+  }
+})";
+}
+
+std::string CrossbowAssetGenerator::getProjectileTemplate() {
+    return R"({
+  "projectileName": "",
+  "image": "",
+  "physics": "arrow",
+  "flippable": true,
+  "orientationLocked": false,
+  "speed": 60,
+  "timeToLive": 2.0,
+  "damageKind": "physical",
+  "damage": 0,
+  "knockback": 0,
+  "piercing": false,
+  "actionOnReap": []
+})";
+}
+
+std::string CrossbowAssetGenerator::getFramesTemplate() {
+    return R"({
+  "frameGrid": {
+    "size": [32, 32],
+    "dimensions": [1, 1],
+    "names": [[]]
+  }
+})";
+}
+
+std::string CrossbowAssetGenerator::getBehaviorTemplate() {
+    return R"(-- Crossbow behavior script for %ID%
+-- Generated by Magi-Tech Crossbow Asset Generator
+
+require "/scripts/util.lua"
+require "/scripts/vec2.lua"
+require "/items/active/weapons/weapon.lua"
+require "/items/active/weapons/crossbow/crossbow.lua"
+
+local function callEffectHook(prefix, effect, ...)
+  local hook = _ENV[prefix .. effect .. "Effect"]
+  if type(hook) == "function" then hook(...) end
+end
+
+function init()
+  -- Initialize base crossbow behavior
+  CrossbowInit()
+
+  -- Magi-Tech integration
+  self.magitechData = {
+    behaviorSystem = "%BEHAVIOR_SYSTEM%",
+    effectSystem = "%EFFECT_SYSTEM%",
+    materialSystem = "%MATERIAL_SYSTEM%",
+    specialEffects = %SPECIAL_EFFECTS%
+  }
+
+  -- Initialize special effects
+  for effect in pairs(self.magitechData.specialEffects) do
+    callEffectHook("init", effect)
+  end
+end
+
+function update(dt, fireMode, shiftHeld)
+  -- Update base crossbow behavior
+  CrossbowUpdate(dt, fireMode, shiftHeld)
+
+  -- Update special effects
+  for effect in pairs(self.magitechData.specialEffects) do
+    callEffectHook("update", effect, dt)
+  end
+end
+
+function uninit()
+  CrossbowUninit()
+end
+)";
+}
+
+std::string CrossbowAssetGenerator::getEffectTemplate() {
+    return R"({
+  "effectSystem": "projectile",
+  "specialEffects": [],
+  "materialEffects": {}
+})";
+}
+
+// ---------------------------------------------------------------------------
+// Naming and descriptions
+
+std::string CrossbowAssetGenerator::generateAssetName(const std::string& baseName, const std::string& suffix) {
+    return sanitizeFilename(baseName) + suffix;
 }
 
 std::string CrossbowAssetGenerator::generateDescription(const CrossbowParams& params) {
@@ -492,5 +780,26 @@ std::string CrossbowAssetGenerator::generateDescription(const ArrowParams& param
     return desc.str();
 }
 
+// ---------------------------------------------------------------------------
+// Integration helpers: name the module that implements each configured system
+
+std::string CrossbowAssetGenerator::integrateWithBehaviorSystem(const ItemConfig& config) {
+    if (config.behaviorSystem == "cpp") return "magitech:crossbow_native";
+    if (config.behaviorSystem == "hybrid") return "magitech:crossbow_native+/items/active/weapons/crossbow/crossbow.lua";
+    return "/items/active/weapons/crossbow/crossbow.lua";
+}
+
+std::string CrossbowAssetGenerator::integrateWithEffectSystem(const ItemConfig& config) {
+    if (config.effectSystem == "spell") return "magitech:spell_effects";
+    if (config.effectSystem == "custom") return "magitech:custom_effects";
+    return "magitech:projectile_effects";
+}
+
+std::string CrossbowAssetGenerator::integrateWithMaterialSystem(const ItemConfig& config) {
+    if (config.materialSystem == "magitech") return "magitech:materials";
+    if (config.materialSystem == "custom") return "magitech:custom_materials";
+    return "vanilla";
+}
+
 } // namespace Crossbows
-} // namespace MagiTech 
+} // namespace MagiTech

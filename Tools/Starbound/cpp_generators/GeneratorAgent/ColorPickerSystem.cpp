@@ -4,6 +4,8 @@
 #include <iomanip>
 #include <random>
 #include <set>
+#include <cctype>
+#include <optional>
 #include <algorithm>
 #include <fstream>
 #include <future>
@@ -1097,6 +1099,268 @@ void ColorPickerSystem::backgroundProcessing() {
 void ColorPickerSystem::processColorQueue() {
     // Process any pending color operations
     // This would handle background color generation, caching, etc.
+}
+
+// ---------------------------------------------------------------------------
+// Palette / theme management
+// ---------------------------------------------------------------------------
+
+void ColorPickerSystem::addPalette(const ColorPalette& palette) {
+    m_palettes[palette.name] = palette;
+}
+
+void ColorPickerSystem::removePalette(const std::string& name) {
+    m_palettes.erase(name);
+}
+
+ColorPalette* ColorPickerSystem::getPalette(const std::string& name) {
+    auto it = m_palettes.find(name);
+    return it == m_palettes.end() ? nullptr : &it->second;
+}
+
+std::vector<std::string> ColorPickerSystem::getPaletteNames() const {
+    std::vector<std::string> names;
+    names.reserve(m_palettes.size());
+    for (const auto& [name, palette] : m_palettes) names.push_back(name);
+    return names;
+}
+
+void ColorPickerSystem::addTheme(const ColorTheme& theme) {
+    m_themes[theme.name] = theme;
+}
+
+void ColorPickerSystem::removeTheme(const std::string& name) {
+    m_themes.erase(name);
+}
+
+ColorTheme* ColorPickerSystem::getTheme(const std::string& name) {
+    auto it = m_themes.find(name);
+    return it == m_themes.end() ? nullptr : &it->second;
+}
+
+std::vector<std::string> ColorPickerSystem::getThemeNames(const std::string& assetType) const {
+    // Themes apply to an asset type when their name mentions it (e.g. "fire_launcher"),
+    // when one of their colour parameters is prefixed with it, or for any type when empty.
+    auto lower = [](std::string s) {
+        std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        return s;
+    };
+    const std::string type = lower(assetType);
+    std::vector<std::string> names;
+    for (const auto& [name, theme] : m_themes) {
+        bool matches = type.empty() || lower(name).find(type) != std::string::npos;
+        for (auto it = theme.colorMap.begin(); !matches && it != theme.colorMap.end(); ++it) {
+            matches = lower(it->first).rfind(type, 0) == 0;
+        }
+        if (matches) names.push_back(name);
+    }
+    return names;
+}
+
+// ---------------------------------------------------------------------------
+// File I/O (JSON; compress = compact output)
+// ---------------------------------------------------------------------------
+
+namespace {
+bool writeJsonFile(const std::string& filename, const nlohmann::json& json, bool compress) {
+    std::ofstream file(filename);
+    if (!file.is_open()) {
+        Log::error("ColorPicker", "Could not write {}", filename);
+        return false;
+    }
+    file << (compress ? json.dump() : json.dump(2));
+    return true;
+}
+
+std::optional<nlohmann::json> readJsonFile(const std::string& filename) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        Log::error("ColorPicker", "Could not open {}", filename);
+        return std::nullopt;
+    }
+    try {
+        return nlohmann::json::parse(file);
+    } catch (const std::exception& e) {
+        Log::error("ColorPicker", "Invalid JSON in {}: {}", filename, e.what());
+        return std::nullopt;
+    }
+}
+} // namespace
+
+void ColorPickerSystem::savePalettes(const std::string& filename, bool compress) {
+    nlohmann::json json = nlohmann::json::array();
+    for (const auto& [name, palette] : m_palettes) json.push_back(palette.toJson());
+    writeJsonFile(filename, json, compress);
+}
+
+void ColorPickerSystem::loadPalettes(const std::string& filename) {
+    auto json = readJsonFile(filename);
+    if (!json || !json->is_array()) return;
+    for (const auto& entry : *json) {
+        ColorPalette palette = ColorPalette::fromJson(entry);
+        if (!palette.name.empty()) m_palettes[palette.name] = std::move(palette);
+    }
+}
+
+void ColorPickerSystem::saveThemes(const std::string& filename, bool compress) {
+    nlohmann::json json = nlohmann::json::array();
+    for (const auto& [name, theme] : m_themes) json.push_back(theme.toJson());
+    writeJsonFile(filename, json, compress);
+}
+
+void ColorPickerSystem::loadThemes(const std::string& filename) {
+    auto json = readJsonFile(filename);
+    if (!json || !json->is_array()) return;
+    for (const auto& entry : *json) {
+        ColorTheme theme = ColorTheme::fromJson(entry);
+        if (!theme.name.empty()) m_themes[theme.name] = std::move(theme);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Randomization and utilities
+// ---------------------------------------------------------------------------
+
+Color ColorPickerSystem::randomColor(float saturation, float value) {
+    return ColorUtils::randomColor(saturation, value);
+}
+
+Color ColorPickerSystem::randomHarmony(const Color& base, const std::string& harmonyType) {
+    return ColorUtils::randomHarmony(base, harmonyType);
+}
+
+void ColorPickerSystem::randomizePalette(ColorPalette& palette, const std::string& harmonyType) {
+    // Re-roll every colour as a harmony of a fresh random base, keeping the palette size.
+    const size_t count = std::max<size_t>(palette.colors.size(), 5);
+    const Color base = palette.colors.empty() ? randomColor() : randomHarmony(palette.colors.front(), harmonyType);
+    palette.colors.clear();
+    palette.addColor(base);
+    while (palette.colors.size() < count) {
+        palette.addColor(randomHarmony(palette.colors.back(), harmonyType));
+    }
+}
+
+Color ColorPickerSystem::lerp(const Color& a, const Color& b, float t) {
+    return ColorUtils::lerp(a, b, t);
+}
+
+float ColorPickerSystem::getContrastRatio(const Color& a, const Color& b) {
+    return ColorUtils::getContrastRatio(a, b);
+}
+
+bool ColorPickerSystem::isAccessible(const Color& foreground, const Color& background) {
+    return ColorUtils::isAccessible(foreground, background);
+}
+
+// ---------------------------------------------------------------------------
+// Palette / theme UI
+// ---------------------------------------------------------------------------
+
+bool ColorPickerSystem::drawPaletteEditor(const char* label, ColorPalette& palette) {
+    bool changed = false;
+    ImGui::PushID(label);
+    ImGui::Text("%s (%s)", label, palette.name.c_str());
+
+    int removeIndex = -1;
+    for (size_t i = 0; i < palette.colors.size(); ++i) {
+        ImGui::PushID(static_cast<int>(i));
+        Color& color = palette.colors[i];
+        float rgba[4] = {color.rgba.r, color.rgba.g, color.rgba.b, color.rgba.a};
+        if (ImGui::ColorEdit4("##color", rgba)) {
+            color.rgba = glm::vec4(rgba[0], rgba[1], rgba[2], rgba[3]);
+            color.updateAllSpaces();
+            changed = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("x")) removeIndex = static_cast<int>(i);
+        ImGui::PopID();
+    }
+    if (removeIndex >= 0) {
+        palette.removeColor(static_cast<size_t>(removeIndex));
+        changed = true;
+    }
+
+    if (ImGui::Button("Add color")) {
+        palette.addColor(palette.colors.empty() ? randomColor() : randomHarmony(palette.colors.back(), "analogous"));
+        changed = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Randomize")) {
+        randomizePalette(palette);
+        changed = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Accessible")) {
+        palette.optimizeForAccessibility();
+        changed = true;
+    }
+    ImGui::PopID();
+    return changed;
+}
+
+void ColorPickerSystem::drawAdvancedPaletteSelector(const char* label, Color& selectedColor) {
+    ImGui::PushID(label);
+    static std::string currentPalette;
+    if (currentPalette.empty() || m_palettes.find(currentPalette) == m_palettes.end()) {
+        currentPalette = m_palettes.empty() ? std::string() : m_palettes.begin()->first;
+    }
+
+    if (ImGui::BeginCombo(label, currentPalette.empty() ? "<no palettes>" : currentPalette.c_str())) {
+        for (const auto& [name, palette] : m_palettes) {
+            const bool selected = name == currentPalette;
+            if (ImGui::Selectable(name.c_str(), selected)) currentPalette = name;
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    if (auto* palette = getPalette(currentPalette)) {
+        for (size_t i = 0; i < palette->colors.size(); ++i) {
+            const Color& color = palette->colors[i];
+            ImGui::PushID(static_cast<int>(i));
+            if (ImGui::ColorButton("##swatch", ImVec4(color.rgba.r, color.rgba.g, color.rgba.b, color.rgba.a),
+                                   0, ImVec2(20, 20))) {
+                selectedColor = color;
+            }
+            ImGui::PopID();
+            if ((i + 1) % 8 != 0 && i + 1 < palette->colors.size()) ImGui::SameLine();
+        }
+    }
+    ImGui::PopID();
+}
+
+void ColorPickerSystem::drawAdvancedThemeSelector(const char* label, const std::string& assetType,
+                                                  std::map<std::string, Color>& colors) {
+    ImGui::PushID(label);
+    const auto names = getThemeNames(assetType);
+    static std::string currentTheme;
+    if (!currentTheme.empty() && std::find(names.begin(), names.end(), currentTheme) == names.end()) {
+        currentTheme.clear();
+    }
+
+    if (ImGui::BeginCombo(label, currentTheme.empty() ? "<select theme>" : currentTheme.c_str())) {
+        for (const auto& name : names) {
+            const bool selected = name == currentTheme;
+            if (ImGui::Selectable(name.c_str(), selected)) {
+                currentTheme = name;
+                // Apply the theme's colours to the matching parameters.
+                if (const auto* theme = getTheme(name)) {
+                    for (const auto& [param, color] : theme->colorMap) colors[param] = color;
+                }
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+
+    for (auto& [param, color] : colors) {
+        float rgba[4] = {color.rgba.r, color.rgba.g, color.rgba.b, color.rgba.a};
+        if (ImGui::ColorEdit4(param.c_str(), rgba)) {
+            color.rgba = glm::vec4(rgba[0], rgba[1], rgba[2], rgba[3]);
+            color.updateAllSpaces();
+        }
+    }
+    ImGui::PopID();
 }
 
 } // namespace ColorPicker

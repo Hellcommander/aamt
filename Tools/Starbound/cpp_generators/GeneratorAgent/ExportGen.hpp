@@ -168,6 +168,11 @@ public:
     // Main processing function
     AudioBundle process(const ExportParams& params);
 
+    // Runs the export pipeline for params (definition from params.exportDefinitionPath, or the
+    // default one) with the working format taken from params. A non-empty `audio` overrides
+    // params.sourceBuffer.
+    ExportResult exportAudio(const ExportParams& params, const AudioBuffer& audio = {});
+
     // Export definition management (JSON)
     ExportDefinition loadExportDefinition(const std::string& filePath);
     ExportDefinition createDefaultExportDefinition(const ExportParams& params);
@@ -266,6 +271,9 @@ public:
     float calculateSignalToNoiseRatio(const std::vector<float>& samples);
 
 private:
+    // Sets the working format from params, resolves the definition and runs the pipeline.
+    ExportResult runExport(const ExportParams& params, const AudioBuffer& audio, ExportDefinition& exportDef);
+
     // Member variables
     bool m_gpuAccelerationEnabled;
     int m_processingQuality;

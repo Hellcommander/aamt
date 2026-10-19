@@ -52,7 +52,7 @@ public:
         if (auto hit = m_cache.find(key)) {
             return std::async(std::launch::deferred, [=] { return *hit; });
         }
-        return m_pool.enqueue([=]() {
+        return m_pool.enqueue([=, this]() {
             BombAssetBundle b;
             b.casingMesh = MeshGen::buildBombCasing(p);
             b.casingShader = ShaderGen::buildCasingShader(p);

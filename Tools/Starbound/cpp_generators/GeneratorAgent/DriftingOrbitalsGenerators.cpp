@@ -4,7 +4,7 @@
 namespace MagiTech {
 namespace DriftingOrbitals {
 
-#define LOG_ORBITAL_GEN(Action, Id) Log::info("OrbitalGen - {}: {}", #Action, Id)
+#define LOG_ORBITAL_GEN(Action, Id) Log::info("DriftingOrbitals", "OrbitalGen - {}: {}", #Action, Id)
 
 namespace MeshGen {
     MeshHandle buildOrb(const DriftingOrbitalParams& p) {

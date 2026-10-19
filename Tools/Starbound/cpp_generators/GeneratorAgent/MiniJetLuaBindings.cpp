@@ -1,24 +1,76 @@
 #include "MiniJetLuaBindings.hpp"
 #include "MiniJetFactory.hpp"
 #include "core/Log.hpp"
+#include <future>
 #include <memory>
+#include <mutex>
 
 namespace MiniJetGen {
 
-// Global instances
-static std::unique_ptr<MiniJetFactory> g_factory;
+using MagiTech::Log;
+
+// Global instances (factory injectable via setFactory; loader/editor follow the factory)
+static std::shared_ptr<MiniJetFactory> g_factory;
 static std::unique_ptr<MiniJetLoader> g_loader;
 static std::unique_ptr<MiniJetEditor> g_editor;
+static std::mutex g_factoryMutex;
+
+namespace {
+
+// Lua-facing handle for an asynchronous factory request (std::future cannot cross into Lua)
+template <typename T>
+struct AsyncRequest {
+    std::shared_future<T> future;
+    bool valid() const { return future.valid(); }
+    bool ready() const {
+        return future.valid() && future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+    }
+    T get() const { return future.valid() ? future.get() : T{}; }
+};
+
+using AssetRequest = AsyncRequest<std::shared_ptr<MiniJetAsset>>;
+using PackageRequest = AsyncRequest<bool>;
+
+// Associative members are exposed as plain Lua tables (sol2's associative container support
+// does not compile with the vendored version).
+template <typename Owner, typename Map>
+auto mapProperty(Map Owner::*member) {
+    using Value = typename Map::mapped_type;
+    return sol::property(
+        [member](const Owner& o) { return sol::as_table(o.*member); },
+        [member](Owner& o, const sol::table& t) {
+            Map m;
+            for (const auto& [k, v] : t) m[k.template as<std::string>()] = v.template as<Value>();
+            o.*member = std::move(m);
+        });
+}
+
+} // namespace
+
+void MiniJetLuaBindings::setFactory(std::shared_ptr<MiniJetFactory> factory) {
+    std::lock_guard<std::mutex> lock(g_factoryMutex);
+    g_factory = std::move(factory);
+    g_loader = g_factory ? std::make_unique<MiniJetLoader>(g_factory) : nullptr;
+    g_editor = g_factory ? std::make_unique<MiniJetEditor>(g_factory) : nullptr;
+}
+
+std::shared_ptr<MiniJetFactory> MiniJetLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(g_factoryMutex);
+    if (!g_factory) {
+        // No factory injected: create a default one
+        g_factory = std::make_shared<MiniJetFactory>();
+        g_factory->initialize(4);
+        g_loader = std::make_unique<MiniJetLoader>(g_factory);
+        g_editor = std::make_unique<MiniJetEditor>(g_factory);
+    }
+    return g_factory;
+}
 
 void MiniJetLuaBindings::bind(sol::state& lua) {
     Log::info("Binding MiniJetMechGen to Lua");
     
-    // Create global instances
-    g_factory = std::make_unique<MiniJetFactory>();
-    g_factory->initialize(4);
-    
-    g_loader = std::make_unique<MiniJetLoader>(g_factory);
-    g_editor = std::make_unique<MiniJetEditor>(g_factory);
+    // Create global instances (factory, loader and editor)
+    factory();
     
     // Bind all components
     bindEnums(lua);
@@ -38,6 +90,7 @@ void MiniJetLuaBindings::poll_assets(sol::state& lua) {
 }
 
 void MiniJetLuaBindings::shutdown() {
+    std::lock_guard<std::mutex> lock(g_factoryMutex);
     if (g_factory) {
         g_factory->shutdown();
     }
@@ -106,7 +159,7 @@ void MiniJetLuaBindings::bindEnums(sol::state& lua) {
 
 void MiniJetLuaBindings::bindStructs(sol::state& lua) {
     // ModuleDefinition
-    lua.new_usertype<ModuleDefinition>("ModuleDefinition",
+    lua.new_usertype<ModuleDefinition>("MiniJetModuleDefinition",
         "id", &ModuleDefinition::id,
         "type", &ModuleDefinition::type,
         "meshPath", &ModuleDefinition::meshPath,
@@ -124,7 +177,7 @@ void MiniJetLuaBindings::bindStructs(sol::state& lua) {
     );
     
     // CockpitDefinition
-    lua.new_usertype<CockpitDefinition>("CockpitDefinition",
+    lua.new_usertype<CockpitDefinition>("MiniJetCockpitDefinition",
         "meshPath", &CockpitDefinition::meshPath,
         "attachBone", &CockpitDefinition::attachBone,
         "seatPosition", &CockpitDefinition::seatPosition,
@@ -159,7 +212,7 @@ void MiniJetLuaBindings::bindStructs(sol::state& lua) {
     );
     
     // MagitechMaterials
-    lua.new_usertype<MagitechMaterials>("MagitechMaterials",
+    lua.new_usertype<MagitechMaterials>("MiniJetMagitechMaterials",
         "runeGlow", &MagitechMaterials::runeGlow,
         "engineHeat", &MagitechMaterials::engineHeat,
         "energyTrail", &MagitechMaterials::energyTrail
@@ -174,11 +227,11 @@ void MiniJetLuaBindings::bindStructs(sol::state& lua) {
         "dragCoefficient", &FlightParameters::dragCoefficient,
         "turnRate", &FlightParameters::turnRate,
         "climbRate", &FlightParameters::climbRate,
-        "controlSurfaceLimits", &FlightParameters::controlSurfaceLimits
+        "controlSurfaceLimits", mapProperty(&FlightParameters::controlSurfaceLimits)
     );
     
     // AnimationDefinition
-    lua.new_usertype<AnimationDefinition>("AnimationDefinition",
+    lua.new_usertype<AnimationDefinition>("MiniJetAnimationDefinition",
         "id", &AnimationDefinition::id,
         "type", &AnimationDefinition::type,
         "path", &AnimationDefinition::path,
@@ -204,16 +257,16 @@ void MiniJetLuaBindings::bindStructs(sol::state& lua) {
     );
     
     // PhysicsDefinition
-    lua.new_usertype<PhysicsDefinition>("PhysicsDefinition",
+    lua.new_usertype<PhysicsDefinition>("MiniJetPhysicsDefinition",
         "totalMass", &PhysicsDefinition::totalMass,
         "centerOfMass", &PhysicsDefinition::centerOfMass,
-        "moduleMass", &PhysicsDefinition::moduleMass,
-        "jointConstraints", &PhysicsDefinition::jointConstraints,
-        "collisionShapes", &PhysicsDefinition::collisionShapes
+        "moduleMass", mapProperty(&PhysicsDefinition::moduleMass),
+        "jointConstraints", mapProperty(&PhysicsDefinition::jointConstraints),
+        "collisionShapes", mapProperty(&PhysicsDefinition::collisionShapes)
     );
     
     // LODDefinition
-    lua.new_usertype<LODDefinition>("LODDefinition",
+    lua.new_usertype<LODDefinition>("MiniJetLODDefinition",
         "quality", &LODDefinition::quality,
         "meshDecimate", &LODDefinition::meshDecimate,
         "materialDetail", &LODDefinition::materialDetail,
@@ -279,6 +332,20 @@ void MiniJetLuaBindings::bindStructs(sol::state& lua) {
 }
 
 void MiniJetLuaBindings::bindFactory(sol::state& lua) {
+    // Async request handles
+    lua.new_usertype<AssetRequest>("MiniJetAssetRequest", sol::no_constructor,
+        "valid", &AssetRequest::valid, "ready", &AssetRequest::ready, "get", &AssetRequest::get);
+    lua.new_usertype<PackageRequest>("MiniJetPackageRequest", sol::no_constructor,
+        "valid", &PackageRequest::valid, "ready", &PackageRequest::ready, "get", &PackageRequest::get);
+
+    // Metrics
+    lua.new_usertype<MiniJetFactory::Metrics>("MiniJetFactoryMetrics", sol::no_constructor,
+        "totalAssetsGenerated", &MiniJetFactory::Metrics::totalAssetsGenerated,
+        "cacheHits", &MiniJetFactory::Metrics::cacheHits,
+        "cacheMisses", &MiniJetFactory::Metrics::cacheMisses,
+        "averageGenerationTime", &MiniJetFactory::Metrics::averageGenerationTime,
+        "averageLoadTime", &MiniJetFactory::Metrics::averageLoadTime);
+
     // Factory namespace
     auto factory = lua["MiniJetFactory"].get_or_create<sol::table>();
     
@@ -307,16 +374,16 @@ void MiniJetLuaBindings::bindFactory(sol::state& lua) {
         return g_factory ? g_factory->generatePackage(name, definitionPath) : false;
     };
     
-    factory["loadAsync"] = [](const std::string& name, Quality quality) -> std::future<std::shared_ptr<MiniJetAsset>> {
-        return g_factory ? g_factory->loadAsync(name, quality) : std::future<std::shared_ptr<MiniJetAsset>>{};
+    factory["loadAsync"] = [](const std::string& name, Quality quality) -> AssetRequest {
+        return g_factory ? AssetRequest{g_factory->loadAsync(name, quality).share()} : AssetRequest{};
     };
     
-    factory["generateAsync"] = [](const std::string& definitionPath, Quality quality) -> std::future<std::shared_ptr<MiniJetAsset>> {
-        return g_factory ? g_factory->generateAsync(definitionPath, quality) : std::future<std::shared_ptr<MiniJetAsset>>{};
+    factory["generateAsync"] = [](const std::string& definitionPath, Quality quality) -> AssetRequest {
+        return g_factory ? AssetRequest{g_factory->generateAsync(definitionPath, quality).share()} : AssetRequest{};
     };
     
-    factory["generatePackageAsync"] = [](const std::string& name, const std::string& definitionPath) -> std::future<bool> {
-        return g_factory ? g_factory->generatePackageAsync(name, definitionPath) : std::future<bool>{};
+    factory["generatePackageAsync"] = [](const std::string& name, const std::string& definitionPath) -> PackageRequest {
+        return g_factory ? PackageRequest{g_factory->generatePackageAsync(name, definitionPath).share()} : PackageRequest{};
     };
     
     factory["clearCache"] = []() {
@@ -343,9 +410,8 @@ void MiniJetLuaBindings::bindFactory(sol::state& lua) {
         if (g_factory) g_factory->reloadAsset(name);
     };
     
-    factory["getMetrics"] = []() -> const MiniJetFactory::Metrics& {
-        static MiniJetFactory::Metrics empty;
-        return g_factory ? g_factory->getMetrics() : empty;
+    factory["getMetrics"] = []() -> MiniJetFactory::Metrics {
+        return g_factory ? g_factory->getMetrics() : MiniJetFactory::Metrics{};
     };
     
     factory["resetMetrics"] = []() {

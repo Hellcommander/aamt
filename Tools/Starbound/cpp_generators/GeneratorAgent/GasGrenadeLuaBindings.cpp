@@ -73,7 +73,7 @@ void GasGrenadeLuaBindings::bind(sol::state& lua) {
         "hissPitch", &GasGrenadeParams::hissPitch
     );
 
-    lua.new_usertype<UIParams>("UIParams",
+    lua.new_usertype<UIParams>("GasGrenadeUIParams",
         sol::constructors<UIParams()>(),
         "iconSize", &UIParams::iconSize,
         "borderColor", &UIParams::borderColor,

@@ -571,9 +571,20 @@ void pushVec3ToLua(lua_State* L, const glm::vec3& vec) {
 bool getVec3FromLua(lua_State* L, int index, glm::vec3& vec) {
     if (!isLuaTable(L, index)) return false;
     
-    vec.x = getTableNumber(L, index, "x", 0.0f);
-    vec.y = getTableNumber(L, index, "y", 0.0f);
-    vec.z = getTableNumber(L, index, "z", 0.0f);
+    const int table = (index > 0 || index <= LUA_REGISTRYINDEX) ? index : lua_gettop(L) + index + 1;
+    float c[3] = {vec.x, vec.y, vec.z};
+    const char* names[3] = {"x", "y", "z"};
+    for (int i = 0; i < 3; ++i) {
+        // Named field, or array element {x, y, z}
+        lua_getfield(L, table, names[i]);
+        if (lua_type(L, -1) != LUA_TNUMBER) {
+            lua_pop(L, 1);
+            lua_rawgeti(L, table, i + 1);
+        }
+        if (lua_type(L, -1) == LUA_TNUMBER) c[i] = static_cast<float>(lua_tonumber(L, -1));
+        lua_pop(L, 1);
+    }
+    vec = glm::vec3(c[0], c[1], c[2]);
     return true;
 }
 
@@ -588,8 +599,19 @@ void pushVec2ToLua(lua_State* L, const glm::vec2& vec) {
 bool getVec2FromLua(lua_State* L, int index, glm::vec2& vec) {
     if (!isLuaTable(L, index)) return false;
     
-    vec.x = getTableNumber(L, index, "x", 0.0f);
-    vec.y = getTableNumber(L, index, "y", 0.0f);
+    const int table = (index > 0 || index <= LUA_REGISTRYINDEX) ? index : lua_gettop(L) + index + 1;
+    float c[2] = {vec.x, vec.y};
+    const char* names[2] = {"x", "y"};
+    for (int i = 0; i < 2; ++i) {
+        lua_getfield(L, table, names[i]);
+        if (lua_type(L, -1) != LUA_TNUMBER) {
+            lua_pop(L, 1);
+            lua_rawgeti(L, table, i + 1);
+        }
+        if (lua_type(L, -1) == LUA_TNUMBER) c[i] = static_cast<float>(lua_tonumber(L, -1));
+        lua_pop(L, 1);
+    }
+    vec = glm::vec2(c[0], c[1]);
     return true;
 }
 
@@ -620,80 +642,69 @@ bool isLuaBoolean(lua_State* L, int index) {
     return lua_type(L, index) == LUA_TBOOLEAN;
 }
 
-// Table field access
+// Table field access (index may be absolute or relative to the stack top)
+namespace {
+int absoluteIndex(lua_State* L, int index) {
+    return (index > 0 || index <= LUA_REGISTRYINDEX) ? index : lua_gettop(L) + index + 1;
+}
+} // namespace
+
 std::string getTableString(lua_State* L, int index, const std::string& key, const std::string& defaultValue) {
-    lua_pushstring(L, key.c_str());
-    lua_gettable(L, index - 1);
-    if (lua_isstring(L, -1)) {
-        std::string result = lua_tostring(L, -1);
-        lua_pop(L, 1);
-        return result;
-    }
+    lua_getfield(L, absoluteIndex(L, index), key.c_str());
+    std::string result = defaultValue;
+    if (lua_type(L, -1) == LUA_TSTRING) result = lua_tostring(L, -1);
     lua_pop(L, 1);
-    return defaultValue;
+    return result;
 }
 
 float getTableNumber(lua_State* L, int index, const std::string& key, float defaultValue) {
-    lua_pushstring(L, key.c_str());
-    lua_gettable(L, index - 1);
-    if (lua_isnumber(L, -1)) {
-        float result = static_cast<float>(lua_tonumber(L, -1));
-        lua_pop(L, 1);
-        return result;
-    }
+    lua_getfield(L, absoluteIndex(L, index), key.c_str());
+    float result = defaultValue;
+    if (lua_type(L, -1) == LUA_TNUMBER) result = static_cast<float>(lua_tonumber(L, -1));
     lua_pop(L, 1);
-    return defaultValue;
+    return result;
 }
 
 bool getTableBoolean(lua_State* L, int index, const std::string& key, bool defaultValue) {
-    lua_pushstring(L, key.c_str());
-    lua_gettable(L, index - 1);
-    if (lua_isboolean(L, -1)) {
-        bool result = lua_toboolean(L, -1);
-        lua_pop(L, 1);
-        return result;
-    }
+    lua_getfield(L, absoluteIndex(L, index), key.c_str());
+    bool result = defaultValue;
+    if (lua_type(L, -1) == LUA_TBOOLEAN) result = lua_toboolean(L, -1) != 0;
     lua_pop(L, 1);
-    return defaultValue;
+    return result;
 }
 
 int getTableInteger(lua_State* L, int index, const std::string& key, int defaultValue) {
-    lua_pushstring(L, key.c_str());
-    lua_gettable(L, index - 1);
-    if (lua_isnumber(L, -1)) {
-        int result = static_cast<int>(lua_tointeger(L, -1));
-        lua_pop(L, 1);
-        return result;
-    }
+    lua_getfield(L, absoluteIndex(L, index), key.c_str());
+    int result = defaultValue;
+    if (lua_type(L, -1) == LUA_TNUMBER) result = static_cast<int>(lua_tointeger(L, -1));
     lua_pop(L, 1);
-    return defaultValue;
+    return result;
 }
 
 // Table field setting
 void setTableString(lua_State* L, int index, const std::string& key, const std::string& value) {
-    lua_pushstring(L, key.c_str());
+    const int table = absoluteIndex(L, index);
     lua_pushstring(L, value.c_str());
-    lua_settable(L, index - 2);
+    lua_setfield(L, table, key.c_str());
 }
 
 void setTableNumber(lua_State* L, int index, const std::string& key, float value) {
-    lua_pushstring(L, key.c_str());
+    const int table = absoluteIndex(L, index);
     lua_pushnumber(L, value);
-    lua_settable(L, index - 2);
+    lua_setfield(L, table, key.c_str());
 }
 
 void setTableBoolean(lua_State* L, int index, const std::string& key, bool value) {
-    lua_pushstring(L, key.c_str());
-    lua_pushboolean(L, value);
-    lua_settable(L, index - 2);
+    const int table = absoluteIndex(L, index);
+    lua_pushboolean(L, value ? 1 : 0);
+    lua_setfield(L, table, key.c_str());
 }
 
 void setTableInteger(lua_State* L, int index, const std::string& key, int value) {
-    lua_pushstring(L, key.c_str());
+    const int table = absoluteIndex(L, index);
     lua_pushinteger(L, value);
-    lua_settable(L, index - 2);
+    lua_setfield(L, table, key.c_str());
 }
-
 } // namespace LuaHelpers
 
 } // namespace MechAssets

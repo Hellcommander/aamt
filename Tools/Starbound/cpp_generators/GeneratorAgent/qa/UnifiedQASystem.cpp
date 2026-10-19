@@ -1,6 +1,6 @@
 #include "UnifiedQASystem.hpp"
 #include "GeneratorConcurrency.hpp"
-#include "VisualQASystem.hpp"
+#include "visual_qa/VisualQASystem.hpp"
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -8,7 +8,7 @@
 #include <thread>
 #include <future>
 #include <nlohmann/json.hpp>
-#include <opencv2/opencv.hpp"
+#include <stb_image.h>
 
 namespace mt::qa {
 
@@ -33,7 +33,8 @@ double ImageScore::overallScore() const {
 }
 
 // UnifiedQASystem implementation
-UnifiedQASystem::UnifiedQASystem() {
+UnifiedQASystem::UnifiedQASystem()
+    : m_visualQA(std::make_unique<MagiTech::VisualQA::VisualQASystem>()) {
     // Register built-in validators
     registerValidator(std::make_shared<JsonAssetValidator>());
     registerValidator(std::make_shared<ImageAssetValidator>());
@@ -62,8 +63,18 @@ void UnifiedQASystem::configure(const UnifiedTestConfig& config) {
     m_config = config;
 }
 
-void UnifiedQASystem::setThreadPool(std::shared_ptr<mt::ThreadPoolManager> threadPool) {
-    m_threadPool = threadPool;
+void UnifiedQASystem::setThreadPool(std::shared_ptr<MagiTech::GeneratorTaskPool> threadPool) {
+    std::lock_guard<std::mutex> lock(m_poolMutex);
+    m_threadPool = std::move(threadPool);
+}
+
+std::shared_ptr<MagiTech::GeneratorTaskPool> UnifiedQASystem::threadPool() {
+    std::lock_guard<std::mutex> lock(m_poolMutex);
+    if (!m_threadPool) {
+        m_threadPool = std::make_shared<MagiTech::GeneratorTaskPool>(
+            static_cast<size_t>(std::max(1, m_config.maxThreads)));
+    }
+    return m_threadPool;
 }
 
 void UnifiedQASystem::registerValidator(std::shared_ptr<IAssetValidator> validator) {
@@ -94,8 +105,12 @@ UnifiedTestResult UnifiedQASystem::testAsset(const std::string& assetPath) {
             }
         }
         
-        // Run visual QA if enabled and asset is visual
-        if (m_config.enableVisualQA && isVisualAsset(result.assetType)) {
+        // Run visual QA if enabled and asset is visual; without a baseline there is nothing to compare
+        if (m_config.enableVisualQA && isVisualAsset(result.assetType) &&
+            !std::filesystem::exists(baselinePathFor(assetPath))) {
+            result.warnings.push_back("No visual baseline at " + baselinePathFor(assetPath) +
+                                      "; run generateBaseline to enable visual QA for this asset");
+        } else if (m_config.enableVisualQA && isVisualAsset(result.assetType)) {
             result.visualQA = runVisualQA(assetPath);
             if (!result.visualQA->passed) {
                 result.overallPassed = false;
@@ -136,13 +151,14 @@ std::vector<UnifiedTestResult> UnifiedQASystem::testDirectory(const std::string&
 std::vector<UnifiedTestResult> UnifiedQASystem::testBatch(const std::vector<std::string>& assetPaths) {
     std::vector<UnifiedTestResult> results;
     
-    if (m_config.parallelExecution && m_threadPool) {
+    if (m_config.parallelExecution) {
         // Parallel execution
+        auto pool = threadPool();
         std::vector<std::future<UnifiedTestResult>> futures;
-        
+
         for (const auto& assetPath : assetPaths) {
             if (!shouldSkipAsset(assetPath)) {
-                futures.push_back(m_threadPool->enqueue([this, assetPath]() {
+                futures.push_back(pool->enqueue([this, assetPath]() {
                     return testAsset(assetPath);
                 }));
             }
@@ -166,12 +182,9 @@ std::vector<UnifiedTestResult> UnifiedQASystem::testBatch(const std::vector<std:
 void UnifiedQASystem::generateBaseline(const std::string& assetPath) {
     if (!m_config.enableVisualQA) return;
     
-    // This would integrate with the VisualQASystem
-    // For now, we'll create a placeholder baseline
-    std::filesystem::path baselineDir(m_config.baselineDirectory);
-    std::filesystem::path assetPathObj(assetPath);
-    std::filesystem::path baselinePath = baselineDir / assetPathObj.filename();
-    
+    // The current render becomes the reference image runVisualQA compares against
+    std::filesystem::path baselinePath = baselinePathFor(assetPath);
+
     if (std::filesystem::exists(assetPath)) {
         std::filesystem::create_directories(baselinePath.parent_path());
         std::filesystem::copy_file(assetPath, baselinePath, 
@@ -183,7 +196,8 @@ void UnifiedQASystem::generateBaselines(const std::string& directoryPath) {
     for (const auto& entry : std::filesystem::recursive_directory_iterator(directoryPath)) {
         if (entry.is_regular_file()) {
             std::string extension = Utils::getFileExtension(entry.path().string());
-            if (isVisualAsset(m_assetTypeMap[extension])) {
+            auto type = m_assetTypeMap.find(extension);
+            if (type != m_assetTypeMap.end() && isVisualAsset(type->second)) {
                 generateBaseline(entry.path().string());
             }
         }
@@ -280,24 +294,50 @@ ValidationResult UnifiedQASystem::runDataValidation(const std::string& assetPath
     return validator->validate(assetPath);
 }
 
+std::string UnifiedQASystem::baselinePathFor(const std::string& assetPath) const {
+    return (std::filesystem::path(m_config.baselineDirectory) / std::filesystem::path(assetPath).filename()).string();
+}
+
 VisualTestResult UnifiedQASystem::runVisualQA(const std::string& assetPath) {
-    // This would integrate with the VisualQASystem
-    // For now, return a placeholder result
+    auto startTime = std::chrono::high_resolution_clock::now();
+
     VisualTestResult result;
-    result.passed = true;
+    result.passed = false;
     result.assetType = determineAssetType(assetPath);
     result.testPath = assetPath;
-    result.baselinePath = m_config.baselineDirectory + "/" + std::filesystem::path(assetPath).filename().string();
-    result.diffPath = m_config.outputDirectory + "/diff_" + std::filesystem::path(assetPath).filename().string();
-    
-    // Placeholder score
-    result.score.psnr = 35.0;
-    result.score.ssim = 0.98;
-    result.score.histogramCorrelation = 0.95;
-    result.score.shapeDifference = 0.9;
-    result.score.colorDistance = 0.92;
-    result.score.edgeSimilarity = 0.88;
-    
+    result.baselinePath = baselinePathFor(assetPath);
+
+    using MagiTech::VisualQA::Image;
+    const Image baseline = m_visualQA->loadImage(result.baselinePath);
+    const Image test = m_visualQA->loadImage(assetPath);
+    if (baseline.empty() || test.empty()) {
+        // Unreadable baseline or render: metrics stay at zero and the test fails
+        result.duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::high_resolution_clock::now() - startTime);
+        return result;
+    }
+
+    // VisualQA reports shape difference and colour distance as "lower is better" in [0, 1];
+    // this API stores every metric as "higher is better" (see ImageScore).
+    const auto metrics = m_visualQA->compareImages(baseline, test);
+    result.score.psnr = metrics.psnr;
+    result.score.ssim = metrics.ssim;
+    result.score.histogramCorrelation = metrics.histCorr;
+    result.score.shapeDifference = std::clamp(1.0 - metrics.shapeDiff, 0.0, 1.0);
+    result.score.colorDistance = std::clamp(1.0 - metrics.colorDistance, 0.0, 1.0);
+    result.score.edgeSimilarity = metrics.edgeSimilarity;
+    result.passed = result.score.passes();
+
+    if (m_config.generateDiffs) {
+        const std::filesystem::path diffPath = std::filesystem::path(m_config.outputDirectory) /
+            ("diff_" + std::filesystem::path(assetPath).stem().string() + ".png");
+        if (m_visualQA->saveImage(m_visualQA->generateDiffImage(baseline, test), diffPath)) {
+            result.diffPath = diffPath.string();
+        }
+    }
+
+    result.duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::high_resolution_clock::now() - startTime);
     return result;
 }
 
@@ -523,34 +563,40 @@ bool isValidJson(const std::string& content) {
 }
 
 bool isValidImage(const std::string& filePath) {
-    try {
-        cv::Mat image = cv::imread(filePath);
-        return !image.empty();
-    } catch (const std::exception&) {
-        return false;
-    }
+    // Header parse via stb_image: succeeds only for a decodable PNG/JPG/BMP/TGA/... with sane dimensions
+    int width = 0, height = 0, channels = 0;
+    return stbi_info(filePath.c_str(), &width, &height, &channels) != 0 && width > 0 && height > 0;
 }
 
 bool isValidAudio(const std::string& filePath) {
-    // This is a simplified check - in a real implementation,
-    // you'd use a proper audio library like libsndfile or similar
+    // Container signature check for the formats the Audio validator accepts
     std::ifstream file(filePath, std::ios::binary);
     if (!file.is_open()) return false;
-    
-    // Check file header for common audio formats
-    char header[12];
-    file.read(header, 12);
-    
-    // WAV header check
-    if (std::string(header, 4) == "RIFF" && std::string(header + 8, 4) == "WAVE") {
+
+    char header[12] = {};
+    file.read(header, sizeof(header));
+    if (file.gcount() < 4) return false;
+
+    // WAV: RIFF....WAVE
+    if (file.gcount() >= 12 && std::string(header, 4) == "RIFF" && std::string(header + 8, 4) == "WAVE") {
         return true;
     }
-    
-    // MP3 header check (simplified)
+    // Ogg (Vorbis / Opus)
+    if (std::string(header, 4) == "OggS") {
+        return true;
+    }
+    // FLAC
+    if (std::string(header, 4) == "fLaC") {
+        return true;
+    }
+    // MP3: ID3v2 tag or an MPEG frame sync
+    if (std::string(header, 3) == "ID3") {
+        return true;
+    }
     if ((header[0] & 0xFF) == 0xFF && (header[1] & 0xE0) == 0xE0) {
         return true;
     }
-    
+
     return false;
 }
 

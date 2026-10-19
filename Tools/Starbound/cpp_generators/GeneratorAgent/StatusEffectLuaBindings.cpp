@@ -101,7 +101,7 @@ void StatusEffectLuaBindings::bind(sol::state& lua) {
     );
 
     // Bind the UIParams struct
-    lua.new_usertype<UIParams>("UIParams",
+    lua.new_usertype<UIParams>("StatusEffectUIParams",
         sol::constructors<UIParams()>(),
         "iconSize", &UIParams::iconSize,
         "borderColor", &UIParams::borderColor,

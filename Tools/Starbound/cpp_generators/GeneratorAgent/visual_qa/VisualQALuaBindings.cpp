@@ -30,8 +30,12 @@ void VisualQALuaBindings::bind(sol::state& lua) {
     // Create global Visual QA instance
     g_visualQA = std::make_unique<VisualQA::VisualQASystem>();
 
+    // Global VisualQA namespace. ImageScore lives in it (VisualQA.ImageScore)
+    // because the unified QA bindings register a different ImageScore type.
+    sol::table qa = lua.create_named_table("VisualQA");
+
     // Bind ImageScore struct
-    lua.new_usertype<VisualQA::ImageScore>("ImageScore",
+    qa.new_usertype<VisualQA::ImageScore>("ImageScore",
         sol::constructors<VisualQA::ImageScore()>(),
         "psnr", &VisualQA::ImageScore::psnr,
         "ssim", &VisualQA::ImageScore::ssim,
@@ -94,9 +98,6 @@ void VisualQALuaBindings::bind(sol::state& lua) {
         "getLastResults", &VisualQA::VisualQASystem::getLastResults,
         "getPassRate", &VisualQA::VisualQASystem::getPassRate
     );
-
-    // Create global VisualQA namespace
-    sol::table qa = lua.create_named_table("VisualQA");
 
     // Add convenience functions (optional arguments use the documented defaults)
     qa["getInstance"] = []() -> VisualQA::VisualQASystem& {

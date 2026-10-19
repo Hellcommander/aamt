@@ -2,7 +2,6 @@
 #include <future>
 #include <vector>
 #include "core/ConcurrentLRU.hpp"
-#include "core/threading/ThreadPool.hpp"
 #include "GeneratorConcurrency.hpp"
 #include "ShotgunPelletTypes.hpp"
 

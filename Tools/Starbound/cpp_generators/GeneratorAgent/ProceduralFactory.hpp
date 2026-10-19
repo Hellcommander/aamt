@@ -3,10 +3,13 @@
 #include "SegmentedCreatureAssetBundle.hpp"
 #include "SegmentedCreatureParams.hpp"
 #include "GeneratorConcurrency.hpp"
+#include <chrono>
 #include <concepts>
 #include <cstdint>
+#include <exception>
 #include <future>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace MagiTech {
@@ -20,6 +23,8 @@ namespace MeshGen {
 
 namespace TextureGen {
     TextureHandle build(const SegmentedCreatureParams& p);
+    /** Normal / roughness / metallic / emissive / AO maps for a creature, stored into `bundle`. */
+    void buildMaterialMaps(const SegmentedCreatureParams& p, AssetBundle& bundle);
 }
 
 namespace RigGen {
@@ -41,10 +46,14 @@ namespace AIGen {
 /** Releases every asset referenced by the bundle from the shared asset store. */
 void releaseBundle(const AssetBundle& bundle);
 
+/** Fills bundle.result (success flag and statistics) from the stored assets. */
+void finalizeBundle(AssetBundle& bundle, float generationSeconds);
+
 /**
  * Generic cached, thread-pooled asset factory. A bundle slot is filled by
  * <Generator>::build(p) whenever an overload for P exists; slots without a
  * generator for P stay 0 (e.g. behaviour bundles carry only `ai`).
+ * Only successful bundles are cached.
  */
 template<typename P>
 class ProceduralFactory {
@@ -83,7 +92,7 @@ public:
 
         return m_pool.enqueue([this, p, key] {
             AssetBundle b = buildBundle(p);
-            if (usesCache(p)) m_cache.insert(key, b);
+            if (usesCache(p) && b.result.success) m_cache.insert(key, b);
             return b;
         });
     }
@@ -99,7 +108,7 @@ public:
         }
 
         AssetBundle b = buildBundle(p);
-        if (usesCache(p)) m_cache.insert(key, b);
+        if (usesCache(p) && b.result.success) m_cache.insert(key, b);
         return b;
     }
 
@@ -110,12 +119,29 @@ public:
     double getCacheHitRate() const { return m_cache.getHitRate(); }
 
     static AssetBundle buildBundle(const P& p) {
+        const auto start = std::chrono::steady_clock::now();
         AssetBundle b;
-        if constexpr (requires(const P& q) { MeshGen::build(q); })    b.mesh     = MeshGen::build(p);
-        if constexpr (requires(const P& q) { TextureGen::build(q); }) b.texture  = TextureGen::build(p);
-        if constexpr (requires(const P& q) { RigGen::build(q); })     b.skeleton = RigGen::build(p);
-        if constexpr (requires(const P& q) { AnimGen::build(q); })    b.anim     = AnimGen::build(p);
-        if constexpr (requires(const P& q) { AIGen::build(q); })      b.ai       = AIGen::build(p);
+        b.creationTime = std::chrono::system_clock::now();
+        if constexpr (std::is_same_v<P, SegmentedCreatureParams>) {
+            b.params = p;
+            b.assetPath = "creatures/segmented/" + (p.id.empty() ? std::string("unnamed") : p.id);
+        } else {
+            b.assetPath = "behaviors/segmented/" + std::to_string(p.hashKey());
+        }
+        try {
+            if constexpr (requires(const P& q) { MeshGen::build(q); })    b.mesh     = MeshGen::build(p);
+            if constexpr (requires(const P& q) { TextureGen::build(q); }) b.texture  = TextureGen::build(p);
+            if constexpr (requires(const P& q, AssetBundle& out) { TextureGen::buildMaterialMaps(q, out); }) {
+                TextureGen::buildMaterialMaps(p, b);
+            }
+            if constexpr (requires(const P& q) { RigGen::build(q); })     b.skeleton = RigGen::build(p);
+            if constexpr (requires(const P& q) { AnimGen::build(q); })    b.anim     = AnimGen::build(p);
+            if constexpr (requires(const P& q) { AIGen::build(q); })      b.ai       = AIGen::build(p);
+        } catch (const std::exception& e) {
+            b.result.errorMessage = e.what();
+        }
+        const float seconds = std::chrono::duration<float>(std::chrono::steady_clock::now() - start).count();
+        finalizeBundle(b, seconds);
         return b;
     }
 

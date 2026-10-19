@@ -68,7 +68,7 @@ void MeshAssetLuaBindings::bind(sol::state& lua) {
         "weldVertices", &MeshParams::weldVertices
     );
 
-    lua.new_usertype<LODParams>("LODParams",
+    lua.new_usertype<LODParams>("MeshLODParams",
         sol::constructors<LODParams()>(),
         "baseMeshId", &LODParams::baseMeshId,
         "screenSizes", &LODParams::screenSizes,
@@ -77,7 +77,7 @@ void MeshAssetLuaBindings::bind(sol::state& lua) {
         "preserveUVSeams", &LODParams::preserveUVSeams
     );
 
-    lua.new_usertype<MaterialParams>("MaterialParams",
+    lua.new_usertype<MaterialParams>("MeshMaterialParams",
         sol::constructors<MaterialParams()>(),
         "id", &MaterialParams::id,
         "shaderType", &MaterialParams::shaderType,
@@ -102,7 +102,7 @@ void MeshAssetLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<NaniteParams>("NaniteParams", sol::constructors<NaniteParams()>(), "trianglesPerCluster", &NaniteParams::trianglesPerCluster);
     lua.new_usertype<TessellationParams>("TessellationParams", sol::constructors<TessellationParams()>(), "maxTessellationFactor", &TessellationParams::maxTessellationFactor);
     lua.new_usertype<MLMeshParams>("MLMeshParams", sol::constructors<MLMeshParams()>(), "styleImagePath", &MLMeshParams::styleImagePath);
-    lua.new_usertype<CollisionParams>("CollisionParams", sol::constructors<CollisionParams()>(), "generateConvexHull", &CollisionParams::generateConvexHull);
+    lua.new_usertype<CollisionParams>("MeshCollisionParams", sol::constructors<CollisionParams()>(), "generateConvexHull", &CollisionParams::generateConvexHull);
     
     lua.new_usertype<MeshAssetBundle>("MeshAssetBundle",
         sol::no_constructor,

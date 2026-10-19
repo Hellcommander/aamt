@@ -62,7 +62,7 @@ void MagicalItemLuaBindings::bind(sol::state& lua) {
         "colorAccent", &MagicalItemParams::colorAccent
     );
 
-    lua.set_function("spawn_item", [&](MagicalItemParams p) {
+    lua.set_function("spawn_item", [](MagicalItemParams p) {
         auto factory = MagicalItemLuaBindings::factory();
         auto fut = factory->generateAsync(p);
         pendingItems.emplace_back(std::move(fut), p.id);
@@ -72,10 +72,12 @@ void MagicalItemLuaBindings::bind(sol::state& lua) {
 void MagicalItemLuaBindings::poll_assets(sol::state& lua) {
     for (auto it = pendingItems.begin(); it != pendingItems.end();) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            auto b = it->first.get();
-            // This would call a Lua function to spawn the item.
-            // For now, we'll just print a message.
-            lua["print"]("Magical Item ready: " + it->second);
+            try {
+                auto b = it->first.get();
+                lua["print"]("Magical Item ready: " + it->second);
+            } catch (const std::exception& e) {
+                Log::error("MagicalItems", "Asset generation failed for {}: {}", it->second, e.what());
+            }
             it = pendingItems.erase(it);
         } else {
             ++it;

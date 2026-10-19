@@ -55,7 +55,7 @@ void TextureAssetLuaBindings::bind(sol::state& lua) {
         "seamless", &TextureParams::seamless
     );
 
-    lua.new_usertype<NoiseParams>("NoiseParams",
+    lua.new_usertype<NoiseParams>("TextureNoiseParams",
         sol::constructors<NoiseParams()>(),
         "noiseType", &NoiseParams::noiseType,
         "octaves", &NoiseParams::octaves,
@@ -82,7 +82,7 @@ void TextureAssetLuaBindings::bind(sol::state& lua) {
         "heightScale", &PBRParams::heightScale
     );
 
-    lua.new_usertype<AtlasParams>("AtlasParams",
+    lua.new_usertype<AtlasParams>("TextureAtlasParams",
         sol::constructors<AtlasParams()>(),
         "sources", &AtlasParams::sources,
         "padding", &AtlasParams::padding,

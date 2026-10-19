@@ -161,7 +161,7 @@ void SegmentedCreatureLuaBindings::bind(sol::state& lua) {
 
 void SegmentedCreatureLuaBindings::bindParameterStructs(sol::state& lua) {
     // Bind SegmentedCreatureParams
-    lua.new_usertype<SegmentedCreatureParams>("SegmentedCreatureParams",
+    auto creatureType = lua.new_usertype<SegmentedCreatureParams>("SegmentedCreatureParams",
         // Constructor
         sol::constructors<SegmentedCreatureParams()>(),
 
@@ -207,11 +207,57 @@ void SegmentedCreatureLuaBindings::bindParameterStructs(sol::state& lua) {
         "enableParallelProcessing", &SegmentedCreatureParams::enableParallelProcessing,
 
         // Methods
-        "hashKey", &SegmentedCreatureParams::hashKey
+        "hashKey", &SegmentedCreatureParams::hashKey,
+        "isValid", &SegmentedCreatureParams::isValid,
+        "toString", &SegmentedCreatureParams::toString
+    );
+
+    // Head / tail, physics, appearance and generation settings
+    creatureType["name"] = &SegmentedCreatureParams::name;
+    creatureType["headScale"] = &SegmentedCreatureParams::headScale;
+    creatureType["tailScale"] = &SegmentedCreatureParams::tailScale;
+    creatureType["headSegmentCount"] = &SegmentedCreatureParams::headSegmentCount;
+    creatureType["tailSegmentCount"] = &SegmentedCreatureParams::tailSegmentCount;
+    creatureType["jointLimit"] = &SegmentedCreatureParams::jointLimit;
+    creatureType["segmentMass"] = &SegmentedCreatureParams::segmentMass;
+    creatureType["segmentDensity"] = &SegmentedCreatureParams::segmentDensity;
+    creatureType["segmentFriction"] = &SegmentedCreatureParams::segmentFriction;
+    creatureType["segmentRestitution"] = &SegmentedCreatureParams::segmentRestitution;
+    creatureType["colorAccent"] = &SegmentedCreatureParams::colorAccent;
+    creatureType["colorVariation"] = &SegmentedCreatureParams::colorVariation;
+    creatureType["materialEmissive"] = &SegmentedCreatureParams::materialEmissive;
+    creatureType["materialTransparency"] = &SegmentedCreatureParams::materialTransparency;
+    creatureType["plateSpacing"] = &SegmentedCreatureParams::plateSpacing;
+    creatureType["plateOverlap"] = &SegmentedCreatureParams::plateOverlap;
+    creatureType["gpuAccelerated"] = &SegmentedCreatureParams::gpuAccelerated;
+    creatureType["simdEnabled"] = &SegmentedCreatureParams::simdEnabled;
+    creatureType["adaptiveLOD"] = &SegmentedCreatureParams::adaptiveLOD;
+    creatureType["proceduralVariation"] = &SegmentedCreatureParams::proceduralVariation;
+    creatureType["dynamicSegments"] = &SegmentedCreatureParams::dynamicSegments;
+    creatureType["damageableSegments"] = &SegmentedCreatureParams::damageableSegments;
+    creatureType["seed"] = &SegmentedCreatureParams::seed;
+    creatureType["generationQuality"] = &SegmentedCreatureParams::generationQuality;
+    // Names used by the former creature_assets types (same storage as armorThickness / enableCaching)
+    creatureType["plateThickness"] = &SegmentedCreatureParams::armorThickness;
+    creatureType["cacheEnabled"] = &SegmentedCreatureParams::enableCaching;
+
+    // Generation statistics carried by every bundle
+    lua.new_usertype<SegmentedCreatureGenerationResult>("SegmentedCreatureGenerationResult",
+        sol::no_constructor,
+        "success", sol::readonly(&SegmentedCreatureGenerationResult::success),
+        "errorMessage", sol::readonly(&SegmentedCreatureGenerationResult::errorMessage),
+        "generationTime", sol::readonly(&SegmentedCreatureGenerationResult::generationTime),
+        "memoryUsage", sol::readonly(&SegmentedCreatureGenerationResult::memoryUsage),
+        "vertexCount", sol::readonly(&SegmentedCreatureGenerationResult::vertexCount),
+        "triangleCount", sol::readonly(&SegmentedCreatureGenerationResult::triangleCount),
+        "textureSize", sol::readonly(&SegmentedCreatureGenerationResult::textureSize),
+        "animationFrameCount", sol::readonly(&SegmentedCreatureGenerationResult::animationFrameCount),
+        "segmentCount", sol::readonly(&SegmentedCreatureGenerationResult::segmentCount),
+        "boneCount", sol::readonly(&SegmentedCreatureGenerationResult::boneCount)
     );
 
     // Bind BehaviorParams
-    lua.new_usertype<BehaviorParams>("BehaviorParams",
+    lua.new_usertype<BehaviorParams>("SegmentedCreatureBehaviorParams",
         // Constructor
         sol::constructors<BehaviorParams()>(),
 
@@ -275,6 +321,17 @@ void SegmentedCreatureLuaBindings::bindParameterStructs(sol::state& lua) {
         "skeleton", &AssetBundle::skeleton,
         "anim", &AssetBundle::anim,
         "ai", &AssetBundle::ai,
+        "normalMap", &AssetBundle::normalMap,
+        "roughnessMap", &AssetBundle::roughnessMap,
+        "metallicMap", &AssetBundle::metallicMap,
+        "emissiveMap", &AssetBundle::emissiveMap,
+        "aoMap", &AssetBundle::aoMap,
+        "result", sol::readonly(&AssetBundle::result),
+        "params", sol::readonly(&AssetBundle::params),
+        "assetPath", sol::readonly(&AssetBundle::assetPath),
+        "isValid", &AssetBundle::isValid,
+        "isBehaviorOnly", &AssetBundle::isBehaviorOnly,
+        "info", &AssetBundle::getInfo,
         "vertexCount", [](const AssetBundle& b) -> size_t {
             auto mesh = CreatureAssets::AssetStore::instance().mesh(b.mesh);
             return mesh ? mesh->vertices.size() : 0;
@@ -315,7 +372,10 @@ void SegmentedCreatureLuaBindings::bindEnums(sol::state& lua) {
         "NONE", TaperProfile::NONE,
         "LINEAR", TaperProfile::LINEAR,
         "EXPONENTIAL", TaperProfile::EXPONENTIAL,
-        "CUSTOM_CURVE", TaperProfile::CUSTOM_CURVE
+        "CUSTOM_CURVE", TaperProfile::CUSTOM_CURVE,
+        "BELL_CURVE", TaperProfile::BELL_CURVE,
+        "STEPPED", TaperProfile::STEPPED,
+        "IRREGULAR", TaperProfile::IRREGULAR
     );
 
     // SegmentType enum
@@ -323,7 +383,11 @@ void SegmentedCreatureLuaBindings::bindEnums(sol::state& lua) {
         "CYLINDER", SegmentType::CYLINDER,
         "BOX", SegmentType::BOX,
         "HEXAGON", SegmentType::HEXAGON,
-        "CUSTOM_MESH", SegmentType::CUSTOM_MESH
+        "CUSTOM_MESH", SegmentType::CUSTOM_MESH,
+        "SPHERE", SegmentType::SPHERE,
+        "CAPSULE", SegmentType::CAPSULE,
+        "PRISM", SegmentType::PRISM,
+        "IRREGULAR", SegmentType::IRREGULAR
     );
 
     // HeadType enum
@@ -331,22 +395,36 @@ void SegmentedCreatureLuaBindings::bindEnums(sol::state& lua) {
         "SIMPLE", HeadType::SIMPLE,
         "MANDIBLE", HeadType::MANDIBLE,
         "MULTI_EYE", HeadType::MULTI_EYE,
-        "HORNED", HeadType::HORNED
+        "HORNED", HeadType::HORNED,
+        "FANGED", HeadType::FANGED,
+        "TENTACLED", HeadType::TENTACLED,
+        "CRYSTAL", HeadType::CRYSTAL,
+        "MECHANICAL", HeadType::MECHANICAL
     );
 
     // TailType enum
     lua.new_enum("TailType",
         "NONE", TailType::NONE,
         "SPIKE", TailType::SPIKE,
-        "FLARED", TailType::FLARED
+        "FLARED", TailType::FLARED,
+        "TENTACLE", TailType::TENTACLE,
+        "CRYSTAL", TailType::CRYSTAL,
+        "MECHANICAL", TailType::MECHANICAL,
+        "BIOLUMINESCENT", TailType::BIOLUMINESCENT,
+        "VENOMOUS", TailType::VENOMOUS
     );
 
-    // AnimationProfile enum
+    // AnimationProfile enum (WAVE_SLITHER is an alias of SLITHER)
     lua.new_enum("AnimationProfile",
         "SLITHER", AnimationProfile::SLITHER,
+        "WAVE_SLITHER", AnimationProfile::WAVE_SLITHER,
         "CRAWL", AnimationProfile::CRAWL,
         "COIL", AnimationProfile::COIL,
-        "CUSTOM", AnimationProfile::CUSTOM
+        "CUSTOM", AnimationProfile::CUSTOM,
+        "BURROW", AnimationProfile::BURROW,
+        "SWIM", AnimationProfile::SWIM,
+        "FLY", AnimationProfile::FLY,
+        "CLIMB", AnimationProfile::CLIMB
     );
 
     // AIProfile enum
@@ -354,7 +432,11 @@ void SegmentedCreatureLuaBindings::bindEnums(sol::state& lua) {
         "PASSIVE", AIProfile::PASSIVE,
         "NEUTRAL", AIProfile::NEUTRAL,
         "PREDATOR", AIProfile::PREDATOR,
-        "SWARM", AIProfile::SWARM
+        "SWARM", AIProfile::SWARM,
+        "BURROWER", AIProfile::BURROWER,
+        "CLIMBER", AIProfile::CLIMBER,
+        "AMBUSHER", AIProfile::AMBUSHER,
+        "GUARDIAN", AIProfile::GUARDIAN
     );
 }
 
@@ -368,7 +450,8 @@ void SegmentedCreatureLuaBindings::bindFactoryFunctions(sol::state& lua) {
 
             auto creatureBundle = creatureFuture.get();
             auto behaviorBundle = behaviorFuture.get();
-            return std::make_tuple(true, creatureBundle, behaviorBundle);
+            const bool ok = creatureBundle.result.success && behaviorBundle.result.success;
+            return std::make_tuple(ok, creatureBundle, behaviorBundle);
         } catch (const std::exception& e) {
             Log::error("SegmentedCreature", "Error spawning segmented creature: {}", e.what());
             return std::make_tuple(false, AssetBundle{}, AssetBundle{});
@@ -609,6 +692,11 @@ void SegmentedCreatureLuaBindings::poll_assets(sol::state& lua) {
         try {
             creature = done.creature.get();
             behavior = done.behavior.get();
+            ok = creature.result.success && behavior.result.success;
+            if (!ok) {
+                Log::warn("SegmentedCreature", "Generation for '{}' incomplete: {}{}", done.id,
+                          creature.result.errorMessage, behavior.result.errorMessage);
+            }
         } catch (const std::exception& e) {
             ok = false;
             Log::error("SegmentedCreature", "Generation failed for '{}': {}", done.id, e.what());

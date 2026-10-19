@@ -6,7 +6,7 @@
 namespace MagiTech {
 namespace UIAssets {
 
-#define LOG_GEN(Asset, Id) Log::info("Building UI Asset {}: {}", #Asset, Id)
+#define LOG_GEN(Asset, Id) Log::info("UIAssets", "Building UI Asset {}: {}", #Asset, Id)
 
 namespace MeshGen {
     // Helper to build a simple quad
@@ -87,7 +87,7 @@ namespace AnimGen {
 
 namespace FontGen {
     FontHandle buildFontAtlas(const std::string& fontName, int fontSize, TextAlign align) {
-        Log::info("Building Font Atlas: {}", fontName);
+        Log::info("UIAssets", "Building Font Atlas: {}", fontName);
         // This would use a library like FreeType to rasterize characters into a texture atlas.
         static uint32_t nextFontId = 1;
         return nextFontId++;
@@ -96,7 +96,7 @@ namespace FontGen {
 
 namespace IconGen {
     TextureHandle buildUIIcon(const std::string& shape, const glm::vec4& color, const glm::vec2& size) {
-        Log::info("Building UI Icon: {}", shape);
+        Log::info("UIAssets", "Building UI Icon: {}", shape);
         Graphics::Image image(static_cast<int>(size.x), static_cast<int>(size.y));
         // Simple circle drawing logic for demonstration
         if (shape == "circle") {

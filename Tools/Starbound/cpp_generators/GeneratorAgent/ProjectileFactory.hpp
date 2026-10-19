@@ -1,8 +1,6 @@
 #pragma once
 
 #include "ProjectileTypes.hpp"
-#include "core/ConcurrentLRU.hpp"
-#include "core/threading/ThreadPool.hpp"
 #include "GeneratorConcurrency.hpp"
 #include <future>
 #include <string>

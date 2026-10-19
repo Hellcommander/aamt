@@ -68,7 +68,7 @@ void IconAssetLuaBindings::bind(sol::state& lua) {
         "sdfPadding", &IconParams::sdfPadding
     );
 
-    lua.new_usertype<AtlasParams>("AtlasParams",
+    lua.new_usertype<AtlasParams>("IconAtlasParams",
         sol::constructors<AtlasParams()>(),
         "id", &AtlasParams::id,
         "iconSize", &AtlasParams::iconSize,

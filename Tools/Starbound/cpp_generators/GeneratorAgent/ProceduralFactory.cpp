@@ -31,13 +31,27 @@ constexpr float kTwoPi = 2.0f * kPi;
 
 int clampedSegmentCount(const SegmentedCreatureParams& p) { return std::clamp(p.segmentCount, 1, 1000); }
 float segmentPitch(const SegmentedCreatureParams& p) { return std::max(p.segmentLength, 0.01f) + std::max(p.segmentSpacing, 0.0f); }
+float baseRadius(const SegmentedCreatureParams& p) { return std::max(p.segmentRadius, 0.01f); }
+float quality(const SegmentedCreatureParams& p) { return std::clamp(p.generationQuality, 0.25f, 2.0f); }
+int qualitySides(const SegmentedCreatureParams& p, int base) {
+    return std::clamp(static_cast<int>(std::lround(static_cast<float>(base) * quality(p))), 4, 48);
+}
 
+/** Explicit seed when given, otherwise derived from the id and the parameters. */
 uint32_t creatureSeed(const SegmentedCreatureParams& p) {
+    if (p.seed != 0) return p.seed;
     return Noise::seedFromString(p.id) ^ static_cast<uint32_t>(p.hashKey() & 0xFFFFFFFFu);
 }
 
+/** Maximum joint bend in radians: stiffness-derived limit capped by jointLimit (degrees). */
+float jointLimitRadians(const SegmentedCreatureParams& p) {
+    const float fromStiffness = glm::radians(glm::mix(60.0f, 8.0f, std::clamp(p.articulationStiffness, 0.0f, 1.0f)));
+    const float cap = glm::radians(std::clamp(p.jointLimit, 0.0f, 180.0f));
+    return std::min(fromStiffness, cap);
+}
+
 /** Radius multiplier along the body; t = 0 at the head, 1 at the tail. */
-float taperAt(const SegmentedCreatureParams& p, float t) {
+float taperAt(const SegmentedCreatureParams& p, float t, uint32_t seed) {
     t = std::clamp(t, 0.0f, 1.0f);
     float scale = 1.0f;
     switch (p.taperProfile) {
@@ -63,6 +77,15 @@ float taperAt(const SegmentedCreatureParams& p, float t) {
             }
             break;
         }
+        case TaperProfile::BELL_CURVE:
+            scale = 0.55f + 0.45f * std::sin(kPi * t);      // thin ends, thick middle
+            break;
+        case TaperProfile::STEPPED:
+            scale = 1.0f - 0.7f * std::floor(t * 4.0f) / 4.0f;   // four discrete radius bands
+            break;
+        case TaperProfile::IRREGULAR:
+            scale = (1.0f - 0.6f * t) * (1.0f + 0.25f * Noise::value3(glm::vec3(t * 6.0f, 0.5f, 0.5f), seed));
+            break;
     }
     return std::max(scale, 0.1f);
 }
@@ -87,6 +110,7 @@ struct SegmentFrame {
 std::vector<SegmentFrame> buildSegmentFrames(const SegmentedCreatureParams& p) {
     const int count = clampedSegmentCount(p);
     const float pitch = segmentPitch(p);
+    const uint32_t seed = creatureSeed(p);
     std::vector<SegmentFrame> frames(static_cast<size_t>(count));
     for (int i = 0; i < count; ++i) {
         SegmentFrame& f = frames[static_cast<size_t>(i)];
@@ -96,7 +120,11 @@ std::vector<SegmentFrame> buildSegmentFrames(const SegmentedCreatureParams& p) {
         f.direction = glm::normalize(f.end - f.start);
         const glm::vec3 side = glm::normalize(glm::cross(f.direction, glm::vec3(0.0f, 1.0f, 0.0f)));
         f.up = glm::normalize(glm::cross(side, f.direction));
-        f.taper = taperAt(p, count > 1 ? static_cast<float>(i) / static_cast<float>(count - 1) : 0.0f);
+        f.taper = taperAt(p, count > 1 ? static_cast<float>(i) / static_cast<float>(count - 1) : 0.0f, seed);
+        if (p.proceduralVariation) {
+            // Seeded +-8% per-segment size variation.
+            f.taper *= 1.0f + 0.08f * (Noise::hash3(i, 11, 0, seed) * 2.0f - 1.0f);
+        }
     }
     return frames;
 }
@@ -104,8 +132,10 @@ std::vector<SegmentFrame> buildSegmentFrames(const SegmentedCreatureParams& p) {
 /** Bone layout shared by RigGen and AnimGen so animation tracks always match the skeleton. */
 struct BoneLayout {
     int segmentBones = 0;
-    int headBone = -1;
-    int tailBone = -1;
+    int headFirst = -1;
+    int headCount = 0;
+    int tailFirst = -1;
+    int tailCount = 0;
     int total = 0;
 };
 
@@ -113,9 +143,101 @@ BoneLayout boneLayout(const SegmentedCreatureParams& p) {
     BoneLayout layout;
     layout.segmentBones = clampedSegmentCount(p);
     layout.total = layout.segmentBones;
-    if (p.headType != HeadType::SIMPLE) layout.headBone = layout.total++;
-    if (p.tailType != TailType::NONE) layout.tailBone = layout.total++;
+    if (p.headType != HeadType::SIMPLE) {
+        layout.headFirst = layout.total;
+        layout.headCount = std::max(1, p.headSegmentCount);
+        layout.total += layout.headCount;
+    }
+    if (p.tailType != TailType::NONE) {
+        layout.tailFirst = layout.total;
+        layout.tailCount = std::max(1, p.tailSegmentCount);
+        layout.total += layout.tailCount;
+    }
     return layout;
+}
+
+/** Neck segments and head placement in front of the first body segment. */
+struct HeadLayout {
+    glm::vec3 forward{1.0f, 0.0f, 0.0f};
+    glm::vec3 up{0.0f, 1.0f, 0.0f};
+    glm::vec3 side{0.0f, 0.0f, 1.0f};
+    std::vector<glm::vec3> neckCenters;
+    std::vector<float> neckRadii;
+    glm::vec3 center{0.0f};
+    float radius = 0.1f;
+};
+
+HeadLayout headLayout(const SegmentedCreatureParams& p, const SegmentFrame& front) {
+    HeadLayout h;
+    h.forward = -front.direction;
+    h.up = front.up;
+    h.side = glm::normalize(glm::cross(h.forward, h.up));
+    const float bodyRadius = baseRadius(p) * front.taper;
+    h.radius = bodyRadius * std::max(p.headScale, 0.1f);
+    const int segments = std::max(1, p.headSegmentCount);
+    const float step = (bodyRadius + h.radius) * 0.45f;
+    for (int k = 1; k < segments; ++k) {
+        const float t = static_cast<float>(k) / static_cast<float>(segments);
+        h.neckCenters.push_back(front.start + h.forward * (step * static_cast<float>(k)));
+        h.neckRadii.push_back(glm::mix(bodyRadius, h.radius, t) * 0.85f);
+    }
+    h.center = front.start + h.forward * (step * static_cast<float>(segments - 1) + h.radius * 0.6f);
+    return h;
+}
+
+float tailRadius(const SegmentedCreatureParams& p, const SegmentFrame& back) {
+    return baseRadius(p) * back.taper * std::max(p.tailScale, 0.1f);
+}
+
+/** Centre line of the tail behind the last segment, shared by the mesh and the rig. */
+std::vector<glm::vec3> tailCurve(const SegmentedCreatureParams& p, const SegmentFrame& back, int points) {
+    const float r = tailRadius(p, back);
+    const float lengthScale = 1.0f + 0.5f * static_cast<float>(std::max(1, p.tailSegmentCount) - 1);
+    const glm::vec3 dir = back.direction;
+    const glm::vec3 up = back.up;
+    const glm::vec3 side = glm::normalize(glm::cross(up, dir));
+    std::vector<glm::vec3> curve;
+    points = std::max(points, 2);
+    for (int k = 0; k < points; ++k) {
+        const float t = static_cast<float>(k) / static_cast<float>(points - 1);
+        glm::vec3 offset(0.0f);
+        switch (p.tailType) {
+            case TailType::NONE:
+                break;
+            case TailType::SPIKE:
+                offset = dir * (4.0f * r * lengthScale * t);
+                break;
+            case TailType::FLARED:
+            case TailType::MECHANICAL:
+                offset = dir * (3.0f * r * lengthScale * t);
+                break;
+            case TailType::TENTACLE:
+                offset = dir * (5.0f * r * lengthScale * t) + side * (0.6f * r * std::sin(3.0f * kPi * t) * t);
+                break;
+            case TailType::CRYSTAL:
+                offset = dir * (3.5f * r * lengthScale * t);
+                break;
+            case TailType::BIOLUMINESCENT:
+                offset = dir * (3.0f * r * lengthScale * t) + up * (2.0f * r * lengthScale * t * t);   // lure stalk
+                break;
+            case TailType::VENOMOUS: {
+                const float a = kPi * 0.9f * t;   // scorpion arc up and over the body
+                offset = dir * (2.5f * r * lengthScale * std::sin(a)) + up * (2.5f * r * lengthScale * (1.0f - std::cos(a)));
+                break;
+            }
+        }
+        curve.push_back(back.end + offset);
+    }
+    return curve;
+}
+
+std::vector<float> taperedRadii(size_t points, float start, float endFraction) {
+    std::vector<float> radii;
+    for (size_t k = 0; k < points; ++k) {
+        const float t = points > 1 ? static_cast<float>(k) / static_cast<float>(points - 1) : 0.0f;
+        radii.push_back(start * (1.0f - (1.0f - endFraction) * t));
+    }
+    return radii;
 }
 
 float metadataFloat(const SegmentedCreatureParams& p, const std::string& key, float fallback) {
@@ -126,6 +248,12 @@ float metadataFloat(const SegmentedCreatureParams& p, const std::string& key, fl
     } catch (const std::exception&) {
         return fallback;
     }
+}
+
+/** Emissive strength: explicit materialEmissive, at least 0.6 for bioluminescent tails. */
+float emissiveStrength(const SegmentedCreatureParams& p) {
+    const float base = std::clamp(p.materialEmissive, 0.0f, 1.0f);
+    return p.tailType == TailType::BIOLUMINESCENT ? std::max(base, 0.6f) : base;
 }
 
 } // namespace
@@ -196,8 +324,8 @@ bool loadObj(const std::string& path, MeshData& out) {
 
 // Segment primitives are built in local space: the segment runs along +Z from 0 to `length`,
 // with +Y as the dorsal (up) direction.
-MeshData createCylinderSegment(float radius, float length) {
-    return Geometry::tube({glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, length)}, {radius, radius}, 16, true);
+MeshData createCylinderSegment(float radius, float length, int sides) {
+    return Geometry::tube({glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, length)}, {radius, radius}, sides, true);
 }
 
 MeshData createBoxSegment(float radius, float length) {
@@ -209,13 +337,38 @@ MeshData createHexagonSegment(float radius, float length) {
     return Geometry::prism(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f), radius, length, 6);
 }
 
-MeshData createCustomSegment(const SegmentedCreatureParams& p, float radius, float length) {
+MeshData createSphereSegment(float radius, float length, int sides) {
+    // Bead: ellipsoid spanning the segment length.
+    return Geometry::ellipsoid(glm::vec3(0.0f, 0.0f, length * 0.5f), glm::vec3(radius, radius, std::max(length * 0.55f, radius * 0.5f)),
+                               std::max(4, sides / 2), sides);
+}
+
+MeshData createCapsuleSegment(float radius, float length, int sides) {
+    MeshData mesh = Geometry::tube({glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, length)}, {radius, radius}, sides, false);
+    mesh.append(Geometry::sphere(glm::vec3(0.0f), radius, std::max(4, sides / 2), sides));
+    mesh.append(Geometry::sphere(glm::vec3(0.0f, 0.0f, length), radius, std::max(4, sides / 2), sides));
+    return mesh;
+}
+
+MeshData createPrismSegment(float radius, float length) {
+    // Triangular prism with one edge on the dorsal line; scaled so the inscribed circle is ~radius.
+    return Geometry::prism(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f), radius * 1.6f, length, 3, 0.0f);
+}
+
+MeshData createIrregularSegment(float radius, float length, int sides, uint32_t seed) {
+    MeshData mesh = Geometry::tube({glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, length * 0.5f), glm::vec3(0.0f, 0.0f, length)},
+                                   {radius, radius, radius}, sides, true);
+    Geometry::displaceAlongNormals(mesh, radius * 0.25f, 2.0f / radius, seed ^ 0x1E5u, 2);
+    return mesh;
+}
+
+MeshData createCustomSegment(const SegmentedCreatureParams& p, float radius, float length, int sides) {
     auto it = p.metadata.find("customMesh");
     MeshData mesh;
     if (it == p.metadata.end() || !loadObj(it->second, mesh)) {
         Log::warn("SegmentedCreature", "Custom segment mesh for '{}' unavailable ({}), using cylinder segment",
                   p.id, it == p.metadata.end() ? std::string("no metadata.customMesh") : it->second);
-        return createCylinderSegment(radius, length);
+        return createCylinderSegment(radius, length, sides);
     }
     // Fit the loaded mesh into the segment volume: Z extent -> [0, length], XY -> radius.
     const auto [lo, hi] = mesh.bounds();
@@ -231,15 +384,20 @@ MeshData createCustomSegment(const SegmentedCreatureParams& p, float radius, flo
 }
 
 MeshData createSegmentMesh(const SegmentedCreatureParams& p) {
-    const float radius = std::max(p.segmentRadius, 0.01f);
+    const float radius = baseRadius(p);
     const float length = std::max(p.segmentLength, 0.01f);
+    const int sides = qualitySides(p, 16);
     switch (p.segmentType) {
-        case SegmentType::CYLINDER:    return createCylinderSegment(radius, length);
+        case SegmentType::CYLINDER:    return createCylinderSegment(radius, length, sides);
         case SegmentType::BOX:         return createBoxSegment(radius, length);
         case SegmentType::HEXAGON:     return createHexagonSegment(radius, length);
-        case SegmentType::CUSTOM_MESH: return createCustomSegment(p, radius, length);
+        case SegmentType::CUSTOM_MESH: return createCustomSegment(p, radius, length, sides);
+        case SegmentType::SPHERE:      return createSphereSegment(radius, length, sides);
+        case SegmentType::CAPSULE:     return createCapsuleSegment(radius, length, sides);
+        case SegmentType::PRISM:       return createPrismSegment(radius, length);
+        case SegmentType::IRREGULAR:   return createIrregularSegment(radius, length, sides, creatureSeed(p));
     }
-    return createCylinderSegment(radius, length);
+    return createCylinderSegment(radius, length, sides);
 }
 
 /** Places a tapered copy of `segment` on every segment frame. */
@@ -260,108 +418,206 @@ MeshData assembleAlongSpline(const MeshData& segment, const std::vector<SegmentF
 }
 
 void applyNoiseDisplacement(MeshData& mesh, const SegmentedCreatureParams& p) {
-    const float radius = std::max(p.segmentRadius, 0.01f);
+    const float radius = baseRadius(p);
     Geometry::displaceAlongNormals(mesh, p.noiseDetail * radius * 0.12f, 3.0f / radius, creatureSeed(p));
 }
 
-float headRadius(const SegmentedCreatureParams& p, const SegmentFrame& front) {
-    return std::max(p.segmentRadius, 0.01f) * front.taper * 1.25f;
-}
-
-void addMandibleHead(MeshData& mesh, const glm::vec3& center, const glm::vec3& forward, const glm::vec3& up, float radius) {
-    const glm::vec3 side = glm::normalize(glm::cross(forward, up));
+void addMandibleHead(MeshData& mesh, const HeadLayout& h) {
     for (int s = -1; s <= 1; s += 2) {
-        const glm::vec3 root = center + side * (radius * 0.6f * s) - up * (radius * 0.3f) + forward * (radius * 0.5f);
+        const glm::vec3 root = h.center + h.side * (h.radius * 0.6f * s) - h.up * (h.radius * 0.3f) + h.forward * (h.radius * 0.5f);
         std::vector<glm::vec3> path;
         std::vector<float> radii;
         const int steps = 6;
         for (int k = 0; k <= steps; ++k) {
             const float t = static_cast<float>(k) / steps;
             // Curve forward, then hook inward.
-            path.push_back(root + forward * (radius * 1.2f * t) - side * (radius * 0.55f * s * t * t));
-            radii.push_back(radius * 0.18f * (1.0f - 0.85f * t));
+            path.push_back(root + h.forward * (h.radius * 1.2f * t) - h.side * (h.radius * 0.55f * s * t * t));
+            radii.push_back(h.radius * 0.18f * (1.0f - 0.85f * t));
         }
         mesh.append(Geometry::tube(path, radii, 6, true));
     }
 }
 
-void addMultiEyeHead(MeshData& mesh, const glm::vec3& center, const glm::vec3& forward, const glm::vec3& up, float radius) {
-    const glm::vec3 side = glm::normalize(glm::cross(forward, up));
+void addMultiEyeHead(MeshData& mesh, const HeadLayout& h) {
     const int eyes = 6;
     for (int e = 0; e < eyes; ++e) {
         const float a = (static_cast<float>(e) / (eyes - 1) - 0.5f) * kPi * 0.7f;   // spread across the front
         const float row = (e % 2 == 0) ? 0.35f : 0.6f;
-        const glm::vec3 dir = glm::normalize(forward * std::cos(a) + side * std::sin(a) + up * row);
-        mesh.append(Geometry::sphere(center + dir * radius * 0.92f, radius * 0.16f, 6, 8));
+        const glm::vec3 dir = glm::normalize(h.forward * std::cos(a) + h.side * std::sin(a) + h.up * row);
+        mesh.append(Geometry::sphere(h.center + dir * h.radius * 0.92f, h.radius * 0.16f, 6, 8));
     }
 }
 
-void addHornedHead(MeshData& mesh, const glm::vec3& center, const glm::vec3& forward, const glm::vec3& up, float radius) {
-    const glm::vec3 side = glm::normalize(glm::cross(forward, up));
+void addHornedHead(MeshData& mesh, const HeadLayout& h) {
     for (int s = -1; s <= 1; s += 2) {
-        const glm::vec3 base = center + up * (radius * 0.7f) + side * (radius * 0.45f * s);
-        const glm::vec3 dir = glm::normalize(up * 0.8f - forward * 0.5f + side * (0.3f * s));
-        mesh.append(Geometry::cone(base, dir, radius * 0.22f, radius * 1.4f, 10));
+        const glm::vec3 base = h.center + h.up * (h.radius * 0.7f) + h.side * (h.radius * 0.45f * s);
+        const glm::vec3 dir = glm::normalize(h.up * 0.8f - h.forward * 0.5f + h.side * (0.3f * s));
+        mesh.append(Geometry::cone(base, dir, h.radius * 0.22f, h.radius * 1.4f, 10));
+    }
+}
+
+void addFangedHead(MeshData& mesh, const HeadLayout& h) {
+    for (int s = -1; s <= 1; s += 2) {
+        const glm::vec3 base = h.center + h.forward * (h.radius * 0.7f) - h.up * (h.radius * 0.35f) + h.side * (h.radius * 0.35f * s);
+        const glm::vec3 dir = glm::normalize(-h.up + h.forward * 0.3f);
+        mesh.append(Geometry::cone(base, dir, h.radius * 0.12f, h.radius * 0.9f, 8));
+    }
+}
+
+void addTentacledHead(MeshData& mesh, const HeadLayout& h) {
+    const int tentacles = 6;
+    for (int i = 0; i < tentacles; ++i) {
+        const float a = kTwoPi * static_cast<float>(i) / tentacles;
+        const glm::vec3 ring = std::cos(a) * h.up + std::sin(a) * h.side;
+        const glm::vec3 base = h.center + h.forward * (h.radius * 0.85f) + ring * (h.radius * 0.35f);
+        std::vector<glm::vec3> path;
+        for (int k = 0; k < 6; ++k) {
+            const float t = static_cast<float>(k) / 5.0f;
+            path.push_back(base + h.forward * (h.radius * 1.6f * t) + ring * (h.radius * 0.4f * t)
+                           + h.side * (h.radius * 0.15f * std::sin(kTwoPi * t + a)));
+        }
+        mesh.append(Geometry::tube(path, taperedRadii(path.size(), h.radius * 0.12f, 0.25f), 6, true));
+    }
+}
+
+void addCrystalHead(MeshData& mesh, const HeadLayout& h) {
+    const int shards = 5;
+    for (int k = 0; k < shards; ++k) {
+        const float spread = static_cast<float>(k) - 0.5f * static_cast<float>(shards - 1);
+        const glm::vec3 dir = glm::normalize(h.up - h.forward * (0.3f + 0.1f * std::abs(spread)) + h.side * (0.35f * spread));
+        const glm::vec3 base = h.center + dir * (h.radius * 0.7f);
+        const float length = h.radius * (0.6f + 0.15f * (2.0f - std::abs(spread)));
+        mesh.append(Geometry::prism(base, dir, h.radius * 0.15f, length, 6));
+        mesh.append(Geometry::cone(base + dir * length, dir, h.radius * 0.15f, h.radius * 0.3f, 6));
+    }
+}
+
+void addMechanicalHead(MeshData& mesh, const HeadLayout& h) {
+    // Visor bar across the face.
+    mesh.append(Geometry::prism(h.center + h.forward * (h.radius * 0.8f) + h.up * (h.radius * 0.2f) - h.side * (h.radius * 0.7f),
+                                h.side, h.radius * 0.18f, h.radius * 1.4f, 4, kPi * 0.25f));
+    for (int s = -1; s <= 1; s += 2) {
+        // Jaw plates
+        mesh.append(Geometry::prism(h.center - h.up * (h.radius * 0.45f) + h.side * (h.radius * 0.5f * s),
+                                    h.forward, h.radius * 0.15f, h.radius * 1.1f, 4, kPi * 0.25f));
+        // Antennae with sensor tips
+        const glm::vec3 dir = glm::normalize(h.up - h.forward * 0.4f + h.side * (0.25f * s));
+        const glm::vec3 base = h.center + h.up * (h.radius * 0.8f) + h.side * (h.radius * 0.3f * s);
+        mesh.append(Geometry::prism(base, dir, h.radius * 0.04f, h.radius * 1.2f, 6));
+        mesh.append(Geometry::sphere(base + dir * h.radius * 1.2f, h.radius * 0.08f, 4, 6));
     }
 }
 
 void attachHead(MeshData& mesh, const SegmentedCreatureParams& p, const SegmentFrame& front) {
-    const glm::vec3 forward = -front.direction;
-    const float radius = headRadius(p, front);
-    const glm::vec3 center = front.start + forward * (radius * 0.6f);
-    const glm::vec3 side = glm::normalize(glm::cross(forward, front.up));
+    const HeadLayout h = headLayout(p, front);
+    const int sides = qualitySides(p, 12);
+    // Neck segments between the body and the head.
+    for (size_t k = 0; k < h.neckCenters.size(); ++k) {
+        mesh.append(Geometry::ellipsoid(h.neckCenters[k], glm::vec3(h.neckRadii[k]), std::max(4, sides / 2), sides));
+    }
     // Head capsule, slightly elongated along the travel direction.
-    MeshData head = Geometry::sphere(glm::vec3(0.0f), 1.0f, 10, 14);
+    MeshData head = Geometry::sphere(glm::vec3(0.0f), 1.0f, std::max(6, sides - 2), sides + 2);
     const glm::mat4 orient(
-        glm::vec4(forward * radius * 1.15f, 0.0f),
-        glm::vec4(front.up * radius * 0.9f, 0.0f),
-        glm::vec4(side * radius, 0.0f),
-        glm::vec4(center, 1.0f));
+        glm::vec4(h.forward * h.radius * 1.15f, 0.0f),
+        glm::vec4(h.up * h.radius * 0.9f, 0.0f),
+        glm::vec4(h.side * h.radius, 0.0f),
+        glm::vec4(h.center, 1.0f));
     head.transform(orient);
     mesh.append(head);
 
     switch (p.headType) {
         case HeadType::SIMPLE:
-            break;   // plain rounded head only
+            break;   // plain rounded head (and neck) only
         case HeadType::MANDIBLE:
-            addMandibleHead(mesh, center, forward, front.up, radius);
+            addMandibleHead(mesh, h);
             break;
         case HeadType::MULTI_EYE:
-            addMultiEyeHead(mesh, center, forward, front.up, radius);
+            addMultiEyeHead(mesh, h);
             break;
         case HeadType::HORNED:
-            addHornedHead(mesh, center, forward, front.up, radius);
+            addHornedHead(mesh, h);
+            break;
+        case HeadType::FANGED:
+            addFangedHead(mesh, h);
+            break;
+        case HeadType::TENTACLED:
+            addTentacledHead(mesh, h);
+            break;
+        case HeadType::CRYSTAL:
+            addCrystalHead(mesh, h);
+            break;
+        case HeadType::MECHANICAL:
+            addMechanicalHead(mesh, h);
             break;
     }
 }
 
-void addSpikeTail(MeshData& mesh, const SegmentFrame& back, float radius) {
-    mesh.append(Geometry::cone(back.end, back.direction, radius * 0.9f, radius * 4.0f, 12));
-}
-
-void addFlaredTail(MeshData& mesh, const SegmentFrame& back, float radius) {
-    const glm::vec3 side = glm::normalize(glm::cross(back.up, back.direction));
-    const glm::vec3 root = back.end;
-    const glm::vec3 tip = root + back.direction * radius * 3.0f;
-    // Horizontal fan plus a smaller vertical fin.
-    mesh.append(Geometry::membrane(root - side * radius * 0.5f, root + side * radius * 0.5f,
-                                   tip + side * radius * 2.2f, tip - side * radius * 2.2f));
-    mesh.append(Geometry::membrane(root, root + back.up * radius * 0.4f,
-                                   tip + back.up * radius * 1.4f, tip - back.up * radius * 0.2f));
-    mesh.append(Geometry::cone(root - back.direction * radius * 0.2f, back.direction, radius * 0.6f, radius * 1.2f, 10));
-}
-
 void attachTail(MeshData& mesh, const SegmentedCreatureParams& p, const SegmentFrame& back) {
-    const float radius = std::max(p.segmentRadius, 0.01f) * back.taper;
+    const float r = tailRadius(p, back);
+    const glm::vec3 side = glm::normalize(glm::cross(back.up, back.direction));
+    const int sides = qualitySides(p, 12);
     switch (p.tailType) {
         case TailType::NONE:
             break;
-        case TailType::SPIKE:
-            addSpikeTail(mesh, back, radius);
+        case TailType::SPIKE: {
+            const auto curve = tailCurve(p, back, 2);
+            mesh.append(Geometry::cone(back.end, back.direction, r * 0.9f, glm::length(curve.back() - curve.front()), sides));
             break;
-        case TailType::FLARED:
-            addFlaredTail(mesh, back, radius);
+        }
+        case TailType::FLARED: {
+            const auto curve = tailCurve(p, back, 2);
+            const glm::vec3 root = back.end;
+            const glm::vec3 tip = curve.back();
+            // Horizontal fan plus a smaller vertical fin.
+            mesh.append(Geometry::membrane(root - side * r * 0.5f, root + side * r * 0.5f,
+                                           tip + side * r * 2.2f, tip - side * r * 2.2f));
+            mesh.append(Geometry::membrane(root, root + back.up * r * 0.4f,
+                                           tip + back.up * r * 1.4f, tip - back.up * r * 0.2f));
+            mesh.append(Geometry::cone(root - back.direction * r * 0.2f, back.direction, r * 0.6f, r * 1.2f, sides));
             break;
+        }
+        case TailType::TENTACLE: {
+            const auto curve = tailCurve(p, back, 10);
+            mesh.append(Geometry::tube(curve, taperedRadii(curve.size(), r * 0.7f, 0.12f), sides, true));
+            break;
+        }
+        case TailType::CRYSTAL: {
+            const auto curve = tailCurve(p, back, 5);
+            for (size_t k = 0; k + 1 < curve.size(); ++k) {
+                const glm::vec3 d = curve[k + 1] - curve[k];
+                const float scale = 1.0f - 0.18f * static_cast<float>(k);
+                mesh.append(Geometry::prism(curve[k], d, r * scale, glm::length(d) * 0.92f, 6));
+            }
+            const glm::vec3 lastDir = curve.back() - curve[curve.size() - 2];
+            mesh.append(Geometry::cone(curve.back(), lastDir, r * 0.35f, r * 1.5f, 6));
+            break;
+        }
+        case TailType::MECHANICAL: {
+            const auto curve = tailCurve(p, back, 4);
+            for (size_t k = 0; k + 1 < curve.size(); ++k) {
+                const glm::vec3 d = curve[k + 1] - curve[k];
+                const float scale = 0.9f - 0.15f * static_cast<float>(k);
+                mesh.append(Geometry::prism(curve[k], d, r * scale * std::sqrt(2.0f), glm::length(d) * 0.85f, 4, kPi * 0.25f));
+            }
+            for (int s = -1; s <= 1; s += 2) {   // pincer claw
+                mesh.append(Geometry::cone(curve.back(), glm::normalize(back.direction + side * (0.45f * s)), r * 0.25f, r * 1.3f, 5));
+            }
+            break;
+        }
+        case TailType::BIOLUMINESCENT: {
+            const auto curve = tailCurve(p, back, 8);
+            mesh.append(Geometry::tube(curve, taperedRadii(curve.size(), r * 0.35f, 0.6f), sides, false));
+            mesh.append(Geometry::sphere(curve.back(), r * 0.8f, std::max(4, sides / 2), sides));   // glowing lure
+            break;
+        }
+        case TailType::VENOMOUS: {
+            const auto curve = tailCurve(p, back, 10);
+            mesh.append(Geometry::tube(curve, taperedRadii(curve.size(), r * 0.8f, 0.5f), sides, false));
+            mesh.append(Geometry::sphere(curve.back(), r * 0.6f, std::max(4, sides / 2), sides));     // venom bulb
+            const glm::vec3 lastDir = glm::normalize(curve.back() - curve[curve.size() - 2]);
+            mesh.append(Geometry::cone(curve.back() + lastDir * r * 0.4f, lastDir - back.up * 0.5f, r * 0.2f, r * 1.5f, 6));   // stinger
+            break;
+        }
     }
 }
 
@@ -369,18 +625,28 @@ void addArmorPlates(MeshData& mesh, const SegmentedCreatureParams& p, const std:
     const int detail = std::clamp(p.plateDetailLevel, 0, 3);
     if (detail == 0) return;
     const float arc = kPi * (0.6f + 0.15f * detail);
-    const int arcSegments = 4 * (detail + 1);
+    const int arcSegments = std::max(2, static_cast<int>(std::lround(4.0f * (detail + 1) * quality(p))));
     const float thickness = std::max(p.armorThickness, 0.005f);
+    const float segmentLength = std::max(p.segmentLength, 0.01f);
+    const float gap = std::clamp(p.plateSpacing, 0.0f, 0.9f);
     // Box segments have corners at radius*sqrt(2); keep plates clear of them.
-    const float shapeScale = p.segmentType == SegmentType::BOX ? std::sqrt(2.0f) : 1.0f;
-    for (const auto& f : frames) {
+    const float shapeScale = (p.segmentType == SegmentType::BOX || p.segmentType == SegmentType::PRISM) ? std::sqrt(2.0f) : 1.0f;
+    for (size_t i = 0; i < frames.size(); ++i) {
+        const auto& f = frames[i];
+        float length = segmentLength * (1.0f - gap);
+        float offset = segmentLength * gap * 0.5f;
+        float radius = baseRadius(p) * f.taper * shapeScale * 1.04f;
+        if (p.plateOverlap) {
+            // Plates bridge the segment gap and overlap their neighbours; alternate radii avoid z-fighting.
+            length = segmentLength * 1.15f + std::max(p.segmentSpacing, 0.0f);
+            offset = -segmentLength * 0.075f;
+            if (i % 2 == 1) radius += thickness;
+        }
         Geometry::Frame frame;
-        frame.origin = f.start;
+        frame.origin = f.start + f.direction * offset;
         frame.tangent = f.direction;
         frame.normal = f.up;
         frame.binormal = glm::cross(f.direction, f.up);
-        const float radius = std::max(p.segmentRadius, 0.01f) * f.taper * shapeScale * 1.04f;
-        const float length = std::max(p.segmentLength, 0.01f) * 0.92f;
         mesh.append(Geometry::shell(frame, radius, thickness, length, arc, arcSegments));
     }
 }
@@ -394,7 +660,7 @@ void addSpikes(MeshData& mesh, const SegmentedCreatureParams& p, const std::vect
             static_cast<size_t>((static_cast<float>(k) + 0.5f) / spikes * static_cast<float>(frames.size())));
         const auto& f = frames[index];
         const glm::vec3 mid = (f.start + f.end) * 0.5f;
-        const float radius = std::max(p.segmentRadius, 0.01f) * f.taper;
+        const float radius = baseRadius(p) * f.taper;
         const glm::vec3 base = mid + f.up * (radius + (p.armorPlates ? p.armorThickness : 0.0f));
         const glm::vec3 dir = glm::normalize(f.up + f.direction * 0.35f);   // swept back
         mesh.append(Geometry::cone(base, dir, length * 0.25f, length, 8));
@@ -439,22 +705,33 @@ namespace {
 
 glm::vec3 toVec3(const std::array<float, 3>& c) { return glm::vec3(c[0], c[1], c[2]); }
 
+uint32_t textureSize(const SegmentedCreatureParams& p) {
+    const float base = static_cast<float>(64u << std::clamp(p.plateDetailLevel, 0, 2));
+    return static_cast<uint32_t>(std::clamp(std::lround(base * quality(p)), 32L, 1024L));
+}
+
 // Texture layout matches the segment UVs: x = around the body (0 = dorsal, 0.5 = ventral),
 // y = along one segment (0 = front edge, 1 = back edge).
 TextureData generateBaseTexture(const SegmentedCreatureParams& p, uint32_t size) {
     TextureData texture(size, size);
     const glm::vec3 primary = toVec3(p.colorPrimary);
     const glm::vec3 secondary = toVec3(p.colorSecondary);
+    const glm::vec3 accent = toVec3(p.colorAccent);
     const uint32_t seed = creatureSeed(p);
+    const float alpha = 1.0f - std::clamp(p.materialTransparency, 0.0f, 1.0f);
     for (uint32_t y = 0; y < size; ++y) {
         for (uint32_t x = 0; x < size; ++x) {
             const float u = (x + 0.5f) / size;
             const float v = (y + 0.5f) / size;
             const float belly = 0.5f - 0.5f * std::cos(kTwoPi * u);       // 0 dorsal -> 1 ventral
             glm::vec3 color = glm::mix(primary, secondary, glm::smoothstep(0.35f, 0.75f, belly));
+            // Dorsal accent stripe.
+            const float stripe = 1.0f - glm::smoothstep(0.015f, 0.04f, std::min(u, 1.0f - u));
+            color = glm::mix(color, accent, stripe * 0.6f);
             const float grain = Noise::fbm3(glm::vec3(u * 8.0f, v * 8.0f, 0.0f), 4, seed);
-            color *= 1.0f + grain * (0.08f + 0.15f * p.noiseDetail);
-            texture.set(x, y, glm::vec4(color, 1.0f));
+            const float variation = Noise::value3(glm::vec3(u * 3.0f, v * 3.0f, 1.5f), seed + 5u);
+            color *= 1.0f + grain * (0.08f + 0.15f * p.noiseDetail) + variation * std::clamp(p.colorVariation, 0.0f, 1.0f);
+            texture.set(x, y, glm::vec4(color, alpha));
         }
     }
     return texture;
@@ -464,28 +741,33 @@ void applyArmorPattern(TextureData& texture, const SegmentedCreatureParams& p) {
     const int detail = std::clamp(p.plateDetailLevel, 0, 3);
     if (detail == 0) return;
     const uint32_t seed = creatureSeed(p) + 77u;
+    const glm::vec3 accent = toVec3(p.colorAccent);
     const float seamWidth = 0.06f / detail;
     for (uint32_t y = 0; y < texture.height; ++y) {
         for (uint32_t x = 0; x < texture.width; ++x) {
             const float u = (x + 0.5f) / texture.width;
             const float v = (y + 0.5f) / texture.height;
-            glm::vec4 c = texture.get(x, y);
-            float shade = 1.0f;
-            // Plate seams at the segment boundaries.
+            const glm::vec4 c = texture.get(x, y);
+            glm::vec3 color(c);
+            // Plate seams at the segment boundaries, with an accent-coloured rim just inside.
             const float edge = std::min(v, 1.0f - v);
-            if (edge < seamWidth) shade *= 0.55f + 0.45f * (edge / seamWidth);
+            if (edge < seamWidth) {
+                color *= 0.55f + 0.45f * (edge / seamWidth);
+            } else if (edge < seamWidth * 1.6f) {
+                color = glm::mix(color, accent, 0.35f);
+            }
             // Scales inside each plate from medium detail up.
             if (detail >= 2) {
                 const float cell = Noise::worley2(glm::vec2(u * 6.0f * detail, v * 3.0f * detail), seed);
-                shade *= 0.85f + 0.15f * glm::smoothstep(0.05f, 0.45f, cell);
+                color *= 0.85f + 0.15f * glm::smoothstep(0.05f, 0.45f, cell);
             }
-            // Rivets along the plate rim at high detail.
+            // Accent rivets along the plate rim at high detail.
             if (detail >= 3) {
                 const float rivetU = std::fmod(u * 16.0f, 1.0f) - 0.5f;
                 const float rivetV = v - 0.15f;
-                if (rivetU * rivetU + rivetV * rivetV * 4.0f < 0.02f) shade *= 1.35f;
+                if (rivetU * rivetU + rivetV * rivetV * 4.0f < 0.02f) color = glm::mix(color, accent, 0.8f);
             }
-            texture.set(x, y, glm::vec4(glm::vec3(c) * shade, c.a));
+            texture.set(x, y, glm::vec4(color, c.a));
         }
     }
 }
@@ -508,11 +790,14 @@ void applyMaterialProperties(TextureData& texture, float roughness, float metall
     }
 }
 
+float luminance(const glm::vec4& c) { return glm::dot(glm::vec3(c), glm::vec3(0.299f, 0.587f, 0.114f)); }
+
+glm::vec4 gray(float value) { return glm::vec4(glm::vec3(std::clamp(value, 0.0f, 1.0f)), 1.0f); }
+
 } // namespace
 
 TextureHandle build(const SegmentedCreatureParams& p) {
-    const uint32_t size = 64u << std::clamp(p.plateDetailLevel, 0, 2);
-    TextureData baseTexture = generateBaseTexture(p, size);
+    TextureData baseTexture = generateBaseTexture(p, textureSize(p));
 
     if (p.armorPlates) {
         applyArmorPattern(baseTexture, p);
@@ -521,6 +806,64 @@ TextureHandle build(const SegmentedCreatureParams& p) {
     applyMaterialProperties(baseTexture, p.materialRoughness, p.materialMetallic);
 
     return AssetStore::instance().addTexture(std::move(baseTexture));
+}
+
+void buildMaterialMaps(const SegmentedCreatureParams& p, AssetBundle& bundle) {
+    auto& store = AssetStore::instance();
+    const auto albedo = store.texture(bundle.texture);
+    if (!albedo || albedo->empty()) return;
+    const uint32_t w = albedo->width, h = albedo->height;
+    const int wi = static_cast<int>(w), hi = static_cast<int>(h);
+    auto H = [&](int x, int y) {
+        return luminance(albedo->get(static_cast<uint32_t>((x % wi + wi) % wi), static_cast<uint32_t>((y % hi + hi) % hi)));
+    };
+
+    TextureData normal(w, h), rough(w, h), metal(w, h), ao(w, h);
+    for (int y = 0; y < hi; ++y) {
+        for (int x = 0; x < wi; ++x) {
+            const float here = H(x, y);
+            // Sobel normal from the albedo luminance.
+            const float dx = (H(x + 1, y - 1) + 2.0f * H(x + 1, y) + H(x + 1, y + 1)) -
+                             (H(x - 1, y - 1) + 2.0f * H(x - 1, y) + H(x - 1, y + 1));
+            const float dy = (H(x - 1, y + 1) + 2.0f * H(x, y + 1) + H(x + 1, y + 1)) -
+                             (H(x - 1, y - 1) + 2.0f * H(x, y - 1) + H(x + 1, y - 1));
+            const glm::vec3 n = glm::normalize(glm::vec3(-dx * 2.0f, -dy * 2.0f, 1.0f));
+            normal.set(static_cast<uint32_t>(x), static_cast<uint32_t>(y), glm::vec4(n * 0.5f + 0.5f, 1.0f));
+            // Darker crevices (seams) are rougher and less metallic.
+            rough.set(static_cast<uint32_t>(x), static_cast<uint32_t>(y), gray(p.materialRoughness + (0.5f - here) * 0.3f));
+            metal.set(static_cast<uint32_t>(x), static_cast<uint32_t>(y), gray(p.materialMetallic * (0.8f + 0.4f * here)));
+            // Ambient occlusion: lower than the neighbourhood average means occluded.
+            float sum = 0.0f;
+            for (int oy = -2; oy <= 2; ++oy) {
+                for (int ox = -2; ox <= 2; ++ox) sum += H(x + ox, y + oy);
+            }
+            ao.set(static_cast<uint32_t>(x), static_cast<uint32_t>(y), gray(1.0f - std::max(0.0f, sum / 25.0f - here) * 4.0f));
+        }
+    }
+    rough.roughness = std::clamp(p.materialRoughness, 0.0f, 1.0f);
+    metal.metallic = std::clamp(p.materialMetallic, 0.0f, 1.0f);
+    bundle.normalMap = store.addTexture(std::move(normal));
+    bundle.roughnessMap = store.addTexture(std::move(rough));
+    bundle.metallicMap = store.addTexture(std::move(metal));
+    bundle.aoMap = store.addTexture(std::move(ao));
+
+    const float glow = emissiveStrength(p);
+    if (glow > 0.0f) {
+        const glm::vec3 accent = toVec3(p.colorAccent);
+        const uint32_t seed = creatureSeed(p) + 313u;
+        TextureData emissive(w, h);
+        for (uint32_t y = 0; y < h; ++y) {
+            for (uint32_t x = 0; x < w; ++x) {
+                const float u = (x + 0.5f) / w;
+                const float v = (y + 0.5f) / h;
+                const float belly = 0.5f - 0.5f * std::cos(kTwoPi * u);
+                const float spots = 1.0f - glm::smoothstep(0.1f, 0.25f, Noise::worley2(glm::vec2(u * 8.0f, v * 4.0f), seed));
+                const float pattern = std::max(glm::smoothstep(0.7f, 0.95f, belly), spots * 0.8f);   // ventral glow + photophores
+                emissive.set(x, y, glm::vec4(accent * glow * pattern, 1.0f));
+            }
+        }
+        bundle.emissiveMap = store.addTexture(std::move(emissive));
+    }
 }
 
 } // namespace TextureGen
@@ -535,27 +878,73 @@ void createBoneChain(SkeletonData& skeleton, const std::vector<SegmentFrame>& fr
     }
 }
 
-void addHeadBone(SkeletonData& skeleton, const SegmentedCreatureParams& p, const SegmentFrame& front) {
-    const float radius = std::max(p.segmentRadius, 0.01f) * front.taper * 1.25f;
-    const glm::vec3 forward = -front.direction;
-    const float reach = p.headType == HeadType::MANDIBLE ? 2.2f : 1.6f;
-    skeleton.addBone("head", 0, front.start, front.start + forward * radius * reach);
+float headReach(HeadType type) {
+    switch (type) {
+        case HeadType::MANDIBLE:
+        case HeadType::TENTACLED:  return 2.2f;
+        case HeadType::HORNED:
+        case HeadType::CRYSTAL:    return 1.8f;
+        case HeadType::FANGED:
+        case HeadType::MECHANICAL: return 1.7f;
+        case HeadType::MULTI_EYE:
+        case HeadType::SIMPLE:     return 1.6f;
+    }
+    return 1.6f;
 }
 
-void addTailBone(SkeletonData& skeleton, const SegmentedCreatureParams& p, const SegmentFrame& back, int parent) {
-    const float radius = std::max(p.segmentRadius, 0.01f) * back.taper;
-    const float reach = p.tailType == TailType::SPIKE ? 4.0f : 3.0f;
-    skeleton.addBone("tail", parent, back.end, back.end + back.direction * radius * reach);
+/** Neck bones (all but the last) and the head bone, following HeadLayout. */
+void addHeadBones(SkeletonData& skeleton, const SegmentedCreatureParams& p, const SegmentFrame& front, int count) {
+    const HeadLayout h = headLayout(p, front);
+    std::vector<glm::vec3> joints{front.start};
+    for (const auto& c : h.neckCenters) joints.push_back(c);
+    joints.push_back(h.center + h.forward * h.radius * (headReach(p.headType) - 0.6f));
+    int parent = 0;
+    for (int k = 0; k < count && static_cast<size_t>(k) + 1 < joints.size(); ++k) {
+        const bool last = k == count - 1;
+        parent = skeleton.addBone(last ? "head" : "neck_" + std::to_string(k), parent,
+                                  joints[static_cast<size_t>(k)], last ? joints.back() : joints[static_cast<size_t>(k) + 1]);
+    }
+}
+
+/** Tail bones following tailCurve(). */
+void addTailBones(SkeletonData& skeleton, const SegmentedCreatureParams& p, const SegmentFrame& back, int parent, int count) {
+    const auto curve = tailCurve(p, back, count + 1);
+    for (int k = 0; k < count; ++k) {
+        parent = skeleton.addBone(count == 1 ? "tail" : "tail_" + std::to_string(k), parent,
+                                  curve[static_cast<size_t>(k)], curve[static_cast<size_t>(k) + 1]);
+    }
 }
 
 void setJointLimits(SkeletonData& skeleton, const SegmentedCreatureParams& p) {
     const float stiffness = std::clamp(p.articulationStiffness, 0.0f, 1.0f);
-    float limit = glm::radians(glm::mix(60.0f, 8.0f, stiffness));
+    float limit = jointLimitRadians(p);
     limit *= p.enableJoints ? (0.5f + std::clamp(p.jointFlexibility, 0.0f, 1.0f)) : 0.0f;
+    limit = std::min(limit, glm::radians(std::clamp(p.jointLimit, 0.0f, 180.0f)));
     for (auto& bone : skeleton.bones) {
         bone.stiffness = stiffness;
         bone.minAngle = bone.parent < 0 ? -kPi : -limit;   // root bone orients freely
         bone.maxAngle = bone.parent < 0 ? kPi : limit;
+    }
+}
+
+/** Rigid-body values per bone: segment mass scales with cross-section, head/tail with their scale. */
+void setPhysics(SkeletonData& skeleton, const SegmentedCreatureParams& p, const std::vector<SegmentFrame>& frames,
+                const BoneLayout& layout) {
+    const float unitMass = std::max(p.segmentMass, 0.0f) * std::max(p.segmentDensity, 0.0f);
+    for (size_t b = 0; b < skeleton.bones.size(); ++b) {
+        auto& bone = skeleton.bones[b];
+        const int i = static_cast<int>(b);
+        float mass = unitMass;
+        if (i < layout.segmentBones) {
+            mass *= frames[b].taper * frames[b].taper;
+        } else if (layout.headCount > 0 && i >= layout.headFirst && i < layout.headFirst + layout.headCount) {
+            mass *= std::pow(std::max(p.headScale, 0.1f), 3.0f) / static_cast<float>(layout.headCount);
+        } else if (layout.tailCount > 0 && i >= layout.tailFirst) {
+            mass *= std::pow(std::max(p.tailScale, 0.1f), 3.0f) / static_cast<float>(layout.tailCount);
+        }
+        bone.mass = mass;
+        bone.friction = std::clamp(p.segmentFriction, 0.0f, 1.0f);
+        bone.restitution = std::clamp(p.segmentRestitution, 0.0f, 1.0f);
     }
 }
 
@@ -567,13 +956,14 @@ SkeletonHandle build(const SegmentedCreatureParams& p) {
     SkeletonData skeleton;
 
     createBoneChain(skeleton, frames);
-    if (layout.headBone >= 0) {
-        addHeadBone(skeleton, p, frames.front());
+    if (layout.headCount > 0) {
+        addHeadBones(skeleton, p, frames.front(), layout.headCount);
     }
-    if (layout.tailBone >= 0) {
-        addTailBone(skeleton, p, frames.back(), layout.segmentBones - 1);
+    if (layout.tailCount > 0) {
+        addTailBones(skeleton, p, frames.back(), layout.segmentBones - 1, layout.tailCount);
     }
     setJointLimits(skeleton, p);
+    setPhysics(skeleton, p, frames, layout);
 
     return AssetStore::instance().addSkeleton(std::move(skeleton));
 }
@@ -586,16 +976,22 @@ namespace {
 
 constexpr size_t kFrames = 24;
 
-/** Joint index along the spine used for wave phases (head = -1, tail = segments). */
+bool isHeadBone(const BoneLayout& layout, size_t bone) {
+    const int b = static_cast<int>(bone);
+    return layout.headCount > 0 && b >= layout.headFirst && b < layout.headFirst + layout.headCount;
+}
+
+/** Joint index along the spine used for wave phases (head chain < 0, tail chain >= segments). */
 float spineIndex(const BoneLayout& layout, size_t bone) {
     const int b = static_cast<int>(bone);
-    if (b == layout.headBone) return -1.0f;
-    if (b == layout.tailBone) return static_cast<float>(layout.segmentBones);
+    if (isHeadBone(layout, bone)) return -1.0f - static_cast<float>(b - layout.headFirst);
+    if (layout.tailCount > 0 && b >= layout.tailFirst) return static_cast<float>(layout.segmentBones + (b - layout.tailFirst));
     return static_cast<float>(b);
 }
 
 float waveAmplitude(const SegmentedCreatureParams& p, float maxDegrees) {
-    return glm::radians(maxDegrees) * (1.0f - 0.7f * std::clamp(p.articulationStiffness, 0.0f, 1.0f));
+    const float amplitude = glm::radians(maxDegrees) * (1.0f - 0.7f * std::clamp(p.articulationStiffness, 0.0f, 1.0f));
+    return std::min(amplitude, jointLimitRadians(p));
 }
 
 float cycleDuration(const SegmentedCreatureParams& p) {
@@ -608,7 +1004,7 @@ void createSlitherAnimation(AnimationData& animation, const SegmentedCreaturePar
     animation.addSampledClip("slither", cycleDuration(p), true, kFrames, [&](size_t bone, float phase) {
         BoneKey key;
         const float i = spineIndex(layout, bone);
-        const float scale = static_cast<int>(bone) == layout.headBone ? 0.4f : 1.0f;
+        const float scale = isHeadBone(layout, bone) ? 0.4f : 1.0f;
         key.rotation.y = amplitude * scale * std::cos(kTwoPi * phase - k * i);
         return key;
     });
@@ -617,7 +1013,7 @@ void createSlitherAnimation(AnimationData& animation, const SegmentedCreaturePar
 void createCrawlAnimation(AnimationData& animation, const SegmentedCreatureParams& p, const BoneLayout& layout) {
     const float amplitude = waveAmplitude(p, 15.0f);
     const float k = kTwoPi / std::max(3.0f, layout.segmentBones / 2.0f);
-    const float lift = std::max(p.segmentRadius, 0.01f) * 0.6f;
+    const float lift = baseRadius(p) * 0.6f;
     animation.addSampledClip("crawl", cycleDuration(p) * 1.4f, true, kFrames, [&](size_t bone, float phase) {
         BoneKey key;
         const float i = spineIndex(layout, bone);
@@ -631,14 +1027,13 @@ void createCrawlAnimation(AnimationData& animation, const SegmentedCreatureParam
 
 void createCoilAnimation(AnimationData& animation, const SegmentedCreatureParams& p, const BoneLayout& layout) {
     const float perJoint = kTwoPi * 1.25f / std::max(1, layout.segmentBones);
-    const float limit = glm::radians(glm::mix(60.0f, 8.0f, std::clamp(p.articulationStiffness, 0.0f, 1.0f)));
-    const float bend = std::min(perJoint, limit);
+    const float bend = std::min(perJoint, jointLimitRadians(p));
     animation.addSampledClip("coil", cycleDuration(p) * 2.0f, true, kFrames, [&](size_t bone, float phase) {
         BoneKey key;
         const float amount = 0.5f - 0.5f * std::cos(kTwoPi * phase);    // curl in, then release
         const bool spine = static_cast<int>(bone) < layout.segmentBones;
         key.rotation.y = spine && bone > 0 ? bend * amount : 0.0f;
-        key.rotation.x = static_cast<int>(bone) == layout.headBone ? -0.3f * amount : 0.0f;  // head rears up
+        key.rotation.x = isHeadBone(layout, bone) ? -0.3f * amount : 0.0f;  // head rears up
         return key;
     });
 }
@@ -659,13 +1054,70 @@ void createCustomAnimation(AnimationData& animation, const SegmentedCreaturePara
     });
 }
 
+void createBurrowAnimation(AnimationData& animation, const SegmentedCreatureParams& p, const BoneLayout& layout) {
+    const float amplitude = waveAmplitude(p, 30.0f);
+    const float k = kTwoPi / std::max(4.0f, layout.segmentBones / 1.5f);
+    const float depth = baseRadius(p) * 2.0f;
+    const float segments = static_cast<float>(std::max(1, layout.segmentBones));
+    animation.addSampledClip("burrow", cycleDuration(p) * 1.6f, true, kFrames, [&](size_t bone, float phase) {
+        BoneKey key;
+        const float i = spineIndex(layout, bone);
+        key.rotation.x = amplitude * std::sin(kTwoPi * phase - k * i);   // head-first dive and surface
+        // Segments follow the head below the surface one after another.
+        key.translation.y = -depth * std::max(0.0f, std::sin(kTwoPi * (phase - 0.5f * std::max(i, 0.0f) / segments)));
+        return key;
+    });
+}
+
+void createSwimAnimation(AnimationData& animation, const SegmentedCreatureParams& p, const BoneLayout& layout) {
+    const float amplitude = waveAmplitude(p, 18.0f);
+    const float k = kTwoPi / std::max(6.0f, static_cast<float>(layout.segmentBones));
+    const float segments = static_cast<float>(std::max(1, layout.segmentBones));
+    animation.addSampledClip("swim", cycleDuration(p) * 0.8f, true, kFrames, [&](size_t bone, float phase) {
+        BoneKey key;
+        const float i = spineIndex(layout, bone);
+        const float growth = 0.4f + 0.6f * std::clamp(i / segments, 0.0f, 1.0f);   // amplitude grows toward the tail
+        key.rotation.y = amplitude * growth * std::sin(kTwoPi * phase - k * i);
+        return key;
+    });
+}
+
+void createFlyAnimation(AnimationData& animation, const SegmentedCreatureParams& p, const BoneLayout& layout) {
+    const float amplitude = waveAmplitude(p, 12.0f);
+    const float k = kTwoPi / std::max(5.0f, layout.segmentBones / 1.2f);
+    const float bob = baseRadius(p) * 0.8f;
+    animation.addSampledClip("fly", cycleDuration(p) * 1.2f, true, kFrames, [&](size_t bone, float phase) {
+        BoneKey key;
+        const float i = spineIndex(layout, bone);
+        key.rotation.x = amplitude * std::sin(kTwoPi * phase - k * i);           // airborne serpent undulation
+        key.rotation.y = glm::radians(5.0f) * std::cos(kTwoPi * phase - 0.5f * k * i);
+        key.translation.y = bob * std::sin(kTwoPi * phase - 0.3f * i);
+        return key;
+    });
+}
+
+void createClimbAnimation(AnimationData& animation, const SegmentedCreatureParams& p, const BoneLayout& layout) {
+    const int lifted = std::max(1, layout.segmentBones / 2);
+    const float bend = std::min(kPi * 0.5f / static_cast<float>(lifted), jointLimitRadians(p));
+    const float grip = waveAmplitude(p, 6.0f);
+    animation.addSampledClip("climb", cycleDuration(p) * 1.5f, true, kFrames, [&](size_t bone, float phase) {
+        BoneKey key;
+        const float i = spineIndex(layout, bone);
+        const float amount = 0.6f + 0.4f * std::sin(kTwoPi * phase);
+        // Front half bends upward onto the wall, the rest pushes; small lateral grip wave.
+        if (i < static_cast<float>(lifted)) key.rotation.x = -bend * amount;
+        key.rotation.y = grip * std::sin(kTwoPi * phase * 2.0f - 0.8f * i);
+        return key;
+    });
+}
+
 void createIdleAnimation(AnimationData& animation, const SegmentedCreatureParams& p, const BoneLayout& layout) {
-    const float breathe = std::max(p.segmentRadius, 0.01f) * 0.05f;
+    const float breathe = baseRadius(p) * 0.05f;
     animation.addSampledClip("idle", 2.5f, true, kFrames, [&](size_t bone, float phase) {
         BoneKey key;
         const float i = spineIndex(layout, bone);
         key.translation.y = breathe * std::sin(kTwoPi * phase - 0.3f * i);
-        key.rotation.y = glm::radians(2.0f) * std::sin(kTwoPi * phase * 0.5f - 0.2f * i);
+        key.rotation.y = std::min(glm::radians(2.0f), jointLimitRadians(p)) * std::sin(kTwoPi * phase * 0.5f - 0.2f * i);
         return key;
     });
 }
@@ -678,7 +1130,7 @@ AnimationHandle build(const SegmentedCreatureParams& p) {
     animation.boneCount = static_cast<size_t>(layout.total);
 
     switch (p.animationProfile) {
-        case AnimationProfile::SLITHER:
+        case AnimationProfile::SLITHER:   // also WAVE_SLITHER
             createSlitherAnimation(animation, p, layout);
             break;
         case AnimationProfile::CRAWL:
@@ -689,6 +1141,18 @@ AnimationHandle build(const SegmentedCreatureParams& p) {
             break;
         case AnimationProfile::CUSTOM:
             createCustomAnimation(animation, p, layout);
+            break;
+        case AnimationProfile::BURROW:
+            createBurrowAnimation(animation, p, layout);
+            break;
+        case AnimationProfile::SWIM:
+            createSwimAnimation(animation, p, layout);
+            break;
+        case AnimationProfile::FLY:
+            createFlyAnimation(animation, p, layout);
+            break;
+        case AnimationProfile::CLIMB:
+            createClimbAnimation(animation, p, layout);
             break;
     }
     createIdleAnimation(animation, p, layout);
@@ -723,6 +1187,8 @@ void createBehaviorTree(BehaviorTreeData& ai, const BehaviorParams& p) {
     ai.addChildNode(flee, BehaviorNodeType::Condition, "healthBelow", {{"fraction", p.retreatHealth}});
     if (p.burrower) {
         ai.addChildNode(flee, BehaviorNodeType::Action, "burrowEscape", {{"depth", p.burrowDepth}});
+    } else if (p.climber) {
+        ai.addChildNode(flee, BehaviorNodeType::Action, "climbAway", {{"speed", p.speed}});
     } else {
         ai.addChildNode(flee, BehaviorNodeType::Action, "retreat", {{"speed", p.speed * p.chaseSpeed}});
     }
@@ -782,6 +1248,9 @@ void createBehaviorTree(BehaviorTreeData& ai, const BehaviorParams& p) {
     if (p.packHunting && p.packSize > 1) {
         ai.addChildNode(routine, BehaviorNodeType::Action, "keepFormation", {{"cohesion", p.packCohesion}});
     }
+    if (p.climber || p.climbAbility) {
+        ai.addChildNode(routine, BehaviorNodeType::Action, "preferHighGround", {{"radius", p.patrolRadius}});
+    }
     ai.addChildNode(routine, BehaviorNodeType::Action, "wander", {{"radius", p.patrolRadius}, {"speed", p.speed}});
     ai.addChildNode(root, BehaviorNodeType::Action, "idle", {{"duration", p.idleTime}});
 
@@ -838,6 +1307,40 @@ BehaviorParams presetFor(AIProfile profile) {
             b.attackDamage = 5.0f;
             b.retreatHealth = 0.1f;
             break;
+        case AIProfile::BURROWER:
+            b.behaviorName = "burrower";
+            b.burrower = true;
+            b.burrowDepth = 3.0f;
+            b.aggression = 0.6f;
+            b.detectionRange = 12.0f;
+            b.chaseSpeed = 1.6f;
+            b.retreatHealth = 0.3f;
+            break;
+        case AIProfile::CLIMBER:
+            b.behaviorName = "climber";
+            b.climber = true;
+            b.climbAbility = true;
+            b.aggression = 0.5f;
+            b.patrolRadius = 15.0f;
+            break;
+        case AIProfile::AMBUSHER:
+            b.behaviorName = "ambusher";
+            b.aggression = 0.95f;
+            b.detectionRange = 8.0f;     // waits until prey is close
+            b.idleTime = 10.0f;
+            b.chaseSpeed = 2.5f;
+            b.attackDamage = 20.0f;
+            b.retreatHealth = 0.35f;
+            b.nocturnal = true;
+            break;
+        case AIProfile::GUARDIAN:
+            b.behaviorName = "guardian";
+            b.territorial = true;
+            b.territorySize = 12.0f;
+            b.aggression = 0.65f;
+            b.retreatHealth = 0.0f;      // never retreats
+            b.patrolRadius = 6.0f;
+            break;
     }
     return b;
 }
@@ -850,11 +1353,26 @@ AIHandle build(const BehaviorParams& p) {
 
 AIHandle build(const SegmentedCreatureParams& p) {
     BehaviorParams behavior = presetFor(p.aiProfile);
-    behavior.behaviorName = p.id.empty() ? behavior.behaviorName : p.id + "_" + behavior.behaviorName;
-    // Movement scales with body size.
-    behavior.attackRange = std::max(behavior.attackRange, std::max(p.segmentRadius, 0.01f) * 3.0f);
+    const std::string label = !p.name.empty() ? p.name : p.id;
+    behavior.behaviorName = label.empty() ? behavior.behaviorName : label + "_" + behavior.behaviorName;
+    // Reach and speed scale with body size.
+    behavior.attackRange = std::max(behavior.attackRange, baseRadius(p) * 3.0f * std::max(p.headScale, 0.1f));
     behavior.speed *= std::clamp(p.segmentLength * 2.0f, 0.5f, 2.0f);
-    return build(behavior);
+    if (p.animationProfile == AnimationProfile::BURROW) behavior.burrower = true;
+    if (p.animationProfile == AnimationProfile::CLIMB) behavior.climber = true;
+    if (p.animationProfile == AnimationProfile::SWIM) behavior.swimmer = true;
+    if (p.animationProfile == AnimationProfile::FLY) behavior.flyer = true;
+    if (p.tailType == TailType::VENOMOUS) behavior.attackDamage *= 1.5f;
+
+    BehaviorTreeData ai;
+    createBehaviorTree(ai, behavior);
+    // Body facts the runtime needs for physics and damage handling.
+    const float segments = static_cast<float>(clampedSegmentCount(p));
+    ai.blackboard["segmentCount"] = segments;
+    ai.blackboard["bodyMass"] = std::max(p.segmentMass, 0.0f) * std::max(p.segmentDensity, 0.0f) * segments;
+    ai.blackboard["damageableSegments"] = p.damageableSegments ? 1.0f : 0.0f;
+    ai.blackboard["dynamicSegments"] = p.dynamicSegments ? 1.0f : 0.0f;
+    return AssetStore::instance().addBehavior(std::move(ai));
 }
 
 } // namespace AIGen
@@ -863,9 +1381,48 @@ void releaseBundle(const AssetBundle& bundle) {
     auto& store = AssetStore::instance();
     if (bundle.mesh) store.releaseMesh(bundle.mesh);
     if (bundle.texture) store.releaseTexture(bundle.texture);
+    for (TextureHandle map : {bundle.normalMap, bundle.roughnessMap, bundle.metallicMap, bundle.emissiveMap, bundle.aoMap}) {
+        if (map) store.releaseTexture(map);
+    }
     if (bundle.skeleton) store.releaseSkeleton(bundle.skeleton);
     if (bundle.anim) store.releaseAnimation(bundle.anim);
     if (bundle.ai) store.releaseBehavior(bundle.ai);
+}
+
+void finalizeBundle(AssetBundle& bundle, float generationSeconds) {
+    auto& store = AssetStore::instance();
+    auto& r = bundle.result;
+    r.generationTime = generationSeconds;
+    r.memoryUsage = 0;
+    if (auto mesh = store.mesh(bundle.mesh)) {
+        r.vertexCount = static_cast<uint32_t>(mesh->vertices.size());
+        r.triangleCount = static_cast<uint32_t>(mesh->triangleCount());
+        r.memoryUsage += mesh->vertices.size() * sizeof(CreatureAssets::MeshVertex) + mesh->indices.size() * sizeof(uint32_t);
+    }
+    if (auto texture = store.texture(bundle.texture)) {
+        r.textureSize = texture->width;
+        r.memoryUsage += texture->rgba.size();
+    }
+    for (TextureHandle map : {bundle.normalMap, bundle.roughnessMap, bundle.metallicMap, bundle.emissiveMap, bundle.aoMap}) {
+        if (auto texture = store.texture(map)) r.memoryUsage += texture->rgba.size();
+    }
+    if (auto skeleton = store.skeleton(bundle.skeleton)) {
+        r.boneCount = static_cast<uint32_t>(skeleton->bones.size());
+        r.memoryUsage += skeleton->bones.size() * sizeof(CreatureAssets::Bone);
+    }
+    if (auto anim = store.animation(bundle.anim)) {
+        r.animationFrameCount = static_cast<uint32_t>(anim->frameCount());
+        r.memoryUsage += anim->frameCount() * anim->boneCount * sizeof(BoneKey);
+    }
+    if (auto ai = store.behavior(bundle.ai)) {
+        r.memoryUsage += ai->nodes.size() * sizeof(CreatureAssets::BehaviorNode);
+    }
+    r.segmentCount = bundle.isBehaviorOnly() ? 0u : static_cast<uint32_t>(clampedSegmentCount(bundle.params));
+    r.success = r.errorMessage.empty() && bundle.isValid();
+    if (!r.success && r.errorMessage.empty()) r.errorMessage = "one or more assets failed to generate";
+    if (!r.success) {
+        Log::warn("SegmentedCreature", "Generation of '{}' failed: {}", bundle.assetPath, r.errorMessage);
+    }
 }
 
 namespace {
@@ -904,11 +1461,7 @@ std::vector<std::future<AssetBundle>> SegmentedCreatureFactory::generateBatch(
 }
 
 bool SegmentedCreatureFactory::validateParams(const SegmentedCreatureParams& params) {
-    return params.segmentCount > 0 &&
-           params.segmentLength > 0.0f &&
-           params.segmentRadius > 0.0f &&
-           params.articulationStiffness >= 0.0f &&
-           params.articulationStiffness <= 1.0f;
+    return getValidationErrors(params).empty();
 }
 
 std::string SegmentedCreatureFactory::getValidationErrors(const SegmentedCreatureParams& params) {
@@ -925,6 +1478,24 @@ std::string SegmentedCreatureFactory::getValidationErrors(const SegmentedCreatur
     }
     if (params.articulationStiffness < 0.0f || params.articulationStiffness > 1.0f) {
         errors += "articulationStiffness must be between 0 and 1\n";
+    }
+    if (params.headScale <= 0.0f || params.tailScale <= 0.0f) {
+        errors += "headScale and tailScale must be greater than 0\n";
+    }
+    if (params.headSegmentCount < 1 || params.tailSegmentCount < 1) {
+        errors += "headSegmentCount and tailSegmentCount must be at least 1\n";
+    }
+    if (params.jointLimit < 0.0f || params.jointLimit > 180.0f) {
+        errors += "jointLimit must be between 0 and 180 degrees\n";
+    }
+    if (params.segmentMass < 0.0f || params.segmentDensity <= 0.0f) {
+        errors += "segmentMass must be non-negative and segmentDensity greater than 0\n";
+    }
+    if (params.materialTransparency < 0.0f || params.materialTransparency > 1.0f) {
+        errors += "materialTransparency must be between 0 and 1\n";
+    }
+    if (params.generationQuality <= 0.0f || params.generationQuality > 2.0f) {
+        errors += "generationQuality must be in (0, 2]\n";
     }
 
     return errors;

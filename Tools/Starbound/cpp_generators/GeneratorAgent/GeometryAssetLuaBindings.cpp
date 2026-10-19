@@ -57,14 +57,14 @@ void GeometryAssetLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<BooleanParams>("BooleanParams", sol::constructors<BooleanParams()>(),
         "type", &BooleanParams::type, "op", &BooleanParams::op, "meshA", &BooleanParams::meshA, "meshB", &BooleanParams::meshB);
 
-    lua.new_usertype<LODParams>("LODParams", sol::constructors<LODParams()>(),
+    lua.new_usertype<LODParams>("GeometryLODParams", sol::constructors<LODParams()>(),
         "screenSizes", &LODParams::screenSizes, "simplificationFactors", &LODParams::simplificationFactors);
 
     lua.new_usertype<GeometryBundle>("GeometryBundle", sol::no_constructor,
         "meshes", &GeometryBundle::meshes, "lod", &GeometryBundle::lod);
 
     lua.set_function("spawn_geometry_asset",
-        [&](sol::table requests_table, const LODParams& lp) {
+        [](sol::table requests_table, const LODParams& lp) {
             std::vector<GeometryRequest> requests;
             for (const auto& kv : requests_table) {
                 sol::table req = kv.second.as<sol::table>();
@@ -87,7 +87,7 @@ void GeometryAssetLuaBindings::poll_assets(sol::state& lua) {
             try {
                 auto b = it->first.get();
                 lua["print"]("Geometry asset ready: " + it->second);
-            } catch (const std::exception& e) { /* log error */ }
+            } catch (const std::exception& e) { Log::error("Geometry", "Asset generation failed for {}: {}", it->second, e.what()); }
             it = pendingGeometry.erase(it);
         } else { ++it; }
     }

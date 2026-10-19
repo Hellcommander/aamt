@@ -59,7 +59,7 @@ void SpellstoneLuaBindings::bind(sol::state& lua) {
         "detailLevel", &SpellstoneParams::detailLevel
     );
 
-    lua.set_function("spawn_spellstone", [&](SpellstoneParams p) {
+    lua.set_function("spawn_spellstone", [](SpellstoneParams p) {
         auto factory = SpellstoneLuaBindings::factory();
         auto fut = factory->generateAsync(p);
         pendingSpellstones.emplace_back(std::move(fut), p.id);
@@ -69,10 +69,12 @@ void SpellstoneLuaBindings::bind(sol::state& lua) {
 void SpellstoneLuaBindings::poll_assets(sol::state& lua) {
     for (auto it = pendingSpellstones.begin(); it != pendingSpellstones.end();) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            auto b = it->first.get();
-            // This would call a Lua function to spawn the spellstone.
-            // For now, we'll just print a message.
-            lua["print"]("Spellstone ready: " + it->second);
+            try {
+                auto b = it->first.get();
+                lua["print"]("Spellstone ready: " + it->second);
+            } catch (const std::exception& e) {
+                Log::error("Spellstones", "Asset generation failed for {}: {}", it->second, e.what());
+            }
             it = pendingSpellstones.erase(it);
         } else {
             ++it;

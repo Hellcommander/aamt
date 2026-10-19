@@ -56,7 +56,7 @@ void WormMechLuaBindings::bind(sol::state& lua) {
         "aiProfile", &WormMechParams::aiProfile
     );
 
-    lua.new_usertype<UIParams>("UIParams",
+    lua.new_usertype<UIParams>("WormMechUIParams",
         sol::constructors<UIParams()>(),
         "iconSize", &UIParams::iconSize,
         "borderColor", &UIParams::borderColor,

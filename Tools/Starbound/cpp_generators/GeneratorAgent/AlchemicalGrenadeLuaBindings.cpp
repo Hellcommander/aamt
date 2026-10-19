@@ -1,7 +1,8 @@
 #include "AlchemicalGrenadeLuaBindings.hpp"
 #include "AlchemicalGrenadeFactory.hpp"
 #include "AlchemicalGrenadeTypes.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include "core/Log.hpp"
 #include <map>
 #include <future>
@@ -12,6 +13,64 @@ namespace AlchemicalGrenades {
 
 static std::vector<std::pair<std::future<GrenadeAssetBundle>, std::string>> pendingGrenades;
 static std::map<std::string, GrenadeAssetBundle> loadedGrenades;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<AlchemicalGrenadeFactory>& factorySlot() {
+    static std::shared_ptr<AlchemicalGrenadeFactory> f;
+    return f;
+}
+} // namespace
+
+void AlchemicalGrenadeLuaBindings::setFactory(std::shared_ptr<AlchemicalGrenadeFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<AlchemicalGrenadeFactory> AlchemicalGrenadeLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<AlchemicalGrenadeFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
+
+namespace {
+/**
+ * metadata (std::map<std::string, std::string>) exposed as a plain Lua table, copied in/out:
+ * the vendored sol2 container usertype cannot iterate std::map.
+ */
+template <typename T>
+auto metadataProperty() {
+    return sol::property(
+        [](const T& params) { return sol::as_table(params.metadata); },
+        [](T& params, sol::table table) {
+            params.metadata.clear();
+            for (const auto& [key, value] : table) {
+                params.metadata[key.as<std::string>()] = value.as<std::string>();
+            }
+        });
+}
+/** Generates the grenade (waiting for the worker pool), records it as loaded and returns it. */
+GrenadeAssetBundle spawnGrenade(const AlchemicalGrenadeParams& g, const UIItemParams& u) {
+    auto factory = AlchemicalGrenadeLuaBindings::factory();
+    if (!factory) {
+        Log::error("AlchemicalGrenade", "AlchemicalGrenadeFactory not available");
+        return GrenadeAssetBundle{};
+    }
+
+    Log::info("AlchemicalGrenade", "Generating grenade: {}", g.id);
+    GrenadeAssetBundle bundle = factory->generateAsync(g, u).get();
+    loadedGrenades[g.id] = bundle;
+    return bundle;
+}
+} // namespace
 
 void AlchemicalGrenadeLuaBindings::bind(sol::state& lua) {
     // Bind enums
@@ -154,7 +213,7 @@ void AlchemicalGrenadeLuaBindings::bind(sol::state& lua) {
         "lodLevel", &AlchemicalGrenadeParams::lodLevel,
         "description", &AlchemicalGrenadeParams::description,
         "tags", &AlchemicalGrenadeParams::tags,
-        "metadata", &AlchemicalGrenadeParams::metadata
+        "metadata", metadataProperty<AlchemicalGrenadeParams>()
     );
 
     lua.new_usertype<UIItemParams>("UIItemParams",
@@ -187,27 +246,22 @@ void AlchemicalGrenadeLuaBindings::bind(sol::state& lua) {
         "lodLevel", &UIItemParams::lodLevel,
         "description", &UIItemParams::description,
         "tags", &UIItemParams::tags,
-        "metadata", &UIItemParams::metadata
+        "metadata", metadataProperty<UIItemParams>()
     );
 
     // Main generation function
-    lua.set_function("spawn_alchemical_grenade", [&](const AlchemicalGrenadeParams& g, const UIItemParams& u) {
-        auto factory = MainPlugin::instance().getAlchemicalGrenadeFactory();
-        if (!factory) {
-            Log::error("AlchemicalGrenadeFactory not available");
-            return GrenadeAssetBundle{};
-        }
-        
-        auto fut = factory->generateAsync(g, u);
-        pendingGrenades.emplace_back(std::move(fut), g.id);
+    lua.set_function("spawn_alchemical_grenade", &spawnGrenade);
+
+    // Queues generation; poll_assets stores the bundle and calls on_grenade_ready(id, bundle)
+    lua.set_function("spawn_alchemical_grenade_async", [](const AlchemicalGrenadeParams& g, const UIItemParams& u) {
+        auto factory = AlchemicalGrenadeLuaBindings::factory();
+        pendingGrenades.emplace_back(factory->generateAsync(g, u), g.id);
         Log::info("AlchemicalGrenade", "Queued grenade generation for: {}", g.id);
-        
-        // Return the future result
-        return fut.get();
+        return g.id;
     });
 
     // Helper functions for common grenade types
-    lua.set_function("create_fire_grenade", [&](std::string id, float radius, float fuseTime) {
+    lua.set_function("create_fire_grenade", [](std::string id, float radius, float fuseTime) {
         AlchemicalGrenadeParams g;
         g.id = id;
         g.grenadeType = GrenadeType::FIRE;
@@ -245,10 +299,10 @@ void AlchemicalGrenadeLuaBindings::bind(sol::state& lua) {
         u.glowColor = g.glowColor;
         u.glowIntensity = 0.6f;
         
-        return spawn_alchemical_grenade(g, u);
+        return spawnGrenade(g, u);
     });
 
-    lua.set_function("create_acid_grenade", [&](std::string id, float radius, float fuseTime) {
+    lua.set_function("create_acid_grenade", [](std::string id, float radius, float fuseTime) {
         AlchemicalGrenadeParams g;
         g.id = id;
         g.grenadeType = GrenadeType::ACID;
@@ -286,10 +340,10 @@ void AlchemicalGrenadeLuaBindings::bind(sol::state& lua) {
         u.glowColor = g.glowColor;
         u.glowIntensity = 0.4f;
         
-        return spawn_alchemical_grenade(g, u);
+        return spawnGrenade(g, u);
     });
 
-    lua.set_function("create_frost_grenade", [&](std::string id, float radius, float fuseTime) {
+    lua.set_function("create_frost_grenade", [](std::string id, float radius, float fuseTime) {
         AlchemicalGrenadeParams g;
         g.id = id;
         g.grenadeType = GrenadeType::FROST;
@@ -327,10 +381,10 @@ void AlchemicalGrenadeLuaBindings::bind(sol::state& lua) {
         u.glowColor = g.glowColor;
         u.glowIntensity = 0.5f;
         
-        return spawn_alchemical_grenade(g, u);
+        return spawnGrenade(g, u);
     });
 
-    lua.set_function("create_shock_grenade", [&](std::string id, float radius, float fuseTime) {
+    lua.set_function("create_shock_grenade", [](std::string id, float radius, float fuseTime) {
         AlchemicalGrenadeParams g;
         g.id = id;
         g.grenadeType = GrenadeType::SHOCK;
@@ -368,10 +422,10 @@ void AlchemicalGrenadeLuaBindings::bind(sol::state& lua) {
         u.glowColor = g.glowColor;
         u.glowIntensity = 0.8f;
         
-        return spawn_alchemical_grenade(g, u);
+        return spawnGrenade(g, u);
     });
 
-    lua.set_function("create_healing_grenade", [&](std::string id, float radius, float fuseTime) {
+    lua.set_function("create_healing_grenade", [](std::string id, float radius, float fuseTime) {
         AlchemicalGrenadeParams g;
         g.id = id;
         g.grenadeType = GrenadeType::HEALING;
@@ -409,15 +463,15 @@ void AlchemicalGrenadeLuaBindings::bind(sol::state& lua) {
         u.glowColor = g.glowColor;
         u.glowIntensity = 0.7f;
         
-        return spawn_alchemical_grenade(g, u);
+        return spawnGrenade(g, u);
     });
 
     // Asset management functions
-    lua.set_function("is_grenade_ready", [&](std::string id) {
+    lua.set_function("is_grenade_ready", [](std::string id) {
         return loadedGrenades.find(id) != loadedGrenades.end();
     });
 
-    lua.set_function("get_grenade", [&](std::string id) {
+    lua.set_function("get_grenade", [](std::string id) {
         auto it = loadedGrenades.find(id);
         if (it != loadedGrenades.end()) {
             return it->second;
@@ -425,20 +479,20 @@ void AlchemicalGrenadeLuaBindings::bind(sol::state& lua) {
         return GrenadeAssetBundle{};
     });
 
-    lua.set_function("clear_grenade_cache", [&]() {
+    lua.set_function("clear_grenade_cache", []() {
         loadedGrenades.clear();
         Log::info("Grenade cache cleared");
     });
 
     // Utility functions
-    lua.set_function("validate_grenade_params", [&](const AlchemicalGrenadeParams& g) {
-        auto factory = MainPlugin::instance().getAlchemicalGrenadeFactory();
+    lua.set_function("validate_grenade_params", [](const AlchemicalGrenadeParams& g) {
+        auto factory = AlchemicalGrenadeLuaBindings::factory();
         if (!factory) return false;
         return factory->validateGrenadeParams(g);
     });
 
-    lua.set_function("get_grenade_validation_errors", [&](const AlchemicalGrenadeParams& g) {
-        auto factory = MainPlugin::instance().getAlchemicalGrenadeFactory();
+    lua.set_function("get_grenade_validation_errors", [](const AlchemicalGrenadeParams& g) {
+        auto factory = AlchemicalGrenadeLuaBindings::factory();
         if (!factory) return std::vector<std::string>{};
         return factory->getGrenadeValidationErrors(g);
     });

@@ -4,7 +4,12 @@
 #include "core/Log.hpp"
 #include "core/threading/ThreadPool.hpp"
 #include "GeneratorConcurrency.hpp"
-#include "core/graphics/Texture.hpp"
+#include <concurrentqueue.h>
+#include <sol/sol.hpp>
+#include <atomic>
+#include <cstdint>
+#include <mutex>
+#include <thread>
 #include <string>
 #include <vector>
 #include <memory>
@@ -15,33 +20,38 @@
 namespace MagiTech {
 namespace RealTimeArt {
 
+// Crossbow parameter schemas (CrossbowAssetFactory.hpp)
+using Crossbows::CrossbowParams;
+using Crossbows::BoltParams;
+using Crossbows::ArrowParams;
+
 // Real-Time In-Game AI Art Generation Pipeline
 class RealTimeArtGenerator {
 public:
     struct GenDef {
         std::string prompt;
-        int outW, outH;        // e.g. 64×64
-        int directions;         // 1, 4, 8
-        int seed;
+        int outW = 64, outH = 64;  // e.g. 64x64
+        int directions = 1;     // 1, 4, 8
+        int seed = 0;
         std::string style;     // "pixel-art", "realistic", "cartoon"
         std::string palette;   // "starbound", "neon", "earth-tone"
         std::vector<std::string> effects; // ["metallic", "glowing", "weathered"]
     };
 
     struct DamageParams {
-        uint32_t baseTexId;
-        float impactX, impactY;  // UV coordinates
-        float intensity;          // 0–1
-        uint32_t seed;
-        bool useAI;
+        uint32_t baseTexId = 0;
+        float impactX = 0.5f, impactY = 0.5f;  // UV coordinates
+        float intensity = 0.5f;   // 0-1
+        uint32_t seed = 0;
+        bool useAI = false;
         std::string prompt;
         std::string damageType;  // "bullet_hole", "crack", "burn", "rust"
     };
 
     struct TextureHandle {
-        uint32_t id;
-        int width, height;
-        bool isValid;
+        uint32_t id = 0;
+        int width = 0, height = 0;
+        bool isValid = false;
     };
 
     struct Task {
@@ -63,7 +73,7 @@ public:
     };
 
     RealTimeArtGenerator();
-    ~RealTimeArtGenerator() = default;
+    ~RealTimeArtGenerator();
 
     // Initialize the real-time pipeline
     bool initialize(const AIArt::ModelConfig& aiConfig);
@@ -103,14 +113,17 @@ public:
 
     // Performance monitoring
     struct Stats {
-        uint64_t totalRequests;
-        uint64_t cacheHits;
-        uint64_t aiGenerations;
-        uint64_t shaderEdits;
-        float averageGenerationTime;
-        float averageDamageEditTime;
+        uint64_t totalRequests = 0;
+        uint64_t cacheHits = 0;
+        uint64_t aiGenerations = 0;
+        uint64_t shaderEdits = 0;
+        float averageGenerationTime = 0.0f;
+        float averageDamageEditTime = 0.0f;
     };
     Stats getStats() const;
+
+    // CPU-side pixels of a texture created by this generator (RGBA8); false if unknown
+    bool getTextureData(uint32_t textureId, std::vector<uint8_t>& rgba, int& width, int& height) const;
 
 private:
     std::unique_ptr<GeneratorTaskPool> pool;
@@ -124,6 +137,18 @@ private:
     // Cache
     std::unordered_map<std::string, TextureHandle> textureCache;
     std::unordered_map<std::string, TextureHandle> damageCache;
+    mutable std::mutex cacheMutex_;
+
+    // Pixel store backing every TextureHandle (id -> RGBA8 + size)
+    struct TexturePixels {
+        std::vector<uint8_t> rgba;
+        int width = 0;
+        int height = 0;
+    };
+    std::unordered_map<uint32_t, TexturePixels> textures_;
+    mutable std::mutex texturesMutex_;
+    std::atomic<uint32_t> nextTextureId_{1};
+    std::atomic<uint64_t> nextRequestId_{0};
     
     // Stats
     mutable Stats stats_;
@@ -163,6 +188,9 @@ private:
     AIArt::ArtPrompt createArtPrompt(const GenDef& def);
     AIArt::ArtPrompt createDamagePrompt(const DamageParams& params);
 };
+
+/// Registers the ArtGen / Damage Lua API (RealTimeArtLuaBindings.cpp)
+void bindRealTimeArtGenerator(sol::state& lua);
 
 // Global real-time art generator instance
 extern std::unique_ptr<RealTimeArtGenerator> g_realTimeArtGenerator;

@@ -92,8 +92,8 @@ MeshAssetParams MeshAssetPresets::terrain(const glm::vec2& size, uint32_t resolu
     params.meshParams.weldVertices = true;
     
     // Set up UV generation for terrain
-    params.uvParams.unwrapMethod = UVGenParams::UnwrapMethod::Planar;
-    params.uvParams.packingMethod = UVGenParams::PackingMethod::MaxRects;
+    params.uvParams.unwrapMethod = mt::UVGenParams::UnwrapMethod::Planar;
+    params.uvParams.packingMethod = mt::UVGenParams::PackingMethod::MaxRects;
     params.uvParams.atlasSize = glm::vec2(2048, 2048);
     params.uvParams.padding = 4.0f;
     params.uvParams.texelDensity = 1.0f;
@@ -119,8 +119,8 @@ MeshAssetParams MeshAssetPresets::mountain(const glm::vec2& size, uint32_t resol
     params.meshParams.weldVertices = true;
     
     // Set up UV generation for mountain
-    params.uvParams.unwrapMethod = UVGenParams::UnwrapMethod::Planar;
-    params.uvParams.packingMethod = UVGenParams::PackingMethod::MaxRects;
+    params.uvParams.unwrapMethod = mt::UVGenParams::UnwrapMethod::Planar;
+    params.uvParams.packingMethod = mt::UVGenParams::PackingMethod::MaxRects;
     params.uvParams.atlasSize = glm::vec2(4096, 4096);
     params.uvParams.padding = 8.0f;
     params.uvParams.texelDensity = 2.0f;
@@ -146,8 +146,8 @@ MeshAssetParams MeshAssetPresets::valley(const glm::vec2& size, uint32_t resolut
     params.meshParams.weldVertices = true;
     
     // Set up UV generation for valley
-    params.uvParams.unwrapMethod = UVGenParams::UnwrapMethod::Planar;
-    params.uvParams.packingMethod = UVGenParams::PackingMethod::MaxRects;
+    params.uvParams.unwrapMethod = mt::UVGenParams::UnwrapMethod::Planar;
+    params.uvParams.packingMethod = mt::UVGenParams::PackingMethod::MaxRects;
     params.uvParams.atlasSize = glm::vec2(2048, 2048);
     params.uvParams.padding = 4.0f;
     params.uvParams.texelDensity = 1.5f;
@@ -207,8 +207,8 @@ MeshAssetParams MeshAssetPresets::proceduralCylinder(float radius, float height)
 
 // Material presets
 
-MaterialParams MeshAssetPresets::pbrMetal() {
-    MaterialParams params;
+mt::MaterialParams MeshAssetPresets::pbrMetal() {
+    mt::MaterialParams params;
     params.id = "pbr_metal";
     params.shaderType = "PBR";
     params.albedo = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f);
@@ -222,8 +222,8 @@ MaterialParams MeshAssetPresets::pbrMetal() {
     return params;
 }
 
-MaterialParams MeshAssetPresets::pbrPlastic() {
-    MaterialParams params;
+mt::MaterialParams MeshAssetPresets::pbrPlastic() {
+    mt::MaterialParams params;
     params.id = "pbr_plastic";
     params.shaderType = "PBR";
     params.albedo = glm::vec4(0.9f, 0.9f, 0.9f, 1.0f);
@@ -237,8 +237,8 @@ MaterialParams MeshAssetPresets::pbrPlastic() {
     return params;
 }
 
-MaterialParams MeshAssetPresets::pbrWood() {
-    MaterialParams params;
+mt::MaterialParams MeshAssetPresets::pbrWood() {
+    mt::MaterialParams params;
     params.id = "pbr_wood";
     params.shaderType = "PBR";
     params.albedo = glm::vec4(0.6f, 0.4f, 0.2f, 1.0f);
@@ -252,8 +252,8 @@ MaterialParams MeshAssetPresets::pbrWood() {
     return params;
 }
 
-MaterialParams MeshAssetPresets::pbrStone() {
-    MaterialParams params;
+mt::MaterialParams MeshAssetPresets::pbrStone() {
+    mt::MaterialParams params;
     params.id = "pbr_stone";
     params.shaderType = "PBR";
     params.albedo = glm::vec4(0.5f, 0.5f, 0.5f, 1.0f);
@@ -267,8 +267,8 @@ MaterialParams MeshAssetPresets::pbrStone() {
     return params;
 }
 
-MaterialParams MeshAssetPresets::emissive() {
-    MaterialParams params;
+mt::MaterialParams MeshAssetPresets::emissive() {
+    mt::MaterialParams params;
     params.id = "emissive";
     params.shaderType = "PBR";
     params.albedo = glm::vec4(0.2f, 0.2f, 0.2f, 1.0f);
@@ -282,8 +282,8 @@ MaterialParams MeshAssetPresets::emissive() {
     return params;
 }
 
-MaterialParams MeshAssetPresets::transparent() {
-    MaterialParams params;
+mt::MaterialParams MeshAssetPresets::transparent() {
+    mt::MaterialParams params;
     params.id = "transparent";
     params.shaderType = "PBR";
     params.albedo = glm::vec4(0.8f, 0.8f, 0.8f, 0.5f);
@@ -299,8 +299,8 @@ MaterialParams MeshAssetPresets::transparent() {
 
 // LOD presets
 
-LODParams MeshAssetPresets::standardLOD() {
-    LODParams params;
+mt::LODParams MeshAssetPresets::standardLOD() {
+    mt::LODParams params;
     params.baseMeshId = "";
     params.screenSizes = {0.4f, 0.15f, 0.03f};
     params.targetRatios = {1.0f, 0.4f, 0.15f};
@@ -311,8 +311,8 @@ LODParams MeshAssetPresets::standardLOD() {
     return params;
 }
 
-LODParams MeshAssetPresets::aggressiveLOD() {
-    LODParams params;
+mt::LODParams MeshAssetPresets::aggressiveLOD() {
+    mt::LODParams params;
     params.baseMeshId = "";
     params.screenSizes = {0.6f, 0.25f, 0.05f};
     params.targetRatios = {1.0f, 0.25f, 0.1f};
@@ -323,8 +323,8 @@ LODParams MeshAssetPresets::aggressiveLOD() {
     return params;
 }
 
-LODParams MeshAssetPresets::conservativeLOD() {
-    LODParams params;
+mt::LODParams MeshAssetPresets::conservativeLOD() {
+    mt::LODParams params;
     params.baseMeshId = "";
     params.screenSizes = {0.2f, 0.08f, 0.02f};
     params.targetRatios = {1.0f, 0.6f, 0.25f};
@@ -337,10 +337,10 @@ LODParams MeshAssetPresets::conservativeLOD() {
 
 // UV presets
 
-UVGenParams MeshAssetPresets::standardUV() {
-    UVGenParams params;
-    params.unwrapMethod = UVGenParams::UnwrapMethod::Auto;
-    params.packingMethod = UVGenParams::PackingMethod::MaxRects;
+mt::UVGenParams MeshAssetPresets::standardUV() {
+    mt::UVGenParams params;
+    params.unwrapMethod = mt::UVGenParams::UnwrapMethod::Auto;
+    params.packingMethod = mt::UVGenParams::PackingMethod::MaxRects;
     params.atlasSize = glm::vec2(1024, 1024);
     params.padding = 2.0f;
     params.texelDensity = 1.0f;
@@ -351,10 +351,10 @@ UVGenParams MeshAssetPresets::standardUV() {
     return params;
 }
 
-UVGenParams MeshAssetPresets::optimizedUV() {
-    UVGenParams params;
-    params.unwrapMethod = UVGenParams::UnwrapMethod::LSCM;
-    params.packingMethod = UVGenParams::PackingMethod::Guillotine;
+mt::UVGenParams MeshAssetPresets::optimizedUV() {
+    mt::UVGenParams params;
+    params.unwrapMethod = mt::UVGenParams::UnwrapMethod::LSCM;
+    params.packingMethod = mt::UVGenParams::PackingMethod::Guillotine;
     params.atlasSize = glm::vec2(2048, 2048);
     params.padding = 4.0f;
     params.texelDensity = 1.5f;
@@ -365,10 +365,10 @@ UVGenParams MeshAssetPresets::optimizedUV() {
     return params;
 }
 
-UVGenParams MeshAssetPresets::seamlessUV() {
-    UVGenParams params;
-    params.unwrapMethod = UVGenParams::UnwrapMethod::Planar;
-    params.packingMethod = UVGenParams::PackingMethod::Skyline;
+mt::UVGenParams MeshAssetPresets::seamlessUV() {
+    mt::UVGenParams params;
+    params.unwrapMethod = mt::UVGenParams::UnwrapMethod::Planar;
+    params.packingMethod = mt::UVGenParams::PackingMethod::Skyline;
     params.atlasSize = glm::vec2(1024, 1024);
     params.padding = 8.0f;
     params.texelDensity = 1.0f;

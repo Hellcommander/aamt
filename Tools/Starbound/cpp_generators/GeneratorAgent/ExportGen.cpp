@@ -192,6 +192,35 @@ ExportGen::ExportGen()
 
 ExportGen::~ExportGen() = default;
 
+ExportResult ExportGen::runExport(const ExportParams& params, const AudioBuffer& audio, ExportDefinition& exportDef) {
+    // Working format of this export
+    m_sampleRate = static_cast<uint32_t>(params.exportSampleRate);
+    m_numChannels = std::max<uint32_t>(1, static_cast<uint32_t>(params.exportChannels));
+    m_bitDepth = params.exportBitDepth == BitDepth::BD_FLOAT ? 32u : static_cast<uint32_t>(params.exportBitDepth);
+    m_compressionLevel = params.compressionLevel;
+    m_enableDithering = params.enableDithering;
+    m_enableNormalization = params.enableNormalization;
+
+    // Load export definition if provided
+    if (!params.exportDefinitionPath.empty()) {
+        exportDef = loadExportDefinition(params.exportDefinitionPath);
+    } else {
+        exportDef = createDefaultExportDefinition(params);
+    }
+
+    if (audio.empty()) {
+        return processExportPipeline(exportDef, params);
+    }
+    ExportParams withAudio = params;
+    withAudio.sourceBuffer = audio;
+    return processExportPipeline(exportDef, withAudio);
+}
+
+ExportResult ExportGen::exportAudio(const ExportParams& params, const AudioBuffer& audio) {
+    ExportDefinition exportDef;
+    return runExport(params, audio, exportDef);
+}
+
 AudioBundle ExportGen::process(const ExportParams& params) {
     try {
         AudioBundle bundle;
@@ -199,24 +228,9 @@ AudioBundle ExportGen::process(const ExportParams& params) {
         bundle.meta.duration = 0.0f;
         bundle.meta.loop = false;
 
-        // Working format of this export
-        m_sampleRate = static_cast<uint32_t>(params.exportSampleRate);
-        m_numChannels = std::max<uint32_t>(1, static_cast<uint32_t>(params.exportChannels));
-        m_bitDepth = params.exportBitDepth == BitDepth::BD_FLOAT ? 32u : static_cast<uint32_t>(params.exportBitDepth);
-        m_compressionLevel = params.compressionLevel;
-        m_enableDithering = params.enableDithering;
-        m_enableNormalization = params.enableNormalization;
-
-        // Load export definition if provided
-        ExportDefinition exportDef;
-        if (!params.exportDefinitionPath.empty()) {
-            exportDef = loadExportDefinition(params.exportDefinitionPath);
-        } else {
-            exportDef = createDefaultExportDefinition(params);
-        }
-
         // Process export pipeline
-        ExportResult result = processExportPipeline(exportDef, params);
+        ExportDefinition exportDef;
+        ExportResult result = runExport(params, {}, exportDef);
 
         // Set the exported data
         bundle.buffer = result.audioData;

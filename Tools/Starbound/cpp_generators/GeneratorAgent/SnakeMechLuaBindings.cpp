@@ -78,14 +78,14 @@ void SnakeMechLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_snake_mech",
-        [&](const SnakeMechParams& p) {
+        [](const SnakeMechParams& p) {
             auto factory = SnakeMechLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("spawn_snake_mech_async",
-        [&](const SnakeMechParams& p) {
+        [](const SnakeMechParams& p) {
             auto factory = SnakeMechLuaBindings::factory();
             pendingMechs.emplace_back(factory->generateAsync(p), p.id);
         }
@@ -99,7 +99,7 @@ void SnakeMechLuaBindings::poll_assets(sol::state& lua) {
                 auto b = it->first.get();
                 lua["print"]("Snake mech ready: " + it->second);
             } catch (const std::exception& e) {
-                // log error
+                Log::error("SnakeMechs", "Asset generation failed for {}: {}", it->second, e.what());
             }
             it = pendingMechs.erase(it);
         } else {

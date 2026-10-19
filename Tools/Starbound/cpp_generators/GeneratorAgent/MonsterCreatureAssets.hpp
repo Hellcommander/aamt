@@ -78,6 +78,10 @@ struct Bone {
     float minAngle = -3.14159265f;  // joint limits in radians
     float maxAngle = 3.14159265f;
     float stiffness = 0.5f;         // 0 = floppy, 1 = rigid
+    // Rigid-body properties of the body part driven by this bone
+    float mass = 1.0f;
+    float friction = 0.5f;
+    float restitution = 0.3f;
 };
 
 struct SkeletonData {

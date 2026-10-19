@@ -16,7 +16,10 @@ TaperProfile parseTaperProfile(const std::string& str) {
     if (lower == "linear") return TaperProfile::LINEAR;
     if (lower == "exponential") return TaperProfile::EXPONENTIAL;
     if (lower == "custom_curve" || lower == "customcurve") return TaperProfile::CUSTOM_CURVE;
-    
+    if (lower == "bell_curve" || lower == "bellcurve") return TaperProfile::BELL_CURVE;
+    if (lower == "stepped") return TaperProfile::STEPPED;
+    if (lower == "irregular") return TaperProfile::IRREGULAR;
+
     return TaperProfile::LINEAR; // Default
 }
 
@@ -28,7 +31,11 @@ SegmentType parseSegmentType(const std::string& str) {
     if (lower == "box") return SegmentType::BOX;
     if (lower == "hexagon") return SegmentType::HEXAGON;
     if (lower == "custom_mesh" || lower == "custommesh") return SegmentType::CUSTOM_MESH;
-    
+    if (lower == "sphere") return SegmentType::SPHERE;
+    if (lower == "capsule") return SegmentType::CAPSULE;
+    if (lower == "prism") return SegmentType::PRISM;
+    if (lower == "irregular") return SegmentType::IRREGULAR;
+
     return SegmentType::CYLINDER; // Default
 }
 
@@ -40,7 +47,11 @@ HeadType parseHeadType(const std::string& str) {
     if (lower == "mandible") return HeadType::MANDIBLE;
     if (lower == "multi_eye" || lower == "multieye") return HeadType::MULTI_EYE;
     if (lower == "horned") return HeadType::HORNED;
-    
+    if (lower == "fanged") return HeadType::FANGED;
+    if (lower == "tentacled") return HeadType::TENTACLED;
+    if (lower == "crystal") return HeadType::CRYSTAL;
+    if (lower == "mechanical") return HeadType::MECHANICAL;
+
     return HeadType::MANDIBLE; // Default
 }
 
@@ -51,7 +62,12 @@ TailType parseTailType(const std::string& str) {
     if (lower == "none") return TailType::NONE;
     if (lower == "spike") return TailType::SPIKE;
     if (lower == "flared") return TailType::FLARED;
-    
+    if (lower == "tentacle") return TailType::TENTACLE;
+    if (lower == "crystal") return TailType::CRYSTAL;
+    if (lower == "mechanical") return TailType::MECHANICAL;
+    if (lower == "bioluminescent") return TailType::BIOLUMINESCENT;
+    if (lower == "venomous") return TailType::VENOMOUS;
+
     return TailType::SPIKE; // Default
 }
 
@@ -59,7 +75,11 @@ AnimationProfile parseAnimationProfile(const std::string& str) {
     std::string lower = str;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
     
-    if (lower == "slither") return AnimationProfile::SLITHER;
+    if (lower == "slither" || lower == "wave_slither" || lower == "waveslither") return AnimationProfile::SLITHER;
+    if (lower == "burrow") return AnimationProfile::BURROW;
+    if (lower == "swim") return AnimationProfile::SWIM;
+    if (lower == "fly") return AnimationProfile::FLY;
+    if (lower == "climb") return AnimationProfile::CLIMB;
     if (lower == "crawl") return AnimationProfile::CRAWL;
     if (lower == "coil") return AnimationProfile::COIL;
     if (lower == "custom") return AnimationProfile::CUSTOM;
@@ -75,7 +95,11 @@ AIProfile parseAIProfile(const std::string& str) {
     if (lower == "neutral") return AIProfile::NEUTRAL;
     if (lower == "predator") return AIProfile::PREDATOR;
     if (lower == "swarm") return AIProfile::SWARM;
-    
+    if (lower == "burrower") return AIProfile::BURROWER;
+    if (lower == "climber") return AIProfile::CLIMBER;
+    if (lower == "ambusher") return AIProfile::AMBUSHER;
+    if (lower == "guardian") return AIProfile::GUARDIAN;
+
     return AIProfile::PREDATOR; // Default
 }
 
@@ -86,6 +110,9 @@ std::string taperProfileToString(TaperProfile profile) {
         case TaperProfile::LINEAR: return "linear";
         case TaperProfile::EXPONENTIAL: return "exponential";
         case TaperProfile::CUSTOM_CURVE: return "custom_curve";
+        case TaperProfile::BELL_CURVE: return "bell_curve";
+        case TaperProfile::STEPPED: return "stepped";
+        case TaperProfile::IRREGULAR: return "irregular";
         default: return "linear";
     }
 }
@@ -96,6 +123,10 @@ std::string segmentTypeToString(SegmentType type) {
         case SegmentType::BOX: return "box";
         case SegmentType::HEXAGON: return "hexagon";
         case SegmentType::CUSTOM_MESH: return "custom_mesh";
+        case SegmentType::SPHERE: return "sphere";
+        case SegmentType::CAPSULE: return "capsule";
+        case SegmentType::PRISM: return "prism";
+        case SegmentType::IRREGULAR: return "irregular";
         default: return "cylinder";
     }
 }
@@ -106,6 +137,10 @@ std::string headTypeToString(HeadType type) {
         case HeadType::MANDIBLE: return "mandible";
         case HeadType::MULTI_EYE: return "multi_eye";
         case HeadType::HORNED: return "horned";
+        case HeadType::FANGED: return "fanged";
+        case HeadType::TENTACLED: return "tentacled";
+        case HeadType::CRYSTAL: return "crystal";
+        case HeadType::MECHANICAL: return "mechanical";
         default: return "mandible";
     }
 }
@@ -115,6 +150,11 @@ std::string tailTypeToString(TailType type) {
         case TailType::NONE: return "none";
         case TailType::SPIKE: return "spike";
         case TailType::FLARED: return "flared";
+        case TailType::TENTACLE: return "tentacle";
+        case TailType::CRYSTAL: return "crystal";
+        case TailType::MECHANICAL: return "mechanical";
+        case TailType::BIOLUMINESCENT: return "bioluminescent";
+        case TailType::VENOMOUS: return "venomous";
         default: return "spike";
     }
 }
@@ -125,6 +165,10 @@ std::string animationProfileToString(AnimationProfile profile) {
         case AnimationProfile::CRAWL: return "crawl";
         case AnimationProfile::COIL: return "coil";
         case AnimationProfile::CUSTOM: return "custom";
+        case AnimationProfile::BURROW: return "burrow";
+        case AnimationProfile::SWIM: return "swim";
+        case AnimationProfile::FLY: return "fly";
+        case AnimationProfile::CLIMB: return "climb";
         default: return "slither";
     }
 }
@@ -135,6 +179,10 @@ std::string aiProfileToString(AIProfile profile) {
         case AIProfile::NEUTRAL: return "neutral";
         case AIProfile::PREDATOR: return "predator";
         case AIProfile::SWARM: return "swarm";
+        case AIProfile::BURROWER: return "burrower";
+        case AIProfile::CLIMBER: return "climber";
+        case AIProfile::AMBUSHER: return "ambusher";
+        case AIProfile::GUARDIAN: return "guardian";
         default: return "predator";
     }
 }
@@ -170,6 +218,30 @@ nlohmann::json toJson(const SegmentedCreatureParams& params) {
     j["enableSpikes"] = params.enableSpikes;
     j["spikeCount"] = params.spikeCount;
     j["spikeLength"] = params.spikeLength;
+    j["name"] = params.name;
+    j["headScale"] = params.headScale;
+    j["tailScale"] = params.tailScale;
+    j["headSegmentCount"] = params.headSegmentCount;
+    j["tailSegmentCount"] = params.tailSegmentCount;
+    j["jointLimit"] = params.jointLimit;
+    j["segmentMass"] = params.segmentMass;
+    j["segmentDensity"] = params.segmentDensity;
+    j["segmentFriction"] = params.segmentFriction;
+    j["segmentRestitution"] = params.segmentRestitution;
+    j["colorAccent"] = params.colorAccent;
+    j["colorVariation"] = params.colorVariation;
+    j["materialEmissive"] = params.materialEmissive;
+    j["materialTransparency"] = params.materialTransparency;
+    j["plateSpacing"] = params.plateSpacing;
+    j["plateOverlap"] = params.plateOverlap;
+    j["gpuAccelerated"] = params.gpuAccelerated;
+    j["simdEnabled"] = params.simdEnabled;
+    j["adaptiveLOD"] = params.adaptiveLOD;
+    j["proceduralVariation"] = params.proceduralVariation;
+    j["dynamicSegments"] = params.dynamicSegments;
+    j["damageableSegments"] = params.damageableSegments;
+    j["seed"] = params.seed;
+    j["generationQuality"] = params.generationQuality;
     j["description"] = params.description;
     j["tags"] = params.tags;
     j["metadata"] = params.metadata;
@@ -200,11 +272,11 @@ SegmentedCreatureParams creatureFromJson(const nlohmann::json& json) {
         return json.contains(key) ? json[key].get<bool>() : defaultValue;
     };
     
-    auto getArray = [&json](const std::string& key) -> std::array<float, 3> {
+    auto getArray = [&json](const std::string& key, std::array<float, 3> defaultValue) -> std::array<float, 3> {
         if (json.contains(key) && json[key].is_array() && json[key].size() >= 3) {
             return {json[key][0].get<float>(), json[key][1].get<float>(), json[key][2].get<float>()};
         }
-        return {0.3f, 0.3f, 0.35f}; // Default color
+        return defaultValue;
     };
     
     auto getVector = [&json](const std::string& key) -> std::vector<std::string> {
@@ -240,8 +312,8 @@ SegmentedCreatureParams creatureFromJson(const nlohmann::json& json) {
     params.noiseDetail = getFloat("noiseDetail", 0.4f);
     params.armorPlates = getBool("armorPlates", true);
     params.plateDetailLevel = getInt("plateDetailLevel", 2);
-    params.colorPrimary = getArray("colorPrimary");
-    params.colorSecondary = getArray("colorSecondary");
+    params.colorPrimary = getArray("colorPrimary", {0.3f, 0.3f, 0.35f});
+    params.colorSecondary = getArray("colorSecondary", {0.1f, 0.1f, 0.1f});
     params.materialRoughness = getFloat("materialRoughness", 0.6f);
     params.materialMetallic = getFloat("materialMetallic", 0.8f);
     params.animationProfile = parseAnimationProfile(getString("animationProfile", "slither"));
@@ -257,18 +329,46 @@ SegmentedCreatureParams creatureFromJson(const nlohmann::json& json) {
     params.enableJoints = getBool("enableJoints", true);
     params.jointFlexibility = getFloat("jointFlexibility", 0.5f);
     params.enableArmor = getBool("enableArmor", true);
-    params.armorThickness = getFloat("armorThickness", 0.05f);
+    // "plateThickness" is the former creature_assets name of armorThickness
+    params.armorThickness = getFloat("armorThickness", getFloat("plateThickness", 0.05f));
     params.enableSpikes = getBool("enableSpikes", false);
     params.spikeCount = getInt("spikeCount", 0);
     params.spikeLength = getFloat("spikeLength", 0.1f);
-    
+
+    // Head / tail, physics, appearance and generation settings
+    params.name = getString("name");
+    params.headScale = getFloat("headScale", 1.2f);
+    params.tailScale = getFloat("tailScale", 0.8f);
+    params.headSegmentCount = getInt("headSegmentCount", 1);
+    params.tailSegmentCount = getInt("tailSegmentCount", 1);
+    params.jointLimit = getFloat("jointLimit", 45.0f);
+    params.segmentMass = getFloat("segmentMass", 1.0f);
+    params.segmentDensity = getFloat("segmentDensity", 1.0f);
+    params.segmentFriction = getFloat("segmentFriction", 0.5f);
+    params.segmentRestitution = getFloat("segmentRestitution", 0.3f);
+    params.colorAccent = getArray("colorAccent", {0.8f, 0.8f, 0.8f});
+    params.colorVariation = getFloat("colorVariation", 0.1f);
+    params.materialEmissive = getFloat("materialEmissive", 0.0f);
+    params.materialTransparency = getFloat("materialTransparency", 0.0f);
+    params.plateSpacing = getFloat("plateSpacing", 0.1f);
+    params.plateOverlap = getBool("plateOverlap", false);
+    params.gpuAccelerated = getBool("gpuAccelerated", true);
+    params.simdEnabled = getBool("simdEnabled", true);
+    params.adaptiveLOD = getBool("adaptiveLOD", true);
+    params.proceduralVariation = getBool("proceduralVariation", true);
+    params.dynamicSegments = getBool("dynamicSegments", false);
+    params.damageableSegments = getBool("damageableSegments", false);
+    params.seed = json.contains("seed") ? json["seed"].get<uint32_t>() : 0u;
+    params.generationQuality = getFloat("generationQuality", 1.0f);
+
     // Parse metadata
     params.description = getString("description");
     params.tags = getVector("tags");
     params.metadata = getMap("metadata");
     
     // Parse performance settings
-    params.enableCaching = getBool("enableCaching", true);
+    // "cacheEnabled" is the former creature_assets name of enableCaching
+    params.enableCaching = getBool("enableCaching", getBool("cacheEnabled", true));
     params.enableHotReload = getBool("enableHotReload", true);
     params.enableParallelProcessing = getBool("enableParallelProcessing", true);
     

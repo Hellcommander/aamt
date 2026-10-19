@@ -1,4 +1,6 @@
 #include "ColorPickerSystem.hpp"
+#include <algorithm>
+#include <limits>
 #include <random>
 #include <sstream>
 #include <iomanip>
@@ -237,6 +239,88 @@ std::string colorToHsvString(const Color& color) {
        << static_cast<int>(color.hsv.y * 100.0f) << "%, "
        << static_cast<int>(color.hsv.z * 100.0f) << "%)";
     return ss.str();
+}
+
+// CIE XYZ / LAB conversions. Color::rgba is linear RGB (sRGB primaries, D65 white).
+glm::vec3 rgbToXYZ(const glm::vec3& rgb) {
+    return glm::vec3(
+        0.4124564f * rgb.r + 0.3575761f * rgb.g + 0.1804375f * rgb.b,
+        0.2126729f * rgb.r + 0.7151522f * rgb.g + 0.0721750f * rgb.b,
+        0.0193339f * rgb.r + 0.1191920f * rgb.g + 0.9503041f * rgb.b);
+}
+
+glm::vec3 xyzToRGB(const glm::vec3& xyz) {
+    return glm::vec3(
+         3.2404542f * xyz.x - 1.5371385f * xyz.y - 0.4985314f * xyz.z,
+        -0.9692660f * xyz.x + 1.8760108f * xyz.y + 0.0415560f * xyz.z,
+         0.0556434f * xyz.x - 0.2040259f * xyz.y + 1.0572252f * xyz.z);
+}
+
+namespace {
+constexpr float kWhiteX = 0.95047f;
+constexpr float kWhiteY = 1.00000f;
+constexpr float kWhiteZ = 1.08883f;
+constexpr float kLabEpsilon = 216.0f / 24389.0f;
+constexpr float kLabKappa = 24389.0f / 27.0f;
+
+float labF(float t) {
+    return t > kLabEpsilon ? std::cbrt(t) : (kLabKappa * t + 16.0f) / 116.0f;
+}
+float labFInv(float f) {
+    const float f3 = f * f * f;
+    return f3 > kLabEpsilon ? f3 : (116.0f * f - 16.0f) / kLabKappa;
+}
+} // namespace
+
+glm::vec3 rgbToLAB(const glm::vec3& rgb) {
+    const glm::vec3 xyz = rgbToXYZ(rgb);
+    const float fx = labF(xyz.x / kWhiteX);
+    const float fy = labF(xyz.y / kWhiteY);
+    const float fz = labF(xyz.z / kWhiteZ);
+    return glm::vec3(116.0f * fy - 16.0f, 500.0f * (fx - fy), 200.0f * (fy - fz));
+}
+
+glm::vec3 labToRGB(const glm::vec3& lab) {
+    const float fy = (lab.x + 16.0f) / 116.0f;
+    const float fx = fy + lab.y / 500.0f;
+    const float fz = fy - lab.z / 200.0f;
+    const glm::vec3 xyz(labFInv(fx) * kWhiteX, labFInv(fy) * kWhiteY, labFInv(fz) * kWhiteZ);
+    return glm::clamp(xyzToRGB(xyz), glm::vec3(0.0f), glm::vec3(1.0f));
+}
+
+// Additional harmonies (hue rotations)
+Color square(const Color& color) {
+    return Color::fromHSV(std::fmod(color.hsv.x + 90.0f, 360.0f), color.hsv.y, color.hsv.z, color.rgba.a);
+}
+
+Color rectangle(const Color& color) {
+    return Color::fromHSV(std::fmod(color.hsv.x + 60.0f, 360.0f), color.hsv.y, color.hsv.z, color.rgba.a);
+}
+
+Color pentadic(const Color& color) {
+    return Color::fromHSV(std::fmod(color.hsv.x + 72.0f, 360.0f), color.hsv.y, color.hsv.z, color.rgba.a);
+}
+
+float getPerceivedBrightness(const Color& color) {
+    // HSP model on gamma-encoded components
+    const glm::vec3 srgb = linearToSrgb(glm::vec3(color.rgba.r, color.rgba.g, color.rgba.b));
+    return std::sqrt(0.299f * srgb.r * srgb.r + 0.587f * srgb.g * srgb.g + 0.114f * srgb.b * srgb.b);
+}
+
+float getColorTemperature(const Color& color) {
+    // McCamy's approximation of the correlated colour temperature from CIE xy.
+    const glm::vec3 xyz = rgbToXYZ(glm::vec3(color.rgba.r, color.rgba.g, color.rgba.b));
+    const float sum = xyz.x + xyz.y + xyz.z;
+    if (sum <= 1e-6f) return 0.0f;
+    const float x = xyz.x / sum;
+    const float y = xyz.y / sum;
+    const float n = (x - 0.3320f) / (0.1858f - y);
+    const float cct = 449.0f * n * n * n + 3525.0f * n * n + 6823.3f * n + 5520.33f;
+    return std::clamp(cct, 1000.0f, 40000.0f);
+}
+
+Color lerp(const Color& a, const Color& b, float t) {
+    return Color(glm::mix(a.rgba, b.rgba, std::clamp(t, 0.0f, 1.0f)));
 }
 
 } // namespace ColorUtils
@@ -557,6 +641,46 @@ Color ensureContrast(const Color& foreground, const Color& background, float min
     glm::vec3 srgb = linearToSrgb(linear);
     
     return Color(srgb.r, srgb.g, srgb.b, foreground.rgba.a);
+}
+
+Color optimizeForAccessibility(const Color& color, const std::vector<Color>& background) {
+    if (background.empty()) return color;
+
+    auto worstContrast = [&](const Color& c) {
+        float worst = std::numeric_limits<float>::max();
+        for (const auto& bg : background) worst = std::min(worst, getContrastRatio(c, bg));
+        return worst;
+    };
+
+    constexpr float kTarget = 4.5f; // WCAG AA
+    if (worstContrast(color) >= kTarget) return color;
+
+    // Keep hue and saturation; search the value (brightness) axis in both directions
+    // for the closest variant that reaches the target against every background.
+    Color best = color;
+    float bestScore = worstContrast(color);
+    for (int step = 1; step <= 20; ++step) {
+        const float delta = step * 0.05f;
+        for (float v : {color.hsv.z + delta, color.hsv.z - delta}) {
+            if (v < 0.0f || v > 1.0f) continue;
+            Color candidate = Color::fromHSV(color.hsv.x, color.hsv.y, v, color.rgba.a);
+            const float score = worstContrast(candidate);
+            if (score >= kTarget) return candidate;
+            if (score > bestScore) {
+                bestScore = score;
+                best = candidate;
+            }
+        }
+    }
+    // Unreachable with this hue: fall back to whichever of black / white contrasts best.
+    const Color black(0.0f, 0.0f, 0.0f, color.rgba.a);
+    const Color white(1.0f, 1.0f, 1.0f, color.rgba.a);
+    const float blackScore = worstContrast(black);
+    const float whiteScore = worstContrast(white);
+    if (std::max(blackScore, whiteScore) > bestScore) {
+        return blackScore >= whiteScore ? black : white;
+    }
+    return best;
 }
 
 } // namespace Accessibility

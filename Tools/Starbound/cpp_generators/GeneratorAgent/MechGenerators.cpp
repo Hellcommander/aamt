@@ -26,20 +26,26 @@ std::string lower(std::string s) {
     return s;
 }
 
-bool contains(const std::string& haystack, const char* needle) {
-    return lower(haystack).find(needle) != std::string::npos;
-}
-
 glm::mat4 trs(const glm::vec3& t, const glm::quat& r = glm::quat(1.0f, 0.0f, 0.0f, 0.0f),
               const glm::vec3& s = glm::vec3(1.0f)) {
     return glm::translate(glm::mat4(1.0f), t) * glm::mat4_cast(r) * glm::scale(glm::mat4(1.0f), s);
 }
 
+// Shortest-arc rotation taking unit vector `from` onto unit vector `to`.
+glm::quat rotationBetween(const glm::vec3& from, const glm::vec3& to) {
+    const float d = glm::dot(from, to);
+    if (d > 0.9999f) return glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+    if (d < -0.9999f) {
+        glm::vec3 axis = glm::cross(glm::vec3(1, 0, 0), from);
+        if (glm::dot(axis, axis) < 1e-6f) axis = glm::cross(glm::vec3(0, 0, 1), from);
+        return glm::angleAxis(kPi, glm::normalize(axis));
+    }
+    const glm::vec3 axis = glm::cross(from, to);
+    return glm::normalize(glm::quat(1.0f + d, axis.x, axis.y, axis.z));
+}
+
 // mt cylinders are built along +Y; this turns them to run along +Z.
 glm::quat yToZ() { return glm::angleAxis(kPi * 0.5f, glm::vec3(1.0f, 0.0f, 0.0f)); }
-// ... and this one along +X.
-glm::quat yToX() { return glm::angleAxis(-kPi * 0.5f, glm::vec3(0.0f, 0.0f, 1.0f)); }
-
 uint32_t subdivisionsFor(int detailLevel) {
     return 8u << static_cast<uint32_t>(std::clamp(detailLevel, 0, 3));
 }
@@ -553,7 +559,7 @@ MechColliderShape capsuleShape(const glm::vec3& a, const glm::vec3& b, float rad
     const glm::vec3 axis = b - a;
     const float len = glm::length(axis);
     shape.size = glm::vec3(radius, len, 0.0f);
-    const glm::quat rot = len > 1e-5f ? glm::rotation(glm::vec3(0, 1, 0), axis / len) : glm::quat(1, 0, 0, 0);
+    const glm::quat rot = len > 1e-5f ? rotationBetween(glm::vec3(0, 1, 0), axis / len) : glm::quat(1, 0, 0, 0);
     shape.transform = trs((a + b) * 0.5f, rot);
     shape.mass = mass;
     return shape;
@@ -1371,7 +1377,7 @@ MeshHandle CentipedeLegGenerator::buildSingleLeg(const CentipedeMechParams& p, i
     auto limb = [&](const glm::vec3& a, const glm::vec3& b, float radius, const std::string& name) {
         const glm::vec3 axis = b - a;
         const float len = glm::length(axis);
-        const glm::quat rot = len > 1e-5f ? glm::rotation(glm::vec3(0, 1, 0), axis / len) : glm::quat(1, 0, 0, 0);
+        const glm::quat rot = len > 1e-5f ? rotationBetween(glm::vec3(0, 1, 0), axis / len) : glm::quat(1, 0, 0, 0);
         appendPart(*mesh, cylinder(radius, len, 8), trs((a + b) * 0.5f, rot), name, 0, legColor);
     };
     limb(hip, knee, p.jointRadius * 0.8f, "upper");

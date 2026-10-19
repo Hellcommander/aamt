@@ -169,7 +169,7 @@ void CentipedeMechLuaBindings::bind(sol::state& lua) {
     );
 
     // Bind CockpitParams with validation
-    lua.new_usertype<CockpitParams>("CockpitParams", 
+    lua.new_usertype<CockpitParams>("CentipedeCockpitParams", 
         sol::constructors<CockpitParams()>(),
         "hasCockpit", &CockpitParams::hasCockpit,
         "cockpitPosition", &CockpitParams::cockpitPosition,

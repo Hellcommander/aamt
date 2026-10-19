@@ -1,7 +1,6 @@
 #pragma once
 #include <future>
 #include "core/ConcurrentLRU.hpp"
-#include "core/threading/ThreadPool.hpp"
 #include "GeneratorConcurrency.hpp"
 #include "FireballTypes.hpp"
 

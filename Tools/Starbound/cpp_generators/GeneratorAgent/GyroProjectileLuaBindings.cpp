@@ -1,25 +1,69 @@
 #include "GyroProjectileLuaBindings.hpp"
+#include "GyroProjectileFactory.hpp"
 #include "core/Log.hpp"
 #include <chrono>
+#include <mutex>
 
 namespace MagiTech {
 namespace GyroProjectiles {
 
 // Static member initialization
-std::unique_ptr<GyroProjectileFactory> GyroProjectileLuaBindings::g_factory;
 std::vector<std::pair<std::future<GyroAssetBundle>, std::string>> GyroProjectileLuaBindings::pendingGyros;
 
-void GyroProjectileLuaBindings::bind(sol::state& lua) {
-    // Initialize factory if not already done
-    if (!g_factory) {
-        g_factory = std::make_unique<GyroProjectileFactory>();
-        g_factory->initialize(100, 4); // 100 cache entries, 4 threads
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<GyroProjectileFactory>& factorySlot() {
+    static std::shared_ptr<GyroProjectileFactory> f;
+    return f;
+}
+} // namespace
+
+void GyroProjectileLuaBindings::setFactory(std::shared_ptr<GyroProjectileFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<GyroProjectileFactory> GyroProjectileLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<GyroProjectileFactory>();
+        slot->initialize(100, 4); // 100 cache entries, 4 threads
     }
+    return slot;
+}
+
+void GyroProjectileLuaBindings::bind(sol::state& lua) {
+    // ============================================================================
+    // ENUMS
+    // ============================================================================
+
+    lua.new_enum("GyroShape",
+        "Disc", GyroShape::Disc,
+        "Ring", GyroShape::Ring,
+        "Spindle", GyroShape::Spindle,
+        "CustomMesh", GyroShape::CustomMesh);
+    lua.new_enum("GyroTrailType",
+        "Ribbon", TrailType::Ribbon,
+        "Streaks", TrailType::Streaks,
+        "Particles", TrailType::Particles);
+    lua.new_enum("GyroParticleStyle",
+        "Sparks", ParticleStyle::Sparks,
+        "Smoke", ParticleStyle::Smoke,
+        "Sparkle", ParticleStyle::Sparkle);
+    lua.new_enum("GyroFlickerMode",
+        "None", FlickerMode::None,
+        "Sinusoidal", FlickerMode::Sinusoidal,
+        "NoiseDriven", FlickerMode::NoiseDriven);
 
     // ============================================================================
     // GYRO PARAMETERS BINDINGS
     // ============================================================================
-    
+
     lua.new_usertype<GyroParams>("GyroParams", sol::constructors<GyroParams()>(),
         "id", &GyroParams::id,
         "shape", &GyroParams::shape,
@@ -38,7 +82,7 @@ void GyroProjectileLuaBindings::bind(sol::state& lua) {
         "gravityScale", &FlightParams::gravityScale,
         "validate", [](FlightParams& p) -> bool { return validateFlightParams(p); });
 
-    lua.new_usertype<TrailParams>("TrailParams", sol::constructors<TrailParams()>(),
+    lua.new_usertype<TrailParams>("GyroTrailParams", sol::constructors<TrailParams()>(),
         "enableTrail", &TrailParams::enableTrail,
         "type", &TrailParams::type,
         "length", &TrailParams::length,
@@ -48,7 +92,7 @@ void GyroProjectileLuaBindings::bind(sol::state& lua) {
         "uvScrollSpeed", &TrailParams::uvScrollSpeed,
         "validate", [](TrailParams& p) -> bool { return validateTrailParams(p); });
 
-    lua.new_usertype<VFXParams>("VFXParams", sol::constructors<VFXParams()>(),
+    lua.new_usertype<VFXParams>("GyroVFXParams", sol::constructors<VFXParams()>(),
         "shaderTemplate", &VFXParams::shaderTemplate,
         "defines", &VFXParams::defines,
         "glowIntensity", &VFXParams::glowIntensity,
@@ -56,7 +100,7 @@ void GyroProjectileLuaBindings::bind(sol::state& lua) {
         "flickerMode", &VFXParams::flickerMode,
         "validate", [](VFXParams& p) -> bool { return validateVFXParams(p); });
 
-    lua.new_usertype<ParticleParams>("ParticleParams", sol::constructors<ParticleParams()>(),
+    lua.new_usertype<ParticleParams>("GyroParticleParams", sol::constructors<ParticleParams()>(),
         "enableParticles", &ParticleParams::enableParticles,
         "style", &ParticleParams::style,
         "count", &ParticleParams::count,
@@ -66,7 +110,7 @@ void GyroProjectileLuaBindings::bind(sol::state& lua) {
         "velocityMax", &ParticleParams::velocityMax,
         "validate", [](ParticleParams& p) -> bool { return validateParticleParams(p); });
 
-    lua.new_usertype<AudioParams>("AudioParams", sol::constructors<AudioParams()>(),
+    lua.new_usertype<AudioParams>("GyroAudioParams", sol::constructors<AudioParams()>(),
         "playOnLaunch", &AudioParams::playOnLaunch,
         "humFile", &AudioParams::humFile,
         "impactFile", &AudioParams::impactFile,
@@ -74,7 +118,7 @@ void GyroProjectileLuaBindings::bind(sol::state& lua) {
         "pitchVariance", &AudioParams::pitchVariance,
         "validate", [](AudioParams& p) -> bool { return validateAudioParams(p); });
 
-    lua.new_usertype<CollisionParams>("CollisionParams", sol::constructors<CollisionParams()>(),
+    lua.new_usertype<CollisionParams>("GyroCollisionParams", sol::constructors<CollisionParams()>(),
         "enableCollider", &CollisionParams::enableCollider,
         "meshCollider", &CollisionParams::meshCollider,
         "radius", &CollisionParams::radius,
@@ -96,7 +140,7 @@ void GyroProjectileLuaBindings::bind(sol::state& lua) {
     // GENERATION FUNCTION
     // ============================================================================
     
-    lua.set_function("spawn_gyro", [&](const GyroParams& g,
+    lua.set_function("spawn_gyro", [](const GyroParams& g,
                                        const FlightParams& f,
                                        const TrailParams& t,
                                        const VFXParams& v,
@@ -110,7 +154,7 @@ void GyroProjectileLuaBindings::bind(sol::state& lua) {
         }
         
         try {
-            pendingGyros.emplace_back(g_factory->generateAsync(g, f, t, v, p, a, c), g.id);
+            pendingGyros.emplace_back(factory()->generateAsync(g, f, t, v, p, a, c), g.id);
             Log::info("GyroProjectile", "Gyro projectile generation started: {}", g.id);
             return true;
         } catch (const std::exception& e) {
@@ -137,6 +181,10 @@ void GyroProjectileLuaBindings::bind(sol::state& lua) {
     lua.set_function("create_heavy_gyro", &createHeavyGyro);
     lua.set_function("create_stealth_gyro", &createStealthGyro);
     lua.set_function("create_showy_gyro", &createShowyGyro);
+    lua.set_function("create_fast_spinner_flight", &createFastSpinnerFlight);
+    lua.set_function("create_heavy_gyro_flight", &createHeavyGyroFlight);
+    lua.set_function("create_stealth_gyro_flight", &createStealthGyroFlight);
+    lua.set_function("create_showy_gyro_flight", &createShowyGyroFlight);
 
     // Status and management functions
     lua.set_function("get_gyro_pending_count", []() -> int {
@@ -158,10 +206,20 @@ void GyroProjectileLuaBindings::poll_assets(sol::state& lua) {
                 Log::info("GyroProjectile", "Gyro projectile ready: {} (mesh: {}, flight: {}, trail: {}, shader: {}, particles: {}, audio: {}, collider: {})", 
                     it->second, bundle.mesh, bundle.flightSim, bundle.trailMesh, bundle.vfxShader, 
                     bundle.particleSys, bundle.humAudio, bundle.collider);
-                lua["on_gyro_ready"](it->second, bundle);
+                sol::protected_function onReady = lua["on_gyro_ready"];
+                if (onReady.valid()) {
+                    auto result = onReady(it->second, bundle);
+                    if (!result.valid()) {
+                        sol::error err = result;
+                        Log::error("GyroProjectile", "on_gyro_ready failed for {}: {}", it->second, err.what());
+                    }
+                }
             } catch (const std::exception& e) {
                 Log::error("GyroProjectile", "Gyro generation failed for {}: {}", it->second, e.what());
-                lua["on_gyro_error"](it->second, e.what());
+                sol::protected_function onError = lua["on_gyro_error"];
+                if (onError.valid()) {
+                    onError(it->second, std::string(e.what()));
+                }
             }
             it = pendingGyros.erase(it);
         } else { ++it; }

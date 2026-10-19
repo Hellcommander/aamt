@@ -1,9 +1,14 @@
 #include "ParticleFieldLuaBindings.hpp"
 #include "ParticleFieldAssetFactory.hpp"
 #include "ParticleFieldTypes.hpp"
+#include "core/Log.hpp"
 #include <sol/sol.hpp>
+#include <chrono>
 #include <memory>
+#include <mutex>
 #include <future>
+#include <utility>
+#include <vector>
 
 namespace MagiTech {
 namespace ParticleFields {
@@ -22,7 +27,7 @@ void bindParticleFieldToLua(sol::state& lua) {
         "lod", &ParticleFieldParams::lod
     );
 
-    lua.new_usertype<NoiseParams>("NoiseParams",
+    lua.new_usertype<NoiseParams>("ParticleFieldNoiseParams",
         sol::constructors<NoiseParams()>(),
         "noiseType", &NoiseParams::noiseType,
         "octaves", &NoiseParams::octaves,
@@ -39,7 +44,7 @@ void bindParticleFieldToLua(sol::state& lua) {
         "resolution", &ColorRampParams::resolution
     );
 
-    lua.new_usertype<ParticleParams>("ParticleParams",
+    lua.new_usertype<ParticleParams>("ParticleFieldParticleParams",
         sol::constructors<ParticleParams()>(),
         "sizeRange", &ParticleParams::sizeRange,
         "lifeTimeRange", &ParticleParams::lifeTimeRange,
@@ -47,7 +52,7 @@ void bindParticleFieldToLua(sol::state& lua) {
         "alignToCamera", &ParticleParams::alignToCamera
     );
 
-    lua.new_usertype<LODParams>("LODParams",
+    lua.new_usertype<LODParams>("ParticleFieldLODParams",
         sol::constructors<LODParams()>(),
         "screenSizes", &LODParams::screenSizes,
         "densityScales", &LODParams::densityScales
@@ -250,52 +255,94 @@ void bindParticleFieldToLua(sol::state& lua) {
             return params;
         });
 
-    // Bind particle system management
-    lua.set_function("get_particle_count", 
-        [&](ParticleSystemHandle handle) {
-            // TODO: Implement particle count retrieval
-            return 0;
+    // Bind particle system management (systems registered by spawnField)
+    lua.set_function("get_particle_count",
+        [](ParticleSystemHandle handle) -> size_t {
+            auto system = FieldGen::getSystem(handle);
+            return system ? system->getActiveParticleCount() : 0;
         });
 
-    lua.set_function("update_particle_system", 
-        [&](ParticleSystemHandle handle, float deltaTime) {
-            // TODO: Implement particle system update
+    lua.set_function("update_particle_system",
+        [](ParticleSystemHandle handle, float deltaTime) -> bool {
+            auto system = FieldGen::getSystem(handle);
+            if (!system) return false;
+            system->update(deltaTime);
+            if (auto sim = SimGen::getSimulation(handle)) {
+                sim->update(system->getParticles(), deltaTime);
+            }
+            return true;
         });
 
-    lua.set_function("enable_particle_compute_update", 
-        [&](ParticleSystemHandle handle, const std::string& shaderPath) {
-            // TODO: Implement compute shader enablement
+    lua.set_function("enable_particle_compute_update",
+        [](ParticleSystemHandle handle, const std::string& shaderPath) -> bool {
+            auto system = FieldGen::getSystem(handle);
+            if (!system) return false;
+            system->enableComputeUpdate(shaderPath);
+            if (auto sim = SimGen::getSimulation(handle)) {
+                sim->enableComputeUpdate(shaderPath);
+            }
+            return true;
         });
 
-    lua.set_function("enable_particle_cpu_update", 
-        [&](ParticleSystemHandle handle) {
-            // TODO: Implement CPU update enablement
+    // Optional Lua callback(particle_table, dt) run per active particle on update;
+    // without a callback the built-in force integration (SimGen) drives the system.
+    lua.set_function("enable_particle_cpu_update",
+        [](ParticleSystemHandle handle, sol::optional<sol::protected_function> callback) -> bool {
+            auto system = FieldGen::getSystem(handle);
+            if (!system) return false;
+            if (!SimGen::getSimulation(handle)) {
+                SimGen::attachSim(handle, false);
+            }
+            if (callback && callback->valid()) {
+                sol::protected_function fn = *callback;
+                system->enableCPUUpdate([fn](Particle& particle, float dt) {
+                    sol::state_view lua(fn.lua_state());
+                    sol::table p = lua.create_table();
+                    p["position"] = particle.position;
+                    p["velocity"] = particle.velocity;
+                    p["color"] = particle.color;
+                    p["size"] = particle.size;
+                    p["age"] = particle.age;
+                    p["lifetime"] = particle.lifetime;
+                    p["active"] = particle.active;
+                    auto result = fn(p, dt);
+                    if (!result.valid()) return;
+                    particle.position = p.get_or("position", particle.position);
+                    particle.velocity = p.get_or("velocity", particle.velocity);
+                    particle.color = p.get_or("color", particle.color);
+                    particle.size = p.get_or("size", particle.size);
+                    particle.active = p.get_or("active", particle.active);
+                });
+            } else {
+                system->enableCPUUpdate(nullptr);
+            }
+            return true;
         });
 
     // Bind performance monitoring
-    lua.set_function("get_particle_update_time", 
-        [&](ParticleSystemHandle handle) {
-            // TODO: Implement update time retrieval
-            return 0.0f;
+    lua.set_function("get_particle_update_time",
+        [](ParticleSystemHandle handle) -> float {
+            auto system = FieldGen::getSystem(handle);
+            float time = system ? system->getUpdateTime() : 0.0f;
+            if (auto sim = SimGen::getSimulation(handle)) time += sim->getUpdateTime();
+            return time;
         });
 
-    lua.set_function("get_particle_render_time", 
-        [&](ParticleSystemHandle handle) {
-            // TODO: Implement render time retrieval
-            return 0.0f;
+    lua.set_function("get_particle_render_time",
+        [](ParticleSystemHandle handle) -> float {
+            auto system = FieldGen::getSystem(handle);
+            return system ? system->getRenderTime() : 0.0f;
         });
 
     // Bind LOD management
-    lua.set_function("select_lod_level", 
-        [&](const LODData& lodData, float screenSize) {
-            // TODO: Implement LOD selection
-            return 0;
+    lua.set_function("select_lod_level",
+        [](const LODData& lodData, float screenSize) {
+            return LODGen::LODManager(lodData).selectLOD(screenSize);
         });
 
-    lua.set_function("get_density_scale", 
-        [&](const LODData& lodData, int lodLevel) {
-            // TODO: Implement density scale retrieval
-            return 1.0f;
+    lua.set_function("get_density_scale",
+        [](const LODData& lodData, int lodLevel) {
+            return LODGen::LODManager(lodData).getDensityScale(lodLevel);
         });
 
     // Bind shader compilation
@@ -320,19 +367,55 @@ void bindParticleFieldToLua(sol::state& lua) {
         });
 
     // Bind simulation parameters
-    lua.set_function("set_particle_gravity", 
-        [&](ParticleSystemHandle handle, const glm::vec3& gravity) {
-            // TODO: Implement gravity setting
+    // (attaches a CPU simulation module when the system has none yet)
+    auto simulationFor = [](ParticleSystemHandle handle) -> std::shared_ptr<SimGen::SimulationModule> {
+        if (!FieldGen::getSystem(handle)) return nullptr;
+        if (!SimGen::getSimulation(handle)) SimGen::attachSim(handle, false);
+        return SimGen::getSimulation(handle);
+    };
+
+    lua.set_function("set_particle_gravity",
+        [simulationFor](ParticleSystemHandle handle, const glm::vec3& gravity) -> bool {
+            auto sim = simulationFor(handle);
+            if (!sim) return false;
+            sim->setGravity(gravity);
+            return true;
         });
 
-    lua.set_function("set_particle_wind", 
-        [&](ParticleSystemHandle handle, const glm::vec3& wind) {
-            // TODO: Implement wind setting
+    lua.set_function("set_particle_wind",
+        [simulationFor](ParticleSystemHandle handle, const glm::vec3& wind) -> bool {
+            auto sim = simulationFor(handle);
+            if (!sim) return false;
+            sim->setWind(wind);
+            return true;
         });
 
-    lua.set_function("set_particle_turbulence", 
-        [&](ParticleSystemHandle handle, float intensity) {
-            // TODO: Implement turbulence setting
+    lua.set_function("set_particle_turbulence",
+        [simulationFor](ParticleSystemHandle handle, float intensity) -> bool {
+            auto sim = simulationFor(handle);
+            if (!sim) return false;
+            sim->setTurbulence(intensity);
+            return true;
+        });
+
+    lua.set_function("destroy_particle_system",
+        [](ParticleSystemHandle handle) {
+            FieldGen::destroySystem(handle);
+        });
+
+    // Asynchronous generation: results are delivered by ParticleFieldLuaBindings::poll_assets
+    // through the global Lua function on_particle_field_ready(id, bundle).
+    lua.set_function("spawn_field_asset_async",
+        [](const ParticleFieldParams& fp,
+           const NoiseParams& np,
+           const ColorRampParams& cr,
+           const ParticleParams& pp) -> bool {
+            try {
+                ParticleFieldLuaBindings::queue(fieldFactory.generateAsync(fp, np, cr, pp), fp.id);
+                return true;
+            } catch (const std::exception&) {
+                return false; // details via get_particle_field_last_error()
+            }
         });
 
     // Bind noise type constants
@@ -473,6 +556,61 @@ void bindParticleFieldToLua(sol::state& lua) {
             return field
         end
     )");
+}
+
+namespace {
+struct PendingFields {
+    std::mutex mutex;
+    std::vector<std::pair<std::future<ParticleFieldBundle>, std::string>> jobs;
+};
+PendingFields& pendingFields() {
+    static PendingFields pending;
+    return pending;
+}
+} // namespace
+
+void ParticleFieldLuaBindings::bind(sol::state& lua) {
+    bindParticleFieldToLua(lua);
+}
+
+void ParticleFieldLuaBindings::queue(std::future<ParticleFieldBundle> future, const std::string& id) {
+    std::lock_guard<std::mutex> lock(pendingFields().mutex);
+    pendingFields().jobs.emplace_back(std::move(future), id);
+}
+
+void ParticleFieldLuaBindings::poll_assets(sol::state& lua) {
+    std::vector<std::pair<std::future<ParticleFieldBundle>, std::string>> ready;
+    {
+        std::lock_guard<std::mutex> lock(pendingFields().mutex);
+        auto& jobs = pendingFields().jobs;
+        for (auto it = jobs.begin(); it != jobs.end();) {
+            if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                ready.push_back(std::move(*it));
+                it = jobs.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+    for (auto& [future, id] : ready) {
+        try {
+            ParticleFieldBundle bundle = future.get();
+            sol::protected_function onReady = lua["on_particle_field_ready"];
+            if (onReady.valid()) {
+                auto result = onReady(id, bundle);
+                if (!result.valid()) {
+                    sol::error err = result;
+                    Log::error("ParticleField", "on_particle_field_ready failed for {}: {}", id, err.what());
+                }
+            }
+        } catch (const std::exception& e) {
+            Log::error("ParticleField", "Particle field generation failed for {}: {}", id, e.what());
+            sol::protected_function onError = lua["on_particle_field_error"];
+            if (onError.valid()) {
+                onError(id, std::string(e.what()));
+            }
+        }
+    }
 }
 
 } // namespace ParticleFields

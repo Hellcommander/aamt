@@ -2,8 +2,8 @@
 #include <future>
 #include <vector>
 #include <string>
-#include "core/ConcurrentLRU.hpp"
-#include "core/threading/ThreadPool.hpp"
+#include <fstream>
+#include <stdexcept>
 #include "GeneratorConcurrency.hpp"
 #include "AlchemicalGrenadeTypes.hpp"
 
@@ -502,11 +502,36 @@ private:
         return seed ^ (value + 0x9e3779b9 + (seed << 6) + (seed >> 2));
     }
 
+    /**
+     * Loads {grenade, ui} params from a JSON file. Accepts either
+     * {"grenade": {...}, "ui": {...}} or a bare grenade object (ui then uses the defaults).
+     */
     std::pair<AlchemicalGrenadeParams, UIItemParams> loadParamsFromJson(const std::string& jsonPath) {
-        // Implementation would load JSON file and parse parameters
-        // For now, return default parameters
+        std::ifstream file(jsonPath);
+        if (!file.is_open()) {
+            throw std::runtime_error("AlchemicalGrenadeFactory: cannot open params file " + jsonPath);
+        }
+        const nlohmann::json json = nlohmann::json::parse(file);  // throws on malformed JSON
+        auto params = defaultParams();
+        if (json.contains("grenade") && json["grenade"].is_object()) {
+            params.first = ParamUtils::fromJson(json["grenade"]);
+            if (json.contains("ui") && json["ui"].is_object()) {
+                params.second = ParamUtils::uiItemParamsFromJson(json["ui"]);
+            }
+        } else {
+            params.first = ParamUtils::fromJson(json);
+        }
+        if (params.first.id.empty()) {
+            params.first.id = jsonPath;
+        }
+        return params;
+    }
+
+public:
+    /** Built-in fire grenade preset with matching UI params (every field initialized). */
+    static std::pair<AlchemicalGrenadeParams, UIItemParams> defaultParams() {
         AlchemicalGrenadeParams grenadeParams;
-        grenadeParams.id = "loaded_from_json";
+        grenadeParams.id = "default_grenade";
         grenadeParams.grenadeType = GrenadeType::FIRE;
         grenadeParams.casingMaterial = CasingMaterial::GLASS;
         grenadeParams.particleType = ParticleType::EMBER;
@@ -596,9 +621,9 @@ private:
         grenadeParams.enableHotReload = true;
         grenadeParams.enableParallelProcessing = true;
         grenadeParams.lodLevel = 0;
-        grenadeParams.description = "Loaded from JSON";
-        grenadeParams.tags = {"grenade", "alchemical", "json"};
-        grenadeParams.metadata = {{"source", "json_file"}};
+        grenadeParams.description = "Default fire grenade";
+        grenadeParams.tags = {"grenade", "alchemical", "default"};
+        grenadeParams.metadata = {{"source", "builtin_default"}};
         
         UIItemParams uiParams;
         uiParams.iconSize = 48;
@@ -627,13 +652,14 @@ private:
         uiParams.enableCaching = true;
         uiParams.enableHotReload = true;
         uiParams.lodLevel = 0;
-        uiParams.description = "Loaded from JSON";
-        uiParams.tags = {"ui", "item", "json"};
-        uiParams.metadata = {{"source", "json_file"}};
+        uiParams.description = "Default grenade item UI";
+        uiParams.tags = {"ui", "item", "default"};
+        uiParams.metadata = {{"source", "builtin_default"}};
         
         return {grenadeParams, uiParams};
     }
 
+private:
     ConcurrentLRUCache<uint64_t, GrenadeAssetBundle> m_cache;
     GeneratorTaskPool m_pool;
     bool m_initialized;

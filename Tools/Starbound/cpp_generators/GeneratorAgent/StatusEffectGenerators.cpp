@@ -1,16 +1,20 @@
-#include "core/modules/status_effect_generator/StatusEffectFactory.hpp"
-#include "core/modules/status_effect_generator/StatusEffectParams.hpp"
+#include "StatusEffectFactory.hpp"
+#include "StatusEffectGenerators.hpp"
+#include "StatusEffectTypes.hpp"
+#include "StatusEffectGenAssets.hpp"
 #include "core/Log.hpp"
+#include "core/rendering/ShaderBuilder.hpp"
+#include "core/particles/ParticleBuilder.hpp"
+#include <FastNoiseLite.h>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/transform.hpp>
-#include <fstream>
-#include <sstream>
 #include <algorithm>
-#include <stdexcept>
-#include <vector>
 #include <cmath>
-#include <random>
+#include <numbers>
+#include <string>
+#include <vector>
+
+// The StatusEffectFactory member functions live in StatusEffectFactory.cpp; this file
+// holds the generator namespaces and the global factory instance.
 
 namespace MagiTech {
 namespace StatusEffects {
@@ -20,179 +24,140 @@ StatusEffectFactory g_effectFactory;
 
 // Utility functions for generation
 namespace {
-    static uint32_t nextShaderHandle = 1;
-    static uint32_t nextTextureHandle = 1;
-    static uint32_t nextMeshHandle = 1;
-    static uint32_t nextParticleHandle = 1;
-    static uint32_t nextIconHandle = 1;
+    constexpr float kTwoPi = 2.0f * std::numbers::pi_v<float>;
 
-    // Generate procedural noise for textures
-    std::vector<unsigned char> generateNoiseTexture(int width, int height, float scale) {
-        std::vector<unsigned char> pixels(width * height * 4);
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_real_distribution<float> noiseDist(0.0f, 1.0f);
-        
+    uint8_t toByte(float v) {
+        return static_cast<uint8_t>(std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f);
+    }
+
+    int seedOf(const StatusEffectParams& s) {
+        return static_cast<int>(s.hashKey() & 0x7fffffff);
+    }
+
+    // Fractal (4-octave) value noise texture; deterministic per effect so cache hits match
+    std::vector<unsigned char> generateNoiseTexture(int width, int height, float scale, int seed) {
+        std::vector<unsigned char> pixels(static_cast<size_t>(width) * height * 4);
+        FastNoiseLite noise(seed);
+        noise.SetNoiseType(FastNoiseLite::NoiseType_ValueCubic);
+        noise.SetFractalType(FastNoiseLite::FractalType_FBm);
+        noise.SetFractalOctaves(4);
+        noise.SetFrequency(1.0f);
+
         for (int y = 0; y < height; ++y) {
             for (int x = 0; x < width; ++x) {
-                float u = static_cast<float>(x) / width * scale;
-                float v = static_cast<float>(y) / height * scale;
-                
-                // Generate noise using multiple octaves
-                float noise = 0.0f;
-                float amplitude = 1.0f;
-                float frequency = 1.0f;
-                
-                for (int octave = 0; octave < 4; ++octave) {
-                    noise += noiseDist(gen) * amplitude;
-                    amplitude *= 0.5f;
-                    frequency *= 2.0f;
-                }
-                
-                noise = std::max(0.0f, std::min(1.0f, noise));
-                
-                int index = (y * width + x) * 4;
-                unsigned char value = static_cast<unsigned char>(noise * 255);
-                pixels[index + 0] = value; // R
-                pixels[index + 1] = value; // G
-                pixels[index + 2] = value; // B
+                float u = static_cast<float>(x) / width * scale * 8.0f;
+                float v = static_cast<float>(y) / height * scale * 8.0f;
+                float value = 0.5f + 0.5f * noise.GetNoise(u, v);
+
+                size_t index = (static_cast<size_t>(y) * width + x) * 4;
+                unsigned char b = toByte(value);
+                pixels[index + 0] = b; // R
+                pixels[index + 1] = b; // G
+                pixels[index + 2] = b; // B
                 pixels[index + 3] = 255;   // A
             }
         }
-        
+
         return pixels;
     }
 
     // Generate radial gradient texture
-    std::vector<unsigned char> generateGradientTexture(int width, int height, 
-                                                      const glm::vec3& colorPrimary, 
+    std::vector<unsigned char> generateGradientTexture(int width, int height,
+                                                      const glm::vec3& colorPrimary,
                                                       const glm::vec3& colorSecondary) {
-        std::vector<unsigned char> pixels(width * height * 4);
-        
+        std::vector<unsigned char> pixels(static_cast<size_t>(width) * height * 4);
+
         for (int y = 0; y < height; ++y) {
             for (int x = 0; x < width; ++x) {
                 float dx = static_cast<float>(x - width/2) / (width/2);
                 float dy = static_cast<float>(y - height/2) / (height/2);
-                float dist = sqrt(dx*dx + dy*dy);
+                float dist = std::sqrt(dx*dx + dy*dy);
                 dist = std::max(0.0f, std::min(1.0f, dist));
-                
+
                 // Interpolate between primary and secondary colors
                 glm::vec3 color = glm::mix(colorPrimary, colorSecondary, dist);
-                
-                int index = (y * width + x) * 4;
-                pixels[index + 0] = static_cast<unsigned char>(color.r * 255);
-                pixels[index + 1] = static_cast<unsigned char>(color.g * 255);
-                pixels[index + 2] = static_cast<unsigned char>(color.b * 255);
-                pixels[index + 3] = 255;
+
+                size_t index = (static_cast<size_t>(y) * width + x) * 4;
+                pixels[index + 0] = toByte(color.r);
+                pixels[index + 1] = toByte(color.g);
+                pixels[index + 2] = toByte(color.b);
+                pixels[index + 3] = toByte(1.0f - dist * dist);
             }
         }
-        
+
         return pixels;
     }
 
-    // Generate vertex data for ring mesh
-    struct Vertex {
-        glm::vec3 position;
-        glm::vec3 normal;
-        glm::vec2 texCoord;
-    };
-
-    std::vector<Vertex> generateRingVertices(int segments, float innerRadius, float outerRadius) {
-        std::vector<Vertex> vertices;
-        
-        for (int i = 0; i <= segments; ++i) {
-            float angle = static_cast<float>(i) / segments * 2.0f * M_PI;
-            float cosA = cos(angle);
-            float sinA = sin(angle);
-            
-            // Inner vertex
-            Vertex v1;
-            v1.position = {cosA * innerRadius, 0, sinA * innerRadius};
-            v1.normal = {0, 1, 0};
-            v1.texCoord = {static_cast<float>(i) / segments, 0};
-            vertices.push_back(v1);
-            
-            // Outer vertex
-            Vertex v2;
-            v2.position = {cosA * outerRadius, 0, sinA * outerRadius};
-            v2.normal = {0, 1, 0};
-            v2.texCoord = {static_cast<float>(i) / segments, 1};
-            vertices.push_back(v2);
-        }
-        
-        return vertices;
+    MagiTech::Mesh::Vertex makeVertex(const glm::vec3& position, const glm::vec3& normal, const glm::vec2& uv) {
+        MagiTech::Mesh::Vertex v;
+        v.position = position;
+        v.normal = normal;
+        v.uv = uv;
+        return v;
     }
 
-    // Generate vertex data for aura quad
-    std::vector<Vertex> generateAuraQuadVertices(float size) {
-        std::vector<Vertex> vertices = {
-            {{-size, 0, -size}, {0, 1, 0}, {0, 0}},
-            {{ size, 0, -size}, {0, 1, 0}, {1, 0}},
-            {{ size, 0,  size}, {0, 1, 0}, {1, 1}},
-            {{-size, 0,  size}, {0, 1, 0}, {0, 1}}
+    /** Flat ring (annulus) in the XZ plane; `radiusAt(i)` lets the outer edge vary per segment. */
+    template <typename OuterRadius>
+    MagiTech::Mesh generateRing(int segments, float innerRadius, OuterRadius radiusAt) {
+        MagiTech::Mesh mesh;
+        for (int i = 0; i <= segments; ++i) {
+            const float u = static_cast<float>(i) / segments;
+            const float angle = u * kTwoPi;
+            const float cosA = std::cos(angle);
+            const float sinA = std::sin(angle);
+            const float outer = radiusAt(i);
+            mesh.vertices.push_back(makeVertex({cosA * innerRadius, 0, sinA * innerRadius}, {0, 1, 0}, {u, 0}));
+            mesh.vertices.push_back(makeVertex({cosA * outer, 0, sinA * outer}, {0, 1, 0}, {u, 1}));
+        }
+        for (int i = 0; i < segments; ++i) {
+            const uint32_t b = static_cast<uint32_t>(i * 2);
+            mesh.indices.insert(mesh.indices.end(), {b, b + 1, b + 2, b + 1, b + 3, b + 2});
+        }
+        return mesh;
+    }
+
+    MagiTech::Mesh generateRing(int segments, float innerRadius, float outerRadius) {
+        return generateRing(segments, innerRadius, [outerRadius](int) { return outerRadius; });
+    }
+
+    // Aura quad in the XZ plane
+    MagiTech::Mesh generateAuraQuad(float size) {
+        MagiTech::Mesh mesh;
+        mesh.vertices = {
+            makeVertex({-size, 0, -size}, {0, 1, 0}, {0, 0}),
+            makeVertex({ size, 0, -size}, {0, 1, 0}, {1, 0}),
+            makeVertex({ size, 0,  size}, {0, 1, 0}, {1, 1}),
+            makeVertex({-size, 0,  size}, {0, 1, 0}, {0, 1})
         };
-        return vertices;
+        mesh.indices = {0, 1, 2, 0, 2, 3};
+        return mesh;
     }
 
-    // Generate vertex data for beam mesh
-    std::vector<Vertex> generateBeamVertices(int segments, float length, float radius) {
-        std::vector<Vertex> vertices;
-        
-        for (int i = 0; i <= segments; ++i) {
-            float angle = static_cast<float>(i) / segments * 2.0f * M_PI;
-            float cosA = cos(angle);
-            float sinA = sin(angle);
-            
-            // Start vertex
-            Vertex v1;
-            v1.position = {cosA * radius, 0, sinA * radius};
-            v1.normal = {cosA, 0, sinA};
-            v1.texCoord = {static_cast<float>(i) / segments, 0};
-            vertices.push_back(v1);
-            
-            // End vertex
-            Vertex v2;
-            v2.position = {cosA * radius, length, sinA * radius};
-            v2.normal = {cosA, 0, sinA};
-            v2.texCoord = {static_cast<float>(i) / segments, 1};
-            vertices.push_back(v2);
-        }
-        
-        return vertices;
+    // Plus-shaped aura: two crossing bars in the XZ plane
+    MagiTech::Mesh generateCross(float size, float barWidth) {
+        MagiTech::Mesh mesh;
+        auto addBar = [&mesh](float hx, float hz) {
+            const uint32_t b = static_cast<uint32_t>(mesh.vertices.size());
+            mesh.vertices.push_back(makeVertex({-hx, 0, -hz}, {0, 1, 0}, {0, 0}));
+            mesh.vertices.push_back(makeVertex({ hx, 0, -hz}, {0, 1, 0}, {1, 0}));
+            mesh.vertices.push_back(makeVertex({ hx, 0,  hz}, {0, 1, 0}, {1, 1}));
+            mesh.vertices.push_back(makeVertex({-hx, 0,  hz}, {0, 1, 0}, {0, 1}));
+            mesh.indices.insert(mesh.indices.end(), {b, b + 1, b + 2, b, b + 2, b + 3});
+        };
+        addBar(size, barWidth);
+        addBar(barWidth, size);
+        return mesh;
     }
 
-    // Generate vertex data for splash mesh
-    std::vector<Vertex> generateSplashVertices(int fanCount, float radius) {
-        std::vector<Vertex> vertices;
-        
-        for (int i = 0; i <= fanCount; ++i) {
-            float angle = static_cast<float>(i) / fanCount * 2.0f * M_PI;
-            float cosA = cos(angle);
-            float sinA = sin(angle);
-            
-            // Center vertex
-            Vertex v1;
-            v1.position = {0, 0, 0};
-            v1.normal = {0, 1, 0};
-            v1.texCoord = {0.5f, 0.5f};
-            vertices.push_back(v1);
-            
-            // Edge vertex
-            Vertex v2;
-            v2.position = {cosA * radius, 0, sinA * radius};
-            v2.normal = {0, 1, 0};
-            v2.texCoord = {cosA * 0.5f + 0.5f, sinA * 0.5f + 0.5f};
-            vertices.push_back(v2);
-        }
-        
-        return vertices;
+    std::string shaderTypeName(const StatusEffectParams& s) {
+        return s.shaderType.empty() ? std::string("standard") : s.shaderType;
     }
 }
 
 namespace ShaderGen {
     ShaderHandle build(const StatusEffectParams& s) {
         Log::info("StatusEffect", "Building shader for effect: {}", s.id);
-        
+
         // Generate shader source with parameters
         std::string vertexShader = R"(
 #version 330 core
@@ -217,22 +182,22 @@ out vec3 Normal;
 
 void main() {
     vec3 pos = aPos;
-    
+
     // Apply oscillation if enabled
     if (uOscillationFreq > 0.0) {
         float oscillation = sin(uTime * uOscillationFreq) * 0.1;
         pos += aNormal * oscillation;
     }
-    
+
     // Apply noise distortion
     vec2 noiseUV = aTexCoord * uNoiseScale + uTime * uNoiseSpeed;
     float noise = sin(noiseUV.x) * cos(noiseUV.y);
     pos += aNormal * noise * 0.05;
-    
+
     WorldPos = vec3(uModel * vec4(pos, 1.0));
     Normal = mat3(transpose(inverse(uModel))) * aNormal;
     TexCoord = aTexCoord;
-    
+
     gl_Position = uProjection * uView * uModel * vec4(pos, 1.0);
 }
 )";
@@ -261,433 +226,308 @@ void main() {
     // Sample noise texture
     vec2 noiseUV = TexCoord * uNoiseScale + uTime * uNoiseSpeed;
     float noise = texture(uNoiseTexture, noiseUV).r;
-    
+
     // Sample gradient texture
     vec4 gradient = texture(uGradientTexture, TexCoord);
-    
+
     // Blend colors based on noise
     vec3 color = mix(uColorPrimary, uColorSecondary, noise);
     color *= gradient.rgb;
-    
+
     // Apply intensity
     color *= uIntensity;
-    
+
     // Apply dissolve effect
     float alpha = 1.0;
     if (uDissolve) {
         float dissolveNoise = texture(uNoiseTexture, TexCoord * 2.0).r;
         alpha = step(uDissolveThreshold, dissolveNoise);
     }
-    
+
     // Add pulsing effect
     float pulse = sin(uTime * uOscillationFreq) * 0.5 + 0.5;
     color *= (1.0 + pulse * 0.2);
-    
+
     FragColor = vec4(color, alpha * gradient.a);
 }
 )";
 
-        Log::info("StatusEffect", "Shader created with handle: {}", nextShaderHandle);
-        return nextShaderHandle++;
+        ShaderBuilder builder = ShaderBuilder::create("status_" + s.id + "_" + shaderTypeName(s));
+        builder.setVertexShader(vertexShader);
+        builder.setFragmentShader(fragmentShader);
+        builder.addUniform("uColorPrimary", s.colorPrimary);
+        builder.addUniform("uColorSecondary", s.colorSecondary);
+        builder.addUniform("uIntensity", s.intensity * s.shaderIntensity);
+        builder.addUniform("uNoiseScale", s.noiseScale);
+        builder.addUniform("uNoiseSpeed", s.noiseSpeed);
+        builder.addUniform("uOscillationFreq", s.oscillationFreq);
+        builder.addUniform("uDissolve", s.dissolve ? 1 : 0);
+        builder.addUniform("uDissolveThreshold", 1.0f - std::clamp(s.opacity, 0.0f, 1.0f));
+        if (s.enableDistortion) {
+            builder.enableFeature("DISTORTION");
+            builder.addUniform("uDistortionStrength", s.distortionStrength);
+        }
+        if (s.enableBlur) {
+            builder.enableFeature("BLUR");
+            builder.addUniform("uBlurStrength", s.blurStrength);
+        }
+        builder.enableAdditiveBlend();
+
+        const ShaderHandle handle = builder.compile();
+        storeStatusEffectShader(handle, StatusEffectShaderSource{vertexShader, fragmentShader});
+        Log::info("StatusEffect", "Shader created with handle: {}", handle);
+        return handle;
     }
 }
 
 namespace TextureGen {
     TextureHandle build(const StatusEffectParams& s) {
         Log::info("StatusEffect", "Building texture for effect: {}", s.id);
-        
+
         const int width = 256;
         const int height = 256;
-        
+
         // Generate noise texture
-        auto noisePixels = generateNoiseTexture(width, height, s.noiseScale);
-        
+        auto noisePixels = generateNoiseTexture(width, height, s.noiseScale, seedOf(s));
+
         // Generate gradient texture
         auto gradientPixels = generateGradientTexture(width, height, s.colorPrimary, s.colorSecondary);
-        
-        // Combine textures (in a real implementation, this would be done in the shader)
-        std::vector<unsigned char> combinedPixels(width * height * 4);
-        for (int i = 0; i < width * height * 4; i += 4) {
-            // Blend noise and gradient
+
+        // Combine: gradient colour modulated by noise, gradient alpha scaled by opacity
+        std::vector<unsigned char> combinedPixels(static_cast<size_t>(width) * height * 4);
+        for (size_t i = 0; i + 3 < combinedPixels.size(); i += 4) {
             float noise = noisePixels[i] / 255.0f;
-            float gradient = gradientPixels[i] / 255.0f;
-            unsigned char blended = static_cast<unsigned char>((noise * 0.3f + gradient * 0.7f) * 255);
-            
-            combinedPixels[i + 0] = blended; // R
-            combinedPixels[i + 1] = blended; // G
-            combinedPixels[i + 2] = blended; // B
-            combinedPixels[i + 3] = 255;     // A
+            float shade = 0.7f + 0.3f * noise;
+            for (size_t c = 0; c < 3; ++c) {
+                combinedPixels[i + c] = toByte(gradientPixels[i + c] / 255.0f * shade);
+            }
+            combinedPixels[i + 3] = toByte(gradientPixels[i + 3] / 255.0f * std::clamp(s.opacity, 0.0f, 1.0f));
         }
-        
-        Log::info("StatusEffect", "Texture created with handle: {}, size: {}x{}", 
-                 nextTextureHandle, width, height);
-        return nextTextureHandle++;
+
+        const TextureHandle handle = storeStatusEffectTexture(width, height, std::move(combinedPixels));
+        Log::info("StatusEffect", "Texture created with handle: {}, size: {}x{}", handle, width, height);
+        return handle;
     }
 }
 
 namespace MeshGen {
     MeshHandle build(const StatusEffectParams& s) {
         Log::info("StatusEffect", "Building mesh for effect: {}", s.id);
-        
-        std::vector<Vertex> vertices;
-        std::vector<uint32_t> indices;
-        
+
+        MagiTech::Mesh mesh;
+
         switch (s.shapeType) {
             case ShapeType::CIRCLE:
-                // Create ring mesh
-                vertices = generateRingVertices(64, 0.8f, 1.2f);
-                // Generate indices for triangle strip
-                for (int i = 0; i < 64; ++i) {
-                    indices.push_back(i * 2);
-                    indices.push_back(i * 2 + 1);
-                }
+                // Ring around the target
+                mesh = generateRing(64, 0.8f, 1.2f);
                 break;
-                
+
             case ShapeType::SQUARE:
-                // Create aura quad
-                vertices = generateAuraQuadVertices(1.0f);
-                indices = {0, 1, 2, 0, 2, 3};
+                // Aura quad
+                mesh = generateAuraQuad(1.0f);
                 break;
-                
+
             case ShapeType::HEXAGON:
-                // Create hexagonal ring
-                vertices = generateRingVertices(6, 0.8f, 1.2f);
-                for (int i = 0; i < 6; ++i) {
-                    indices.push_back(i * 2);
-                    indices.push_back(i * 2 + 1);
-                }
+                // Hexagonal ring
+                mesh = generateRing(6, 0.8f, 1.2f);
                 break;
-                
+
             case ShapeType::STAR:
-                // Create star-shaped mesh
-                vertices = generateRingVertices(10, 0.6f, 1.4f);
-                for (int i = 0; i < 10; ++i) {
-                    indices.push_back(i * 2);
-                    indices.push_back(i * 2 + 1);
-                }
+                // Five-pointed star: outer edge alternates between point and notch radius
+                mesh = generateRing(10, 0.3f, [](int i) { return (i % 2 == 0) ? 1.4f : 0.6f; });
                 break;
-                
+
             case ShapeType::CROSS:
-                // Create cross-shaped mesh
-                vertices = generateAuraQuadVertices(1.0f);
-                indices = {0, 1, 2, 0, 2, 3};
+                mesh = generateCross(1.0f, 0.3f);
                 break;
-                
+
             case ShapeType::DIAMOND:
-                // Create diamond-shaped mesh
-                vertices = generateRingVertices(4, 0.8f, 1.2f);
-                for (int i = 0; i < 4; ++i) {
-                    indices.push_back(i * 2);
-                    indices.push_back(i * 2 + 1);
-                }
+                // Four-sided ring
+                mesh = generateRing(4, 0.8f, 1.2f);
                 break;
-                
+
             default:
                 // Default to aura quad
-                vertices = generateAuraQuadVertices(1.0f);
-                indices = {0, 1, 2, 0, 2, 3};
+                mesh = generateAuraQuad(1.0f);
                 break;
         }
-        
-        Log::info("StatusEffect", "Mesh created with handle: {}, vertices: {}, indices: {}", 
-                 nextMeshHandle, vertices.size(), indices.size());
-        return nextMeshHandle++;
+
+        // Effect scale applies to the whole shape
+        if (s.scale != 1.0f) {
+            for (auto& v : mesh.vertices) {
+                v.position *= s.scale;
+            }
+        }
+
+        const MeshHandle handle = storeStatusEffectMesh(mesh);
+        Log::info("StatusEffect", "Mesh created with handle: {}, vertices: {}, indices: {}",
+                 handle, mesh.vertices.size(), mesh.indices.size());
+        return handle;
     }
 }
 
 namespace ParticleGen {
     ParticleHandle build(const StatusEffectParams& s) {
         Log::info("StatusEffect", "Building particles for effect: {}", s.id);
-        
+
         if (s.particleType == ParticleType::NONE) {
             Log::info("StatusEffect", "No particles requested for effect: {}", s.id);
             return 0;
         }
-        
-        // Create particle system configuration
-        struct ParticleSystem {
-            std::string type;
-            int count;
-            glm::vec3 color;
-            float lifetime;
-            float speed;
-            float size;
-            bool enableRotation;
-            float rotationSpeed;
-        };
-        
-        ParticleSystem ps;
-        ps.count = s.particleCount;
-        ps.color = s.colorPrimary;
-        ps.lifetime = s.duration;
-        ps.speed = s.noiseSpeed * 0.5f;
-        ps.size = 0.1f;
-        ps.enableRotation = s.enableRotation;
-        ps.rotationSpeed = s.rotationSpeed;
-        
+
+        int count = s.particleCount;
+        glm::vec3 color = s.colorPrimary;
+        float speed = s.noiseSpeed * 0.5f;
+        float size = 0.1f;
+        glm::vec3 gravity(0.0f);
+        MagiTech::ParticleType emitterType = MagiTech::ParticleType::BILLBOARD;
+        std::string typeName;
+
         switch (s.particleType) {
             case ParticleType::SPARKLE:
-                ps.type = "sparkle";
-                ps.count *= 2; // More sparkles
+                typeName = "sparkle";
+                count *= 2; // More sparkles
+                emitterType = MagiTech::ParticleType::EMBER;
                 break;
             case ParticleType::SMOKE:
-                ps.type = "smoke";
-                ps.size *= 2.0f; // Larger smoke particles
+                typeName = "smoke";
+                size *= 2.0f; // Larger smoke particles
+                emitterType = MagiTech::ParticleType::AREA_PUFF;
+                gravity = {0.0f, 0.3f, 0.0f};
                 break;
             case ParticleType::FIRE:
-                ps.type = "fire";
-                ps.color = {1.0f, 0.5f, 0.0f};
+                typeName = "fire";
+                color = {1.0f, 0.5f, 0.0f};
+                emitterType = MagiTech::ParticleType::EMBER;
+                gravity = {0.0f, 1.0f, 0.0f};
                 break;
             case ParticleType::ICE:
-                ps.type = "ice";
-                ps.color = {0.5f, 0.8f, 1.0f};
+                typeName = "ice";
+                color = {0.5f, 0.8f, 1.0f};
+                emitterType = MagiTech::ParticleType::SHARD_BURST;
+                gravity = {0.0f, -2.0f, 0.0f};
                 break;
             case ParticleType::LIGHTNING:
-                ps.type = "lightning";
-                ps.color = {1.0f, 1.0f, 0.0f};
-                ps.speed *= 2.0f;
+                typeName = "lightning";
+                color = {1.0f, 1.0f, 0.0f};
+                speed *= 2.0f;
+                emitterType = MagiTech::ParticleType::STREAK;
                 break;
             case ParticleType::POISON:
-                ps.type = "poison";
-                ps.color = {0.2f, 1.0f, 0.2f};
+                typeName = "poison";
+                color = {0.2f, 1.0f, 0.2f};
+                emitterType = MagiTech::ParticleType::AREA_PUFF;
+                gravity = {0.0f, 0.2f, 0.0f};
                 break;
             case ParticleType::HEALING:
-                ps.type = "healing";
-                ps.color = {0.0f, 1.0f, 0.0f};
+                typeName = "healing";
+                color = {0.0f, 1.0f, 0.0f};
+                gravity = {0.0f, 0.8f, 0.0f};
                 break;
             case ParticleType::SHIELD:
-                ps.type = "shield";
-                ps.color = {0.5f, 0.5f, 1.0f};
+                typeName = "shield";
+                color = {0.5f, 0.5f, 1.0f};
                 break;
             default:
-                ps.type = "custom";
+                typeName = "custom";
                 break;
         }
-        
-        Log::info("StatusEffect", "Particle system created with handle: {}, type: {}, count: {}", 
-                 nextParticleHandle, ps.type, ps.count);
-        return nextParticleHandle++;
+
+        ParticleEmitter emitter = ParticleBuilder::createEmitter(emitterType);
+        emitter.setCount(count)
+            .setRate(count / std::max(s.duration, 0.1f))
+            .setLifetime(std::min(s.duration, 2.0f))
+            .setStartSize(size * s.scale)
+            .setEndSize(size * s.scale * 0.5f)
+            .setColor(glm::vec4(color, std::clamp(s.opacity, 0.0f, 1.0f)))
+            .setAlpha(std::clamp(s.opacity, 0.0f, 1.0f), 0.0f)
+            .setShape(ParticleShape::CYLINDER)
+            .setRadius(1.0f * s.scale)
+            .setHeight(2.0f * s.scale)
+            .setSpeed(speed)
+            .setGravity(gravity)
+            .setGlowColor(s.glowColor)
+            .setGlowIntensity(s.intensity)
+            .setLayer(ParticleLayer::Front);
+
+        const ParticleHandle handle = storeStatusEffectParticles(emitter.toOpenStarboundParticleJson());
+        Log::info("StatusEffect", "Particle system created with handle: {}, type: {}, count: {}",
+                 handle, typeName, count);
+        return handle;
     }
 }
 
 namespace IconGen {
     TextureHandle build(const StatusEffectParams& s, const UIParams& u) {
         Log::info("StatusEffect", "Building icon for effect: {}", s.id);
-        
-        const int width = u.iconSize;
-        const int height = u.iconSize;
-        std::vector<unsigned char> pixels(width * height * 4);
-        
+
+        const int width = std::clamp(u.iconSize, 1, 512);
+        const int height = width;
+        std::vector<unsigned char> pixels(static_cast<size_t>(width) * height * 4, 0);
+        const float half = std::max(width / 2.0f, 1.0f);
+
         // Generate background
         for (int y = 0; y < height; ++y) {
             for (int x = 0; x < width; ++x) {
-                float dx = static_cast<float>(x - width/2) / (width/2);
-                float dy = static_cast<float>(y - height/2) / (height/2);
-                float dist = sqrt(dx*dx + dy*dy);
-                
-                int index = (y * width + x) * 4;
-                
-                if (u.backgroundShape == "circle") {
-                    if (dist <= 1.0f) {
-                        // Background circle
-                        pixels[index + 0] = static_cast<unsigned char>(u.borderColor.r * 255);
-                        pixels[index + 1] = static_cast<unsigned char>(u.borderColor.g * 255);
-                        pixels[index + 2] = static_cast<unsigned char>(u.borderColor.b * 255);
-                        pixels[index + 3] = static_cast<unsigned char>(u.borderColor.a * 255);
-                    } else {
-                        // Transparent outside
-                        pixels[index + 0] = 0;
-                        pixels[index + 1] = 0;
-                        pixels[index + 2] = 0;
-                        pixels[index + 3] = 0;
-                    }
-                } else if (u.backgroundShape == "square") {
-                    // Square background
-                    pixels[index + 0] = static_cast<unsigned char>(u.borderColor.r * 255);
-                    pixels[index + 1] = static_cast<unsigned char>(u.borderColor.g * 255);
-                    pixels[index + 2] = static_cast<unsigned char>(u.borderColor.b * 255);
-                    pixels[index + 3] = static_cast<unsigned char>(u.borderColor.a * 255);
-                } else {
-                    // No background
-                    pixels[index + 0] = 0;
-                    pixels[index + 1] = 0;
-                    pixels[index + 2] = 0;
-                    pixels[index + 3] = 0;
+                float dx = (x + 0.5f - half) / half;
+                float dy = (y + 0.5f - half) / half;
+                float dist = std::sqrt(dx*dx + dy*dy);
+
+                size_t index = (static_cast<size_t>(y) * width + x) * 4;
+                const bool inside = (u.backgroundShape == "circle" && dist <= 1.0f) || u.backgroundShape == "square";
+                if (inside) {
+                    pixels[index + 0] = toByte(u.borderColor.r);
+                    pixels[index + 1] = toByte(u.borderColor.g);
+                    pixels[index + 2] = toByte(u.borderColor.b);
+                    pixels[index + 3] = toByte(u.borderColor.a);
                 }
             }
         }
-        
-        // Add icon symbol based on effect type
+
+        // Symbol: filled disc in the effect's icon colour with a soft glow ring
         int centerX = width / 2;
         int centerY = height / 2;
-        int symbolSize = width / 4;
-        
-        // Draw simple symbol based on effect type
+        int symbolSize = std::max(1, width / 4);
+
         for (int y = centerY - symbolSize; y <= centerY + symbolSize; ++y) {
             for (int x = centerX - symbolSize; x <= centerX + symbolSize; ++x) {
                 if (x >= 0 && x < width && y >= 0 && y < height) {
-                    int index = (y * width + x) * 4;
-                    
-                    // Simple symbol drawing (in a real implementation, this would use proper glyphs)
+                    size_t index = (static_cast<size_t>(y) * width + x) * 4;
+
                     float dx = static_cast<float>(x - centerX) / symbolSize;
                     float dy = static_cast<float>(y - centerY) / symbolSize;
-                    float dist = sqrt(dx*dx + dy*dy);
-                    
+                    float dist = std::sqrt(dx*dx + dy*dy);
+
                     if (dist <= 0.8f) {
-                        pixels[index + 0] = static_cast<unsigned char>(s.iconColor.r * 255);
-                        pixels[index + 1] = static_cast<unsigned char>(s.iconColor.g * 255);
-                        pixels[index + 2] = static_cast<unsigned char>(s.iconColor.b * 255);
+                        pixels[index + 0] = toByte(s.iconColor.r);
+                        pixels[index + 1] = toByte(s.iconColor.g);
+                        pixels[index + 2] = toByte(s.iconColor.b);
                         pixels[index + 3] = 255;
+                    } else if (dist <= 1.0f && glm::length(s.glowColor) > 0.0f) {
+                        const float a = (1.0f - dist) / 0.2f;
+                        pixels[index + 0] = toByte(glm::mix(pixels[index + 0] / 255.0f, s.glowColor.r, a));
+                        pixels[index + 1] = toByte(glm::mix(pixels[index + 1] / 255.0f, s.glowColor.g, a));
+                        pixels[index + 2] = toByte(glm::mix(pixels[index + 2] / 255.0f, s.glowColor.b, a));
+                        pixels[index + 3] = std::max<unsigned char>(pixels[index + 3], toByte(a));
                     }
                 }
             }
         }
-        
-        // Add flash overlay if requested
+
+        // Flash overlay: brighten the whole icon so it reads as "just applied"
         if (u.flashOnApply) {
-            Log::info("  - Adding flash overlay to icon");
+            Log::info("StatusEffect", "  - Adding flash overlay to icon {}", s.id);
+            for (size_t i = 0; i + 3 < pixels.size(); i += 4) {
+                for (size_t c = 0; c < 3; ++c) {
+                    pixels[i + c] = toByte(pixels[i + c] / 255.0f * 0.6f + 0.4f);
+                }
+            }
         }
-        
-        Log::info("StatusEffect", "Icon created with handle: {}, size: {}x{}", 
-                 nextIconHandle, width, height);
-        return nextIconHandle++;
+
+        const TextureHandle handle = storeStatusEffectTexture(width, height, std::move(pixels));
+        Log::info("StatusEffect", "Icon created with handle: {}, size: {}x{}", handle, width, height);
+        return handle;
     }
-}
-
-// Factory implementation
-StatusEffectFactory::StatusEffectFactory() : m_initialized(false) {
-}
-
-StatusEffectFactory::~StatusEffectFactory() {
-    shutdown();
-}
-
-void StatusEffectFactory::initialize(size_t cache_size, size_t num_threads) {
-    if (m_initialized) return;
-    
-    m_cache.set_capacity(cache_size);
-    m_pool.start(num_threads);
-    m_initialized = true;
-    
-    Log::info("StatusEffect", "StatusEffectFactory initialized with cache_size={}, threads={}", 
-             cache_size, num_threads);
-}
-
-void StatusEffectFactory::shutdown() {
-    if (!m_initialized) return;
-    
-    m_pool.stop();
-    m_initialized = false;
-    
-    Log::info("StatusEffectFactory shutdown");
-}
-
-std::future<EffectBundle> StatusEffectFactory::generateAsync(const StatusEffectParams& s, const UIParams& u) {
-    uint64_t key = s.hashKey() ^ (u.hashKey() << 1);
-    
-    if (auto found = m_cache.find(key)) {
-        return std::async(std::launch::deferred, [=] { return *found; });
-    }
-    
-    return m_pool.enqueue([=]() {
-        EffectBundle bundle;
-        bundle.shader = ShaderGen::build(s);
-        bundle.texture = TextureGen::build(s);
-        bundle.mesh = MeshGen::build(s);
-        bundle.particles = ParticleGen::build(s);
-        bundle.icon = IconGen::build(s, u);
-        
-        m_cache.insert(key, bundle);
-        return bundle;
-    });
-}
-
-EffectBundle StatusEffectFactory::generateSync(const StatusEffectParams& s, const UIParams& u) {
-    return generateAsync(s, u).get();
-}
-
-std::future<EffectBundle> StatusEffectFactory::generateFromJson(const std::string& effectJsonPath, const std::string& uiJsonPath) {
-    return m_pool.enqueue([=]() {
-        // Load effect params from JSON
-        StatusEffectParams effectParams;
-        std::ifstream effectFile(effectJsonPath);
-        if (effectFile.is_open()) {
-            // Parse JSON and populate effectParams
-            Log::info("StatusEffect", "Loading effect params from: {}", effectJsonPath);
-        }
-        
-        // Load UI params from JSON
-        UIParams uiParams;
-        std::ifstream uiFile(uiJsonPath);
-        if (uiFile.is_open()) {
-            // Parse JSON and populate uiParams
-            Log::info("StatusEffect", "Loading UI params from: {}", uiJsonPath);
-        }
-        
-        return generateSync(effectParams, uiParams);
-    });
-}
-
-std::future<EffectBundle> StatusEffectFactory::generateFromParams(const StatusEffectParams& effectParams, const UIParams& uiParams) {
-    return generateAsync(effectParams, uiParams);
-}
-
-std::vector<std::future<EffectBundle>> StatusEffectFactory::generateBatch(const std::vector<std::pair<StatusEffectParams, UIParams>>& params) {
-    std::vector<std::future<EffectBundle>> futures;
-    futures.reserve(params.size());
-    
-    for (const auto& param : params) {
-        futures.push_back(generateAsync(param.first, param.second));
-    }
-    
-    return futures;
-}
-
-void StatusEffectFactory::clearCache() {
-    m_cache.clear();
-    Log::info("StatusEffectFactory cache cleared");
-}
-
-size_t StatusEffectFactory::getCacheSize() const {
-    return m_cache.size();
-}
-
-size_t StatusEffectFactory::getCacheCapacity() const {
-    return m_cache.capacity();
-}
-
-bool StatusEffectFactory::validateEffectParams(const StatusEffectParams& params) {
-    return params.duration > 0 && params.intensity >= 0 && params.intensity <= 1;
-}
-
-std::string StatusEffectFactory::getEffectValidationErrors(const StatusEffectParams& params) {
-    std::string errors;
-    
-    if (params.duration <= 0) {
-        errors += "Duration must be positive\n";
-    }
-    if (params.intensity < 0 || params.intensity > 1) {
-        errors += "Intensity must be between 0 and 1\n";
-    }
-    if (params.particleCount < 0) {
-        errors += "Particle count must be non-negative\n";
-    }
-    
-    return errors;
-}
-
-bool StatusEffectFactory::validateUIParams(const UIParams& params) {
-    return params.iconSize > 0 && params.iconSize <= 512;
-}
-
-std::string StatusEffectFactory::getUIValidationErrors(const UIParams& params) {
-    std::string errors;
-    
-    if (params.iconSize <= 0 || params.iconSize > 512) {
-        errors += "Icon size must be between 1 and 512\n";
-    }
-    
-    return errors;
 }
 
 } // namespace StatusEffects

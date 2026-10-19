@@ -6,7 +6,12 @@
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
+#include <cctype>
+#include "vendor/json/include/nlohmann/json.hpp"
 #include <xxhash.h>
+#include <stb_image_write.h>
+#include <cmath>
 
 namespace MagiTech {
 namespace AIArt {
@@ -17,8 +22,6 @@ std::unique_ptr<AIArtGenerator> g_aiArtGenerator;
 AIArtGenerator::AIArtGenerator() : isInitialized(false) {
     pool = std::make_unique<GeneratorTaskPool>(4);
 }
-
-AIArtGenerator::~AIArtGenerator() = default;
 
 bool AIArtGenerator::initialize(const ModelConfig& config) {
     try {
@@ -84,8 +87,8 @@ AIArtGenerator::ArtOutput AIArtGenerator::generateSprite(const ArtPrompt& prompt
         std::string promptHash = hashPrompt(prompt);
         
         // Check cache first
-        if (isCached(promptHash)) {
-            output = artCache[promptHash];
+        if (auto cached = findCached(promptHash)) {
+            output = *cached;
             Log::info("AIArt", "Retrieved cached art for prompt: {}", prompt.description);
             return output;
         }
@@ -127,24 +130,19 @@ AIArtGenerator::ArtOutput AIArtGenerator::generateSprite(const ArtPrompt& prompt
         }
         
         // Create metadata
-        std::ostringstream metadata;
-        metadata << "{\n";
-        metadata << "  \"prompt\" : \"" << prompt.description << "\",\n";
-        metadata << "  \"style\" : \"" << prompt.style << "\",\n";
-        metadata << "  \"resolution\" : " << prompt.resolution << ",\n";
-        metadata << "  \"frameCount\" : " << prompt.frameCount << ",\n";
-        metadata << "  \"direction\" : \"" << prompt.direction << "\",\n";
-        metadata << "  \"useAlpha\" : " << (prompt.useAlpha ? "true" : "false") << ",\n";
-        metadata << "  \"specialEffects\" : [";
-        for (size_t i = 0; i < prompt.specialEffects.size(); ++i) {
-            metadata << "\"" << prompt.specialEffects[i] << "\"";
-            if (i < prompt.specialEffects.size() - 1) metadata << ", ";
-        }
-        metadata << "]\n";
-        metadata << "}";
-        
+        nlohmann::json metadata = {
+            {"prompt", prompt.description},
+            {"style", prompt.style},
+            {"colorPalette", prompt.colorPalette},
+            {"resolution", prompt.resolution},
+            {"frameCount", prompt.frameCount},
+            {"direction", prompt.direction},
+            {"useAlpha", prompt.useAlpha},
+            {"specialEffects", prompt.specialEffects}
+        };
+
         std::ofstream metadataFile(metadataPath);
-        metadataFile << metadata.str();
+        metadataFile << metadata.dump(2);
         metadataFile.close();
         
         // Set output paths
@@ -155,7 +153,10 @@ AIArtGenerator::ArtOutput AIArtGenerator::generateSprite(const ArtPrompt& prompt
         output.success = true;
         
         // Cache the result
-        artCache[promptHash] = output;
+        {
+            std::lock_guard<std::mutex> lock(cacheMutex);
+            artCache[promptHash] = output;
+        }
         
         Log::info("AIArt", "Generated AI art: {}", prompt.description);
         return output;
@@ -323,7 +324,14 @@ bool AIArtGenerator::postProcessSprite(const std::string& inputPath, const std::
     // This would integrate with image processing libraries
     // For now, just copy the file
     try {
-        std::filesystem::copy_file(inputPath, outputPath, std::filesystem::copy_options::overwrite_existing);
+        if (!std::filesystem::exists(inputPath)) {
+            Log::error("AIArt", "Sprite to post-process does not exist: {}", inputPath);
+            return false;
+        }
+        // In-place processing: nothing to copy
+        if (std::filesystem::path(inputPath).lexically_normal() != std::filesystem::path(outputPath).lexically_normal()) {
+            std::filesystem::copy_file(inputPath, outputPath, std::filesystem::copy_options::overwrite_existing);
+        }
         return true;
     } catch (const std::exception& e) {
         Log::error("AIArt", "Failed to post-process sprite: {}", e.what());
@@ -366,16 +374,26 @@ bool AIArtGenerator::createIcon(const std::string& spritePath, const std::string
 }
 
 void AIArtGenerator::clearCache() {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     artCache.clear();
     Log::info("Cleared AI art cache");
 }
 
 size_t AIArtGenerator::getCacheSize() const {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     return artCache.size();
 }
 
 bool AIArtGenerator::isCached(const std::string& promptHash) const {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     return artCache.find(promptHash) != artCache.end();
+}
+
+std::optional<AIArtGenerator::ArtOutput> AIArtGenerator::findCached(const std::string& promptHash) const {
+    std::lock_guard<std::mutex> lock(cacheMutex);
+    auto it = artCache.find(promptHash);
+    if (it == artCache.end()) return std::nullopt;
+    return it->second;
 }
 
 bool AIArtGenerator::loadModel(const ModelConfig& config) {
@@ -388,19 +406,53 @@ bool AIArtGenerator::loadModel(const ModelConfig& config) {
 }
 
 bool AIArtGenerator::generateImage(const ArtPrompt& prompt, const std::string& outputPath) {
-    // This would call the actual AI model
-    // For now, create a placeholder image
+    // No diffusion backend is linked into the backend; render a deterministic
+    // procedural sprite from the prompt instead, so the rest of the pipeline
+    // (post-processing, frames, icons, real-time loading) works on real PNGs.
     Log::info("AIArt", "Generating image for prompt: {}", prompt.description);
     Log::info("AIArt", "Output path: {}", outputPath);
-    
-    // Create a simple placeholder file
-    std::ofstream file(outputPath, std::ios::binary);
-    if (file.is_open()) {
-        // In a real implementation, this would generate the actual image
-        file.close();
-        return true;
+
+    const int size = std::clamp(prompt.resolution > 0 ? prompt.resolution : 32, 8, 512);
+    const int frames = std::clamp(prompt.frameCount > 0 ? prompt.frameCount : 1, 1, 16);
+    const int width = size * frames;
+    std::vector<uint8_t> rgba(static_cast<size_t>(width) * size * 4, 0);
+
+    // Palette: base hue from the prompt hash, tinted by the requested palette name
+    const uint64_t seed = XXH64(prompt.description.data(), prompt.description.size(), 0);
+    float r = ((seed >> 0) & 0xFF) / 255.0f, g = ((seed >> 8) & 0xFF) / 255.0f, b = ((seed >> 16) & 0xFF) / 255.0f;
+    if (prompt.colorPalette == "neon") { r = std::max(r, 0.3f); g = std::max(g, 0.8f); b = 1.0f; }
+    else if (prompt.colorPalette == "earth-tone") { r = 0.45f + r * 0.2f; g = 0.35f + g * 0.15f; b = 0.2f + b * 0.1f; }
+    const bool metallic = std::find(prompt.specialEffects.begin(), prompt.specialEffects.end(), "metallic") != prompt.specialEffects.end();
+    const bool glowing = std::find(prompt.specialEffects.begin(), prompt.specialEffects.end(), "glowing") != prompt.specialEffects.end();
+
+    for (int f = 0; f < frames; ++f) {
+        const float phase = frames > 1 ? static_cast<float>(f) / frames : 0.0f;
+        for (int y = 0; y < size; ++y) {
+            for (int x = 0; x < size; ++x) {
+                // Diamond silhouette that "breathes" over the frames
+                const float nx = (x + 0.5f) / size - 0.5f;
+                const float ny = (y + 0.5f) / size - 0.5f;
+                const float extent = 0.38f + 0.04f * std::sin(phase * 6.2831853f);
+                const float d = std::abs(nx) + std::abs(ny) * 1.3f;
+                if (d > extent) continue;
+                float shade = 1.0f - d / extent * 0.6f;          // lighter centre
+                if (metallic) shade *= 0.85f + 0.15f * ((x + y) % 4 == 0);
+                if (glowing && d > extent * 0.8f) shade = 1.0f;  // bright rim
+                const bool outline = d > extent - 1.5f / size;
+                uint8_t* p = &rgba[(static_cast<size_t>(y) * width + f * size + x) * 4];
+                p[0] = outline ? 20 : static_cast<uint8_t>(std::clamp(r * shade, 0.0f, 1.0f) * 255);
+                p[1] = outline ? 20 : static_cast<uint8_t>(std::clamp(g * shade, 0.0f, 1.0f) * 255);
+                p[2] = outline ? 28 : static_cast<uint8_t>(std::clamp(b * shade, 0.0f, 1.0f) * 255);
+                p[3] = 255;
+            }
+        }
     }
-    return false;
+
+    if (!stbi_write_png(outputPath.c_str(), width, size, 4, rgba.data(), width * 4)) {
+        Log::error("AIArt", "Failed to write image: {}", outputPath);
+        return false;
+    }
+    return true;
 }
 
 std::string AIArtGenerator::getCrossbowPromptTemplate(const CrossbowParams& params) {
@@ -461,7 +513,7 @@ std::string AIArtGenerator::sanitizeFilename(const std::string& name) {
     std::string sanitized = name;
     std::replace(sanitized.begin(), sanitized.end(), ' ', '_');
     sanitized.erase(std::remove_if(sanitized.begin(), sanitized.end(), 
-        [](char c) { return !std::isalnum(c) && c != '_' && c != '-'; }), sanitized.end());
+        [](char c) { return !std::isalnum(static_cast<unsigned char>(c)) && c != '_' && c != '-'; }), sanitized.end());
     return sanitized;
 }
 

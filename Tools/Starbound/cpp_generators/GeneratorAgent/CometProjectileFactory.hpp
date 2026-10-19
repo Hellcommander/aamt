@@ -1,5 +1,6 @@
 #pragma once
 #include <future>
+#include <mutex>
 #include <vector>
 #include <string>
 #include "core/ConcurrentLRU.hpp"
@@ -16,7 +17,10 @@ namespace MeshGen {
     MeshHandle buildCometTrail(const CometProjectileParams& p);
     MeshHandle generateIcoSphere(float radius, int detail);
     MeshHandle applyVertexNoise(MeshHandle mesh, float irregularity);
-    MeshHandle createRibbonMesh(float length, float speed, int segmentCount);
+    MeshHandle applyCrystallineNoise(MeshHandle mesh, float irregularity);
+    MeshHandle applyPhysicsDeformation(MeshHandle mesh, float mass, float speed);
+    MeshHandle createRibbonMesh(float length, float width, int segmentCount);
+    MeshHandle applyTrailDistortion(MeshHandle mesh, float strength, float scale, float speed);
     MeshHandle buildFragments(const CometProjectileParams& p);
 }
 
@@ -24,6 +28,9 @@ namespace ShaderGen {
     ShaderHandle buildCometShader(const CometProjectileParams& p);
     ShaderHandle buildHeatDistortion(const CometProjectileParams& p);
     std::string generateCometShaderCode(const CometProjectileParams& p);
+    std::string generateCometVertexShader(const CometProjectileParams& p);
+    std::string generateHeatDistortionVertexShader(const CometProjectileParams& p);
+    std::string generateHeatDistortionFragmentShader(const CometProjectileParams& p);
 }
 
 namespace TextureGen {
@@ -31,6 +38,11 @@ namespace TextureGen {
     TextureHandle buildRockTexture(float frequency);
     TextureHandle buildColorMap(const glm::vec3& heatColor, const glm::vec3& burnColor);
     TextureHandle mergeTextures(const TextureHandle& rock, const TextureHandle& color);
+    TextureHandle applyMeteorEffects(TextureHandle texture, const CometProjectileParams& p);
+    TextureHandle applyCometEffects(TextureHandle texture, const CometProjectileParams& p);
+    TextureHandle applyAsteroidEffects(TextureHandle texture, const CometProjectileParams& p);
+    TextureHandle applyFallingStarEffects(TextureHandle texture, const CometProjectileParams& p);
+    TextureHandle applyCelestialRockEffects(TextureHandle texture, const CometProjectileParams& p);
 }
 
 namespace ParticleGen {
@@ -38,6 +50,12 @@ namespace ParticleGen {
     ParticleHandle buildSparks(const CometProjectileParams& p);
     ParticleHandle buildFragments(const CometProjectileParams& p);
 }
+
+/** Runs every generator for p and fills the bundle, including its metrics. */
+CometAssetBundle buildCometAssetBundle(const CometProjectileParams& p);
+
+/** Reads a comet parameter file (JSON, see ParamUtils::fromJson); throws on I/O or parse errors. */
+CometProjectileParams loadCometParamsFromJsonFile(const std::string& jsonPath);
 
 class CometProjectileFactory {
 public:
@@ -61,25 +79,12 @@ public:
     std::future<CometAssetBundle> generateAsync(const CometProjectileParams& p) {
         uint64_t key = p.hashKey();
         if (auto hit = m_cache.find(key)) {
+            recordGeneration(true, 0.0);
             return std::async(std::launch::deferred, [=] { return *hit; });
         }
-        return m_pool.enqueue([=]() {
-            CometAssetBundle b;
-            b.mesh = MeshGen::buildCometCore(p);
-            b.texture = TextureGen::buildCometTexture(p);
-            b.shader = ShaderGen::buildCometShader(p);
-            b.dustTrail = ParticleGen::buildDustTrail(p);
-            b.sparks = ParticleGen::buildSparks(p);
-            b.fragments = ParticleGen::buildFragments(p);
-            b.heatDistortion = ShaderGen::buildHeatDistortion(p);
-            
-            // Performance metrics
-            b.generationTime = 0.0f; // Would be calculated
-            b.vertexCount = 0; // Would be calculated
-            b.triangleCount = 0; // Would be calculated
-            b.particleCount = p.dustParticleCount + p.sparkParticleCount;
-            b.gpuAccelerated = p.enableParallelProcessing;
-            
+        return m_pool.enqueue([this, p, key]() {
+            CometAssetBundle b = buildCometAssetBundle(p);
+            recordGeneration(false, b.generationTime);
             m_cache.insert(key, b);
             return b;
         });
@@ -89,34 +94,21 @@ public:
     CometAssetBundle generateSync(const CometProjectileParams& p) {
         uint64_t key = p.hashKey();
         if (auto hit = m_cache.find(key)) {
+            recordGeneration(true, 0.0);
             return *hit;
         }
         
-        CometAssetBundle b;
-        b.mesh = MeshGen::buildCometCore(p);
-        b.texture = TextureGen::buildCometTexture(p);
-        b.shader = ShaderGen::buildCometShader(p);
-        b.dustTrail = ParticleGen::buildDustTrail(p);
-        b.sparks = ParticleGen::buildSparks(p);
-        b.fragments = ParticleGen::buildFragments(p);
-        b.heatDistortion = ShaderGen::buildHeatDistortion(p);
-        
-        // Performance metrics
-        b.generationTime = 0.0f; // Would be calculated
-        b.vertexCount = 0; // Would be calculated
-        b.triangleCount = 0; // Would be calculated
-        b.particleCount = p.dustParticleCount + p.sparkParticleCount;
-        b.gpuAccelerated = p.enableParallelProcessing;
-        
+        CometAssetBundle b = buildCometAssetBundle(p);
+        recordGeneration(false, b.generationTime);
         m_cache.insert(key, b);
         return b;
     }
 
     // JSON-based generation
     std::future<CometAssetBundle> generateFromJson(const std::string& jsonPath) {
-        return m_pool.enqueue([=]() {
+        return m_pool.enqueue([this, jsonPath]() {
             // Load JSON and parse parameters
-            CometProjectileParams params = loadParamsFromJson(jsonPath);
+            CometProjectileParams params = loadCometParamsFromJsonFile(jsonPath);
             return generateSync(params);
         });
     }
@@ -320,7 +312,7 @@ public:
     }
 
     double getCacheHitRate() const {
-        return m_cache.hit_rate();
+        return m_cache.getHitRate();
     }
 
     void setCacheCapacity(size_t capacity) {
@@ -350,99 +342,34 @@ public:
     };
 
     PerformanceMetrics getPerformanceMetrics() const {
+        std::lock_guard<std::mutex> lock(m_metricsMutex);
         return m_performanceMetrics;
     }
 
     void resetPerformanceMetrics() {
+        std::lock_guard<std::mutex> lock(m_metricsMutex);
         m_performanceMetrics.reset();
     }
 
 private:
-    CometProjectileParams loadParamsFromJson(const std::string& jsonPath) {
-        // Implementation would load JSON file and parse parameters
-        // For now, return default parameters
-        CometProjectileParams params;
-        params.id = "loaded_from_json";
-        params.cometType = CometType::METEOR;
-        params.cometShape = CometShape::SPHERE;
-        params.trailType = TrailType::DUST;
-        params.fragmentationType = FragmentationType::NONE;
-        params.noiseType = NoiseType::PERLIN;
-        params.blendMode = BlendMode::ADDITIVE;
-        params.coreRadius = 0.5f;
-        params.irregularity = 0.8f;
-        params.speed = 30.0f;
-        params.gravityInfluence = 1.0f;
-        params.mass = 1.0f;
-        params.drag = 0.1f;
-        params.lift = 0.0f;
-        params.heatColor = {1.0f, 0.5f, 0.1f};
-        params.burnColor = {1.0f, 0.8f, 0.3f};
-        params.coreColor = {0.8f, 0.6f, 0.4f};
-        params.glowColor = {1.0f, 0.4f, 0.0f};
-        params.dustColor = {0.5f, 0.5f, 0.5f, 0.6f};
-        params.sparkColor = {1.0f, 0.4f, 0.1f, 1.0f};
-        params.glowIntensity = 2.0f;
-        params.emissivePower = 1.0f;
-        params.coreOpacity = 1.0f;
-        params.trailOpacity = 0.8f;
-        params.enableCoreGlow = true;
-        params.enableTrailGlow = true;
-        params.trailLength = 2.0f;
-        params.trailWidth = 0.1f;
-        params.trailNoiseScale = 1.5f;
-        params.trailNoiseSpeed = 3.0f;
-        params.trailFadeSpeed = 1.0f;
-        params.enableTrailFade = true;
-        params.enableTrailDistortion = true;
-        params.trailDistortionStrength = 0.1f;
-        params.dustParticleCount = 100;
-        params.dustLifetime = 1.5f;
-        params.dustSize = 0.05f;
-        params.dustSpeed = 1.0f;
-        params.enableDustFade = true;
-        params.dustFadeSpeed = 1.0f;
-        params.sparkParticleCount = 30;
-        params.sparkLifetime = 0.6f;
-        params.sparkSize = 0.03f;
-        params.sparkSpeed = 1.5f;
-        params.enableSparkFade = true;
-        params.sparkFadeSpeed = 1.0f;
-        params.fragmentationCount = 0;
-        params.fragmentSizeFactor = 0.3f;
-        params.fragmentSpread = 1.0f;
-        params.fragmentVelocity = 2.0f;
-        params.enableFragmentPhysics = true;
-        params.fragmentLifetime = 2.0f;
-        params.shaderType = "comet";
-        params.shaderIntensity = 1.0f;
-        params.enableDistortion = true;
-        params.distortionStrength = 0.1f;
-        params.enableBlur = false;
-        params.blurStrength = 0.1f;
-        params.enableHeatDistortion = false;
-        params.heatDistortionStrength = 0.1f;
-        params.enablePhysics = true;
-        params.enableCollision = true;
-        params.collisionRadius = 0.5f;
-        params.enableGravity = true;
-        params.enableAirResistance = true;
-        params.airResistanceFactor = 0.1f;
-        params.enableCaching = true;
-        params.enableHotReload = true;
-        params.enableParallelProcessing = true;
-        params.lodLevel = 0;
-        params.description = "Loaded from JSON";
-        params.tags = {"comet", "projectile", "json"};
-        params.metadata = {{"source", "json_file"}};
-        
-        return params;
+    void recordGeneration(bool cacheHit, double seconds) {
+        std::lock_guard<std::mutex> lock(m_metricsMutex);
+        if (cacheHit) {
+            ++m_performanceMetrics.cacheHits;
+            return;
+        }
+        ++m_performanceMetrics.cacheMisses;
+        ++m_performanceMetrics.totalGenerations;
+        m_performanceMetrics.totalGenerationTime += seconds;
+        m_performanceMetrics.averageGenerationTime =
+            m_performanceMetrics.totalGenerationTime / static_cast<double>(m_performanceMetrics.totalGenerations);
     }
 
     ConcurrentLRUCache<uint64_t, CometAssetBundle> m_cache;
     GeneratorTaskPool m_pool;
     bool m_initialized;
-    mutable PerformanceMetrics m_performanceMetrics;
+    PerformanceMetrics m_performanceMetrics;
+    mutable std::mutex m_metricsMutex;
 };
 
 // Global factory instance

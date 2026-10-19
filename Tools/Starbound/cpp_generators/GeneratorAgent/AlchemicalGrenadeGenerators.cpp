@@ -1,4 +1,5 @@
 #include "AlchemicalGrenadeFactory.hpp"
+#include "AlchemicalGrenadeAssets.hpp"
 #include "core/Log.hpp"
 #include "core/mesh/Mesh.hpp"
 #include "core/rendering/Primitives.hpp"
@@ -10,6 +11,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/transform.hpp>
 #include <cmath>
+#include <random>
+#include <vector>
 
 namespace MagiTech {
 namespace AlchemicalGrenades {
@@ -26,106 +29,109 @@ inline float simplex2(const glm::vec3& p) {
 }
 } // namespace
 
+namespace {
+// Grenade item geometry: core sphere, material-specific casing and optional label plate
+Mesh buildItemMesh(const AlchemicalGrenadeParams& g) {
+    Mesh mesh;
+
+    // Build core grenade body
+    auto core = Primitives::createSphere(g.coreRadius, 16);
+    mesh.append(core);
+
+    // Add casing based on material type
+    if (g.casingMaterial == CasingMaterial::GLASS) {
+        // Glass casing with beveled edges
+        auto casing = Primitives::createSphere(g.coreRadius + g.casingThickness, 16);
+        mesh.append(casing);
+    }
+    else if (g.casingMaterial == CasingMaterial::METAL) {
+        // Metal casing with seams
+        auto casing = Primitives::createSphere(g.coreRadius + g.casingThickness, 12);
+        mesh.append(casing);
+    }
+    else if (g.casingMaterial == CasingMaterial::CERAMIC) {
+        // Ceramic casing with texture
+        auto casing = Primitives::createSphere(g.coreRadius + g.casingThickness, 14);
+        mesh.append(casing);
+    }
+
+    // Add label plate if specified
+    if (!g.description.empty()) {
+        auto label = Primitives::createQuad(g.coreRadius * 0.3f, g.coreRadius * 0.1f);
+        glm::mat4 labelTransform = glm::translate(glm::mat4(1.0f),
+            glm::vec3(0, g.coreRadius * 0.8f, g.coreRadius * 0.6f));
+        mesh.append(label, labelTransform);
+    }
+
+    mesh.optimize();
+    return mesh;
+}
+} // namespace
+
 namespace MeshGen {
     MeshHandle buildItem(const AlchemicalGrenadeParams& g) {
         Log::info("AlchemicalGrenade", "Building grenade item mesh for: {}", g.id);
-        
-        Mesh mesh;
-        
-        // Build core grenade body
-        auto core = Primitives::createSphere(g.coreRadius, 16);
-        mesh.append(core);
-        
-        // Add casing based on material type
-        if (g.casingMaterial == CasingMaterial::GLASS) {
-            // Glass casing with beveled edges
-            auto casing = Primitives::createSphere(g.coreRadius + g.casingThickness, 16);
-            mesh.append(casing);
-        }
-        else if (g.casingMaterial == CasingMaterial::METAL) {
-            // Metal casing with seams
-            auto casing = Primitives::createSphere(g.coreRadius + g.casingThickness, 12);
-            mesh.append(casing);
-        }
-        else if (g.casingMaterial == CasingMaterial::CERAMIC) {
-            // Ceramic casing with texture
-            auto casing = Primitives::createSphere(g.coreRadius + g.casingThickness, 14);
-            mesh.append(casing);
-        }
-        
-        // Add label plate if specified
-        if (!g.description.empty()) {
-            auto label = Primitives::createQuad(g.coreRadius * 0.3f, g.coreRadius * 0.1f);
-            glm::mat4 labelTransform = glm::translate(glm::mat4(1.0f), 
-                glm::vec3(0, g.coreRadius * 0.8f, g.coreRadius * 0.6f));
-            mesh.append(label, labelTransform);
-        }
-        
-        mesh.optimize();
-        return mesh.upload();
+        return storeGrenadeMesh(buildItemMesh(g));
     }
-    
+
     MeshHandle buildProjectile(const AlchemicalGrenadeParams& g) {
         Log::info("AlchemicalGrenade", "Building grenade projectile mesh for: {}", g.id);
-        
-        Mesh mesh;
-        
+
         // Start with item mesh
-        auto itemMesh = buildItem(g);
-        mesh.append(itemMesh);
-        
+        Mesh mesh = buildItemMesh(g);
+
         // Add trail effect based on grenade type
         if (g.grenadeType == GrenadeType::FIRE) {
             auto trail = Primitives::createCone(g.coreRadius * 0.2f, g.coreRadius * 0.5f, 8);
-            glm::mat4 trailTransform = glm::translate(glm::mat4(1.0f), 
+            glm::mat4 trailTransform = glm::translate(glm::mat4(1.0f),
                 glm::vec3(0, -g.coreRadius * 1.2f, 0));
             mesh.append(trail, trailTransform);
         }
         else if (g.grenadeType == GrenadeType::SMOKE) {
             auto smokeTrail = Primitives::createCylinder(g.coreRadius * 0.15f, g.coreRadius * 0.8f, 6);
-            glm::mat4 smokeTransform = glm::translate(glm::mat4(1.0f), 
+            glm::mat4 smokeTransform = glm::translate(glm::mat4(1.0f),
                 glm::vec3(0, -g.coreRadius * 1.0f, 0));
             mesh.append(smokeTrail, smokeTransform);
         }
         else if (g.grenadeType == GrenadeType::FROST) {
             auto frostTrail = Primitives::createCone(g.coreRadius * 0.25f, g.coreRadius * 0.6f, 8);
-            glm::mat4 frostTransform = glm::translate(glm::mat4(1.0f), 
+            glm::mat4 frostTransform = glm::translate(glm::mat4(1.0f),
                 glm::vec3(0, -g.coreRadius * 1.1f, 0));
             mesh.append(frostTrail, frostTransform);
         }
-        
+
         mesh.optimize();
-        return mesh.upload();
+        return storeGrenadeMesh(mesh);
     }
-    
+
     MeshHandle buildGrenadeCore(const AlchemicalGrenadeParams& g) {
-        return Primitives::createSphere(g.coreRadius, 16).upload();
+        return storeGrenadeMesh(Primitives::createSphere(g.coreRadius, 16));
     }
-    
+
     MeshHandle buildCasing(const AlchemicalGrenadeParams& g) {
-        return Primitives::createSphere(g.coreRadius + g.casingThickness, 16).upload();
+        return storeGrenadeMesh(Primitives::createSphere(g.coreRadius + g.casingThickness, 16));
     }
-    
+
     MeshHandle buildLabel(const AlchemicalGrenadeParams& g) {
-        return Primitives::createQuad(g.coreRadius * 0.3f, g.coreRadius * 0.1f).upload();
+        return storeGrenadeMesh(Primitives::createQuad(g.coreRadius * 0.3f, g.coreRadius * 0.1f));
     }
-    
+
     MeshHandle buildTrail(const AlchemicalGrenadeParams& g) {
         if (g.grenadeType == GrenadeType::FIRE) {
-            return Primitives::createCone(g.coreRadius * 0.2f, g.coreRadius * 0.5f, 8).upload();
+            return storeGrenadeMesh(Primitives::createCone(g.coreRadius * 0.2f, g.coreRadius * 0.5f, 8));
         }
         return 0;
     }
-    
+
     MeshHandle mergeMeshes(const std::vector<MeshHandle>& meshes) {
         Mesh combined;
         for (auto handle : meshes) {
-            if (handle > 0) {
-                combined.append(handle);
+            if (auto part = getGrenadeMesh(handle)) {
+                combined.append(*part);
             }
         }
         combined.optimize();
-        return combined.upload();
+        return storeGrenadeMesh(combined);
     }
 }
 
@@ -302,7 +308,7 @@ namespace TextureGen {
             }
         }
         
-        return Texture::upload(W, H, pixels.data());
+        return storeGrenadeTexture(W, H, std::move(pixels));
     }
     
     TextureHandle buildGrenadeTexture(const AlchemicalGrenadeParams& g) {
@@ -331,7 +337,7 @@ namespace TextureGen {
             }
         }
         
-        return Texture::upload(W, H, pixels.data());
+        return storeGrenadeTexture(W, H, std::move(pixels));
     }
     
     TextureHandle buildLiquidTexture(const AlchemicalGrenadeParams& g) {
@@ -351,8 +357,8 @@ namespace TextureGen {
                 combinedNoise = (combinedNoise + 1.0f) * 0.5f;
                 
                 glm::vec4 color = g.liquidColor;
-                color.rgb *= 0.8f + combinedNoise * 0.4f;
-                color.a *= 0.7f + combinedNoise * 0.3f;
+                const glm::vec3 rgb = glm::vec3(color) * (0.8f + combinedNoise * 0.4f);
+                color = glm::vec4(rgb, color.a * (0.7f + combinedNoise * 0.3f));
                 
                 color = glm::clamp(color, 0.0f, 1.0f);
                 
@@ -365,7 +371,7 @@ namespace TextureGen {
             }
         }
         
-        return Texture::upload(W, H, pixels.data());
+        return storeGrenadeTexture(W, H, std::move(pixels));
     }
     
     TextureHandle buildNoiseTexture(const AlchemicalGrenadeParams& g) {
@@ -383,12 +389,36 @@ namespace TextureGen {
             }
         }
         
-        return Texture::upload(W, H, pixels.data());
+        return storeGrenadeTexture(W, H, std::move(pixels));
     }
     
     TextureHandle mergeGrenadeTextures(const TextureHandle& casing, const TextureHandle& liquid) {
-        // Simple texture merging - in practice would use more sophisticated blending
-        return casing; // Placeholder
+        auto casingTex = getGrenadeTexture(casing);
+        auto liquidTex = getGrenadeTexture(liquid);
+        if (!casingTex) {
+            return liquid;
+        }
+        if (!liquidTex || liquidTex->width <= 0 || liquidTex->height <= 0) {
+            return casing;
+        }
+
+        // Composite the liquid over the casing ("over" operator); the liquid is sampled
+        // nearest-neighbour so textures of different sizes can be merged.
+        std::vector<glm::u8vec4> pixels(casingTex->pixels.size());
+        for (int y = 0; y < casingTex->height; ++y) {
+            for (int x = 0; x < casingTex->width; ++x) {
+                const int lx = x * liquidTex->width / casingTex->width;
+                const int ly = y * liquidTex->height / casingTex->height;
+                const glm::vec4 base = glm::vec4(casingTex->pixels[y * casingTex->width + x]) / 255.0f;
+                const glm::vec4 top = glm::vec4(liquidTex->pixels[ly * liquidTex->width + lx]) / 255.0f;
+                const float outA = top.a + base.a * (1.0f - top.a);
+                const glm::vec3 outRgb = outA > 0.0f
+                    ? (glm::vec3(top) * top.a + glm::vec3(base) * base.a * (1.0f - top.a)) / outA
+                    : glm::vec3(0.0f);
+                pixels[y * casingTex->width + x] = glm::u8vec4(glm::clamp(glm::vec4(outRgb, outA), 0.0f, 1.0f) * 255.0f + 0.5f);
+            }
+        }
+        return storeGrenadeTexture(casingTex->width, casingTex->height, std::move(pixels));
     }
 }
 
@@ -396,8 +426,8 @@ namespace ParticleGen {
     ParticleHandle buildExplosion(const AlchemicalGrenadeParams& g) {
         Log::info("AlchemicalGrenade", "Building grenade explosion particles for: {}", g.id);
         
-        ParticleSystem ps;
-        ps.setType(ParticleType::BURST);
+        GrenadeParticleSystem ps;
+        ps.setType(MagiTech::ParticleType::BURST);
         ps.setCount(g.particleBurstCount);
         ps.setLifetime(g.particleLifetime);
         ps.setSpeed(g.particleSpeed);
@@ -443,8 +473,8 @@ namespace ParticleGen {
     ParticleHandle buildResidue(const AlchemicalGrenadeParams& g) {
         Log::info("AlchemicalGrenade", "Building grenade residue particles for: {}", g.id);
         
-        ParticleSystem ps;
-        ps.setType(ParticleType::AREA_PUFF);
+        GrenadeParticleSystem ps;
+        ps.setType(MagiTech::ParticleType::AREA_PUFF);
         ps.setCount(g.particleBurstCount / 2);
         ps.setLifetime(g.residueDuration);
         ps.setSpeed(g.particleSpeed * 0.5f);
@@ -478,8 +508,8 @@ namespace ParticleGen {
     }
     
     ParticleHandle buildShrapnel(const AlchemicalGrenadeParams& g) {
-        ParticleSystem ps;
-        ps.setType(ParticleType::SHARD_BURST);
+        GrenadeParticleSystem ps;
+        ps.setType(MagiTech::ParticleType::SHARD_BURST);
         ps.setCount(g.shrapnelCount);
         ps.setLifetime(g.shardLifetime);
         ps.setSpeed(g.shardSpeed);
@@ -490,8 +520,8 @@ namespace ParticleGen {
     }
     
     ParticleHandle buildTrail(const AlchemicalGrenadeParams& g) {
-        ParticleSystem ps;
-        ps.setType(ParticleType::TRAIL);
+        GrenadeParticleSystem ps;
+        ps.setType(MagiTech::ParticleType::TRAIL);
         ps.setCount(g.particleBurstCount / 4);
         ps.setLifetime(g.particleLifetime * 0.5f);
         ps.setSpeed(g.particleSpeed * 0.3f);
@@ -712,8 +742,11 @@ namespace PhysGen {
     PhysicsHandle buildShrapnel(const AlchemicalGrenadeParams& g) {
         Log::info("AlchemicalGrenade", "Building grenade shrapnel physics for: {}", g.id);
         
-        PhysicsSystem ps;
-        
+        GrenadePhysicsSystem ps;
+        // Deterministic per grenade so cached bundles match regenerated ones
+        std::mt19937 rng(static_cast<uint32_t>(g.hashKey()));
+        std::uniform_real_distribution<float> unit(-1.0f, 1.0f);
+
         for (int i = 0; i < g.shrapnelCount; ++i) {
             std::string name = "shard_" + std::to_string(i);
             
@@ -721,14 +754,11 @@ namespace PhysGen {
             ps.addRigidBody(name, g.shardMass);
             
             // Add capsule collider
-            ps.addCollider(name, ColliderType::CAPSULE, g.shardSize);
+            ps.addCollider(name, GrenadeColliderType::CAPSULE, g.shardSize);
             
             // Set initial velocity in random direction
-            glm::vec3 direction = glm::normalize(glm::vec3(
-                (float)rand() / RAND_MAX * 2.0f - 1.0f,
-                (float)rand() / RAND_MAX * 2.0f - 1.0f,
-                (float)rand() / RAND_MAX * 2.0f - 1.0f
-            ));
+            glm::vec3 direction(unit(rng), unit(rng), unit(rng));
+            direction = glm::length(direction) > 1e-4f ? glm::normalize(direction) : glm::vec3(0.0f, 1.0f, 0.0f);
             ps.setInitialVelocity(name, direction * g.shardSpeed);
             
             // Set lifetime
@@ -739,11 +769,11 @@ namespace PhysGen {
     }
     
     PhysicsHandle buildGrenadePhysics(const AlchemicalGrenadeParams& g) {
-        PhysicsSystem ps;
+        GrenadePhysicsSystem ps;
         
         // Create main grenade body
         ps.addRigidBody("grenade", g.mass);
-        ps.addCollider("grenade", ColliderType::SPHERE, g.coreRadius);
+        ps.addCollider("grenade", GrenadeColliderType::SPHERE, g.coreRadius);
         
         // Set physics properties
         ps.setBounciness("grenade", g.bounciness);
@@ -759,7 +789,7 @@ namespace PhysGen {
     }
     
     PhysicsHandle buildExplosionPhysics(const AlchemicalGrenadeParams& g) {
-        PhysicsSystem ps;
+        GrenadePhysicsSystem ps;
         
         // Create explosion force field
         ps.addForceField("explosion", g.explosionRadius, g.explosionForce);

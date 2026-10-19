@@ -96,14 +96,14 @@ void IngredientLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_ingredient",
-        [&](const IngredientParams& p) {
+        [](const IngredientParams& p) {
             auto factory = IngredientLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("spawn_ingredient_async",
-        [&](const IngredientParams& p) {
+        [](const IngredientParams& p) {
             auto factory = IngredientLuaBindings::factory();
             pendingIngredients.emplace_back(factory->generateAsync(p), p.id);
         }
@@ -117,7 +117,7 @@ void IngredientLuaBindings::poll_assets(sol::state& lua) {
                 auto b = it->first.get();
                 lua["print"]("Ingredient ready: " + it->second);
             } catch (const std::exception& e) {
-                // log error
+                Log::error("Ingredients", "Asset generation failed for {}: {}", it->second, e.what());
             }
             it = pendingIngredients.erase(it);
         } else {

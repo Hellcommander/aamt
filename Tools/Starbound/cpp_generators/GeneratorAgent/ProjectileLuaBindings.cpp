@@ -1,7 +1,8 @@
 #include "ProjectileLuaBindings.hpp"
 #include "ProjectileFactory.hpp"
 #include "ProjectileTypes.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include "core/Log.hpp"
 #include <map>
 #include <future>
@@ -12,6 +13,48 @@ namespace Projectiles {
 
 static std::vector<std::pair<std::future<ProjectileBundle>, std::string>> pendingProjectiles;
 static std::map<std::string, ProjectileBundle> loadedProjectiles;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<ProjectileFactory>& factorySlot() {
+    static std::shared_ptr<ProjectileFactory> f;
+    return f;
+}
+} // namespace
+
+void ProjectileLuaBindings::setFactory(std::shared_ptr<ProjectileFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<ProjectileFactory> ProjectileLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<ProjectileFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
+
+namespace {
+/** Queues asynchronous generation; poll_assets collects the finished bundle. */
+void spawnProjectile(const ProjectileParams& p) {
+    auto factory = ProjectileLuaBindings::factory();
+    if (!factory) {
+        Log::error("Projectile", "ProjectileFactory not available");
+        return;
+    }
+
+    auto fut = factory->generateAsync(p);
+    pendingProjectiles.emplace_back(std::move(fut), p.id);
+    Log::info("Projectile", "Queued projectile generation for: {}", p.id);
+}
+} // namespace
 
 void ProjectileLuaBindings::bind(sol::state& lua) {
     // Bind ProjectileParams with all properties
@@ -35,20 +78,10 @@ void ProjectileLuaBindings::bind(sol::state& lua) {
     );
 
     // Function to spawn projectiles asynchronously
-    lua.set_function("spawn_proj", [&](ProjectileParams p) {
-        auto factory = MainPlugin::instance().getProjectileFactory();
-        if (!factory) {
-            Log::error("ProjectileFactory not available");
-            return;
-        }
-        
-        auto fut = factory->generateAsync(p);
-        pendingProjectiles.emplace_back(std::move(fut), p.id);
-        Log::info("Projectile", "Queued projectile generation for: {}", p.id);
-    });
+    lua.set_function("spawn_proj", &spawnProjectile);
 
     // Function to create predefined projectile types
-    lua.set_function("create_fireball", [&](std::string id, float radius, float speed) {
+    lua.set_function("create_fireball", [](std::string id, float radius, float speed) {
         ProjectileParams p;
         p.id = id;
         p.projType = "fireball";
@@ -66,10 +99,10 @@ void ProjectileLuaBindings::bind(sol::state& lua) {
         p.fragmentationCount = 0;
         p.homingStrength = 0.0f;
         
-        spawn_proj(p);
+        spawnProjectile(p);
     });
 
-    lua.set_function("create_arrow", [&](std::string id, float length, float speed) {
+    lua.set_function("create_arrow", [](std::string id, float length, float speed) {
         ProjectileParams p;
         p.id = id;
         p.projType = "arrow";
@@ -87,10 +120,10 @@ void ProjectileLuaBindings::bind(sol::state& lua) {
         p.fragmentationCount = 0;
         p.homingStrength = 0.0f;
         
-        spawn_proj(p);
+        spawnProjectile(p);
     });
 
-    lua.set_function("create_laser", [&](std::string id, float length, float speed) {
+    lua.set_function("create_laser", [](std::string id, float length, float speed) {
         ProjectileParams p;
         p.id = id;
         p.projType = "laser";
@@ -108,10 +141,10 @@ void ProjectileLuaBindings::bind(sol::state& lua) {
         p.fragmentationCount = 0;
         p.homingStrength = 0.0f;
         
-        spawn_proj(p);
+        spawnProjectile(p);
     });
 
-    lua.set_function("create_bolt", [&](std::string id, float length, float speed) {
+    lua.set_function("create_bolt", [](std::string id, float length, float speed) {
         ProjectileParams p;
         p.id = id;
         p.projType = "bolt";
@@ -129,16 +162,16 @@ void ProjectileLuaBindings::bind(sol::state& lua) {
         p.fragmentationCount = 3;
         p.homingStrength = 0.3f;
         
-        spawn_proj(p);
+        spawnProjectile(p);
     });
 
     // Function to check if projectile is ready
-    lua.set_function("is_projectile_ready", [&](std::string id) {
+    lua.set_function("is_projectile_ready", [](std::string id) {
         return loadedProjectiles.find(id) != loadedProjectiles.end();
     });
 
     // Function to get projectile bundle
-    lua.set_function("get_projectile", [&](std::string id) {
+    lua.set_function("get_projectile", [](std::string id) {
         auto it = loadedProjectiles.find(id);
         if (it != loadedProjectiles.end()) {
             return it->second;
@@ -147,7 +180,7 @@ void ProjectileLuaBindings::bind(sol::state& lua) {
     });
 
     // Function to clear projectile cache
-    lua.set_function("clear_projectile_cache", [&]() {
+    lua.set_function("clear_projectile_cache", []() {
         loadedProjectiles.clear();
         Log::info("Projectile cache cleared");
     });

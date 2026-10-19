@@ -1,43 +1,55 @@
-#include "CrossbowAssetFactory.hpp"
+#include "CrossbowGenerators.hpp"
 #include "core/Log.hpp"
 #include "core/mesh/Mesh.hpp"
 #include "core/rendering/Primitives.hpp"
 #include "core/rendering/Materials.hpp"
 #include "core/physics/Collision.hpp"
-#include "core/animation/Animation.hpp"
+// MagiTech::Animation (setDuration/addKeyframe/upload) comes from core/animation/AssetAnimation.hpp
+// via CrossbowAssetFactory.hpp; core/animation/Animation.hpp defines a different class of the same name.
+#include "vendor/xxhash/xxhash.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/transform.hpp>
+#include <type_traits>
 
 namespace MagiTech {
 namespace Crossbows {
 
 #define LOG_CROSSBOW_GEN(Action, Id) Log::info("Crossbow", "CrossbowGen - {}: {}", #Action, Id)
 
-// Hash function implementations
+namespace {
+    // Field-wise hashing (raw struct bytes would include padding and heap pointers).
+    struct Hasher {
+        XXH64_state_t state;
+        Hasher() { XXH64_reset(&state, 0); }
+        template <typename T>
+        Hasher& pod(const T& v) {
+            static_assert(std::is_trivially_copyable_v<T>);
+            XXH64_update(&state, &v, sizeof(T));
+            return *this;
+        }
+        Hasher& str(const std::string& v) {
+            pod(static_cast<uint64_t>(v.size()));
+            XXH64_update(&state, v.data(), v.size());
+            return *this;
+        }
+        uint64_t digest() { return XXH64_digest(&state); }
+    };
+}
+
+// Hash function implementations (the kind tag keeps bolt and arrow keys apart in the shared cache)
 uint64_t CrossbowParams::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(CrossbowParams) - 4 * sizeof(std::string));
-    XXH64_update(&s, id.c_str(), id.length());
-    XXH64_update(&s, stockMaterial.c_str(), stockMaterial.length());
-    XXH64_update(&s, limbMaterial.c_str(), limbMaterial.length());
-    XXH64_update(&s, stringMaterial.c_str(), stringMaterial.length());
-    return XXH64_digest(&s);
+    return Hasher().pod(uint8_t{0}).str(id).pod(drawLength).pod(drawWeight).pod(autoReload).pod(reloadTime)
+                   .str(stockMaterial).str(limbMaterial).str(stringMaterial).digest();
 }
 
 uint64_t BoltParams::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(BoltParams) - 2 * sizeof(std::string));
-    XXH64_update(&s, id.c_str(), id.length());
-    XXH64_update(&s, fletchMaterial.c_str(), fletchMaterial.length());
-    return XXH64_digest(&s);
+    return Hasher().pod(uint8_t{1}).str(id).pod(length).pod(shaftRadius).pod(useFletching).str(fletchMaterial)
+                   .pod(fletchLength).pod(tipMass).pod(barbedTip).digest();
 }
 
 uint64_t ArrowParams::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(ArrowParams) - 2 * sizeof(std::string));
-    XXH64_update(&s, id.c_str(), id.length());
-    XXH64_update(&s, fletchStyle.c_str(), fletchStyle.length());
-    return XXH64_digest(&s);
+    return Hasher().pod(uint8_t{2}).str(id).pod(shaftLength).pod(shaftDiameter).pod(spineRating).pod(useFletching)
+                   .str(fletchStyle).pod(nockSize).pod(tipMass).digest();
 }
 
 // Enhanced Generator Implementations

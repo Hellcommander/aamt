@@ -72,6 +72,7 @@ namespace MeshGen {
         material.roughness = p.roughness;
         material.emissivePower = p.emissivePower;
         setMeshMaterial(handle, material);
+        recordMeshStats(handle, finalMesh.vertices.size(), finalMesh.indices.size() / 3);
 
         return handle;
     }
@@ -85,6 +86,23 @@ namespace MeshGen {
             static std::unordered_map<MeshHandle, LauncherSurfaceMaterial> table;
             return table;
         }
+        std::unordered_map<MeshHandle, LauncherMeshStats>& statsTable() {
+            static std::unordered_map<MeshHandle, LauncherMeshStats> table;
+            return table;
+        }
+    }
+
+    void recordMeshStats(MeshHandle mesh, size_t vertexCount, size_t triangleCount) {
+        if (mesh == 0) return;
+        std::lock_guard<std::mutex> lock(materialMutex());
+        statsTable()[mesh] = LauncherMeshStats{vertexCount, triangleCount};
+    }
+
+    std::optional<LauncherMeshStats> getMeshStats(MeshHandle mesh) {
+        std::lock_guard<std::mutex> lock(materialMutex());
+        auto it = statsTable().find(mesh);
+        if (it == statsTable().end()) return std::nullopt;
+        return it->second;
     }
 
     void setMeshMaterial(MeshHandle mesh, const LauncherSurfaceMaterial& material) {

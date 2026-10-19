@@ -670,7 +670,7 @@ nlohmann::json toJson(const UIItemParams& params) {
     return j;
 }
 
-UIItemParams fromJson(const nlohmann::json& json) {
+UIItemParams uiItemParamsFromJson(const nlohmann::json& json) {
     UIItemParams params;
     
     try {

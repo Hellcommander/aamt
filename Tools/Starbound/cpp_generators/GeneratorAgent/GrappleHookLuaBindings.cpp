@@ -45,15 +45,15 @@ void GrappleHookLuaBindings::bind(sol::state& lua) {
         "linkCount", &ChainParams::linkCount, "linkLength", &ChainParams::linkLength,
         "linkThickness", &ChainParams::linkThickness, "linkScale", &ChainParams::linkScale, "twistAngle", &ChainParams::twistAngle);
 
-    lua.new_usertype<MaterialParams>("MaterialParams", sol::constructors<MaterialParams()>(),
+    lua.new_usertype<MaterialParams>("GrappleMaterialParams", sol::constructors<MaterialParams()>(),
         "baseColorMap", &MaterialParams::baseColorMap, "normalMap", &MaterialParams::normalMap,
         "metallicRoughnessMap", &MaterialParams::metallicRoughnessMap, "colorTint", &MaterialParams::colorTint);
 
-    lua.new_usertype<PhysicsParams>("PhysicsParams", sol::constructors<PhysicsParams()>(),
+    lua.new_usertype<PhysicsParams>("GrapplePhysicsParams", sol::constructors<PhysicsParams()>(),
         "enablePhysics", &PhysicsParams::enablePhysics, "linkMass", &PhysicsParams::linkMass,
         "jointStiffness", &PhysicsParams::jointStiffness, "jointDamping", &PhysicsParams::jointDamping, "gravityOverride", &PhysicsParams::gravityOverride);
 
-    lua.new_usertype<LODParams>("LODParams", sol::constructors<LODParams()>(),
+    lua.new_usertype<LODParams>("GrappleLODParams", sol::constructors<LODParams()>(),
         "meshLODs", &LODParams::meshLODs, "displayRanges", &LODParams::displayRanges);
     
     lua.new_usertype<GrappleBundle>("GrappleBundle", sol::no_constructor,

@@ -60,7 +60,7 @@ public:
             return std::async(std::launch::deferred, [=] { return *hit; });
         }
 
-        return m_pool.enqueue([=]() {
+        return m_pool.enqueue([=, this]() {
             UIAssetBundle b;
             b.mesh = MeshGen::buildUIElement(p, t);
             b.texture = TextureGen::buildUITexture(p, t);

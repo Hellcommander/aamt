@@ -62,7 +62,7 @@ void TrapLuaBindings::bind(sol::state& lua) {
         "acidType", &TrapParams::acidType
     );
 
-    lua.new_usertype<BehaviorParams>("BehaviorParams",
+    lua.new_usertype<BehaviorParams>("TrapBehaviorParams",
         sol::constructors<BehaviorParams()>(),
         "detectionRange", &BehaviorParams::detectionRange,
         "resetOnPlayerLeave", &BehaviorParams::resetOnPlayerLeave,

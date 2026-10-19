@@ -1,7 +1,7 @@
 #include "CometProjectileLuaBindings.hpp"
 #include "CometProjectileFactory.hpp"
 #include "CometProjectileTypes.hpp"
-#include "CometProjectileGenerators.cpp"
+#include "CometProjectileAssets.hpp"
 #include <fstream>
 #include <sstream>
 
@@ -9,6 +9,21 @@ namespace MagiTech {
 namespace CometProjectiles {
 
 static std::vector<std::pair<std::future<CometAssetBundle>, std::string>> pendingComets;
+
+// std::map members are exposed as plain Lua tables (copy in / copy out): sol2's
+// associative container usertype does not compile with the vendored sol2
+// (usertype_container.hpp next_associative calls iter::end()).
+template <typename T>
+static auto metadataProperty() {
+    return sol::property(
+        [](const T& p) { return sol::as_table(p.metadata); },
+        [](T& p, const sol::table& t) {
+            p.metadata.clear();
+            for (const auto& [k, v] : t) {
+                p.metadata[k.as<std::string>()] = v.as<std::string>();
+            }
+        });
+}
 
 void CometProjectileLuaBindings::bind(sol::state& lua) {
     // Bind enums
@@ -160,7 +175,7 @@ void CometProjectileLuaBindings::bind(sol::state& lua) {
         // Metadata
         "description", &CometProjectileParams::description,
         "tags", &CometProjectileParams::tags,
-        "metadata", &CometProjectileParams::metadata,
+        "metadata", metadataProperty<CometProjectileParams>(),
         
         // Methods
         "hashKey", &CometProjectileParams::hashKey

@@ -11,9 +11,11 @@
 #include <chrono>
 #include <filesystem>
 
+#include <mutex>
+
 // Forward declarations
-namespace mt {
-    class ThreadPoolManager;
+namespace MagiTech::VisualQA {
+    class VisualQASystem;
 }
 
 namespace mt::qa {
@@ -37,13 +39,15 @@ struct ValidationResult {
 };
 
 // Visual QA result types (from VisualQASystem)
+// All metrics are "higher is better": shapeDifference and colorDistance are stored as
+// similarities (1 - normalized difference / distance), so each one passes when >= its threshold.
 struct ImageScore {
-    double psnr;
-    double ssim;
-    double histogramCorrelation;
-    double shapeDifference;
-    double colorDistance;
-    double edgeSimilarity;
+    double psnr = 0.0;
+    double ssim = 0.0;
+    double histogramCorrelation = 0.0;
+    double shapeDifference = 0.0;
+    double colorDistance = 0.0;
+    double edgeSimilarity = 0.0;
     
     // Thresholds for pass/fail
     double psnrThreshold = 30.0;
@@ -58,7 +62,7 @@ struct ImageScore {
 };
 
 struct VisualTestResult {
-    bool passed;
+    bool passed = false;
     ImageScore score;
     std::string baselinePath;
     std::string testPath;
@@ -121,7 +125,8 @@ public:
     
     // Configuration
     void configure(const UnifiedTestConfig& config);
-    void setThreadPool(std::shared_ptr<mt::ThreadPoolManager> threadPool);
+    // Pool used for parallel batches; when none is injected, one with config.maxThreads workers is created on demand.
+    void setThreadPool(std::shared_ptr<MagiTech::GeneratorTaskPool> threadPool);
     
     // Asset validation registration
     void registerValidator(std::shared_ptr<IAssetValidator> validator);
@@ -165,7 +170,9 @@ public:
 private:
     // Internal state
     UnifiedTestConfig m_config;
-    std::shared_ptr<mt::ThreadPoolManager> m_threadPool;
+    std::shared_ptr<MagiTech::GeneratorTaskPool> m_threadPool;
+    std::mutex m_poolMutex;
+    std::unique_ptr<MagiTech::VisualQA::VisualQASystem> m_visualQA;   // image metrics backend
     std::unordered_map<std::string, std::shared_ptr<IAssetValidator>> m_validators;
     std::unordered_map<std::string, std::string> m_assetTypeMap;
     
@@ -178,6 +185,9 @@ private:
     std::shared_ptr<IAssetValidator> findValidator(const std::string& assetPath) const;
     ValidationResult runDataValidation(const std::string& assetPath);
     VisualTestResult runVisualQA(const std::string& assetPath);
+    std::string baselinePathFor(const std::string& assetPath) const;
+    bool isVisualAsset(const std::string& assetType) const;
+    std::shared_ptr<MagiTech::GeneratorTaskPool> threadPool();
     
     // Helper methods
     bool shouldSkipAsset(const std::string& assetPath) const;
