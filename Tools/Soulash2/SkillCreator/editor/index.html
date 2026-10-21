@@ -106,6 +106,8 @@
     <button class="nav-tab" data-tab="entities">Items / Creatures</button>
     <button class="nav-tab" data-tab="races">Races</button>
     <button class="nav-tab" data-tab="buildings">Buildings</button>
+    <button class="nav-tab" data-tab="maps">Procedural Maps</button>
+    <button class="nav-tab" data-tab="conversations">Conversations</button>
     <button class="nav-tab" data-tab="catalog">Catalog</button>
     <button class="nav-tab" data-tab="json">JSON</button>
     <a class="nav-tab" href="/planner.html" style="text-decoration:none">Planner</a>
@@ -123,9 +125,9 @@
       <label>Projects (staging / live / workshop)
         <select id="projects"><option value="">— pick a mod —</option></select>
       </label>
-      <p class="hint">Select a project then click <strong>Load</strong>. Staging = Output skill.json. Live/workshop folders import into Output for editing.</p>
+      <p class="hint">Select a project then click <strong>Load</strong>. SkillCreator keeps its private spec under <code>.skillcreator/</code>; the mod root contains game-ready files. Live/workshop folders import into Output for editing.</p>
       <label>Or paste folder / skill.json path
-        <input id="loadPath" placeholder="D:\...\Output\Soulash2\acid_magic\skill.json" style="min-width:100%" />
+        <input id="loadPath" placeholder="D:\...\Output\Soulash2\acid_magic\.skillcreator\skill.json" style="min-width:100%" />
       </label>
       <div class="row">
         <button id="btnBrowse">Browse…</button>
@@ -216,6 +218,12 @@
             </select>
           </label>
           <label>Unlock level <input id="addLevel" type="number" value="1" min="0" max="50" /></label>
+          <label id="addMilestoneModeLabel">Milestone type
+            <select id="addInnate">
+              <option value="false">Skill level</option>
+              <option value="true">Innate (grant through entity skills.milestones)</option>
+            </select>
+          </label>
           <label>Id <input id="addId" placeholder="geomancy_stone_bolt" /></label>
           <label>Name <input id="addName" placeholder="Stone Bolt" /></label>
         </div>
@@ -273,6 +281,7 @@
           <label>Type <select id="addAmpType"></select></label>
           <label>Bonus effect <select id="addBonusEffect"></select></label>
           <label>Bonus value <input id="addBonusValue" placeholder="10" /></label>
+          <label>Bonus secondary value <input id="addBonusSecondaryValue" placeholder="optional; entity scaling amount" /></label>
           <label>cost_stamina <input id="addCostStamina" placeholder="-2" /></label>
           <label>range+ <input id="addAmpRange" placeholder="1" /></label>
           <label>description <input id="addAmpDesc" placeholder="tooltip (amplifiers use this)" /></label>
@@ -291,13 +300,15 @@
             </select>
           </label>
           <label>restrict_tags <input id="addRestrictTags" placeholder="9,4 (optional)" /></label>
-          <label>Innate
-            <select id="addInnate">
-              <option value="false">false (skill unlock)</option>
-              <option value="true">true (empty requirements)</option>
-            </select>
-          </label>
         </div>
+        <div class="row hidden" id="passTriggerFields">
+          <label>Triggering ability id <input id="addTriggerSource" placeholder="my_skill_circle" /></label>
+          <label>Triggered ability id <input id="addTriggerPayload" placeholder="my_skill_rune" /></label>
+          <label>Chance (0–1) <input id="addTriggerChance" type="number" min="0" max="1" step="0.01" value="1" /></label>
+          <button type="button" id="btnAddSpellTrigger">Add spell trigger</button>
+        </div>
+        <p class="hint hidden" id="spellTriggerHint">Spell triggers use the documented passive effect trigger_ability_on_cast. Recursive chains are allowed by the data model but can keep scheduling casts; validate flags cycles for review.</p>
+        <div id="spellTriggerList" class="hidden"></div>
         <p class="hint hidden" id="addPassEffectHint"></p>
         <div class="row hidden" id="stackerFields">
           <label>Per-stack effect <select id="addStEffect"></select></label>
@@ -370,7 +381,7 @@
         <div class="row">
           <button class="primary" id="btnAddEntity">Create entity</button>
         </div>
-        <h2 style="margin-top:18px;">Clone from vanilla / workshop</h2>
+        <h2 style="margin-top:18px;">Clone from vanilla / installed mods / Workshop</h2>
         <p class="hint">Search core_2 + workshop entities. <strong>Load</strong> fills the form (and JSON preview) without copying into the skill. <strong>Clone</strong> copies into this skill (needs a project loaded).</p>
         <div class="row">
           <label>Search <input id="entSearch" placeholder="golem" /></label>
@@ -414,8 +425,18 @@
         <div class="row">
           <label>Starting items <input id="raceItems" placeholder="70, skilltest_book" /></label>
           <label>Starting recipes <input id="raceRecipes" placeholder="optional" /></label>
-          <label>Adult entity <input id="raceAdultEnt" placeholder="optional base_entities.adult" /></label>
           <label>Orphan surname <input id="raceOrphan" placeholder="Stone" /></label>
+        </div>
+        <div class="row">
+          <label>Adult age <input id="raceAdultAge" type="number" value="50" /></label>
+          <label>Child age <input id="raceChildAge" type="number" value="14" /></label>
+          <label>Elder age <input id="raceElderAge" type="number" value="70" /></label>
+          <label>Adult entity <input id="raceAdultEnt" placeholder="base_entities.adult" /></label>
+          <label>Child entity <input id="raceChildEnt" placeholder="base_entities.child" /></label>
+          <label>Leader entity <input id="raceLeaderEnt" placeholder="base_entities.leader" /></label>
+          <label>Recruit entity <input id="raceRecruitEnt" placeholder="base_entities.recruit" /></label>
+          <label>Rebel entity <input id="raceRebelEnt" placeholder="base_entities.rebel" /></label>
+          <label>Adventurer entity <input id="raceAdventurerEnt" placeholder="base_entities.adventurer" /></label>
         </div>
         <div class="row">
           <label>settlement.max <input id="raceSettleMax" type="number" placeholder="optional" /></label>
@@ -426,12 +447,16 @@
             <select id="raceCollapse"><option value="false">false</option><option value="true">true</option></select>
           </label>
           <label>Birth resource <input id="raceBirth" placeholder="core_2_Vampire_Blood" /></label>
+          <label>Birth amount <input id="raceBirthAmount" type="number" value="1" /></label>
+          <label>Birth resource type <input id="raceBirthType" type="number" placeholder="e.g. 6" /></label>
+          <label>Birth max population <input id="raceBirthMax" type="number" placeholder="e.g. 100" /></label>
           <label>No settlement block
             <select id="raceNoSettle"><option value="true">true (playable only)</option><option value="false">false</option></select>
           </label>
         </div>
         <div class="row">
           <label>New character tag name <input id="raceNewTag" placeholder="stonefolk (optional)" /></label>
+          <label>Tag options <input id="raceNewTagOptions" placeholder="immune_to_fear,crime_exempt" /></label>
           <label>Control action tag <input id="raceControlTag" placeholder="optional creature tag" /></label>
           <button class="primary" id="btnAddRace">Create race</button>
         </div>
@@ -451,6 +476,18 @@
           </label>
         </div>
         <div id="raceSearchHits"></div>
+        <h2 style="margin-top:18px;">Advanced character.json</h2>
+        <p class="hint">Load this spec’s character data, edit any race, tag, control action, production action, or equipment slot, then merge it back by id. All entry fields are preserved, including action-specific requirements such as <code>require_liquid: {"type":6,"amount":100}</code>. Import a mod folder to bring its character entries and referenced NPC name files, or paste partial JSON below.</p>
+        <div class="row">
+          <label>Mod folder or character.json path <input id="characterJsonPath" placeholder="E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\my_mod" style="min-width:420px" /></label>
+          <button id="btnImportCharacterJsonFile">Import mod character.json</button>
+        </div>
+        <div class="row">
+          <button id="btnLoadCharacterJson">Load current entries</button>
+          <button class="primary" id="btnMergeCharacterJson">Merge JSON into spec</button>
+        </div>
+        <textarea id="characterJsonEditor" rows="18" spellcheck="false" style="width:100%;font-family:monospace" placeholder='{"production_actions":[{"id":"my_pour_poison","name":"Pour Poison","require_liquid":{"type":6,"amount":100}}],"custom_eq_slots":[]}'></textarea>
+        <div id="characterJsonStatus" class="hint"></div>
         <h2 style="margin-top:18px;">Control action</h2>
         <p class="hint">Tame / Control Undead live on <code>character.json</code>, not skill milestones. Clone vanilla then retarget tags.</p>
         <div class="row">
@@ -471,6 +508,12 @@
         <h2>Buildings</h2>
         <p class="hint">Player settlement halls that train this skill use <code>enables: [skill_id]</code>, like vanilla Collegium Magicae / Dojo. Clone a 0.10 template rather than inventing maps. <code>write</code> emits <code>buildings/*.json</code>. Do not invent <code>.smap</code> files — copy an existing map if a civ building needs one.</p>
         <div class="row">
+          <button id="btnFixSpecBuildings">Check and repair buildings in this spec</button>
+          <span class="hint">Repairs safe fields, then reports anything that needs a human or matching worker entity.</span>
+        </div>
+        <div id="bldgFixReport" class="hint"></div>
+        <div id="bldgGuide" class="ent-card">Loading local docs and installed building references…</div>
+        <div class="row">
           <label>Name <input id="bldgName" placeholder="Test Hall" /></label>
           <label>Id <input id="bldgId" placeholder="skilltest_hall" /></label>
           <label>Template
@@ -490,6 +533,51 @@
         <div id="bldgSearchHits"></div>
         <h2 style="margin-top:18px;">In this spec</h2>
         <div id="bldgList"></div>
+      </section>
+      <section id="tab-maps" class="hidden">
+        <h2>Procedural maps</h2>
+        <p class="hint">Search and clone maps from core, installed mods, or Workshop. Edit the complete map JSON here. Map ids are numeric; the editor writes <code>procedural_maps</code> and preserves the source folder spelling when importing an existing mod (including <code>procedual_maps</code>).</p>
+        <div class="row">
+          <label>Search references <input id="procMapSearch" placeholder="forest, biome id, or map id" /></label>
+          <button id="btnSearchProcMap">Search</button>
+          <button id="btnNewProcMap">New blank map</button>
+        </div>
+        <div id="procMapSearchHits"></div>
+        <h2 style="margin-top:18px;">Map JSON</h2>
+        <p class="hint">Required fields and ranges follow local game maps. Cloning keeps all terrain, background, and entity-density settings; use the JSON editor to change them.</p>
+        <textarea id="procMapEditor" rows="22" spellcheck="false" style="width:100%;font-family:monospace" placeholder='{"background":"1","biome":9,"bridge":"44","entities":[],"hill_amount":[1,4],"hill_size":[800,2000],"hill_slope_down":"2035","hill_slope_up":"2034","hill_wall":"242","id":201,"name":"New Map","river":"974","road":"254","slope_amount":[20,80],"underground_background":"30","underground_wall":"242"}'></textarea>
+        <div class="row">
+          <button class="primary" id="btnSaveProcMap">Add / replace map in spec</button>
+          <span class="hint">Saving a map id already in this spec replaces it.</span>
+        </div>
+        <div id="procMapStatus" class="hint"></div>
+        <h2 style="margin-top:18px;">In this spec</h2>
+        <div id="procMapList"></div>
+      </section>
+      <section id="tab-conversations" class="hidden">
+        <h2>Conversations</h2>
+        <p class="hint">Edit the conversation graph from <code>conversations.json</code>. Options link node ids; begin nodes can be gated by entities and conditions. The JSON editor keeps game-specific and future fields intact. Core examples provide current game type templates.</p>
+        <div class="row">
+          <label>Game conversation type
+            <select id="conversationType"><option value="begin_conversation">begin_conversation</option></select>
+          </label>
+          <button id="btnNewConversation">New blank node</button>
+          <button id="btnLoadConversationExample">Load core example</button>
+        </div>
+        <div id="conversationTypeHint" class="hint"></div>
+        <div id="conversationStatus" class="hint"></div>
+        <h2 style="margin-top:14px;">Node JSON</h2>
+        <textarea id="conversationEditor" rows="18" spellcheck="false" style="width:100%;font-family:monospace" placeholder='{"id":"my_mod_begin","type":"begin_conversation","text":"","answer_positive":"What do you need?","answer_negative":"Not now.","entities":["my_mod_npc"],"options":["my_mod_trade"]}'></textarea>
+        <div class="row"><button class="primary" id="btnSaveConversation">Add / update node</button><span class="hint">Editing a listed node replaces that row; a new node appends.</span></div>
+        <h2 style="margin-top:14px;">Conversation graph nodes</h2>
+        <div class="row"><label>Filter nodes <input id="conversationFilter" placeholder="id, type, text, or option" /></label></div>
+        <div id="conversationList"></div>
+        <h2 style="margin-top:22px;">Family conversations</h2>
+        <p class="hint">These are the separate <code>family_conversations</code> rows keyed by race, with a comment and positive / negative replies.</p>
+        <div class="row"><button id="btnNewFamilyConversation">New family row</button></div>
+        <textarea id="familyConversationEditor" rows="8" spellcheck="false" style="width:100%;font-family:monospace" placeholder='{"race":"0","comment":"human","answer_positive":"Do you need anything, ::relative?","answer_negative":"Come back later, ::relative."}'></textarea>
+        <div class="row"><button class="primary" id="btnSaveFamilyConversation">Add / update family row</button></div>
+        <div id="familyConversationList"></div>
       </section>
       <section id="tab-catalog" class="hidden">
         <h2>Effect catalog</h2>
@@ -535,9 +623,14 @@
     const $ = (id) => document.getElementById(id);
     let catalog = { effects: [], enums: {}, dropdowns: {}, cards: {}, limits: {} };
     let spec = null;
+    let passiveSpellTriggers = [];
     let abilityExtras = {};
     let stackerExtras = {};
     let selMile = null;
+    let conversationExamples = {};
+    let conversationTypeCounts = {};
+    let conversationEditIndex = null;
+    let familyConversationEditIndex = null;
     function log(msg) { $("log").textContent = typeof msg === "string" ? msg : JSON.stringify(msg, null, 2); }
 
     const LAST = {
@@ -730,6 +823,7 @@
       fillGroupedSelect($("addAbEffect"), d.ability || [], "abilityEffect");
       fillGroupedSelect($("addBonusEffect"), d.amplifier || [], "amplifierEffect");
       fillGroupedSelect($("addPassEffect"), d.passive || [], "passiveEffect");
+      $("addPassEffect").insertAdjacentHTML("afterbegin", '<option value="">No passive effect (trigger-only)</option>');
       fillGroupedSelect($("addStEffect"), d.stacker || [], "stackerEffect");
       fillSimpleSelect($("addTarget"), d.target || [], "target");
       fillSimpleSelect($("addDmgType"), d.damage_type || [], "damageType");
@@ -750,7 +844,7 @@
 
     function showTab(id) {
       document.querySelectorAll(".nav-tab").forEach(b => b.classList.toggle("active", b.dataset.tab === id));
-      ["tree","skill","add","catalog","json","entities","races","buildings"].forEach(t => $(`tab-${t}`).classList.toggle("hidden", t !== id));
+      ["tree","skill","add","catalog","json","entities","races","buildings","maps","conversations"].forEach(t => $(`tab-${t}`).classList.toggle("hidden", t !== id));
     }
 
     function treeRowsFromSpec(s) {
@@ -804,8 +898,12 @@
       const nSt = (spec && spec.stackers || []).length;
       const nAn = (spec && spec.animations || []).length;
       const nRace = (spec && spec.races || []).length;
+      const nCustomSlots = (spec && spec.custom_eq_slots || []).length;
       const nBldg = (spec && spec.buildings || []).length;
-      $("meta").textContent = spec ? `${spec.skill?.name || ""} (${spec.skill_id})\n${(spec.abilities||[]).length} abilities, ${(spec.amplifiers||[]).length} amplifiers, ${(spec.passives||[]).length} passives, ${nSt} stackers, ${nAn} animations, ${(spec.milestones||[]).length} milestones, ${nEnt} entities, ${nRace} races, ${nBldg} buildings` : "";
+      const nProcMaps = (spec && spec.procedural_maps || []).length;
+      const nConversations = (spec && Array.isArray(spec.conversations) ? spec.conversations : []).length;
+      const nFamilyConversations = (spec && Array.isArray(spec.family_conversations) ? spec.family_conversations : []).length;
+      $("meta").textContent = spec ? `${spec.skill?.name || ""} (${spec.skill_id})\n${(spec.abilities||[]).length} abilities, ${(spec.amplifiers||[]).length} amplifiers, ${(spec.passives||[]).length} passives, ${nSt} stackers, ${nAn} animations, ${(spec.milestones||[]).length} milestones, ${nEnt} entities, ${nRace} races, ${nCustomSlots} equipment slots, ${nBldg} buildings, ${nProcMaps} procedural maps, ${nConversations} conversations, ${nFamilyConversations} family replies` : "";
       const anims = (spec && spec.animations) || [];
       if (anims.length) {
         $("tree").innerHTML += `<h2 style="margin-top:16px;">Animations</h2>` + anims.map(a =>
@@ -815,6 +913,8 @@
       renderEntities();
       renderRaces();
       renderBuildings();
+      renderProceduralMaps();
+      renderConversations();
       renderSkill();
       $("tree").querySelectorAll(".tree-item[data-mid]").forEach(row => {
         row.onclick = () => {
@@ -838,14 +938,63 @@
       const actions = (spec && spec.control_actions) || [];
       let html = races.map(r => {
         const kit = [...(r.passives||[]), ...(r.abilities||[])].join(", ");
-        return `<div class="ent-card"><strong>${esc(r.name||r.id)}</strong> <code>${esc(r.id)}</code> playable=${r.playable} ${kit ? `<em style="color:var(--muted)">${esc(kit)}</em>` : ""}</div>`;
+        return `<div class="ent-card"><strong>${esc(r.name||r.id)}</strong> <code>${esc(r.id)}</code> playable=${r.playable} ${kit ? `<em style="color:var(--muted)">${esc(kit)}</em>` : ""} <button data-edit-race-json="${esc(r.id)}">Edit JSON</button></div>`;
       }).join("") || "<p>No races yet.</p>";
+      const slots = (spec && spec.custom_eq_slots) || [];
+      if (slots.length) {
+        html += `<h2 style="margin-top:18px;">Custom equipment slots</h2>` + slots.map(slot =>
+          `<div class="ent-card"><strong>${esc(slot.name||slot.id)}</strong> <code>${esc(slot.id)}</code> item types=${esc((slot.item_types||[]).join(","))} replaces=${esc(slot.replace||"-")} <button data-edit-character-kind="custom_eq_slots" data-edit-character-id="${esc(slot.id)}">Edit JSON</button></div>`
+        ).join("");
+      }
       if (actions.length) {
         html += `<h2 style="margin-top:18px;">Control actions</h2>` + actions.map(a =>
-          `<div class="ent-card"><strong>${esc(a.name||a.id)}</strong> <code>${esc(a.id)}</code> tags=${esc((a.tags||[]).join(","))}</div>`
+          `<div class="ent-card"><strong>${esc(a.name||a.id)}</strong> <code>${esc(a.id)}</code> tags=${esc((a.tags||[]).join(","))} <button data-edit-character-kind="control_actions" data-edit-character-id="${esc(a.id)}">Edit JSON</button></div>`
+        ).join("");
+      }
+      const production = (spec && spec.production_actions) || [];
+      if (production.length) {
+        html += `<h2 style="margin-top:18px;">Production actions</h2>` + production.map(action =>
+          `<div class="ent-card"><strong>${esc(action.name||action.id)}</strong> <code>${esc(action.id)}</code> ${action.require_liquid ? `liquid type=${esc(action.require_liquid.type)} amount=${esc(action.require_liquid.amount)}` : ""} <button data-edit-character-kind="production_actions" data-edit-character-id="${esc(action.id)}">Edit JSON</button></div>`
+        ).join("");
+      }
+      const tags = (spec && spec.character_tags) || [];
+      if (tags.length) {
+        html += `<h2 style="margin-top:18px;">Character tags</h2>` + tags.map(tag =>
+          `<div class="ent-card"><strong>${esc(tag.name||tag.id)}</strong> <code>${esc(tag.id)}</code> options=${esc((tag.options||[]).join(","))} <button data-edit-character-kind="tags" data-edit-character-id="${esc(tag.id)}">Edit JSON</button></div>`
         ).join("");
       }
       $("raceList").innerHTML = html;
+      $("raceList").querySelectorAll("button[data-edit-character-kind]").forEach(btn => {
+        btn.onclick = () => {
+          const kind = btn.dataset.editCharacterKind;
+          const key = kind === "tags" ? "character_tags" : kind;
+          const row = ((spec && spec[key]) || []).find(item => String(item.id) === btn.dataset.editCharacterId);
+          if (!row) return;
+          const current = currentCharacterJson();
+          current[kind] = [row];
+          $("characterJsonEditor").value = JSON.stringify(current, null, 2);
+          $("characterJsonEditor").scrollIntoView({behavior:"smooth", block:"center"});
+        };
+      });
+      $("raceList").querySelectorAll("button[data-edit-race-json]").forEach(btn => {
+        btn.onclick = () => {
+          const race = races.find(row => String(row.id) === btn.dataset.editRaceJson);
+          if (!race) return;
+          const current = currentCharacterJson();
+          current.races = [race];
+          $("characterJsonEditor").value = JSON.stringify(current, null, 2);
+          $("characterJsonEditor").scrollIntoView({behavior:"smooth", block:"center"});
+        };
+      });
+    }
+
+    function currentCharacterJson() {
+      const data = {...((spec && spec.character_json_extra) || {})};
+      for (const [publicKey, specKey] of [["races","races"],["control_actions","control_actions"],["tags","character_tags"],["production_actions","production_actions"],["custom_eq_slots","custom_eq_slots"]]) {
+        const rows = (spec && spec[specKey]) || [];
+        if (rows.length) data[publicKey] = rows;
+      }
+      return data;
     }
 
     function renderBuildings() {
@@ -854,6 +1003,138 @@
         const enables = (b.enables || []).join(", ") || "-";
         return `<div class="ent-card"><strong>${esc(b.name||b.id)}</strong> <code>${esc(b.id)}</code> enables=${esc(enables)} group=${esc(b.group||"-")}</div>`;
       }).join("") || "<p>No buildings yet.</p>";
+    }
+
+    function renderProceduralMaps() {
+      const rows = (spec && spec.procedural_maps) || [];
+      $("procMapList").innerHTML = rows.map((m, index) =>
+        `<div class="ent-card"><strong>${esc(m.name||"Unnamed map")}</strong> <code>#${esc(m.id)}</code> biome=${esc(m.biome)} <small style="color:var(--muted)">${esc(m._map_dir || (spec && spec.procedural_map_dir) || "procedural_maps")}</small> <button type="button" data-map-edit="${index}">Edit JSON</button></div>`
+      ).join("") || "<p>No procedural maps in this spec.</p>";
+      $("procMapList").querySelectorAll("button[data-map-edit]").forEach(btn => {
+        btn.onclick = () => {
+          const row = rows[Number(btn.dataset.mapEdit)];
+          const payload = Object.fromEntries(Object.entries(row || {}).filter(([key]) => !key.startsWith("_")));
+          $("procMapEditor").value = JSON.stringify(payload, null, 2);
+          $("procMapStatus").textContent = `Editing ${row.name || row.id}. Saving the same id replaces this entry.`;
+          showTab("maps");
+        };
+      });
+    }
+
+    function renderConversations() {
+      const raw = spec && spec.conversations;
+      const rows = Array.isArray(raw) ? raw : [];
+      const rawFamily = spec && spec.family_conversations;
+      const family = Array.isArray(rawFamily) ? rawFamily : [];
+      const filter = ($("conversationFilter").value || "").trim().toLowerCase();
+      const cards = rows.map((row, index) => ({row, index})).filter(({row}) => {
+        const haystack = JSON.stringify(row || {}).toLowerCase();
+        return !filter || haystack.includes(filter);
+      });
+      const localIds = new Map();
+      rows.forEach((row, index) => {
+        if (row && row.id != null) {
+          if (!localIds.has(String(row.id))) localIds.set(String(row.id), index);
+        }
+      });
+      const linked = value => {
+        const id = String(value);
+        return localIds.has(id)
+          ? `<button type="button" class="nav-tab" data-conv-link="${esc(id)}">${esc(id)}</button>`
+          : `<code>${esc(id)}</code>`;
+      };
+      $("conversationList").innerHTML = cards.map(({row, index}) => {
+        if (!row || typeof row !== "object" || Array.isArray(row)) return `<div class="ent-card">Invalid node at row ${index} <button data-conv-edit="${index}">Edit JSON</button></div>`;
+        const options = Array.isArray(row.options) ? row.options.map(linked).join(" ") : "(no options)";
+        const gates = [
+          Array.isArray(row.entities) && row.entities.length ? "entities=" + row.entities.join(", ") : "",
+          row.player_race != null ? "player_race=" + JSON.stringify(row.player_race) : "",
+          row.player_sex != null ? "player_sex=" + row.player_sex : "",
+          row.npc_sex != null ? "npc_sex=" + row.npc_sex : "",
+          row.time != null ? "time=" + JSON.stringify(row.time) : "",
+          row.event != null ? "event=" + row.event : "",
+        ].filter(Boolean).join(" · ");
+        return `<div class="ent-card"><strong>${esc(row.text || row.answer_positive || row.id || "Unnamed node")}</strong><br><code>${esc(row.id || "(missing id)")}</code> <span class="kind-stacker">${esc(row.type || "(missing type)")}</span> <small>${options}</small>${gates ? `<div class="hint">${esc(gates)}</div>` : ""}<div class="row"><button type="button" data-conv-edit="${index}">Edit JSON</button><button type="button" data-conv-remove="${index}">Remove</button></div></div>`;
+      }).join("") || (rows.length ? "<p>No nodes match the filter.</p>" : "<p>No conversation nodes in this spec.</p>");
+      $("conversationList").querySelectorAll("button[data-conv-edit]").forEach(button => {
+        button.onclick = () => {
+          conversationEditIndex = Number(button.dataset.convEdit);
+          $("conversationEditor").value = JSON.stringify(rows[conversationEditIndex], null, 2);
+          $("conversationStatus").textContent = `Editing row ${conversationEditIndex}; saving replaces this row and preserves its complete JSON.`;
+          showTab("conversations");
+        };
+      });
+      $("conversationList").querySelectorAll("button[data-conv-remove]").forEach(button => {
+        button.onclick = async () => {
+          rows.splice(Number(button.dataset.convRemove), 1);
+          conversationEditIndex = null;
+          await persistConversationSpec("Removed conversation node");
+        };
+      });
+      $("conversationList").querySelectorAll("button[data-conv-link]").forEach(button => {
+        button.onclick = () => {
+          const target = localIds.get(button.dataset.convLink);
+          if (target == null) return;
+          conversationEditIndex = target;
+          $("conversationEditor").value = JSON.stringify(rows[target], null, 2);
+          $("conversationStatus").textContent = `Following option link to ${button.dataset.convLink}.`;
+        };
+      });
+      if (!Array.isArray(raw) && raw != null) {
+        $("conversationStatus").textContent = "The imported conversations section is not an array. Correct it in JSON before adding/removing nodes.";
+      }
+      if (spec && spec._conversation_root_invalid) {
+        $("conversationStatus").textContent = "The imported conversations.json root is not an object. Editing a row will rebuild a valid object root.";
+      }
+
+      $("familyConversationList").innerHTML = family.map((row, index) => {
+        if (!row || typeof row !== "object" || Array.isArray(row)) return `<div class="ent-card">Invalid family row ${index} <button data-family-edit="${index}">Edit JSON</button></div>`;
+        return `<div class="ent-card"><strong>${esc(row.comment || "Family conversation")}</strong> race=<code>${esc(row.race ?? "?")}</code><div>${esc(row.answer_positive || "")}</div><small class="hint">${esc(row.answer_negative || "")}</small><div class="row"><button type="button" data-family-edit="${index}">Edit JSON</button><button type="button" data-family-remove="${index}">Remove</button></div></div>`;
+      }).join("") || "<p>No family conversation rows in this spec.</p>";
+      $("familyConversationList").querySelectorAll("button[data-family-edit]").forEach(button => {
+        button.onclick = () => {
+          familyConversationEditIndex = Number(button.dataset.familyEdit);
+          $("familyConversationEditor").value = JSON.stringify(family[familyConversationEditIndex], null, 2);
+          showTab("conversations");
+        };
+      });
+      $("familyConversationList").querySelectorAll("button[data-family-remove]").forEach(button => {
+        button.onclick = async () => {
+          family.splice(Number(button.dataset.familyRemove), 1);
+          familyConversationEditIndex = null;
+          await persistConversationSpec("Removed family conversation row");
+        };
+      });
+    }
+
+    async function persistConversationSpec(message) {
+      if (!spec) return;
+      try {
+        const data = await api("/api/spec", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({spec})});
+        spec = data.spec;
+        renderTree();
+        log(message + ". Saved spec.");
+      } catch (err) {
+        $("conversationStatus").textContent = err.message;
+      }
+    }
+
+    function renderBuildingGuide(data) {
+      const rules = (data.contract || []).map(rule => "<li>" + esc(rule) + "</li>").join("");
+      const templates = (data.templates || []).map(row =>
+        "<li><strong>" + esc(row.name) + "</strong> — " + esc(row.template) + " template, id " + esc(row.id) +
+        ", occupation image " + esc(row.occupation_image) + ", workers " + esc(JSON.stringify(row.workers)) + "</li>"
+      ).join("");
+      const examples = (data.installed_matches || []).map(row =>
+        "<li><strong>" + esc(row.name) + "</strong> — " + esc(row.source) + ", id " + esc(row.id) +
+        ", " + (row.allow_player ? "player settlement" : "civilian") + "</li>"
+      ).join("");
+      $("bldgGuide").innerHTML = "<strong>Local building references</strong><p class=\"hint\">Docs: <code>" +
+        esc(data.docs_path) + "</code><br>Installed mods: <code>" + esc(data.mods_path) +
+        "</code></p><ul>" + rules + "</ul><strong>Vanilla templates</strong><ul>" + templates +
+        "</ul><strong>Installed examples</strong><ul>" + (examples || "<li>Search to find installed examples.</li>") +
+        "</ul><details><summary>Official docs excerpt</summary><p class=\"hint\">" +
+        esc(data.docs_excerpt || "") + "</p></details>";
     }
 
     function renderSkill() {
@@ -949,6 +1230,19 @@
         log("Milestone edit failed: " + (err && err.message ? err.message : err));
       }
     }
+    async function entityMilestonePost(entityId, milestoneId, granted) {
+      try {
+        const data = await api("/api/entity-milestone", {
+          method: "POST", headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({ entity_id: entityId, milestone_id: milestoneId, granted })
+        });
+        spec = data.spec;
+        log((granted ? "Granted " : "Removed ") + milestoneId + (granted ? " on " : " from ") + entityId);
+        renderTree();
+      } catch (err) {
+        log("Entity milestone update failed: " + (err && err.message ? err.message : err));
+      }
+    }
 
     function renderMilestoneEditor() {
       const el = $("milestoneEditor");
@@ -977,6 +1271,16 @@
             <button id="msRemove">Remove from tree (keep reward)</button>
             <button id="msClose">Close</button>
           </div></div>`;
+        if (m.innate) {
+          const entities = spec.entities || [];
+          html += `<div class="ent-card"><strong>Grant this innate milestone to entities</strong>
+            <p class="hint">These checkboxes update <code>skills.milestones</code> on each entity, as in Arborborn.</p>
+            ${entities.length ? entities.map(entity => {
+              const granted = (((entity.skills || {}).milestones) || []).includes(m.id);
+              return `<label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" data-entity-grant="${esc(entity.id)}" ${granted ? "checked" : ""} /> ${esc(entity.name || entity.id)} <code>${esc(entity.id)}</code></label>`;
+            }).join("") : "<em>Add or import an entity first.</em>"}
+          </div>`;
+        }
       }
       const granted = new Set();
       for (const ms of spec.milestones || [])
@@ -1015,6 +1319,9 @@
         };
         $("msRemove").onclick = () => { const id = m.id; selMile = null; msPost({ action: "unassign", id }, "Removed milestone " + id); };
         $("msClose").onclick = () => { selMile = null; renderTree(); };
+        el.querySelectorAll("input[data-entity-grant]").forEach(input => {
+          input.onchange = () => entityMilestonePost(input.dataset.entityGrant, m.id, input.checked);
+        });
       }
       el.querySelectorAll("button[data-assign]").forEach(btn => {
         btn.onclick = () => {
@@ -1104,6 +1411,15 @@
       renderSkill();
     }
 
+    function syncAddMilestoneMode() {
+      const k = $("addKind").value;
+      const stacker = k === "stacker";
+      const innate = $("addInnate").value === "true";
+      $("addMilestoneModeLabel").classList.toggle("hidden", stacker);
+      $("addLevel").closest("label").classList.toggle("hidden", stacker || innate);
+      $("btnAdd").textContent = stacker ? "Add stacker" : (innate ? "Add innate milestone" : "Add + milestone");
+    }
+
     $("addKind").addEventListener("change", () => {
       const k = $("addKind").value;
       $("abilityFields").classList.toggle("hidden", k !== "ability");
@@ -1119,24 +1435,67 @@
       $("passFields").classList.toggle("hidden", k !== "passive");
       $("addPassEffectHint").classList.toggle("hidden", k !== "passive");
       $("passMeta").classList.toggle("hidden", k !== "passive");
+      $("passTriggerFields").classList.toggle("hidden", k !== "passive");
+      $("spellTriggerHint").classList.toggle("hidden", k !== "passive");
+      $("spellTriggerList").classList.toggle("hidden", k !== "passive");
       $("stackerFields").classList.toggle("hidden", k !== "stacker");
       $("addStEffectHint").classList.toggle("hidden", k !== "stacker");
       $("stEffectList").classList.toggle("hidden", k !== "stacker");
       $("stackerMeta").classList.toggle("hidden", k !== "stacker");
-      $("addLevel").closest("label").classList.toggle("hidden", k === "stacker");
-      $("btnAdd").textContent = k === "stacker" ? "Add stacker" : "Add + milestone";
+      syncAddMilestoneMode();
       syncFxCardFromAdd();
     });
+    $("addInnate").addEventListener("change", syncAddMilestoneMode);
+    syncAddMilestoneMode();
     document.querySelectorAll(".nav-tab").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
     $("catKind").addEventListener("change", () => { LAST.set("catKind", $("catKind").value); renderCatalog(); });
     $("catFilter").addEventListener("input", renderCatalog);
     bindRemember($("addAbEffect"), "abilityEffect", () => updateEffectHint("addAbEffect", (catalog.dropdowns||{}).ability, "addAbEffectHint", "addAbEffectValue"));
-    bindRemember($("addBonusEffect"), "amplifierEffect", () => updateEffectHint("addBonusEffect", (catalog.dropdowns||{}).amplifier, "addAmpEffectHint", "addBonusValue"));
+    bindRemember($("addBonusEffect"), "amplifierEffect", () => {
+      updateEffectHint("addBonusEffect", (catalog.dropdowns||{}).amplifier, "addAmpEffectHint", "addBonusValue");
+      const entityScaling = $("addBonusEffect").value === "magic_power_per_entity";
+      $("addBonusValue").placeholder = entityScaling ? "entity id to count" : "10";
+      $("addBonusSecondaryValue").placeholder = entityScaling ? "power per entity" : "optional";
+    });
     bindRemember($("addPassEffect"), "passiveEffect", () => updateEffectHint("addPassEffect", (catalog.dropdowns||{}).passive, "addPassEffectHint", "addPassValue"));
     bindRemember($("addStEffect"), "stackerEffect", () => updateEffectHint("addStEffect", (catalog.dropdowns||{}).stacker, "addStEffectHint", "addStValue"));
     bindRemember($("addTarget"), "target");
     bindRemember($("addDmgType"), "damageType");
     bindRemember($("addAmpType"), "ampType");
+
+    function renderSpellTriggers() {
+      const host = $("spellTriggerList");
+      host.replaceChildren();
+      host.className = $("addKind").value === "passive" ? (passiveSpellTriggers.length ? "fx-list" : "hint") : "hidden";
+      if (!passiveSpellTriggers.length) {
+        host.textContent = "No spell trigger rules added.";
+        return;
+      }
+      passiveSpellTriggers.forEach((rule, index) => {
+        const row = document.createElement("div");
+        row.className = "fx-chip";
+        const text = document.createElement("span");
+        text.textContent = `${rule.value} → ${rule.secondary_value} (${rule.third_value})`;
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.textContent = "×";
+        remove.onclick = () => { passiveSpellTriggers.splice(index, 1); renderSpellTriggers(); };
+        row.append(text, remove);
+        host.append(row);
+      });
+    }
+    $("btnAddSpellTrigger").onclick = () => {
+      const source = $("addTriggerSource").value.trim();
+      const payload = $("addTriggerPayload").value.trim();
+      const chance = Number($("addTriggerChance").value);
+      if (!source || !payload) { log("Enter both a triggering ability id and a triggered ability id"); return; }
+      if (!Number.isFinite(chance) || chance < 0 || chance > 1) { log("Trigger chance must be between 0 and 1"); return; }
+      passiveSpellTriggers.push({ effect: "trigger_ability_on_cast", value: source, secondary_value: payload, third_value: chance });
+      $("addTriggerSource").value = "";
+      $("addTriggerPayload").value = "";
+      renderSpellTriggers();
+    };
+    renderSpellTriggers();
 
     $("btnAddStEffect").onclick = () => {
       const id = $("addStEffect").value;
@@ -1281,8 +1640,11 @@
       $("abSearchHits").querySelectorAll("button[data-clone]").forEach(btn => {
         btn.onclick = async () => {
           const name = prompt("Ability name", btn.dataset.name || btn.dataset.clone) || btn.dataset.clone;
+          const innate = $("addInnate").value === "true";
           const cloned = await api("/api/clone-ability", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({
-            source: btn.dataset.clone, name, unlock_level: Number($("addLevel").value)
+            source: btn.dataset.clone, name,
+            unlock_level: innate ? null : Number($("addLevel").value),
+            innate
           })});
           spec = cloned.spec;
           if (cloned.ability && cloned.ability.id) $("addId").value = cloned.ability.id;
@@ -1316,6 +1678,7 @@
     $("btnAdd").onclick = async () => {
       const kind = $("addKind").value;
       const unlock_level = Number($("addLevel").value);
+      const innate = kind !== "stacker" && $("addInnate").value === "true";
       const id = $("addId").value.trim();
       const name = $("addName").value.trim() || id;
       if (!id) { log("Id required"); return; }
@@ -1350,14 +1713,20 @@
         if ($("addAmpType").value) payload.type = $("addAmpType").value;
         LAST.set("amplifierEffect", $("addBonusEffect").value);
         const be = $("addBonusEffect").value;
-        if (be) payload.bonuses = [{ effect: be, value: parseMaybe($("addBonusValue").value, 0) }];
+        if (be) {
+          const bonus = { effect: be, value: parseMaybe($("addBonusValue").value, 0) };
+          if ($("addBonusSecondaryValue").value.trim()) bonus.secondary_value = parseMaybe($("addBonusSecondaryValue").value, $("addBonusSecondaryValue").value.trim());
+          payload.bonuses = [bonus];
+        }
         if ($("addCostStamina").value) payload.cost_stamina = Number($("addCostStamina").value);
         if ($("addAmpRange").value) payload.range = Number($("addAmpRange").value);
         if ($("addAmpDesc").value.trim()) payload.description = $("addAmpDesc").value.trim();
       } else if (kind === "passive") {
         LAST.set("passiveEffect", $("addPassEffect").value);
         const pe = $("addPassEffect").value;
+        if (pe === "trigger_ability_on_cast") { log("Use Add spell trigger to enter source, payload, and chance explicitly"); return; }
         payload.effects = pe ? [{ effect: pe, value: parseMaybe($("addPassValue").value, 0) }] : [];
+        payload.effects.push(...passiveSpellTriggers);
         if ($("addApplyMode").value) payload.apply_mode = $("addApplyMode").value;
         const rtags = splitCsv($("addRestrictTags").value);
         if (rtags.length) payload.restrict_tags = rtags;
@@ -1377,16 +1746,19 @@
         }
       }
       const body = { kind, payload };
-      if (kind !== "stacker") body.unlock_level = unlock_level;
-      if (kind === "passive" && $("addInnate").value === "true") body.innate = true;
+      if (kind !== "stacker") {
+        body.innate = innate;
+        if (!innate) body.unlock_level = unlock_level;
+      }
       if (kind === "stacker" && $("addStBind").value) {
         body.bind_ability = $("addStBind").value;
         body.stacker_count = Number($("addStCount").value || 1);
       }
       const data = await api("/api/add", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
       spec = data.spec;
-      log("Added " + kind + " " + id + (kind === "stacker" ? "" : " at L" + unlock_level));
+      log("Added " + kind + " " + id + (kind === "stacker" ? "" : (innate ? " as innate" : " at L" + unlock_level)));
       if (kind === "stacker") stackerExtras = {};
+      if (kind === "passive") { passiveSpellTriggers = []; renderSpellTriggers(); }
       renderTree();
       showTab(kind === "stacker" ? "add" : "tree");
     };
@@ -1503,10 +1875,21 @@
         no_trading: $("raceNoTrade").value === "true",
         collapse_on_leader_death: $("raceCollapse").value === "true",
         birth_resource: $("raceBirth").value.trim() || undefined,
-        base_adult: $("raceAdultEnt").value.trim() || undefined,
+        birth_amount: Number($("raceBirthAmount").value || 1),
+        birth_resource_type: $("raceBirthType").value ? Number($("raceBirthType").value) : undefined,
+        birth_max_population: $("raceBirthMax").value ? Number($("raceBirthMax").value) : undefined,
+        adult: Number($("raceAdultAge").value || 50),
+        child: Number($("raceChildAge").value || 14),
+        elder: Number($("raceElderAge").value || 70),
+        base_entities: [
+          ["adult", $("raceAdultEnt").value], ["child", $("raceChildEnt").value],
+          ["leader", $("raceLeaderEnt").value], ["recruit", $("raceRecruitEnt").value],
+          ["rebel", $("raceRebelEnt").value], ["adventurer", $("raceAdventurerEnt").value]
+        ].filter(([, value]) => value.trim()).map(([role, value]) => role + "=" + value.trim()),
         orphan_surname: $("raceOrphan").value.trim() || undefined,
         no_settle: $("raceNoSettle").value === "true",
         new_tag: $("raceNewTag").value.trim() || undefined,
+        new_tag_options: splitCsv($("raceNewTagOptions").value),
         control_tag: $("raceControlTag").value.trim() || undefined
       })});
       if (built.error) { log(built.error); return; }
@@ -1519,6 +1902,35 @@
       })});
       spec = data.spec;
       log("Created race " + (built.payload && built.payload.id));
+      renderTree();
+    };
+
+    $("btnLoadCharacterJson").onclick = () => {
+      $("characterJsonEditor").value = JSON.stringify(currentCharacterJson(), null, 2);
+      $("characterJsonStatus").textContent = "Loaded current character.json entries. Editing an entry and merging replaces that id while keeping other entries.";
+    };
+
+    $("btnImportCharacterJsonFile").onclick = async () => {
+      const path = $("characterJsonPath").value.trim();
+      if (!path) { $("characterJsonStatus").textContent = "Enter a mod folder or character.json path."; return; }
+      const data = await api("/api/import-character-json-file", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({path}) });
+      if (data.error) { $("characterJsonStatus").textContent = data.error; return; }
+      spec = data.spec;
+      $("characterJsonEditor").value = JSON.stringify(currentCharacterJson(), null, 2);
+      $("characterJsonStatus").textContent = "Imported entries and referenced NPC name files: " + Object.entries(data.counts||{}).map(([key,count]) => `${key} ${count}`).join(", ");
+      log("Imported character.json data from " + path);
+      renderTree();
+    };
+
+    $("btnMergeCharacterJson").onclick = async () => {
+      let character_json;
+      try { character_json = JSON.parse($("characterJsonEditor").value); }
+      catch (err) { $("characterJsonStatus").textContent = "Invalid JSON: " + err.message; return; }
+      const data = await api("/api/character-json", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({character_json}) });
+      if (data.error) { $("characterJsonStatus").textContent = data.error; return; }
+      spec = data.spec;
+      $("characterJsonStatus").textContent = "Merged entries: " + Object.entries(data.counts||{}).map(([key,count]) => `${key} ${count}`).join(", ");
+      log("Merged advanced character.json data");
       renderTree();
     };
 
@@ -1561,12 +1973,24 @@
       renderTree();
     };
 
+    $("btnFixSpecBuildings").onclick = async () => {
+      const data = await api("/api/fix-buildings-spec", { method: "POST", headers: {"Content-Type":"application/json"}, body: "{}" });
+      if (data.error) { log(data.error); return; }
+      spec = data.spec;
+      renderTree();
+      const changed = (data.changed || []).map(row => row.id + ": " + row.notes.join(", ")).join("; ");
+      const issues = (data.issues || []).join("; ");
+      $("bldgFixReport").textContent = (data.changed || []).length + " building(s) repaired." +
+        (changed ? " " + changed : "") + (issues ? " Remaining: " + issues : " No remaining building issues.");
+    };
+
     $("btnSearchBldg").onclick = async () => {
       const q = $("bldgSearch").value.trim();
       if (q.length < 2 && !/^\d+$/.test(q)) { log("Type at least 2 characters"); return; }
       const data = await api("/api/buildings/search?q=" + encodeURIComponent(q));
+      try { renderBuildingGuide(await api("/api/buildings/guide?q=" + encodeURIComponent(q))); } catch (e) {}
       $("bldgSearchHits").innerHTML = (data.results||[]).map(r =>
-        `<div class="ent-card"><code>${esc(r.id)}</code> ${esc(r.name)} <em style="color:var(--muted)">${esc(r.source)} ${r.allow_player?"player":"civ"}</em> <button data-clone="${esc(r.id)}">Clone as trainer</button></div>`
+        `<div class="ent-card"><code>${esc(r.id)}</code> ${esc(r.name)} <em style="color:var(--muted)">${esc(r.source)} ${r.allow_player?"player":"civ"}</em> <button data-clone="${esc(r.clone_key || r.id)}">Clone as trainer</button></div>`
       ).join("") || "<p>No matches.</p>";
       $("bldgSearchHits").querySelectorAll("button[data-clone]").forEach(btn => {
         btn.onclick = async () => {
@@ -1582,6 +2006,167 @@
         };
       });
     };
+
+    $("btnNewProcMap").onclick = () => {
+      const ids = ((spec && spec.procedural_maps) || []).map(row => Number(row.id)).filter(Number.isFinite);
+      const nextId = Math.max(200, ...ids) + 1;
+      const blank = {
+        background: "1",
+        biome: 9,
+        bridge: "44",
+        entities: [],
+        hill_amount: [1, 4],
+        hill_size: [800, 2000],
+        hill_slope_down: "2035",
+        hill_slope_up: "2034",
+        hill_wall: "242",
+        id: nextId,
+        name: "New Procedural Map",
+        river: "974",
+        road: "254",
+        slope_amount: [20, 80],
+        underground_background: "30",
+        underground_wall: "242"
+      };
+      $("procMapEditor").value = JSON.stringify(blank, null, 2);
+      $("procMapStatus").textContent = "Blank map template loaded. Set its numeric id and biome, then save.";
+      showTab("maps");
+    };
+
+    $("btnSaveProcMap").onclick = async () => {
+      if (!spec) { log("No spec"); return; }
+      let payload;
+      try { payload = JSON.parse($("procMapEditor").value); }
+      catch (err) { $("procMapStatus").textContent = "Invalid JSON: " + err.message; return; }
+      try {
+        const data = await api("/api/add", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({kind: "procedural_map", payload}) });
+        spec = data.spec;
+        $("procMapStatus").textContent = `Saved map ${payload.id} — ${payload.name}.`;
+        log("Saved procedural map " + payload.id + " " + payload.name);
+        renderTree();
+      } catch (err) {
+        $("procMapStatus").textContent = err.message;
+      }
+    };
+
+    $("btnSearchProcMap").onclick = async () => {
+      const q = $("procMapSearch").value.trim();
+      try {
+        const data = await api("/api/procedural-maps/search?q=" + encodeURIComponent(q));
+        $("procMapSearchHits").innerHTML = (data.results || []).map(row =>
+          `<div class="ent-card"><code>#${esc(row.id)}</code> <strong>${esc(row.name)}</strong> biome=${esc(row.biome)} <small style="color:var(--muted)">${esc(row.source)} / ${esc(row.file)}</small> <button type="button" data-map-source="${esc(row.clone_key || row.id)}" data-map-name="${esc(row.name)}">Clone</button></div>`
+        ).join("") || "<p>No maps found.</p>";
+        $("procMapSearchHits").querySelectorAll("button[data-map-source]").forEach(btn => {
+          btn.onclick = async () => {
+            const name = prompt("New map name", btn.dataset.mapName + " Copy");
+            if (name == null) return;
+            const currentIds = ((spec && spec.procedural_maps) || []).map(row => Number(row.id)).filter(Number.isFinite);
+            const suggestedId = Math.max(200, ...currentIds) + 1;
+            const rawId = prompt("New numeric map id", String(suggestedId));
+            if (rawId == null) return;
+            const newId = Number(rawId);
+            if (!Number.isInteger(newId)) { log("Map id must be a whole number"); return; }
+            try {
+              const cloned = await api("/api/clone-procedural-map", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({source: btn.dataset.mapSource, new_id: newId, name}) });
+              spec = cloned.spec;
+              $("procMapEditor").value = JSON.stringify(Object.fromEntries(Object.entries(cloned.procedural_map || {}).filter(([key]) => !key.startsWith("_"))), null, 2);
+              $("procMapStatus").textContent = `Cloned map ${btn.dataset.mapName} into id ${newId}.`;
+              log("Cloned procedural map into " + newId);
+              renderTree();
+            } catch (err) {
+              $("procMapStatus").textContent = err.message;
+            }
+          };
+        });
+      } catch (err) {
+        $("procMapSearchHits").textContent = err.message;
+      }
+    };
+
+    function suggestedConversationId(type) {
+      const base = String((spec && (spec.mod_id || spec.id)) || "my_mod").replace(/[^a-zA-Z0-9_]/g, "_") + "_" + String(type || "conversation").replace(/[^a-zA-Z0-9_]/g, "_");
+      const used = new Set(((spec && Array.isArray(spec.conversations) && spec.conversations) || []).filter(row => row && row.id).map(row => String(row.id)));
+      if (!used.has(base)) return base;
+      let n = 2;
+      while (used.has(base + "_" + n)) n++;
+      return base + "_" + n;
+    }
+
+    $("btnNewConversation").onclick = () => {
+      if (!spec) { log("No spec"); return; }
+      const type = $("conversationType").value || "begin_conversation";
+      const row = {id:suggestedConversationId(type), type, text:"", answer_positive:"", options:[]};
+      if (type === "begin_conversation") Object.assign(row, {answer_negative:"", entities:[]});
+      conversationEditIndex = null;
+      $("conversationEditor").value = JSON.stringify(row, null, 2);
+      $("conversationStatus").textContent = `Blank ${type} node. Fill its text, responses, gates, and option links, then save.`;
+      showTab("conversations");
+    };
+
+    $("btnLoadConversationExample").onclick = () => {
+      if (!spec) { log("No spec"); return; }
+      const type = $("conversationType").value || "begin_conversation";
+      const example = conversationExamples[type];
+      if (!example) { $("conversationStatus").textContent = `No core example found for ${type}.`; return; }
+      const row = JSON.parse(JSON.stringify(example));
+      row.id = suggestedConversationId(type);
+      conversationEditIndex = null;
+      $("conversationEditor").value = JSON.stringify(row, null, 2);
+      $("conversationStatus").textContent = `Loaded a core_2 ${type} example as ${row.id}. Core option links remain pointed at core_2 nodes.`;
+    };
+
+    $("btnSaveConversation").onclick = async () => {
+      if (!spec) { log("No spec"); return; }
+      if (!Array.isArray(spec.conversations)) { $("conversationStatus").textContent = "Cannot edit: conversations is not an array. Repair it in JSON first."; return; }
+      let row;
+      try { row = JSON.parse($("conversationEditor").value); }
+      catch (err) { $("conversationStatus").textContent = "Invalid JSON: " + err.message; return; }
+      if (!row || typeof row !== "object" || Array.isArray(row) || !row.id || !row.type) {
+        $("conversationStatus").textContent = "A conversation node must be an object with id and type.";
+        return;
+      }
+      if (conversationEditIndex == null) spec.conversations.push(row);
+      else spec.conversations[conversationEditIndex] = row;
+      spec._conversation_file_present = true;
+      spec._conversation_root_invalid = false;
+      spec._conversation_invalid_root = null;
+      spec._conversation_sections_present = [...new Set([...(spec._conversation_sections_present || []), "conversations"])];
+      conversationEditIndex = null;
+      await persistConversationSpec(`Saved conversation node ${row.id}`);
+    };
+
+    $("btnNewFamilyConversation").onclick = () => {
+      familyConversationEditIndex = null;
+      $("familyConversationEditor").value = JSON.stringify({race:"0", comment:"human", answer_positive:"Do you need anything, ::relative?", answer_negative:"Come back later, ::relative."}, null, 2);
+      showTab("conversations");
+    };
+
+    $("btnSaveFamilyConversation").onclick = async () => {
+      if (!spec) { log("No spec"); return; }
+      if (!Array.isArray(spec.family_conversations)) { $("conversationStatus").textContent = "Cannot edit: family_conversations is not an array. Repair it in JSON first."; return; }
+      let row;
+      try { row = JSON.parse($("familyConversationEditor").value); }
+      catch (err) { $("conversationStatus").textContent = "Invalid JSON: " + err.message; return; }
+      if (!row || typeof row !== "object" || Array.isArray(row) || row.race == null) {
+        $("conversationStatus").textContent = "A family row must be an object with a race id.";
+        return;
+      }
+      if (familyConversationEditIndex == null) spec.family_conversations.push(row);
+      else spec.family_conversations[familyConversationEditIndex] = row;
+      spec._conversation_file_present = true;
+      spec._conversation_root_invalid = false;
+      spec._conversation_invalid_root = null;
+      spec._conversation_sections_present = [...new Set([...(spec._conversation_sections_present || []), "family_conversations"])];
+      familyConversationEditIndex = null;
+      await persistConversationSpec(`Saved family conversation for race ${row.race}`);
+    };
+
+    $("conversationFilter").addEventListener("input", renderConversations);
+    $("conversationType").addEventListener("change", () => {
+      const type = $("conversationType").value;
+      const count = conversationTypeCounts[type] || 0;
+      $("conversationTypeHint").textContent = count ? `${count} core_2 example nodes use this type.` : "No core_2 examples found for this type; verify support in current game data.";
+    });
 
     $("btnAddControl").onclick = async () => {
       const name = $("caName").value.trim();
@@ -1603,6 +2188,16 @@
 
     (async () => {
       catalog = await api("/api/catalog");
+      try {
+        const convoTypes = await api("/api/conversations/types");
+        conversationExamples = convoTypes.examples || {};
+        conversationTypeCounts = convoTypes.counts || {};
+        if (convoTypes.types && convoTypes.types.length) {
+          $("conversationType").innerHTML = convoTypes.types.map(type => `<option value="${esc(type)}">${esc(type)}</option>`).join("");
+          $("conversationType").dispatchEvent(new Event("change"));
+        }
+      } catch (e) { $("conversationTypeHint").textContent = "Core conversation templates could not be loaded."; }
+      try { renderBuildingGuide(await api("/api/buildings/guide")); } catch (e) { $("bldgGuide").textContent = "Local building references could not be loaded."; }
       fillStudioDropdowns();
       renderLimits();
       renderCatalog();

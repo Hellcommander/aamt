@@ -12,8 +12,18 @@ from typing import Any, Dict, List, Optional
 from s2_assets import write_packaging
 from s2_buildings import building_filename, public_building
 from s2_entities import ENTITY_REF_KEYS, detect_role, entity_filename, public_entity
-from s2_paths import core2_dir, output_root, skip_mod_path, staging_dir, workshop_root
+from s2_paths import (
+    STUDIO_SPEC_NAME,
+    core2_dir,
+    find_studio_spec_path,
+    output_root,
+    skip_mod_path,
+    staging_dir,
+    studio_spec_path,
+    workshop_root,
+)
 from s2_races import load_character_into_spec, write_character_json
+from s2_procedural_maps import map_folder_name, procedural_map_filename, public_procedural_map
 from s2_schema import infer_amplifier_type, is_effects_keys_id, slug_name
 
 # Vanilla Pyromancy interleaves +1 statistic with empty/milestone-only levels.
@@ -382,8 +392,19 @@ def new_spec(skill_id: str, name: str, *, mod_id: Optional[str] = None, level_st
         "control_actions": [],
         "character_tags": [],
         "production_actions": [],
+        "custom_eq_slots": [],
+        "character_json_extra": {},
         "buildings": [],
+        "procedural_maps": [],
+        "procedural_map_dir": "procedural_maps",
         "loot_exclude": [],
+        "conversations": [],
+        "family_conversations": [],
+        "conversation_root_extra": {},
+        "_conversation_file_present": False,
+        "_conversation_sections_present": [],
+        "_conversation_invalid_root": None,
+        "_conversation_root_invalid": False,
     }
 
 
@@ -395,11 +416,16 @@ def list_staged_specs() -> List[Path]:
     root = output_root()
     if not root.is_dir():
         return []
-    return sorted(p for p in root.glob("*/skill.json") if p.is_file())
+    specs: List[Path] = []
+    for folder in sorted(p for p in root.iterdir() if p.is_dir()):
+        path = find_studio_spec_path(folder)
+        if path:
+            specs.append(path)
+    return specs
 
 
 def save_spec(spec: Dict[str, Any], path: Optional[Path] = None) -> Path:
-    out = Path(path) if path else (staging_dir(spec) / "skill.json")
+    out = Path(path) if path else studio_spec_path(staging_dir(spec))
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
     return out
@@ -418,8 +444,12 @@ def _ensure_lists(spec: Dict[str, Any]) -> None:
         "control_actions",
         "character_tags",
         "production_actions",
+        "custom_eq_slots",
         "buildings",
+        "procedural_maps",
         "loot_exclude",
+        "conversations",
+        "family_conversations",
     ):
         spec.setdefault(key, [])
 
@@ -499,6 +529,7 @@ def _milestone(
     if innate:
         mile["innate"] = True
         mile["requirements"] = {}
+        mile["skill_id"] = ""
         mile["file"] = f"innate_{slug_name(name)}.json"
     return mile
 
@@ -539,9 +570,12 @@ def _upsert_milestone(
         if innate:
             existing["innate"] = True
             existing["requirements"] = {}
+            existing["skill_id"] = ""
             existing["file"] = f"innate_{slug_name(name or existing.get('name') or mid)}.json"
         elif level is not None:
+            existing.pop("innate", None)
             existing.setdefault("requirements", {})["skill"] = int(level)
+            existing["skill_id"] = spec["skill_id"]
             existing["file"] = f"{int(level)}_{slug_name(name or existing.get('name') or mid)}.json"
         if name:
             existing["name"] = name
@@ -568,6 +602,7 @@ def add_ability(
     *,
     unlock_level: Optional[int] = None,
     no_milestone: bool = False,
+    innate: bool = False,
     ) -> Dict[str, Any]:
     _ensure_lists(spec)
     ability = deepcopy(ability)
@@ -595,7 +630,17 @@ def add_ability(
             ability["description"] = "This ability heals ::heal health."
     aid = ability["id"]
     _upsert_by_id(spec["abilities"], ability)
-    if not no_milestone and unlock_level is not None:
+    if innate:
+        _upsert_milestone(
+            spec,
+            mid=aid,
+            name=ability.get("name") or aid,
+            level=None,
+            kind="ability",
+            reward_id=aid,
+            innate=True,
+        )
+    elif not no_milestone and unlock_level is not None:
         _upsert_milestone(
             spec,
             mid=aid,
@@ -658,6 +703,7 @@ def add_amplifier(
     *,
     unlock_level: Optional[int] = None,
     no_milestone: bool = False,
+    innate: bool = False,
     ) -> Dict[str, Any]:
     _ensure_lists(spec)
     amplifier = deepcopy(amplifier)
@@ -669,7 +715,17 @@ def add_amplifier(
             first = bonuses[0].get("effect")
         amplifier["type"] = infer_amplifier_type(str(first or "range"))
     _upsert_by_id(spec["amplifiers"], amplifier)
-    if not no_milestone and unlock_level is not None:
+    if innate:
+        _upsert_milestone(
+            spec,
+            mid=amplifier["id"],
+            name=amplifier.get("name") or amplifier["id"],
+            level=None,
+            kind="amplifier",
+            reward_id=amplifier["id"],
+            innate=True,
+        )
+    elif not no_milestone and unlock_level is not None:
         _upsert_milestone(
             spec,
             mid=amplifier["id"],
@@ -957,11 +1013,13 @@ def grant_existing(
     kind: str,
     reward_id: str,
     name: str,
-    unlock_level: int,
+    unlock_level: Optional[int],
     milestone_id: Optional[str] = None,
     innate: bool = False,
     ) -> Dict[str, Any]:
     _ensure_lists(spec)
+    if not innate and unlock_level is None:
+        raise ValueError("Provide unlock_level unless this is an innate milestone")
     if kind == "passive":
         require_paid_passive_level(None if innate else unlock_level, innate=innate, what=f"Passive {reward_id}")
     mid = milestone_id or f"{spec['skill_id']}_{slug_name(name).lower()}"
@@ -1029,6 +1087,7 @@ def move_milestone(
     if innate:
         m["innate"] = True
         m["requirements"] = {}
+        m["skill_id"] = ""
         m["file"] = f"innate_{slug}.json"
         return m
     if level is None:
@@ -1042,6 +1101,7 @@ def move_milestone(
     _check_prereqs(spec, milestone_id, keep, level)
     m.pop("innate", None)
     m["requirements"] = {"milestones": keep, "skill": level}
+    m["skill_id"] = spec["skill_id"]
     m["file"] = f"{level}_{slug}.json"
     return m
 
@@ -1285,6 +1345,29 @@ def _dump(obj: Any) -> str:
     return json.dumps(obj, indent="\t") + "\n"
 
 
+def ability_filename(ability: Dict[str, Any]) -> str:
+    """Keep an imported ability's original filename, with one JSON suffix."""
+    original = str(ability.get("_file") or "").strip()
+    if original:
+        name = original.replace("\\", "/").rsplit("/", 1)[-1]
+        while name.lower().endswith(".json"):
+            name = name[:-5]
+    else:
+        name = slug_name(str(ability.get("name") or ability.get("id") or "ability"))
+        while name.lower().endswith(".json"):
+            name = name[:-5]
+    return f"{name or slug_name(str(ability.get('id') or 'ability'))}.json"
+
+
+def public_ability(ability: Dict[str, Any]) -> Dict[str, Any]:
+    """Strip SkillCreator bookkeeping before writing game ability JSON."""
+    return {
+        key: value
+        for key, value in ability.items()
+        if not str(key).startswith("_") and key != "file"
+    }
+
+
 def write_mod(spec: Dict[str, Any], dest: Optional[Path] = None) -> Path:
     root = Path(dest) if dest else staging_dir(spec)
     skill_id = spec["skill_id"]
@@ -1299,11 +1382,14 @@ def write_mod(spec: Dict[str, Any], dest: Optional[Path] = None) -> Path:
     abilities.mkdir(exist_ok=True)
     written_abs = set()
     for ab in spec.get("abilities") or []:
-        fname = f"{slug_name(ab.get('name') or ab['id'])}.json"
-        (abilities / fname).write_text(_dump(ab), encoding="utf-8")
-        written_abs.add(fname)
+        fname = ability_filename(ab)
+        file_key = fname.casefold()
+        if file_key in written_abs:
+            raise ValueError(f"Ability filename collision: {fname}. Give the abilities distinct source filenames or names.")
+        (abilities / fname).write_text(_dump(public_ability(ab)), encoding="utf-8")
+        written_abs.add(file_key)
     for stale in abilities.glob("*.json"):
-        if stale.name not in written_abs:
+        if stale.name.casefold() not in written_abs:
             stale.unlink()
     (root / "passives.json").write_text(_dump(spec.get("passives") or []), encoding="utf-8")
     (root / "ability_amplifiers.json").write_text(_dump(spec.get("amplifiers") or []), encoding="utf-8")
@@ -1356,8 +1442,49 @@ def write_mod(spec: Dict[str, Any], dest: Optional[Path] = None) -> Path:
             (bdir / building_filename(building)).write_text(
                 _dump(public_building(building)), encoding="utf-8"
             )
+    if spec.get("procedural_maps"):
+        written_maps = set()
+        default_map_dir = map_folder_name(spec.get("procedural_map_dir"))
+        for row in spec["procedural_maps"]:
+            folder_name = map_folder_name(row.get("_map_dir") or default_map_dir)
+            map_dir = root / folder_name
+            map_dir.mkdir(exist_ok=True)
+            fname = procedural_map_filename(row)
+            collision = (folder_name.casefold(), fname.casefold())
+            if collision in written_maps:
+                raise ValueError(f"Procedural map filename collision in {folder_name}: {fname}")
+            (map_dir / fname).write_text(_dump(public_procedural_map(row)), encoding="utf-8")
+            written_maps.add(collision)
+    conversation_file_present = bool(
+        spec.get("_conversation_file_present")
+        or spec.get("conversations")
+        or spec.get("family_conversations")
+        or spec.get("conversation_root_extra")
+    )
+    if conversation_file_present:
+        invalid_root = spec.get("_conversation_invalid_root")
+        if spec.get("_conversation_root_invalid"):
+            conversation_doc = invalid_root
+        else:
+            conversation_doc = dict(spec.get("conversation_root_extra") or {})
+            sections_present = set(spec.get("_conversation_sections_present") or [])
+            if "conversations" in sections_present or spec.get("conversations"):
+                conversation_doc["conversations"] = spec.get("conversations") or []
+            if "family_conversations" in sections_present or spec.get("family_conversations"):
+                conversation_doc["family_conversations"] = spec.get("family_conversations") or []
+        (root / "conversations.json").write_text(_dump(conversation_doc), encoding="utf-8")
+    elif (root / "conversations.json").is_file():
+        (root / "conversations.json").unlink()
     write_character_json(spec, root)
-    save_spec(spec, root / "skill.json")
+    if dest is None:
+        # The editor's aggregate spec is not a game data file. Keep it out of
+        # the mod root so the folder can be loaded directly by the game.
+        save_spec(spec, studio_spec_path(root))
+        legacy_spec = root / STUDIO_SPEC_NAME
+        if legacy_spec.is_file():
+            legacy = _read_json_file(legacy_spec)
+            if isinstance(legacy, dict) and "skill_id" in legacy and isinstance(legacy.get("skill"), dict):
+                legacy_spec.unlink()
     return root
 
 
@@ -1419,6 +1546,9 @@ _DISK_LIST_KEYS = (
     "control_actions",
     "character_tags",
     "production_actions",
+    "procedural_maps",
+    "conversations",
+    "family_conversations",
 )
 
 def load_mod_folder(folder: Path) -> Dict[str, Any]:
@@ -1477,17 +1607,54 @@ def load_mod_folder(folder: Path) -> Dict[str, Any]:
     if loot is not None:
         spec["loot_exclude"] = loot if isinstance(loot, list) else _as_row_list(loot)
     spec["buildings"] = _load_json_dir(folder / "buildings")
+    procedural_maps: List[Dict[str, Any]] = []
+    map_dirs = [folder / name for name in ("procedural_maps", "procedual_maps") if (folder / name).is_dir()]
+    for map_dir in map_dirs:
+        for row in _load_json_dir(map_dir):
+            row["_map_dir"] = map_dir.name
+            procedural_maps.append(row)
+    spec["procedural_maps"] = procedural_maps
+    if len(map_dirs) == 1:
+        spec["procedural_map_dir"] = map_dirs[0].name
+    conversations_path = folder / "conversations.json"
+    if conversations_path.is_file():
+        conversation_doc = _read_json_strict(conversations_path)
+        spec["_conversation_file_present"] = True
+        if isinstance(conversation_doc, dict):
+            spec["_conversation_sections_present"] = [
+                key for key in ("conversations", "family_conversations") if key in conversation_doc
+            ]
+            spec["conversation_root_extra"] = {
+                key: value
+                for key, value in conversation_doc.items()
+                if key not in ("conversations", "family_conversations")
+            }
+            for key in ("conversations", "family_conversations"):
+                if key in conversation_doc:
+                    spec[key] = conversation_doc[key]
+        else:
+            # Retain an invalid root value so validation/editor JSON can show it
+            # instead of silently replacing an existing file with an empty one.
+            spec["_conversation_invalid_root"] = conversation_doc
+            spec["_conversation_root_invalid"] = True
     load_character_into_spec(spec, folder)
 
-    studio = _read_json_file(folder / "skill.json")
+    studio_path = find_studio_spec_path(folder)
+    studio = _read_json_file(studio_path) if studio_path else None
     if isinstance(studio, dict):
+        disk_conversations_present = bool(spec.get("_conversation_file_present"))
         for key in _DISK_LIST_KEYS:
+            if key in ("conversations", "family_conversations") and spec.get("_conversation_file_present"):
+                continue
             if spec.get(key):
                 continue
             extra = studio.get(key)
             if not extra:
                 continue
             spec[key] = extra if isinstance(extra, list) else _as_row_list(extra)
+        for key in ("_conversation_file_present", "_conversation_sections_present", "conversation_root_extra", "_conversation_invalid_root", "_conversation_root_invalid"):
+            if key in studio and not disk_conversations_present and (not spec.get(key) or key == "_conversation_file_present"):
+                spec[key] = studio[key]
         if not spec.get("assets") and studio.get("assets") is not None:
             spec["assets"] = studio["assets"]
         if not skills and isinstance(studio.get("skill"), dict):

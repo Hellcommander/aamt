@@ -342,6 +342,15 @@ def grant_entity_milestones(entity: Dict[str, Any], milestone_ids: List[str]) ->
     skills["milestones"] = miles
 
 
+def revoke_entity_milestones(entity: Dict[str, Any], milestone_ids: List[str]) -> None:
+    """Remove selected milestone ids from an entity's innate skill grants."""
+    skills = entity.get("skills")
+    if not isinstance(skills, dict):
+        return
+    remove = {str(mid) for mid in milestone_ids}
+    skills["milestones"] = [str(mid) for mid in (skills.get("milestones") or []) if str(mid) not in remove]
+
+
 def entity_filename(entity: Dict[str, Any]) -> str:
     if entity.get("_file"):
         return str(entity["_file"])

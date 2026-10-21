@@ -11,12 +11,14 @@ Do not invent .smap maps. Copy existing maps only.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from copy import deepcopy
+from html import unescape
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from s2_paths import core2_dir, output_root, skip_mod_path, workshop_root
+from s2_paths import core2_dir, docs_index, mods_dir, output_root, skip_mod_path, workshop_root
 from s2_schema import slug_name
 
 SPEC_ONLY_KEYS = ("_file", "_cloned_from", "_source")
@@ -143,6 +145,67 @@ def _load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
+def _parse_building_json(text: str) -> Tuple[Any, bool]:
+    """Parse a building file, repairing only comments, trailing commas, or missing separators."""
+    try:
+        return json.loads(text), False
+    except json.JSONDecodeError as first_error:
+        repaired = text.lstrip("\ufeff")
+        repaired = re.sub(r"(?m)^\s*(//|#).*$", "", repaired)
+        chars: List[str] = []
+        in_string = False
+        escaped = False
+        index = 0
+        while index < len(repaired):
+            char = repaired[index]
+            if in_string:
+                chars.append(char)
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    in_string = False
+            elif char == '"':
+                in_string = True
+                chars.append(char)
+            elif char == ",":
+                look = index + 1
+                while look < len(repaired) and repaired[look].isspace():
+                    look += 1
+                if look >= len(repaired) or repaired[look] not in "]}":
+                    chars.append(char)
+            else:
+                chars.append(char)
+            index += 1
+        repaired = "".join(chars)
+        for _ in range(12):
+            try:
+                return json.loads(repaired), True
+            except json.JSONDecodeError as error:
+                if error.msg != "Expecting ',' delimiter":
+                    raise first_error
+                prev = error.pos - 1
+                while prev >= 0 and repaired[prev].isspace():
+                    prev -= 1
+                if prev < 0 or repaired[prev] in "{[:,":
+                    raise first_error
+                prefix = repaired[:prev + 1].rstrip()
+                terminal = repaired[prev] in '"}]0123456789'
+                if not terminal and not re.search(r"(?:true|false|null)$", prefix):
+                    raise first_error
+                repaired = repaired[:prev + 1] + "," + repaired[prev + 1:]
+        raise first_error
+
+
+def _load_building_json(path: Path) -> Tuple[Dict[str, Any], bool]:
+    text = path.read_text(encoding="utf-8-sig")
+    data, repaired = _parse_building_json(text)
+    if not isinstance(data, dict):
+        raise ValueError("building JSON must be an object")
+    return data, repaired
+
+
 def public_building(building: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in building.items() if k not in SPEC_ONLY_KEYS}
 
@@ -158,17 +221,29 @@ def _iter_building_files() -> Iterable[Tuple[str, Path]]:
     if core.is_dir():
         for path in core.glob("*.json"):
             yield "core_2", path
+    installed = mods_dir()
+    if installed.is_dir():
+        for mod in sorted(installed.iterdir()):
+            if not mod.is_dir() or mod.name == "core_2" or skip_mod_path(mod):
+                continue
+            if not (mod / "mod.json").is_file():
+                continue
+            for folder_name in ("buildings", "building"):
+                folder = mod / folder_name
+                if folder.is_dir():
+                    for path in sorted(folder.glob("*.json")):
+                        yield mod.name, path
     ws = workshop_root()
     if not ws:
         return
     for mod in sorted(ws.iterdir()):
         if not mod.is_dir() or skip_mod_path(mod):
             continue
-        folder = mod / "buildings"
-        if not folder.is_dir():
-            continue
-        for path in folder.glob("*.json"):
-            yield mod.name, path
+        for folder_name in ("buildings", "building"):
+            folder = mod / folder_name
+            if folder.is_dir():
+                for path in folder.glob("*.json"):
+                    yield mod.name, path
 
 
 def search_buildings(query: str, limit: int = 40) -> List[Dict[str, Any]]:
@@ -192,10 +267,11 @@ def search_buildings(query: str, limit: int = 40) -> List[Dict[str, Any]]:
         hits.append(
             {
                 "id": bid,
+                "clone_key": str(path),
                 "name": name or bid,
                 "source": source,
                 "file": str(path),
-                "allow_player": bool(data.get("allow_player")),
+                "allow_player": is_player_building(data),
                 "enables": list(data.get("enables") or []),
                 "group": data.get("group"),
                 "occupation_image": data.get("occupation_image"),
@@ -206,37 +282,165 @@ def search_buildings(query: str, limit: int = 40) -> List[Dict[str, Any]]:
     return hits
 
 
+def _building_docs_excerpt() -> Tuple[str, str]:
+    try:
+        path = docs_index()
+    except FileNotFoundError:
+        return "", "Local Soulash 2 documentation was not found."
+    if not path.is_file():
+        return str(path), "Local Soulash 2 documentation was not found."
+    html = path.read_text(encoding="utf-8-sig", errors="replace")
+    heading = re.search(
+        r"<h3\b[^>]*id=[\"']3\.3\.3\s+creating\s+new\s+building[\"'][^>]*>",
+        html,
+        flags=re.IGNORECASE,
+    )
+    if not heading:
+        return str(path), "The local docs were found, but the building section could not be located."
+    next_heading = re.search(r"<h[1-6]\b", html[heading.end():], flags=re.IGNORECASE)
+    end = heading.end() + next_heading.start() if next_heading else min(len(html), heading.end() + 12000)
+    section = html[heading.start():end]
+    text = unescape(re.sub(r"<[^>]+>", " ", section))
+    text = re.sub(r"\s+", " ", text).strip()
+    return str(path), text[:2200]
+
+
+def building_reference_aid(query: str = "", limit: int = 8) -> Dict[str, Any]:
+    """Summarize the local building contract and cite installed examples and docs."""
+    docs_path, docs_excerpt = _building_docs_excerpt()
+    templates = []
+    for kind, building_id in TEMPLATES.items():
+        try:
+            data = load_building(building_id)
+        except FileNotFoundError:
+            continue
+        templates.append(
+            {
+                "template": kind,
+                "id": str(data.get("id") or building_id),
+                "name": data.get("name") or building_id,
+                "source": data.get("_source") or "core_2",
+                "race": data.get("race"),
+                "occupation_image": data.get("occupation_image"),
+                "workers": data.get("workers"),
+                "group": data.get("group"),
+                "occupation_per_race": data.get("occupation_per_race") or {},
+            }
+        )
+    installed_matches = search_installed_buildings(query, limit=limit) if query else []
+    return {
+        "docs_path": docs_path,
+        "mods_path": str(mods_dir()),
+        "docs_excerpt": docs_excerpt,
+        "contract": [
+            "Official docs section 3.3.3 defines id, image, name, occupation, produces, race, tier, and workers; workers is [minimum, maximum].",
+            "Current 0.10 player settlement examples use allow_player=true, race='-1', occupation_image, produces as an array, and occupation_per_race keyed by race id.",
+            "Player training halls include a vampire worker at occupation_per_race['6']; worker-specific ids need a matching entity in the mod or a valid core_2 id.",
+            "If a building has a resting_place requirement, its count should match the maximum in workers.",
+            "Vanilla training templates are Collegium Magicae (389), Dojo (387), and Chicken Ranch (404). Maps are copied from existing .smap files; the tool does not generate maps.",
+        ],
+        "templates": templates,
+        "installed_matches": installed_matches,
+    }
+
+
+def iter_installed_mods(root: Optional[Path] = None) -> List[Path]:
+    """List installed user mods, excluding the vanilla core_2 package."""
+    root = Path(root) if root else mods_dir()
+    if not root.is_dir():
+        return []
+    return [
+        folder
+        for folder in sorted(root.iterdir())
+        if folder.is_dir()
+        and folder.name != "core_2"
+        and not skip_mod_path(folder)
+        and (folder / "mod.json").is_file()
+    ]
+
+
+def search_installed_buildings(query: str, limit: int = 40) -> List[Dict[str, Any]]:
+    q = (query or "").strip().casefold()
+    if len(q) < 2 and not q.isdigit():
+        return []
+    hits: List[Dict[str, Any]] = []
+    for mod in iter_installed_mods():
+        for folder_name in ("buildings", "building"):
+            folder = mod / folder_name
+            if not folder.is_dir():
+                continue
+            for path in sorted(folder.glob("*.json")):
+                try:
+                    data = _load_json(path)
+                except Exception:
+                    continue
+                if not isinstance(data, dict):
+                    continue
+                bid = str(data.get("id") or path.stem)
+                name = str(data.get("name") or "")
+                enables = " ".join(str(value) for value in (data.get("enables") or []))
+                hay = " ".join((bid, name, path.stem, enables, str(data.get("group") or ""))).casefold()
+                if q not in hay:
+                    continue
+                hits.append({
+                    "id": bid,
+                    "clone_key": str(path),
+                    "name": name or bid,
+                    "source": mod.name,
+                    "file": str(path),
+                    "allow_player": is_player_building(data),
+                    "enables": list(data.get("enables") or []),
+                    "group": data.get("group"),
+                    "occupation_image": data.get("occupation_image"),
+                })
+                if len(hits) >= max(1, min(int(limit), 40)):
+                    return hits
+    return hits
+
+
 def load_building(building_id: str) -> Dict[str, Any]:
     wanted = str(building_id).strip()
-    stem_hits: List[Path] = []
-    for source, path in _iter_building_files():
-        if wanted.lower() in path.stem.lower() or path.stem == wanted:
-            stem_hits.append(path)
-    for path in stem_hits:
+    direct = Path(wanted)
+    if direct.is_file():
+        data = _load_json(direct)
+        if isinstance(data, dict):
+            data["_cloned_from"] = str(direct.resolve())
+            data["_file"] = direct.name
+            data["_source"] = direct.parent.parent.name
+            return data
+    all_files = list(_iter_building_files())
+    wanted_source = None
+    if "::" in wanted:
+        wanted_source, wanted = wanted.split("::", 1)
+    for source, path in all_files:
+        if wanted_source and source.casefold() != wanted_source.casefold():
+            continue
         try:
             data = _load_json(path)
         except Exception:
             continue
         if not isinstance(data, dict):
             continue
-        if str(data.get("id")) == wanted or path.stem == wanted:
+        if str(data.get("id") or "").casefold() == wanted.casefold() or path.stem.casefold() == wanted.casefold():
             data["_cloned_from"] = str(path)
             data["_file"] = path.name
-            data["_source"] = path.parent.parent.name
+            data["_source"] = source
             return data
-        if str(data.get("name") or "").lower() == wanted.lower():
+        if str(data.get("name") or "").casefold() == wanted.casefold():
             data["_cloned_from"] = str(path)
             data["_file"] = path.name
-            data["_source"] = path.parent.parent.name
+            data["_source"] = source
             return data
-    for source, path in _iter_building_files():
+    for source, path in all_files:
+        if wanted_source and source.casefold() != wanted_source.casefold():
+            continue
         try:
             data = _load_json(path)
         except Exception:
             continue
         if not isinstance(data, dict):
             continue
-        if str(data.get("id")) == wanted or str(data.get("name") or "").lower() == wanted.lower():
+        if str(data.get("id") or "").casefold() == wanted.casefold() or str(data.get("name") or "").casefold() == wanted.casefold():
             data["_cloned_from"] = str(path)
             data["_file"] = path.name
             data["_source"] = source
@@ -312,40 +516,122 @@ def vampire_occupation_id(building: Dict[str, Any]) -> Optional[str]:
 
 
 def is_player_building(building: Dict[str, Any]) -> bool:
-    if building.get("allow_player"):
+    if _as_bool(building.get("allow_player")):
         return True
     return str(building.get("race") or "") == "-1"
+
+
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value == 1
+    return isinstance(value, str) and value.strip().casefold() in ("true", "1", "yes")
+
+
+def _as_int(value: Any) -> Optional[int]:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else None
+    if isinstance(value, str) and value.strip().lstrip("+-").isdigit():
+        try:
+            return int(value.strip())
+        except (ValueError, OverflowError):
+            return None
+    return None
 
 
 def _resting_count(building: Dict[str, Any]) -> Optional[int]:
     workers = building.get("workers")
     if isinstance(workers, list) and len(workers) >= 2:
-        try:
-            return int(workers[1])
-        except (TypeError, ValueError):
-            return None
+        return _as_int(workers[1])
     return None
 
 
 def fix_building(building: Dict[str, Any], *, occupation_image: Optional[int] = None) -> List[str]:
     """Patch a building dict to the 0.10 player-settlement contract. Mutates in place."""
     notes: List[str] = []
+    for key in ("image", "max", "occupation_image", "tier", "min_area"):
+        if key in building:
+            value = _as_int(building[key])
+            if value is not None and (type(building[key]) is not int or building[key] != value):
+                building[key] = value
+                notes.append(f"{key}={value}")
+    for key in ("id", "name", "occupation", "race", "type", "group"):
+        if key in building and building[key] is not None and not isinstance(building[key], str):
+            building[key] = str(building[key])
+            notes.append(f"{key} converted to text")
+    workers = building.get("workers")
+    if isinstance(workers, list):
+        normalized_workers = [_as_int(value) if _as_int(value) is not None else value for value in workers]
+        if normalized_workers != workers or any(type(a) is not type(b) for a, b in zip(normalized_workers, workers)):
+            building["workers"] = normalized_workers
+            notes.append("workers converted to numbers")
+    opr = building.get("occupation_per_race")
+    if isinstance(opr, dict):
+        normalized_opr = {str(race): str(worker) for race, worker in opr.items()}
+        if normalized_opr != opr or any(type(k) is not str or type(v) is not str for k, v in opr.items()):
+            building["occupation_per_race"] = normalized_opr
+            notes.append("occupation_per_race ids converted to text")
+    if "building" in building:
+        del building["building"]
+        notes.append("removed stray building key")
+    required = building.get("required_entities")
+    if isinstance(required, list):
+        changed_required = False
+        for row in required:
+            if not isinstance(row, dict):
+                continue
+            count = _as_int(row.get("count"))
+            if "count" in row and count is not None and (type(row["count"]) is not int or row["count"] != count):
+                row["count"] = count
+                changed_required = True
+            entities = row.get("entities")
+            if isinstance(entities, list):
+                converted = [str(value) if value is not None else value for value in entities]
+                if converted != entities or any(type(a) is not type(b) for a, b in zip(converted, entities)):
+                    row["entities"] = converted
+                    changed_required = True
+        if changed_required:
+            notes.append("required_entities types normalized")
+    produces = building.get("produces")
+    if isinstance(produces, list):
+        changed_produces = False
+        for row in produces:
+            if not isinstance(row, dict) or not isinstance(row.get("entities"), list):
+                continue
+            for entity in row["entities"]:
+                if isinstance(entity, dict) and entity.get("id") is not None and not isinstance(entity["id"], str):
+                    entity["id"] = str(entity["id"])
+                    changed_produces = True
+        if changed_produces:
+            notes.append("produces entity ids converted to text")
     player = is_player_building(building)
     if player:
-        if not building.get("allow_player"):
+        if not _as_bool(building.get("allow_player")):
             building["allow_player"] = True
             notes.append("allow_player")
+        elif building.get("allow_player") is not True:
+            building["allow_player"] = True
+            notes.append("allow_player=true")
         if str(building.get("race") or "") != "-1":
             building["race"] = "-1"
             notes.append("race=-1")
-        if "occupation_image" not in building:
+        if not isinstance(building.get("occupation_image"), int) or isinstance(building.get("occupation_image"), bool):
             building["occupation_image"] = int(occupation_image if occupation_image is not None else guess_occupation_image(building))
             notes.append(f"occupation_image={building['occupation_image']}")
-        if "produces" not in building:
+        if not isinstance(building.get("produces"), list):
             building["produces"] = []
             notes.append("produces=[]")
-        opr = building.setdefault("occupation_per_race", {})
-        if isinstance(opr, dict) and "6" not in opr:
+        opr = building.get("occupation_per_race")
+        if not isinstance(opr, dict):
+            opr = {}
+            building["occupation_per_race"] = opr
+            notes.append("occupation_per_race={}")
+        if "6" not in opr:
             vid = vampire_occupation_id(building)
             if vid:
                 opr["6"] = vid
@@ -357,7 +643,7 @@ def fix_building(building: Dict[str, Any], *, occupation_image: Optional[int] = 
         if want_rest and isinstance(req, list):
             for slot in req:
                 if isinstance(slot, dict) and slot.get("component") == "resting_place":
-                    if int(slot.get("count") or 0) != want_rest:
+                    if _as_int(slot.get("count")) != want_rest:
                         slot["count"] = want_rest
                         notes.append(f"resting_place={want_rest}")
                     break
@@ -365,7 +651,7 @@ def fix_building(building: Dict[str, Any], *, occupation_image: Optional[int] = 
         if group == "militaryofficer":
             building["group"] = "military"
             notes.append("group=military")
-    elif "produces" not in building:
+    elif not isinstance(building.get("produces"), list):
         building["produces"] = []
         notes.append("produces=[]")
     return notes
@@ -505,21 +791,51 @@ def output_mod_dir(folder: Path) -> Path:
 def scan_building_issues(building: Dict[str, Any]) -> List[str]:
     issues: List[str] = []
     bid = str(building.get("id") or "")
+    label = bid or "<building>"
+    for key in ("id", "name", "occupation", "race"):
+        if not isinstance(building.get(key), str) or not building.get(key):
+            issues.append(f"{label}: {key} must be a non-empty string")
+    tier = _as_int(building.get("tier"))
+    if tier is None:
+        issues.append(f"{label}: tier must be a number")
+    elif not 1 <= tier <= 3:
+        issues.append(f"{label}: tier should be between 1 and 3 unless locations.json defines more tiers")
+    if _as_int(building.get("image")) is None:
+        issues.append(f"{label}: image must be a number")
+    if not isinstance(building.get("produces"), list):
+        issues.append(f"{label}: produces must be an array")
+    if "building" in building:
+        issues.append(f"{label}: stray 'building' key should be removed")
+    if "required_entities" in building and not isinstance(building.get("required_entities"), list):
+        issues.append(f"{label}: required_entities must be an array")
+    workers = building.get("workers")
+    if not isinstance(workers, list) or len(workers) < 2 or any(_as_int(value) is None for value in workers[:2]):
+        issues.append(f"{label}: workers must contain minimum and maximum numbers")
+    elif _as_int(workers[0]) > _as_int(workers[1]):
+        issues.append(f"{label}: workers minimum exceeds maximum")
     if not is_player_building(building):
         return issues
-    if "occupation_image" not in building:
+    if not _as_bool(building.get("allow_player")):
+        issues.append(f"{bid}: player building should set allow_player=true")
+    if str(building.get("race") or "") != "-1":
+        issues.append(f"{bid}: player building should set race='-1'")
+    if _as_int(building.get("min_area")) is None:
+        issues.append(f"{bid}: player building min_area must be a number")
+    if not isinstance(building.get("group"), str) or not building.get("group"):
+        issues.append(f"{bid}: player building group must be a non-empty string")
+    if not isinstance(building.get("occupation_image"), int) or isinstance(building.get("occupation_image"), bool):
         issues.append(f"{bid}: missing occupation_image")
-    if "produces" not in building:
-        issues.append(f"{bid}: missing produces")
     opr = building.get("occupation_per_race") or {}
-    if isinstance(opr, dict) and "6" not in opr:
+    if not isinstance(opr, dict) or not opr.get("6"):
         issues.append(f"{bid}: occupation_per_race missing vampire 6")
+    elif any(not isinstance(race, str) or not isinstance(worker, str) or not worker for race, worker in opr.items()):
+        issues.append(f"{bid}: occupation_per_race must map string race ids to worker ids")
     want_rest = _resting_count(building)
     req = building.get("required_entities")
     if want_rest and isinstance(req, list):
         for slot in req:
             if isinstance(slot, dict) and slot.get("component") == "resting_place":
-                if int(slot.get("count") or 0) != want_rest:
+                if _as_int(slot.get("count")) != want_rest:
                     issues.append(f"{bid}: resting_place {slot.get('count')} != workers max {want_rest}")
                 break
     if str(building.get("group") or "") == "militaryofficer":
@@ -527,9 +843,55 @@ def scan_building_issues(building: Dict[str, Any]) -> List[str]:
     return issues
 
 
-def scan_mod_folder(folder: Path) -> List[str]:
+def scan_buildings_folder(folder: Path) -> List[str]:
     folder = Path(folder)
     issues: List[str] = []
+    for folder_name in ("buildings", "building"):
+        bdir = folder / folder_name
+        if not bdir.is_dir():
+            continue
+        for path in sorted(bdir.glob("*.json")):
+            try:
+                data, repaired = _load_building_json(path)
+            except Exception as exc:
+                issues.append(f"{path.relative_to(folder)}: unreadable ({exc})")
+                continue
+            if repaired:
+                issues.append(f"{path.relative_to(folder)}: repairable JSON (comments, trailing commas, or missing commas)")
+            issues.extend(scan_building_issues(data))
+    return issues
+
+
+def fix_buildings_folder(folder: Path, *, backup_dir: Optional[Path] = None) -> List[str]:
+    """Repair building JSON in a mod folder without touching NPCs or conversations."""
+    folder = Path(folder)
+    notes: List[str] = []
+    for folder_name in ("buildings", "building"):
+        bdir = folder / folder_name
+        if not bdir.is_dir():
+            continue
+        for path in sorted(bdir.glob("*.json")):
+            try:
+                data, repaired = _load_building_json(path)
+            except Exception as exc:
+                notes.append(f"{path.relative_to(folder)}: unable to repair ({exc})")
+                continue
+            changes = ["JSON repaired (comments, trailing commas, or missing commas)"] if repaired else []
+            changes.extend(fix_building(data))
+            if changes:
+                if backup_dir and path.is_file():
+                    backup = Path(backup_dir) / path.relative_to(folder)
+                    backup.parent.mkdir(parents=True, exist_ok=True)
+                    if not backup.exists():
+                        shutil.copy2(path, backup)
+                _write_json(path, data)
+                notes.append(f"{path.relative_to(folder)}: {', '.join(changes)}")
+    return notes
+
+
+def scan_mod_folder(folder: Path) -> List[str]:
+    folder = Path(folder)
+    issues: List[str] = scan_buildings_folder(folder)
     mj = folder / "mod.json"
     if mj.is_file():
         try:
@@ -538,16 +900,6 @@ def scan_mod_folder(folder: Path) -> List[str]:
             required = ""
         if required and required != GAME_REQUIRED and not required.startswith("0.10"):
             issues.append(f"mod.json game_required={required} (want {GAME_REQUIRED})")
-    bdir = folder / "buildings"
-    if bdir.is_dir():
-        for path in sorted(bdir.glob("*.json")):
-            try:
-                data = _load_json(path)
-            except Exception as exc:
-                issues.append(f"{path.name}: unreadable ({exc})")
-                continue
-            if isinstance(data, dict):
-                issues.extend(scan_building_issues(data))
     edir = folder / "entities"
     if edir.is_dir():
         for path in sorted(edir.glob("*.json")):
@@ -570,10 +922,14 @@ def scan_mod_folder(folder: Path) -> List[str]:
     if conv.is_file():
         try:
             data = _load_json(conv)
-        except Exception:
+        except Exception as exc:
+            issues.append(f"conversations.json: unreadable ({exc})")
             data = {}
-        for row in data.get("conversations") or []:
-            if row.get("type") == "begin_conversation":
+        rows = data.get("conversations") or [] if isinstance(data, dict) else []
+        if isinstance(rows, list):
+            for row in rows:
+                if not isinstance(row, dict) or row.get("type") != "begin_conversation":
+                    continue
                 opts = row.get("options") or []
                 if TRAIN_OPTION not in opts:
                     issues.append(f"{row.get('id')}: begin_conversation missing {TRAIN_OPTION}")
@@ -730,13 +1086,18 @@ def upgrade_mod_folder(folder: Path) -> List[str]:
             if eid not in have and _find_entity_in_folder(folder, eid):
                 have.append(eid)
 
-    bdir = folder / "buildings"
-    if bdir.is_dir():
+    for folder_name in ("buildings", "building"):
+        bdir = folder / folder_name
+        if not bdir.is_dir():
+            continue
         for path in sorted(bdir.glob("*.json")):
-            data = _load_entity_file(path)
-            if not data:
+            try:
+                data, repaired = _load_building_json(path)
+            except Exception as exc:
+                notes.append(f"{path.relative_to(folder)}: unable to repair ({exc})")
                 continue
-            bnotes = fix_building(data)
+            bnotes = ["JSON repaired (comments, trailing commas, or missing commas)"] if repaired else []
+            bnotes.extend(fix_building(data))
             if is_player_building(data) and "6" not in (data.get("occupation_per_race") or {}):
                 occ0 = str((data.get("occupation_per_race") or {}).get("0") or data.get("occupation") or "")
                 bid = str(data.get("id") or path.stem)
@@ -771,7 +1132,7 @@ def upgrade_mod_folder(folder: Path) -> List[str]:
                 bnotes = [n for n in bnotes if "needs cloned vampire" not in n]
             if bnotes:
                 _write_json(path, data)
-                notes.append(f"{path.name}: {', '.join(bnotes)}")
+                notes.append(f"{path.relative_to(folder)}: {', '.join(bnotes)}")
 
     edir = folder / "entities"
     if edir.is_dir():
@@ -813,7 +1174,7 @@ def copy_mod_to_output(src: Path, dest: Optional[Path] = None) -> Path:
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
     if not dest.exists():
-        shutil.copytree(src, dest, ignore=shutil.ignore_patterns("skill.json"))
+        shutil.copytree(src, dest, ignore=shutil.ignore_patterns("skill.json", ".skillcreator"))
     return dest
 
 

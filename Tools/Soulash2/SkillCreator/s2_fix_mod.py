@@ -157,7 +157,7 @@ def copy_mod_to_fixed(src: Path) -> Path:
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
         shutil.rmtree(dest)
-    shutil.copytree(src, dest, ignore=shutil.ignore_patterns("skill.json"))
+    shutil.copytree(src, dest, ignore=shutil.ignore_patterns("skill.json", ".skillcreator"))
     return dest
 
 

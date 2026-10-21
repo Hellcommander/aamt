@@ -47,6 +47,9 @@ WORKSHOP_CANDIDATES = [
 # Cleared: Hydromancy is a normal skill id; prefer Geomancy/Warlock layout still.
 SKIP_MOD_NAME_FRAGMENTS: tuple[str, ...] = ()
 
+STUDIO_DIRNAME = ".skillcreator"
+STUDIO_SPEC_NAME = "skill.json"
+
 
 def tool_dir() -> Path:
     return _HERE
@@ -135,3 +138,26 @@ def skip_mod_path(path: Path) -> bool:
 def staging_dir(spec: dict) -> Path:
     sid = str(spec.get("id") or spec.get("mod_id") or "unnamed")
     return output_root() / sid
+
+
+def studio_spec_path(folder: Path) -> Path:
+    """Private editor state lives below the mod root so it is never a game asset."""
+    return Path(folder) / STUDIO_DIRNAME / STUDIO_SPEC_NAME
+
+
+def find_studio_spec_path(folder: Path) -> Optional[Path]:
+    """Find current editor state, falling back to the pre-.skillcreator layout."""
+    folder = Path(folder)
+    current = studio_spec_path(folder)
+    if current.is_file():
+        return current
+    legacy = folder / STUDIO_SPEC_NAME
+    return legacy if legacy.is_file() else None
+
+
+def project_dir_for_spec(path: Path) -> Path:
+    """Return the mod/staging root for either a private spec or a legacy root spec."""
+    path = Path(path)
+    if path.parent.name == STUDIO_DIRNAME:
+        return path.parent.parent
+    return path.parent

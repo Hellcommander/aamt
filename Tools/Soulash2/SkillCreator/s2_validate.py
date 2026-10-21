@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -11,6 +12,7 @@ from s2_assets import animation_known
 from s2_buildings import is_player_building
 from s2_entities import ENTITY_REF_KEYS
 from s2_paths import core2_dir
+from s2_procedural_maps import validate_procedural_map
 from s2_races import PLAYABLE_MIN, grant_sources
 from s2_schema import load_effects, load_enums, observed_count_warning
 from s2_skill_spec import has_author_prefix, is_rebalance_mastery, prefixed_skill_id
@@ -80,6 +82,9 @@ AMP_BONUS_SHOULD_BE_FIELD = {
     "cast_time": "top-level cast_time",
     "duration": "top-level duration",
 }
+
+CONVERSATION_LIST_FIELDS = {"options", "entities", "player_race", "time", "races"}
+CONVERSATION_STRING_FIELDS = {"id", "type", "text", "answer_positive", "answer_negative", "event", "comment"}
 
 
 def _non_int_number(val: Any) -> bool:
@@ -296,6 +301,108 @@ def _prereq_issues(spec: Dict[str, Any], issues: List[Issue]) -> None:
                 stack.append((nxt, iter(graph[nxt])))
 
 
+def _conversation_issues(spec: Dict[str, Any], issues: List[Issue]) -> None:
+    if spec.get("_conversation_root_invalid") or spec.get("_conversation_invalid_root") is not None:
+        issues.append(Issue("error", "conversations.json root must be an object", "conversations.json"))
+    root_extra = spec.get("conversation_root_extra", {})
+    if root_extra is None:
+        root_extra = {}
+    if not isinstance(root_extra, dict):
+        issues.append(Issue("error", "Unknown conversations.json root fields must be an object", "conversation_root_extra"))
+
+    conversations = spec.get("conversations", [])
+    family = spec.get("family_conversations", [])
+    conversations = [] if conversations is None else conversations
+    family = [] if family is None else family
+    if not isinstance(conversations, list):
+        issues.append(Issue("error", "conversations must be an array", "conversations"))
+        conversations = []
+    if not isinstance(family, list):
+        issues.append(Issue("error", "family_conversations must be an array", "family_conversations"))
+        family = []
+
+    core_ids: set = set()
+    core_types: set = set()
+    try:
+        core_doc = _load(core2_dir() / "conversations.json")
+        if isinstance(core_doc, dict):
+            core_rows = core_doc.get("conversations") or []
+            if isinstance(core_rows, list):
+                core_ids = {str(row.get("id")) for row in core_rows if isinstance(row, dict) and row.get("id")}
+                core_types = {str(row.get("type")) for row in core_rows if isinstance(row, dict) and row.get("type")}
+    except Exception:
+        pass
+
+    local_ids = [str(row.get("id")) for row in conversations if isinstance(row, dict) and row.get("id")]
+    available_ids = set(local_ids) | core_ids
+    counts: Dict[str, int] = {}
+    for cid in local_ids:
+        counts[cid] = counts.get(cid, 0) + 1
+    for cid, count in counts.items():
+        if count > 1:
+            issues.append(
+                Issue(
+                    "warn",
+                    f"Conversation id {cid} occurs {count} times; conditional variants may be intentional, but options resolve ambiguously",
+                    cid,
+                )
+            )
+
+    entity_ids = {str(row.get("id")) for row in spec.get("entities") or [] if isinstance(row, dict) and row.get("id")}
+    for index, row in enumerate(conversations):
+        where = f"conversations[{index}]"
+        if not isinstance(row, dict):
+            issues.append(Issue("error", "Conversation entries must be objects", where))
+            continue
+        cid = str(row.get("id") or f"#{index}")
+        if not row.get("id"):
+            issues.append(Issue("error", "Conversation missing id", where))
+        if not row.get("type"):
+            issues.append(Issue("error", "Conversation missing type", cid))
+        elif core_types and str(row["type"]) not in core_types:
+            issues.append(Issue("warn", f"Conversation type {row['type']} is not present in core_2; current game support is unverified", cid))
+        for field in CONVERSATION_STRING_FIELDS:
+            if field in row and not isinstance(row[field], str):
+                issues.append(Issue("error", f"{field} must be a string", cid))
+        for field in CONVERSATION_LIST_FIELDS:
+            if field not in row:
+                continue
+            values = row[field]
+            if not isinstance(values, list):
+                issues.append(Issue("error", f"{field} must be an array", cid))
+                continue
+            for value in values:
+                if field == "options":
+                    if not isinstance(value, str):
+                        issues.append(Issue("error", "options entries must be conversation ids as strings", cid))
+                    elif value not in available_ids:
+                        issues.append(Issue("warn", f"Option {value} does not resolve in this spec or core_2", cid))
+                elif field == "entities":
+                    ref = str(value)
+                    if ref not in entity_ids and not ref.isdigit() and not ref.startswith("core_2_"):
+                        issues.append(Issue("warn", f"Entity gate {ref} is not defined in this spec or an obvious vanilla id", cid))
+        for field in ("player_sex", "npc_sex"):
+            if field in row and not isinstance(row[field], (int, list)):
+                issues.append(Issue("error", f"{field} must be an integer or array", cid))
+
+    family_races: set = set()
+    for index, row in enumerate(family):
+        where = f"family_conversations[{index}]"
+        if not isinstance(row, dict):
+            issues.append(Issue("error", "Family conversation entries must be objects", where))
+            continue
+        race = row.get("race")
+        if race is None:
+            issues.append(Issue("error", "Family conversation missing race", where))
+        elif str(race) in family_races:
+            issues.append(Issue("warn", f"More than one family conversation targets race {race}", where))
+        else:
+            family_races.add(str(race))
+        for field in ("comment", "answer_positive", "answer_negative"):
+            if field not in row or not isinstance(row[field], str):
+                issues.append(Issue("error", f"Family conversation {field} must be a string", where))
+
+
 def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
     issues: List[Issue] = []
     catalog = _index_effects()
@@ -306,6 +413,7 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
     if not skill_id:
         issues.append(Issue("error", "Missing skill_id"))
         return issues
+    _conversation_issues(spec, issues)
     author = (spec.get("mod") or {}).get("author")
     if not has_author_prefix(str(skill_id), author=author):
         want = prefixed_skill_id(str(skill_id), author=author)
@@ -342,6 +450,18 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
             issues.append(Issue("warn", f"Unknown exp_source id {sid} (docs list is incomplete; walk/carve/production are valid)"))
         if sid == "production" and not src.get("production_action"):
             issues.append(Issue("warn", "exp_source production usually needs production_action (vanilla Agriculture uses it)"))
+    map_ids = set()
+    for index, procedural_map in enumerate(spec.get("procedural_maps") or []):
+        where = f"procedural_maps[{index}]"
+        try:
+            validate_procedural_map(procedural_map)
+        except (TypeError, ValueError) as exc:
+            issues.append(Issue("error", str(exc), where))
+            continue
+        map_id = str(procedural_map["id"])
+        if map_id in map_ids:
+            issues.append(Issue("error", f"Duplicate procedural map id {map_id}", where))
+        map_ids.add(map_id)
     ent_ids = {str(e.get("id")) for e in spec.get("entities") or [] if e.get("id")}
     for i, choice in enumerate(skill.get("starting_gear") or []):
         if not isinstance(choice, dict) or "first" not in choice:
@@ -391,6 +511,10 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
                 )
             )
     ab_ids = {a.get("id") for a in spec.get("abilities") or []}
+    local_ability_ids = {str(a.get("id")) for a in spec.get("abilities") or [] if a.get("id")}
+    triggered_payload_ids: set = set()
+    trigger_graph: Dict[str, set] = {}
+    trigger_chances: Dict[Tuple[str, str], float] = {}
     pa_ids = {p.get("id") for p in spec.get("passives") or []}
     am_ids = {a.get("id") for a in spec.get("amplifiers") or []}
     mile_ids = {m.get("id") for m in spec.get("milestones") or []}
@@ -490,12 +614,17 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
                     issues.append(Issue("warn", f"Unknown ability effect {k}", ab.get("id") or ""))
                 elif (row or {}).get("confidence") == "unconfirmed":
                     issues.append(Issue("warn", f"Unconfirmed exe-only effect {k}; may not work in JSON", ab.get("id") or ""))
+                elif (row or {}).get("confidence") == "docs_unused":
+                    issues.append(Issue("warn", f"Documented ability effect {k} has no vanilla example; current game support in abilities is unverified", ab.get("id") or ""))
         keys = ab.get("effects_keys") or ab.get("effect_keys")
         if isinstance(keys, dict):
             for k in keys:
                 row = catalog.get(("ability_key", k))
                 if not row:
-                    issues.append(Issue("warn", f"Unknown effects_keys {k}", ab.get("id") or ""))
+                    if k == "magic_power_per_entity":
+                        issues.append(Issue("warn", "magic_power_per_entity is not an effects_keys reference in the current catalog; it is confirmed as an amplifier bonus, while its documented ability form is unverified", ab.get("id") or ""))
+                    else:
+                        issues.append(Issue("warn", f"Unknown effects_keys {k}", ab.get("id") or ""))
                 elif row.get("confidence") == "unconfirmed":
                     issues.append(Issue("warn", f"Unconfirmed exe-only effects_keys {k}; may not work in JSON", ab.get("id") or ""))
         n_fx = (len(effects) if isinstance(effects, dict) else 0) + (len(keys) if isinstance(keys, dict) else 0)
@@ -570,12 +699,73 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
             if extra not in KNOWN_PASSIVE_TOP and extra != "only_party":
                 issues.append(Issue("warn", f"Unknown passive field {extra}", p.get("id") or ""))
         for fx in fx_list:
+            if not isinstance(fx, dict):
+                issues.append(Issue("error", "Passive effects entries must be objects", p.get("id") or ""))
+                continue
             eid = fx.get("effect")
             row = catalog.get(("passive", eid)) if eid else None
             if eid and not row:
-                issues.append(Issue("warn", f"Unknown passive effect {eid}", p.get("id") or ""))
+                if eid == "magic_power_per_entity":
+                    issues.append(Issue("warn", "magic_power_per_entity is not confirmed as a passive effect; current vanilla data confirms it as an amplifier bonus only", p.get("id") or ""))
+                else:
+                    issues.append(Issue("warn", f"Unknown passive effect {eid}", p.get("id") or ""))
             elif (row or {}).get("confidence") == "unconfirmed":
                 issues.append(Issue("warn", f"Unconfirmed exe-only passive {eid}; may not work in JSON", p.get("id") or ""))
+            if eid == "trigger_ability_on_cast":
+                source_raw = fx.get("value")
+                payload_raw = fx.get("secondary_value")
+                source = "" if source_raw is None else str(source_raw)
+                payload = "" if payload_raw is None else str(payload_raw)
+                chance = fx.get("third_value")
+                if not source or not payload:
+                    issues.append(Issue("error", "trigger_ability_on_cast needs value (triggering ability id) and secondary_value (triggered ability id)", p.get("id") or ""))
+                    continue
+                if not isinstance(source_raw, str) or not isinstance(payload_raw, str):
+                    issues.append(Issue("error", "trigger_ability_on_cast ability ids must be strings, matching the documented schema", p.get("id") or ""))
+                if chance is None or isinstance(chance, bool) or not isinstance(chance, (int, float)) or not math.isfinite(float(chance)):
+                    issues.append(Issue("error", "trigger_ability_on_cast third_value must be a numeric chance from 0 to 1", p.get("id") or ""))
+                elif not 0 <= float(chance) <= 1:
+                    issues.append(Issue("error", f"trigger_ability_on_cast chance {chance} is outside 0–1", p.get("id") or ""))
+                else:
+                    chance_key = (str(p.get("id") or ""), source)
+                    trigger_chances[chance_key] = trigger_chances.get(chance_key, 0.0) + float(chance)
+                for label, ref in (("triggering", source), ("triggered", payload)):
+                    if ref.startswith(f"{skill_id}_") and ref not in local_ability_ids:
+                        issues.append(Issue("warn", f"trigger_ability_on_cast {label} ability {ref} is not defined in this skill", p.get("id") or ""))
+                if payload in local_ability_ids:
+                    triggered_payload_ids.add(payload)
+                if source in local_ability_ids and payload in local_ability_ids:
+                    trigger_graph.setdefault(source, set()).add(payload)
+
+    for (passive_id, source), total_chance in trigger_chances.items():
+        if total_chance > 1.0 + 1e-9:
+            issues.append(Issue("warn", f"Independent trigger chances for {source} sum to {total_chance:.2f} in one passive, so one cast can fire multiple payloads; confirm that fan-out is intentional", passive_id))
+
+    # Trigger chains are supported by the documented passive effect, but cycles can
+    # recursively schedule casts. Flag them for review instead of assuming a safe cap.
+    visit_state: Dict[str, int] = {}
+    visit_stack: List[str] = []
+    reported_cycles = set()
+
+    def visit_trigger(node: str) -> None:
+        visit_state[node] = 1
+        visit_stack.append(node)
+        for nxt in sorted(trigger_graph.get(node, ())):
+            state = visit_state.get(nxt, 0)
+            if state == 0:
+                visit_trigger(nxt)
+            elif state == 1:
+                cycle = visit_stack[visit_stack.index(nxt):] + [nxt]
+                canonical = tuple(sorted(set(cycle[:-1])))
+                if canonical not in reported_cycles:
+                    reported_cycles.add(canonical)
+                    issues.append(Issue("warn", "Recursive trigger_ability_on_cast chain may keep scheduling casts: " + " -> ".join(cycle), "spell_logic"))
+        visit_stack.pop()
+        visit_state[node] = 2
+
+    for trigger_node in sorted(trigger_graph):
+        if visit_state.get(trigger_node, 0) == 0:
+            visit_trigger(trigger_node)
 
     ent_ids = {e.get("id") for e in spec.get("entities") or [] if e.get("id")}
     if len(ent_ids) != len(spec.get("entities") or []):
@@ -677,10 +867,10 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
 
     unlocked = {"ability": set(), "passive": set(), "amplifier": set()}
     for m in spec.get("milestones") or []:
-        if m.get("skill_id") != skill_id:
+        innate = bool(m.get("innate"))
+        if m.get("skill_id") != skill_id and not (innate and not m.get("skill_id")):
             issues.append(Issue("error", f"Milestone skill_id {m.get('skill_id')} != {skill_id}", m.get("id") or ""))
         req = m.get("requirements") or {}
-        innate = bool(m.get("innate"))
         if "skill" not in req and not innate:
             issues.append(Issue("error", "Milestone missing requirements.skill", m.get("id") or ""))
         for reward in m.get("rewards") or []:
@@ -778,10 +968,18 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
                         eid,
                     )
                 )
+        usable = ent.get("usable") if isinstance(ent.get("usable"), dict) else {}
+        usable_ability = usable.get("ability")
+        if usable_ability:
+            entity_granted.add(str(usable_ability))
+    for stacker in spec.get("stackers") or []:
+        cast_at_max = stacker.get("on_max_stacks_cast")
+        if cast_at_max:
+            entity_granted.add(str(cast_at_max))
     for ab in spec.get("abilities") or []:
         aid = ab.get("id")
         if aid not in unlocked["ability"] and str(aid) not in race_abs:
-            if str(aid) in aura_ids or str(aid) in entity_granted:
+            if str(aid) in aura_ids or str(aid) in entity_granted or str(aid) in triggered_payload_ids:
                 continue
             issues.append(Issue("warn", f"Ability never unlocked by a milestone", ab.get("id") or ""))
     for p in spec.get("passives") or []:

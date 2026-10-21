@@ -53,6 +53,8 @@ python s2_skill_cli.py add-amplifier --id arendeth_myskill --name "Stamina Cost 
 python s2_skill_cli.py add-amplifier --id arendeth_myskill --name "Serrated" --type offensive --bonus bleed=1 --unlock-level 6
 python s2_skill_cli.py set-amplifier --id arendeth_myskill --amplifier arendeth_myskill_serrated --bonus bleed=2 --description "Deeper cut."
 python s2_skill_cli.py add-passive --id arendeth_myskill --name "Durability" --effect health_bonus_percent=0.1 --unlock-level 24
+python s2_skill_cli.py add-passive --id arendeth_myskill --name "Fire Echo" --unlock-level 24
+python s2_skill_cli.py add-spell-trigger --id arendeth_myskill --passive arendeth_myskill_fire_echo --source arendeth_myskill_fire_bolt --cast arendeth_myskill_fire_echo_burst --chance 0.25
 python s2_skill_cli.py add-combat-mastery --id arendeth_myskill
 python s2_skill_cli.py set-passive --id arendeth_myskill --passive arendeth_myskill_durability --append-effect dodge=0.1
 python s2_skill_cli.py set-effect --id arendeth_myskill --ability arendeth_myskill_frost_bomb --clear heal
@@ -93,7 +95,7 @@ python s2_skill_cli.py write --id arendeth_myskill
 python s2_skill_cli.py planner
 ```
 
-`--unlock-level` writes the milestone (`rewards.ability` / `passive` / `amplifier` / `recipe`) in `milestones/<skill_id>/{level}_{Name}.json`. Same id on milestone, reward, and the ability/passive/amplifier. Ability `skill` is set to `skill_id`. Combat abilities default to `slots.offensive=1` and `slots.utility=1`. Self-buffs and transforms that should be shareable with allies need **at least one utility slot**. Do **not** add a `copy_to_party` amplifier — Leadership (companion skill) already grants Party Buff (`core_2_copy_to_party`) for that socket.
+`--unlock-level` writes the milestone (`rewards.ability` / `passive` / `amplifier` / `recipe`) in `milestones/<skill_id>/{level}_{Name}.json`. `--innate` writes `innate: true`, empty `requirements`, and `skill_id: ""` in `milestones/<skill_id>/innate_{Name}.json`, matching Arborborn; grant it with `entity-milestone` or an entity's `skills.milestones`. Same id on milestone and reward. Ability `skill` remains the owning skill id. Combat abilities default to `slots.offensive=1` and `slots.utility=1`. Self-buffs and transforms that should be shareable with allies need **at least one utility slot**. Do **not** add a `copy_to_party` amplifier — Leadership (companion skill) already grants Party Buff (`core_2_copy_to_party`) for that socket.
 
 `add-ability` / `add-amplifier` / `add-passive` / `add-stacker` **replace** a row with the same id (and update its milestone). They do not append a duplicate. To change bonuses or a description without rebuilding the whole object, use `set-amplifier`, `set-passive`, `set-stacker`, `set-ability`, or `set-effect --clear`. `cycle-images` spreads placeholder `image` indexes so every icon is not 0. `set-skill --version` / `--author` / `--mod-description` patch `mod.json`. `set-skill --stat-points default|vanilla|after10|early|none` replaces `skills.json` `stat_points`. **A milestone and +1 statistic may share a level** — do not snap unlocks off stat levels. Vanilla Pyromancy interleaves empty post-10 levels, so a custom tree that puts a milestone on 12/15/18 can show the unlock with no +1. Default for new combat specs follows Skill Stat Rebalance (`3766934606`): **no +1 on 1–10**, then **every level 11–50**, plus a unique level-30 mastery (`add-combat-mastery`) of +10% strength/dexterity/endurance/intelligence/willpower. `new` adds that mastery unless `--no-combat` or `--no-mastery`. `fill-stats-after-10 --id arendeth_myskill` unions 11–50 into the existing list and leaves milestones in place. `early` is the old 2,4,5,7,8,10 then 11–50 schedule.
 
@@ -152,8 +154,10 @@ Repeatable flags: `--effect` (ability and passive), `--bonus` (amplifier). Secon
      npc/names/*.txt
      loot_exclude.json   # optional
      milestones/<skill_id>/{level}_{Name}.json
-     skill.json          # studio spec; not copied on install
+     .skillcreator/skill.json # private studio spec, not a game asset
 ```
+
+Ability source filenames are preserved on import. Strip private `_file` metadata from emitted ability JSON; it belongs only in the private studio spec.
 
 Follow Geomancy, not vanilla numeric ability files.
 
@@ -193,11 +197,13 @@ File `ability_amplifiers.json` (docs wrongly say `amplifiers.json`). Live JSON +
 
 ## Races
 
-Same spec / staging as skills. `write` emits a **partial** `character.json` (races, optional tags, control_actions) plus `npc/names/*.txt` stubs. Never copy vanilla's whole character.json.
+Same spec / staging as skills. `write` emits a **partial** `character.json` (races, tags, control_actions, production_actions, custom_eq_slots, and preserved extra sections) plus `npc/names/*.txt` stubs. Never copy vanilla's whole character.json.
 
 Playable minimum (docs §7.1): `id`, `name`, `description`, `playable`, `statistics`, `tags`, `names`, `items`, `recipes`. Civilization (`settlement`, `base_entities`, crests, maps) is optional. Starting kit is race `passives` + `abilities` (patch / workshop Draken), not skill milestones. Portraits (§7.2) are out of scope; glyphs are enough to ship playable. Description color tags like `[color=244,247,118,255]…[/color]` are vanilla flavor, optional.
 
 Clone sources: Human `0` (full civ), Vampire `6` (`birth_cost`, aggression), Skeleton `17` (`collapse_on_leader_death`, `disabled_trading`). `--keep-id --overlay` patches a vanilla numeric id. Tag **9 is `alive`**, not humanoid; **2 = animal**, **4 = undead**.
+
+`import-character-json --file <mod>/character.json` merges all supported entries by id without dropping per-entry fields, copies referenced NPC name files, and round-trips unknown top-level sections in studio state. This covers race settlement/age/entity/name data, custom tag options, production action gates such as `require_liquid: {type, amount}`, custom `control_actions`, and `custom_eq_slots`. `add-equipment-slot` authors a slot directly; `--birth-resource-type`, `--birth-max-population`, and repeatable `--tag-option` support the common structured cases. Studio **Races → Advanced character.json** imports a mod folder, or loads current entries for editing; matching ids replace and unrelated entries remain. Search and clone references should include installed `<game>/data/mods` as well as core and Workshop folders.
 
 ## Buildings
 
@@ -205,15 +211,27 @@ Player settlement halls that **train a skill** use `enables: ["<skill_id>"]` (va
 
 0.10 player-building contract: `allow_player`, `race: "-1"`, `occupation_image`, `occupation_per_race` including vampire `"6"`, `produces` (array; `[]` is fine), `workers` / `min_area` / `group`. Occupation NPCs need `experience_gainer` and must not list `consumer` without a `consumer` object. Trainer begin conversations should include `core_2_train_1`.
 
-`fix-buildings --scan` reports Officers! / Battlemages / Silkworm Farm gaps. `--apply` writes Output copies; `--in-place` also patches the workshop folder the game loads. Steam can overwrite workshop.
+`building-guide --search wizard` shows the local docs section, vanilla training templates, and matching examples from `<game>/data/mods`. Building search and cloning include installed mods, `core_2`, and Workshop content. The Studio Buildings tab shows the same references and has a safe-field repair for buildings in the current spec.
+
+`fix-buildings --scan` reports Officers! / Battlemages / Silkworm Farm gaps by default. Pass a mod folder, or use `fix-buildings --installed --scan` to inspect user mods under `<game>/data/mods`. `--apply` writes Output copies; `--in-place` also patches selected source folders and backs up changed generic building files under `Output/Soulash2/_building_fix_backups/`. The default is scan-only. Steam can overwrite Workshop content.
 
 `fix-mods` is the general 0.9→0.10 fixer for **workshop** (default) or `--enabled` mods. It patches `game_required`, `S.png`/`S2.png` → `icon.png`, `amplifiers.json` → `ability_amplifiers.json`, `only_party` → `apply_mode`, passive `movement_speed` → `move_speed`, amplifier `stamina_cost`/`range`/`cooldown` bonuses lifted to top-level fields, 0.10 building fields, and orphan `consumer` / missing `experience_gainer`. `--apply` snapshots to `Output/Soulash2/_fixed/<id>/`; `--in-place` patches the folder the game loads. Does **not** invent `.smap` maps, copy `particles32`, or `install`. Control-action *milestones* match vanilla Hunting/Necromancy; the fixer only writes a missing custom `character.json` control_action.
+
+Procedural terrain maps are supported in both the Studio and CLI. They can be searched and cloned from `core_2`, installed mods, and Workshop content, or authored from JSON. `write` emits `procedural_maps/*.json`; importing a mod preserves the existing `procedual_maps` spelling when that is the source folder. Static settlement/civilization `.smap` files remain copy-only.
+
+## Spell logic
+
+The engine-supported event rule is passive `trigger_ability_on_cast`: `value` is the triggering ability id, `secondary_value` is the ability to cast, and `third_value` is a chance from 0 to 1. The Studio Add tab can add multiple rules to one passive; the CLI can append one with `add-spell-trigger`. `validate` checks chance ranges, local ability references, independently rolled branch totals, and recursive trigger cycles. Triggered payload abilities do not need their own milestone unless they should also be directly selectable.
+
+Current data confirms `magic_power_per_entity` as an **amplifier bonus** (`value` = counted entity id, `secondary_value` = power per entity), as in core_2 Hell. The catalog lists a documented ability form but has no vanilla ability example; `effects_keys.magic_power_per_entity` and a passive effect of the same name are not confirmed. Validation warns on those placements. A passing JSON/schema check cannot prove an experimental spell loop is balanced or safe in live combat; recursive chains and summon timing still need in-game review.
+
+Example confirmed slot: `python s2_skill_cli.py add-amplifier --id arendeth_myskill --name "Echo Scaling" --type offensive --bonus magic_power_per_entity=arendeth_myskill_echo:1 --range 10 --unlock-level 20`. The Studio amplifier form exposes `secondary_value` for this encoding.
 
 ## Not implemented in this tool
 
 Do not fake these. Clone vanilla JSON with `--from-json` if the human needs them:
 
-- Civ maps, world events, weather, portraits, Steam Workshop publishing
+- Static civ/building `.smap` authoring, world events, weather, portraits, Steam Workshop publishing
 - Producer entities (docs §9: a producer cannot be both destructible and repeatedly gathered)
 
 ## Checks before you stop
@@ -221,6 +239,6 @@ Do not fake these. Clone vanilla JSON with `--from-json` if the human needs them
 1. `explain` every non-obvious effect you used.
 2. `validate --id <id>` is OK or only unused-milestone / beyond-observed-count warnings you understand.
 3. `write --id <id>` succeeded.
-4. Tree has a milestone for every ability, passive, and amplifier (racial starting kits, innate grants, and transform/summon `ability_user` kits are exceptions — those use `add-ability --no-milestone`).
+4. Tree has a milestone for every player-facing ability, passive, and amplifier. Triggered payloads, usable-item abilities, entity `ability_user` kits, stacker casts, racial starting kits, and innate grants are valid no-milestone cases.
 5. Summon/construct/transform ids exist in `entities/` (or are vanilla numeric ids). Transform forms need their own unique `ability_user` kit (the engine replaces the player's skills for the duration). Do not fill a form with vanilla Lightning Nova / Cyclone clones.
 6. You did **not** install unless asked.

@@ -20,8 +20,11 @@ from s2_assets import clone_animation, search_animations
 from s2_animations import compose_animation
 from s2_buildings import (
     add_building,
+    building_reference_aid,
     clone_building,
+    fix_building,
     make_training_building,
+    scan_building_issues,
     search_buildings,
 )
 from s2_entities import (
@@ -31,21 +34,43 @@ from s2_entities import (
     make_creature,
     make_item,
     make_tile,
+    revoke_entity_milestones,
     search_entities,
 )
-from s2_paths import mods_dir, output_root, skip_mod_path, soulash2_root, staging_dir, workshop_root
+from s2_paths import (
+    STUDIO_SPEC_NAME,
+    core2_dir,
+    find_studio_spec_path,
+    mods_dir,
+    output_root,
+    project_dir_for_spec,
+    skip_mod_path,
+    soulash2_root,
+    staging_dir,
+    studio_spec_path,
+    workshop_root,
+)
 from s2_planner import evaluate, list_available_mods, list_plans, load_overlay, load_plan, save_plan
+from s2_procedural_maps import (
+    add_procedural_map,
+    clone_procedural_map,
+    search_procedural_maps,
+)
 from s2_races import (
+    add_custom_equipment_slot,
     add_character_tag,
     add_control_action,
     add_production_action,
     add_race,
     clone_race,
     make_character_tag,
+    make_custom_equipment_slot,
     make_control_action,
     make_production_action,
     make_race,
     make_settlement,
+    merge_character_json_into_spec,
+    load_referenced_character_files,
     parse_base_entity,
     parse_stat_flag,
     search_control_actions,
@@ -92,6 +117,9 @@ def _spec_counts(spec: Dict[str, Any]) -> Dict[str, int]:
         "milestones": len(spec.get("milestones") or []),
         "stackers": len(spec.get("stackers") or []),
         "animations": len(spec.get("animations") or []),
+        "procedural_maps": len(spec.get("procedural_maps") or []),
+        "conversations": len(spec.get("conversations") or []),
+        "family_conversations": len(spec.get("family_conversations") or []),
     }
 
 
@@ -151,7 +179,7 @@ def _project_row(*, source: str, path: Path, spec: Optional[Dict[str, Any]] = No
         sid = spec.get("id") or spec.get("skill_id") or spec.get("mod_id")
         name = (spec.get("skill") or {}).get("name")
     if not sid:
-        sid = path.parent.name if path.name == "skill.json" else path.name
+        sid = project_dir_for_spec(path).name if path.name == STUDIO_SPEC_NAME else path.name
     return {
         "id": sid,
         "name": name or sid,
@@ -169,8 +197,8 @@ def _projects() -> list:
         for child in sorted(root.iterdir()):
             if not child.is_dir() or child.name.startswith("_") or skip_mod_path(child):
                 continue
-            sp = child / "skill.json"
-            if not sp.is_file():
+            sp = find_studio_spec_path(child)
+            if not sp:
                 continue
             try:
                 spec = load_spec(sp)
@@ -221,17 +249,17 @@ def _projects() -> list:
     return items
 
 def _load_into_studio(raw_path: str, *, force_import: bool = False) -> Dict[str, Any]:
-    """Load a skill.json or mod folder into the studio (always editable via Output staging)."""
+    """Load an editor spec or mod folder into the studio (always editable via Output staging)."""
     path = Path(str(raw_path).strip().strip('"'))
     if not path.exists():
         raise FileNotFoundError(f"Path not found: {path}")
 
-    # FILE: skill.json → load as-is
+    # FILE: current or legacy editor spec → stage in the private sidecar folder
     if path.is_file():
-        if path.name != "skill.json":
-            raise ValueError("File load expects skill.json (or pass a mod folder)")
+        if path.name != STUDIO_SPEC_NAME:
+            raise ValueError("File load expects a SkillCreator skill.json (or pass a mod folder)")
         spec = load_spec(path)
-        dest = staging_dir(spec) / "skill.json"
+        dest = studio_spec_path(staging_dir(spec))
         if path.resolve() != dest.resolve():
             save_spec(spec, dest)
             path = dest
@@ -247,7 +275,7 @@ def _load_into_studio(raw_path: str, *, force_import: bool = False) -> Dict[str,
         # ALWAYS assemble full mod folder
         spec = load_mod_folder(path)
 
-        dest = staging_dir(spec) / "skill.json"
+        dest = studio_spec_path(staging_dir(spec))
         save_spec(spec, dest)
 
         _STATE["spec_path"] = str(dest.resolve())
@@ -329,6 +357,8 @@ class Handler(BaseHTTPRequestHandler):
                         "milestones": spec.get("milestones"),
                         "stackers": spec.get("stackers"),
                         "animations": spec.get("animations"),
+                        "conversations": spec.get("conversations"),
+                        "family_conversations": spec.get("family_conversations"),
                     },
                 )
             except Exception as exc:
@@ -354,6 +384,22 @@ class Handler(BaseHTTPRequestHandler):
                     "limits": observed_limits(),
                 },
             )
+            return
+        if path == "/api/conversations/types":
+            try:
+                source = json.loads((core2_dir() / "conversations.json").read_text(encoding="utf-8-sig"))
+                rows = source.get("conversations") if isinstance(source, dict) else []
+                counts: Dict[str, int] = {}
+                examples: Dict[str, Dict[str, Any]] = {}
+                for row in rows if isinstance(rows, list) else []:
+                    if not isinstance(row, dict) or not row.get("type"):
+                        continue
+                    kind = str(row["type"])
+                    counts[kind] = counts.get(kind, 0) + 1
+                    examples.setdefault(kind, row)
+                _json_response(self, 200, {"types": sorted(counts), "counts": counts, "examples": examples})
+            except Exception as exc:
+                _json_response(self, 200, {"types": [], "counts": {}, "examples": {}, "warning": str(exc)})
             return
         if path == "/api/tree":
             spec = _try_spec()
@@ -420,6 +466,24 @@ class Handler(BaseHTTPRequestHandler):
             qs = parse_qs(urlparse(self.path).query)
             q = (qs.get("q") or [""])[0]
             _json_response(self, 200, {"results": search_buildings(q)})
+            return
+        if path == "/api/procedural-maps/search":
+            qs = parse_qs(urlparse(self.path).query)
+            q = (qs.get("q") or [""])[0]
+            try:
+                limit = int((qs.get("limit") or ["40"])[0])
+            except ValueError:
+                limit = 40
+            _json_response(self, 200, {"results": search_procedural_maps(q, limit=limit)})
+            return
+        if path == "/api/buildings/guide":
+            qs = parse_qs(urlparse(self.path).query)
+            q = (qs.get("q") or [""])[0]
+            try:
+                limit = int((qs.get("limit") or ["8"])[0])
+            except ValueError:
+                limit = 8
+            _json_response(self, 200, building_reference_aid(q, limit=limit))
             return
         if path == "/api/planner/mods":
             _json_response(self, 200, {"mods": list_available_mods()})
@@ -495,7 +559,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 raw = body.get("path") or body.get("folder") or body.get("file")
                 if not raw:
-                    raise ValueError("Provide path to a skill.json or mod folder")
+                    raise ValueError("Provide a SkillCreator spec or mod folder")
                 payload = _load_into_studio(str(raw), force_import=bool(body.get("force")))
                 _json_response(self, 200, payload)
             except Exception as exc:
@@ -512,7 +576,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if "spec" in body:
                 spec = body["spec"]
-                sp = Path(body.get("path") or _STATE.get("spec_path") or (output_root() / spec["id"] / "skill.json"))
+                sp = Path(body.get("path") or _STATE.get("spec_path") or studio_spec_path(output_root() / spec["id"]))
                 save_spec(spec, sp)
                 _STATE["spec_path"] = str(sp.resolve())
                 _json_response(self, 200, {"ok": True, "path": str(sp), "spec": spec})
@@ -527,17 +591,46 @@ class Handler(BaseHTTPRequestHandler):
             _json_response(self, 200, {"ok": True, "spec": spec})
             return
 
+        if path == "/api/character-json":
+            spec = load_spec(_current())
+            try:
+                counts = merge_character_json_into_spec(spec, body.get("character_json"))
+                save_spec(spec, _current())
+            except (TypeError, ValueError) as exc:
+                _json_response(self, 400, {"error": str(exc)})
+                return
+            _json_response(self, 200, {"ok": True, "spec": spec, "counts": counts})
+            return
+
+        if path == "/api/import-character-json-file":
+            spec = load_spec(_current())
+            try:
+                source = Path(str(body.get("path") or "")).expanduser()
+                if source.is_dir():
+                    source = source / "character.json"
+                if not source.is_file() or source.name.lower() != "character.json":
+                    raise ValueError("Choose a mod folder or its character.json file")
+                payload = json.loads(source.read_text(encoding="utf-8-sig"))
+                counts = merge_character_json_into_spec(spec, payload)
+                load_referenced_character_files(spec, source.parent)
+                save_spec(spec, _current())
+            except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                _json_response(self, 400, {"error": str(exc)})
+                return
+            _json_response(self, 200, {"ok": True, "spec": spec, "counts": counts})
+            return
+
         if path == "/api/add":
             spec = load_spec(_current())
             kind = body.get("kind")
             level = body.get("unlock_level")
             if kind == "ability":
-                add_ability(spec, body["payload"], unlock_level=level)
+                add_ability(spec, body["payload"], unlock_level=level, innate=bool(body.get("innate")))
             elif kind == "amplifier":
                 payload = body["payload"]
                 if not payload.get("type") and (payload.get("bonuses") or []):
                     payload["type"] = infer_amplifier_type(str(payload["bonuses"][0].get("effect")))
-                add_amplifier(spec, payload, unlock_level=level)
+                add_amplifier(spec, payload, unlock_level=level, innate=bool(body.get("innate")))
             elif kind == "passive":
                 add_passive(
                     spec,
@@ -589,6 +682,18 @@ class Handler(BaseHTTPRequestHandler):
                     add_character_tag(spec, body["tag"])
                 if body.get("control_action"):
                     add_control_action(spec, body["control_action"])
+            elif kind == "equipment_slot":
+                try:
+                    add_custom_equipment_slot(spec, body["payload"])
+                except (KeyError, TypeError, ValueError) as exc:
+                    _json_response(self, 400, {"error": str(exc)})
+                    return
+            elif kind == "procedural_map":
+                try:
+                    add_procedural_map(spec, body["payload"])
+                except (KeyError, TypeError, ValueError) as exc:
+                    _json_response(self, 400, {"error": str(exc)})
+                    return
             elif kind == "control_action":
                 payload = body["payload"] or {}
                 if payload.get("clone_from") or (payload.get("tags") and not payload.get("id")):
@@ -740,7 +845,12 @@ class Handler(BaseHTTPRequestHandler):
                     name=body.get("name"),
                     keep_image=bool(body.get("keep_image")),
                 )
-                add_ability(spec, ability, unlock_level=body.get("unlock_level"))
+                add_ability(
+                    spec,
+                    ability,
+                    unlock_level=body.get("unlock_level"),
+                    innate=bool(body.get("innate")),
+                )
                 if body.get("clone_animation"):
                     src_anim = str(ability.get("animation") or "").strip()
                     if src_anim:
@@ -817,6 +927,38 @@ class Handler(BaseHTTPRequestHandler):
             _json_response(self, 200, {"ok": True, "spec": spec, "building": row})
             return
 
+        if path == "/api/clone-procedural-map":
+            spec = load_spec(_current())
+            source = body.get("source")
+            if not source:
+                _json_response(self, 400, {"error": "source required"})
+                return
+            try:
+                new_id = int(body.get("new_id"))
+                row = clone_procedural_map(source, new_id=new_id, name=body.get("name"))
+                add_procedural_map(spec, row)
+            except (FileNotFoundError, KeyError, TypeError, ValueError) as exc:
+                _json_response(self, 400, {"error": str(exc)})
+                return
+            save_spec(spec, _current())
+            _json_response(self, 200, {"ok": True, "spec": spec, "procedural_map": row})
+            return
+
+        if path == "/api/fix-buildings-spec":
+            spec = load_spec(_current())
+            changed = []
+            remaining = []
+            for row in spec.get("buildings") or []:
+                if not isinstance(row, dict):
+                    continue
+                notes = fix_building(row)
+                if notes:
+                    changed.append({"id": row.get("id"), "notes": notes})
+                remaining.extend(scan_building_issues(row))
+            save_spec(spec, _current())
+            _json_response(self, 200, {"ok": True, "spec": spec, "changed": changed, "issues": remaining})
+            return
+
         if path == "/api/build-race":
             spec = _try_spec() or {}
             sid = spec.get("skill_id") or "skill"
@@ -843,8 +985,11 @@ class Handler(BaseHTTPRequestHandler):
                 war_causes=body.get("war_causes"),
                 birth_resource=body.get("birth_resource"),
                 birth_amount=int(body.get("birth_amount") or 1),
+                birth_resource_type=body.get("birth_resource_type"),
+                birth_max_population=body.get("birth_max_population"),
                 aggression_default=True if body.get("aggression_default") else None,
                 single_family=bool(body.get("single_family")),
+                migration=body.get("migration"),
             )
             bases = {}
             for raw in body.get("base_entities") or []:
@@ -870,12 +1015,19 @@ class Handler(BaseHTTPRequestHandler):
                 abilities=body.get("abilities") or None,
                 items=body.get("items") or None,
                 recipes=body.get("recipes") or None,
+                adult=int(body.get("adult") if body.get("adult") is not None else 50),
+                child=int(body.get("child") if body.get("child") is not None else 14),
+                elder=int(body.get("elder") if body.get("elder") is not None else 70),
                 settlement=None if body.get("no_settle") else settle,
                 base_entities=bases or None,
                 orphan_surname=body.get("orphan_surname"),
             )
             if body.get("new_tag"):
-                tag = make_character_tag(tag_id=body.get("new_tag_id") or rid, name=body["new_tag"])
+                tag = make_character_tag(
+                    tag_id=body.get("new_tag_id") or rid,
+                    name=body["new_tag"],
+                    options=body.get("new_tag_options") or None,
+                )
                 tags = list(race.get("tags") or [])
                 if tag["id"] not in tags:
                     tags.append(tag["id"])
@@ -917,6 +1069,29 @@ class Handler(BaseHTTPRequestHandler):
                 return
             save_spec(spec, _current())
             _json_response(self, 200, {"ok": True, "spec": spec, "tree": tree_rows(spec)})
+            return
+
+        if path == "/api/entity-milestone":
+            spec = load_spec(_current())
+            entity_id = str(body.get("entity_id") or "")
+            milestone_id = str(body.get("milestone_id") or "")
+            entity = next((e for e in spec.get("entities") or [] if str(e.get("id") or "") == entity_id), None)
+            milestone = next((m for m in spec.get("milestones") or [] if str(m.get("id") or "") == milestone_id), None)
+            if not entity:
+                _json_response(self, 404, {"error": f"Entity not found: {entity_id}"})
+                return
+            if not milestone:
+                _json_response(self, 404, {"error": f"Milestone not found: {milestone_id}"})
+                return
+            if not milestone.get("innate"):
+                _json_response(self, 400, {"error": f"Milestone is not innate: {milestone_id}"})
+                return
+            if body.get("granted"):
+                grant_entity_milestones(entity, [milestone_id])
+            else:
+                revoke_entity_milestones(entity, [milestone_id])
+            save_spec(spec, _current())
+            _json_response(self, 200, {"ok": True, "spec": spec})
             return
             
         if path == "/api/validate":

@@ -20,6 +20,9 @@ python s2_skill_cli.py new --id skilltest --name "Skill Test"
 python s2_skill_cli.py add-gear --id skilltest first=70:1,second=111:1
 python s2_skill_cli.py add-stacker --id skilltest --name Freeze --effect movement_speed=0.01 --max-stacks 50 --duration 3
 python s2_skill_cli.py add-ability --id skilltest --ability-name "Frost Bomb" --unlock-level 8 --damage "[7,10]" --damage-type frost --target aoe_target --range 6 --stamina 6 --stacker skilltest_freeze --stacker-count 2
+python s2_skill_cli.py add-ability --id skilltest --ability-id skilltest_shift --ability-name "Shift Form" --innate --damage "[2,4]" --damage-type physical
+python s2_skill_cli.py add-creature --id skilltest --creature-id skilltest_beast --name "Beast Form"
+python s2_skill_cli.py entity-milestone --id skilltest --entity skilltest_beast --milestone skilltest_shift
 python s2_skill_cli.py add-amplifier --id skilltest --name "Stamina Cost Reduction" --type utility --cost-stamina -2 --unlock-level 3
 python s2_skill_cli.py add-passive --id skilltest --name "Durability" --effect health_bonus_percent=0.1 --unlock-level 24
 python s2_skill_cli.py add-creature --id skilltest --name "Stone Warden" --preset summon --health 80 --damage "[4,8]"
@@ -31,6 +34,8 @@ python s2_skill_cli.py clone-ability --id skilltest --source 15 --name "Fireball
 python s2_skill_cli.py list-races --search vampire
 python s2_skill_cli.py add-race --id skilltest --name Stonefolk --stat strength=2 --no-settle
 python s2_skill_cli.py list-buildings --search collegium
+python s2_skill_cli.py building-guide --search wizard
+python s2_skill_cli.py fix-buildings --installed --scan
 python s2_skill_cli.py add-training-building --id skilltest --template magic --name "Test Hall"
 python s2_skill_cli.py list-entities --id skilltest
 python s2_skill_cli.py list-entities --search golem
@@ -50,7 +55,7 @@ python s2_skill_cli.py particles --id skilltest
 .\Run-S2Particles.bat
 ```
 
-`write` validates first and aborts on errors unless `--force`. It emits a mod under `Tools/Output/Soulash2/<id>/` including `ability_stackers.json`, `animations/`, `assets.json`, and a 32×32 `icon.png` (replacing the old `S.png` pointer). If `mod.thumbnail` is set, `write` also emits a 4:3 placeholder PNG. Existing PNGs are never overwritten. If the spec has races, control actions, or production actions, `write` also emits a merge-only `character.json` plus `npc/names/*.txt` stubs. `install` copies into the game `data/mods/` folder and **requires `--yes`** — only when the human asks.
+`write` validates first and aborts on errors unless `--force`. It emits the game mod files under `Tools/Output/Soulash2/<id>/`, including `skills.json`, `milestones/`, `abilities/`, `ability_stackers.json`, `animations/`, `assets.json`, `conversations.json` when present, procedural map JSON when present, and a 32×32 `icon.png`. The editor's private aggregate spec lives under `.skillcreator/skill.json` and is not a game asset; older root-level studio specs are migrated there. If `mod.thumbnail` is set, `write` also emits a 4:3 placeholder PNG. Existing PNGs are never overwritten. If the spec has character data (races, control actions, tags, production actions, custom equipment slots, or imported sections), `write` also emits a merge-only `character.json` plus `npc/names/*.txt` stubs. `install` copies game files into `data/mods/`, omits editor state, and **requires `--yes`** — only when the human asks.
 
 ## Icons, tilesheets, animations
 
@@ -67,6 +72,24 @@ python s2_skill_cli.py particles --id skilltest
 `list-abilities --search fireball` then `clone-ability --source 15 --unlock-level 10` (or `add-ability --clone Fireball`). That copies the vanilla/workshop JSON, gives it a **string** id (`skilltest_fireball`), and sets `skill` to this spec. `image` is reset to 0 so it fits the placeholder tilesheets. Vanilla animation ids (`"3"`) and `effects_keys` that point at core_2 summons/stackers are left as-is. `--clone-animation` also copies the FX file. `dump-ability 15` still prints the original JSON if you want to inspect it.
 
 `--clone` on `add-ability` accepts the same overrides as a from-scratch ability (`--damage`, `--effect`, `--animation`, `--stamina`, `--cost-item`, …). Ability descriptions may use `::damage` / `::damage_type` (docs §6.2). JSON cost keys: `stamina`, `health`, `item` (entity), `item_type`, `ammo`. Requirements use `one_of` / `always` (docs say require_one_of / require_all).
+
+## Spell trigger logic
+
+The current game documents passive `trigger_ability_on_cast` as a rule with `value` = triggering ability id, `secondary_value` = triggered ability id, and `third_value` = chance (0–1). The Studio Add tab has repeatable structured trigger rows; the CLI can append one to an existing passive:
+
+```powershell
+python s2_skill_cli.py add-passive --id skilltest --name "Rune Resonance" --unlock-level 11
+python s2_skill_cli.py add-spell-trigger --id skilltest --passive skilltest_rune_resonance --source skilltest_draw_circle --cast skilltest_conjure_rune --chance 0.15
+python s2_skill_cli.py validate --id skilltest
+```
+
+The validator checks trigger chances and local ability references, exempts trigger-only payloads from the missing-milestone warning, and flags recursive chains and branches whose independent chances sum above 1.0. These checks validate the JSON graph; they cannot establish runtime balance or prevent every cascade in combat.
+
+Use `magic_power_per_entity` as an amplifier bonus (`value` = entity id to count, `secondary_value` = added power per entity), matching core_2 Hell. Current core data does not confirm it as a passive effect or an `effects_keys` reference. The catalog also has a documented direct ability-effect form with no vanilla example, so validation marks that placement unverified.
+
+## Innate milestones
+
+Use `add-ability --innate`, `add-passive --innate`, `add-amplifier --innate`, or `grant-existing --innate` to create an innate milestone. The exporter writes `innate: true`, empty `requirements`, and an empty `skill_id`, matching the Arborborn reference. Innate milestones need to be granted through an entity's `skills.milestones`; set that when creating an entity with `add-creature --grant-milestone`, or edit a loaded entity with `entity-milestone --entity <id> --milestone <id>`. The Studio tree editor also has entity grant checkboxes on each innate milestone. Ability JSON keeps its original filename on import, but never includes SkillCreator's private `_file` bookkeeping field.
 
 Official docs lag live JSON in a few places this tool already follows: file name is `ability_amplifiers.json` not `amplifiers.json`; passives use `apply_mode: party_only|solo_only` not `only_party`; extra exp_sources `walk` / `carve` / `production` exist in vanilla. Prefer live `core_2` + overlay over stale docs.
 
@@ -87,15 +110,48 @@ The studio **Items / Creatures** tab does the same thing.
 
 `list-races --search vampire` then `clone-race --source 6`, or `add-race --name Stonefolk --stat strength=2 --no-settle`. `dump-race 6` prints the vanilla JSON. `list-control-actions --search tame` then `add-control-action --clone core_2_tame --tag 4`. `--base-entity adult=my_adult` is the civ NPC without maps/buildings.
 
-Vampire `6` and Skeleton `17` are the templates for `birth_cost` / `collapse_on_leader_death` / `disabled_trading`. `--keep-id --overlay` patches a vanilla numeric id (workshop Draken). Portraits are out of scope (a race is playable with glyphs). Studio tabs **Skill**, **Races**, and **Buildings**.
+Vampire `6` and Skeleton `17` are the templates for `birth_cost` / `collapse_on_leader_death` / `disabled_trading`. `--birth-resource-type 6 --birth-amount 40 --birth-max-population 100` supports resource-type birth costs. `--tag-option immune_to_fear` adds custom character-tag options. `--keep-id --overlay` patches a vanilla numeric id (workshop Draken). Portraits are out of scope (a race is playable with glyphs).
+
+`import-character-json --file <mod>/character.json` merges entries by id and retains their full fields, including `production_actions.require_liquid`, custom control actions/tags, race settlement data and `custom_eq_slots`; it also copies referenced NPC name files from that mod. `add-equipment-slot --slot-id skilltest_head --name "Golem Head" --item-type 26 --replace head_armor --icon 22` creates a slot directly. In Studio **Races → Advanced character.json**, enter a mod folder to import its entries and name files, or load current entries for editing; changes replace matching ids and keep other entries. The editor can author liquid gates such as `"require_liquid": {"type": 6, "amount": 100}`. References search installed `<game>/data/mods` and Workshop content. Studio tabs **Skill**, **Races**, and **Buildings**.
 
 ## Buildings
 
 `list-buildings --search collegium` then `add-training-building --template magic` (or `combat` / `farm`) clones a vanilla player hall and sets `enables` to this skill. That is how settlement trainers work in 0.10 (Collegium Magicae, Dojo). `write` emits `buildings/*.json`. Do not invent `.smap` maps.
 
-`fix-buildings --scan` checks Officers!, Battlemages, and Silkworm Farm against the current player-building API. `--apply` writes fixed copies under Output; `--in-place` also patches the workshop folder.
+`building-guide --search wizard` shows the local docs section and working vanilla / installed-mod examples. Building search and cloning include `<game>/data/mods`, `core_2`, and Workshop content. The Studio Buildings tab also lists those references and can repair safe fields in the open spec.
+
+`fix-buildings --scan` checks Officers!, Battlemages, and Silkworm Farm by default. Pass a mod folder to scan any mod, or use `fix-buildings --installed --scan` to inspect every mod under `<game>/data/mods`. `--apply` writes fixed copies under Output; `--in-place` also patches the selected source folders and backs up changed building files under `Output/Soulash2/_building_fix_backups/`. The default is scan-only. The scanner reports malformed building JSON and validates the documented fields, current player-building fields, worker counts, and resting-place counts.
 
 `fix-mods --scan` checks every workshop mod (or `--enabled`, or named Steam ids) for 0.10 rot: `game_required`, missing `icon.png`, old `amplifiers.json` / `only_party` / encoding, and the same building/NPC gaps. `--apply` writes snapshots under `Output/Soulash2/_fixed/<id>/`. `--in-place` patches the workshop folder the game loads (Steam can overwrite it). Hydromancy folders are skipped. This does not `install` into `data/mods/`.
+
+## Procedural maps
+
+`list-procedural-maps --search forest` searches `core_2`, installed mods, and Workshop maps; `dump-procedural-map 1` prints a source map. Clone a complete map into a spec with a new integer id and name, then edit its full terrain/entity JSON in the Studio **Procedural Maps** tab:
+
+```powershell
+python s2_skill_cli.py clone-procedural-map --id arendeth_myskill --source 1 --map-id 201 --name "Peak Forest"
+python s2_skill_cli.py list-procedural-maps --id arendeth_myskill
+python s2_skill_cli.py validate --id arendeth_myskill
+python s2_skill_cli.py write --id arendeth_myskill
+```
+
+The CLI also supports `add-procedural-map --id <skill> --from-json <file>` to add or replace a complete map definition. New output uses `procedural_maps/`; importing an existing mod preserves its folder name, including the `procedual_maps/` spelling used by some mods. Map ids must be integers and each map needs the fields found in the game examples. This covers procedural biome terrain maps; static settlement maps (`.smap`) remain copy-only.
+
+## Conversations
+
+Import a mod folder with `conversations.json` to bring both `conversations` and `family_conversations` into its SkillCreator spec. The Studio **Conversations** tab edits complete node JSON, provides current `core_2` type templates, follows local option links, and edits family replies separately. Unknown node fields and additional root sections survive import and export.
+
+The CLI can list, add/update, and remove either kind of row. `set-conversation` accepts a JSON object inline or a path to one object; it upserts a conversation by `id` or a family row by `race`. Use `--row-index` to target an intentional duplicate id or race.
+
+```powershell
+python s2_skill_cli.py list-conversations --id arendeth_astral_magic
+python s2_skill_cli.py set-conversation --id arendeth_astral_magic --from-json .\astral_back.json
+python s2_skill_cli.py set-conversation --id arendeth_astral_magic --family --from-json .\human_family.json
+python s2_skill_cli.py remove-conversation --id arendeth_astral_magic --conversation-id astral_back
+python s2_skill_cli.py validate --id arendeth_astral_magic
+```
+
+Validation checks row shapes, current `core_2` conversation types, local and vanilla option links, entity gates, and family-row fields. Unresolved custom/external references and duplicate conversation ids are warnings, since cross-mod links and conditional variants can be intentional.
 
 ## Adding an amplifier
 
