@@ -28,7 +28,10 @@ from PIL import Image, ImageDraw, ImageEnhance
 
 TOOLS = Path(__file__).resolve().parent.parent
 STAGE = TOOLS / "Output" / "Soulash2"
-MODS = Path(r"E:\SteamLibrary\steamapps\common\Soulash 2\data\mods")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from s2_game_paths import mods_dir  # noqa: E402
+
+MODS = mods_dir()
 SHEET_FILES = {"abilities": "abilities.png", "passives": "passive_skills.png", "amplifiers": "amplifiers.png",
                "stackers": "stackers.png", "skills": "skills.png"}
 SHEET_NAMES = {"abilities": "abilities", "passives": "passive_skills", "amplifiers": "amplifiers", "stackers": "stackers", "skills": "skills"}

@@ -212,7 +212,10 @@ def patch_mod_meta(
 def apply_skill_update(spec: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
     """Merge Skill-tab / set-skill fields. Unknown keys are ignored."""
     skill = spec.setdefault("skill", {})
-    for key in ("name", "description", "combat_skill", "difficulty", "level_start", "image"):
+    if "level_start" in payload and "start_level" not in payload:
+        payload = {**payload, "start_level": payload["level_start"]}
+    skill.pop("level_start", None)
+    for key in ("name", "description", "combat_skill", "difficulty", "start_level", "weapon_type", "image"):
         if key not in payload:
             continue
         val = payload[key]
@@ -352,7 +355,15 @@ def retarget_owned_ids(spec: Dict[str, Any], old_id: str, new_id: str) -> int:
     return count
 
 
-def new_spec(skill_id: str, name: str, *, mod_id: Optional[str] = None, level_start: Optional[int] = None, author: Optional[str] = None, prefix: bool = True) -> Dict[str, Any]:
+def normalize_skill_fields(skill: Dict[str, Any]) -> Dict[str, Any]:
+    """Migrate the old SkillCreator-only `level_start` key to the game's `start_level`."""
+    if isinstance(skill, dict) and "level_start" in skill:
+        value = skill.pop("level_start")
+        skill.setdefault("start_level", value)
+    return skill
+
+
+def new_spec(skill_id: str, name: str, *, mod_id: Optional[str] = None, start_level: Optional[int] = None, author: Optional[str] = None, prefix: bool = True) -> Dict[str, Any]:
     sid = prefixed_skill_id(skill_id, author=author) if prefix else slug_name(str(skill_id or "").strip()).lower()
     mid = prefixed_skill_id(mod_id, author=author) if (prefix and mod_id) else ((mod_id or sid).strip() if mod_id else sid)
     skill = {
@@ -365,8 +376,8 @@ def new_spec(skill_id: str, name: str, *, mod_id: Optional[str] = None, level_st
             "stat_points": list(DEFAULT_STAT_POINTS),
             "difficulty": 2,
         }
-    if level_start is not None:
-        skill["level_start"] = int(level_start)
+    if start_level is not None:
+        skill["start_level"] = int(start_level)
     return {
         "id": mid,
         "mod_id": mid,
@@ -397,6 +408,7 @@ def new_spec(skill_id: str, name: str, *, mod_id: Optional[str] = None, level_st
         "buildings": [],
         "procedural_maps": [],
         "procedural_map_dir": "procedural_maps",
+        "weather": [],
         "loot_exclude": [],
         "conversations": [],
         "family_conversations": [],
@@ -409,7 +421,10 @@ def new_spec(skill_id: str, name: str, *, mod_id: Optional[str] = None, level_st
 
 
 def load_spec(path: Path) -> Dict[str, Any]:
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    spec = json.loads(Path(path).read_text(encoding="utf-8"))
+    if isinstance(spec, dict) and isinstance(spec.get("skill"), dict):
+        normalize_skill_fields(spec["skill"])
+    return spec
 
 
 def list_staged_specs() -> List[Path]:
@@ -447,6 +462,7 @@ def _ensure_lists(spec: Dict[str, Any]) -> None:
         "custom_eq_slots",
         "buildings",
         "procedural_maps",
+        "weather",
         "loot_exclude",
         "conversations",
         "family_conversations",
@@ -1377,7 +1393,7 @@ def write_mod(spec: Dict[str, Any], dest: Optional[Path] = None) -> Path:
         shutil.rmtree(preview)
     write_packaging(spec, root)
     (root / "mod.json").write_text(_dump(spec["mod"]), encoding="utf-8")
-    (root / "skills.json").write_text(_dump([spec["skill"]]), encoding="utf-8")
+    (root / "skills.json").write_text(_dump([normalize_skill_fields(spec["skill"])]), encoding="utf-8")
     abilities = root / "abilities"
     abilities.mkdir(exist_ok=True)
     written_abs = set()
@@ -1455,6 +1471,10 @@ def write_mod(spec: Dict[str, Any], dest: Optional[Path] = None) -> Path:
                 raise ValueError(f"Procedural map filename collision in {folder_name}: {fname}")
             (map_dir / fname).write_text(_dump(public_procedural_map(row)), encoding="utf-8")
             written_maps.add(collision)
+    if spec.get("weather"):
+        from s2_weather import public_weather
+
+        (root / "weather.json").write_text(_dump([public_weather(r) for r in spec["weather"]]), encoding="utf-8")
     conversation_file_present = bool(
         spec.get("_conversation_file_present")
         or spec.get("conversations")
@@ -1547,6 +1567,7 @@ _DISK_LIST_KEYS = (
     "character_tags",
     "production_actions",
     "procedural_maps",
+    "weather",
     "conversations",
     "family_conversations",
 )
@@ -1616,6 +1637,9 @@ def load_mod_folder(folder: Path) -> Dict[str, Any]:
     spec["procedural_maps"] = procedural_maps
     if len(map_dirs) == 1:
         spec["procedural_map_dir"] = map_dirs[0].name
+    weather = _read_json_file(folder / "weather.json")
+    if weather is not None:
+        spec["weather"] = weather if isinstance(weather, list) else _as_row_list(weather)
     conversations_path = folder / "conversations.json"
     if conversations_path.is_file():
         conversation_doc = _read_json_strict(conversations_path)

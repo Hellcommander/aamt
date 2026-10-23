@@ -196,6 +196,9 @@ def write_packaging(spec: Dict[str, Any], root: Path) -> List[str]:
             written.append(rel)
     (root / "assets.json").write_text(json.dumps(assets, indent="\t") + "\n", encoding="utf-8")
     written.append("assets.json")
+    from s2_sounds import copy_sound_sources
+
+    written.extend(copy_sound_sources(spec, root))
     return written
 
 

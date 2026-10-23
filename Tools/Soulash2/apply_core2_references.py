@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
+from s2_game_paths import mods_dir
+
 
 def load_map(mod_path: Path) -> Dict[str, Any]:
     ref_path = mod_path / "core2_asset_references.json"
@@ -120,7 +122,7 @@ def main() -> int:
     parser.add_argument(
         "--mod-path",
         type=Path,
-        default=Path(r"E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_water_magic"),
+        default=mods_dir() / "arendeth_hydromancy",
     )
     args = parser.parse_args()
     mod_path = args.mod_path.resolve()

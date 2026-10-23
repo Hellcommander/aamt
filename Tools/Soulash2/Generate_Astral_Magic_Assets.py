@@ -47,6 +47,14 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 SHARED_DIR = SCRIPT_DIR.parent / "Shared"
+
+
+def _default_mod_path(name: str) -> Path:
+    if str(SCRIPT_DIR) not in sys.path:
+        sys.path.insert(0, str(SCRIPT_DIR))
+    from s2_game_paths import mods_dir
+
+    return mods_dir() / name
 if str(SHARED_DIR) not in sys.path:
     sys.path.insert(0, str(SHARED_DIR))
 
@@ -74,7 +82,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--mod-path",
         type=Path,
-        default=Path(r"E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic"),
+        default=_default_mod_path("arendeth_astral_magic"),
     )
     p.add_argument(
         "--mode",

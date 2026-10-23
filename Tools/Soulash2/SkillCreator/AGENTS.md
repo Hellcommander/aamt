@@ -9,7 +9,8 @@ D:\games\Ai assisted toolkit\Tools\Soulash2\SkillCreator
 ```
 
 Staging (safe): `D:\games\Ai assisted toolkit\Tools\Output\Soulash2\<id>\`  
-Live game mods: `E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\` — **write-only via `install --yes`**
+Live game mods: `D:\games\Steam\steamapps\common\Soulash 2\data\mods\` — **write-only via `install --yes`**  
+Game path resolution: `Soulash2Path` in `Tools\TranscendenceTools.ini` → `AAMT_SOULASH2_PATH` → auto-detect (`s2_paths.py`). Top-level `Soulash2\*.py` scripts use `s2_game_paths.py`; never hard-code a Steam library.
 
 Icons/sprites prefer Shared SD3.5 (`D:\games\Ai assisted toolkit\Tools\Shared\AGENTS.md`). External PNGs (including Cursor image-gen) pack via `inject-icon`.
 
@@ -103,7 +104,7 @@ python s2_skill_cli.py planner
 
 `write` always emits `icon.png` (32×32, docs size) and placeholder tilesheets + `assets.json` so `mod.json` is not left pointing at missing `S.png`. Existing PNGs are not overwritten. Ability `image` / amplifier `image` / etc. are indexes on those sheets (0 from bottom left). Replace placeholders with `generate-icons --id arendeth_myskill --overwrite` (starts the local SD3.5 server on :1338 via `Tools\Shared`; `--no-sd` is explicit placeholders only; `--dry-run` prints prompts). Atlas cells are **128px** on a padded 16-col grid. Prefer txt2img (omit `--from-existing`) for new silhouettes; `--names` is comma-separated **display names** (exact match). Do not run SD from `write`. Pack Cursor / hand-made PNGs with `inject-icon --id <id> --name "Display Name" --png path.png` (optional `--sheet passives|amplifiers|…`). Official docs mention `{mod}/assets/gfx/skills`; this tool follows workshop Geomancy (`assets.json` + `assets/*.png`), not that gfx/ layout.
 
-`starting_gear` (docs §5.1): `add-gear --id arendeth_myskill first=70:1,second=111:1` or `new --gear 70:1`. `first` only always grants; `first`+`second` is a character-create choice. Entity ids are strings. Docs `exp_sources` list is incomplete — live JSON also has `walk`, `carve`, `production` (Agriculture uses `production` + `production_action`).
+`starting_gear` (docs §5.1): `add-gear --id arendeth_myskill first=70:1,second=111:1` or `new --gear 70:1`. `first` only always grants; `first`+`second` is a character-create choice. Entity ids are strings. Every starting gear / race `items` id must be an **item** entity (has the `item` component) with a whole `amount` ≥ 1: `validate` and `audit-mods` error otherwise. A non-item (e.g. `core_2_Rope`, the placed rope) crashes every new character right after world gen. Docs `exp_sources` list is incomplete — `mine` unions every id seen in core_2 + workshop `skills.json` (e.g. `walk`, `carve`, `production`, Economy's `trade`, `track`, `pet`, `pickpocket`). Agriculture uses `production` + `production_action`. The skill start level key is **`start_level`** (core_2 crafting skills and Economy use 1); older builds of this tool wrote `level_start`, which the game ignores — `load`/`write` migrate it and `fix-mods` repairs shipped `skills.json`.
 
 `mod.json` optional (docs §2): `--thumbnail thumbnail.png` (4:3 Steam PNG; `write` generates a placeholder), `steam_publish_id`, `disable_portraits` (global override — omit unless the human wants that).
 
@@ -209,7 +210,9 @@ Clone sources: Human `0` (full civ), Vampire `6` (`birth_cost`, aggression), Ske
 
 Player settlement halls that **train a skill** use `enables: ["<skill_id>"]` (vanilla Collegium Magicae / Dojo). `add-training-building --template magic|combat|farm` clones 389 / 387 / 404, retargets id/name/`enables`, and fills 0.10 fields (`occupation_image`, vampire race `"6"`, `produces`). `write` emits `buildings/*.json`. Do **not** invent `.smap` maps — `copy-building-map` copies an existing file only.
 
-0.10 player-building contract: `allow_player`, `race: "-1"`, `occupation_image`, `occupation_per_race` including vampire `"6"`, `produces` (array; `[]` is fine), `workers` / `min_area` / `group`. Occupation NPCs need `experience_gainer` and must not list `consumer` without a `consumer` object. Trainer begin conversations should include `core_2_train_1`.
+0.10 player-building contract: `allow_player`, `race: "-1"`, `occupation_image`, `occupation_per_race` including vampire `"6"`, `produces` (array; `[]` is fine), `workers`. `min_area` / `group` are **not proven required**: NPC town buildings (e.g. Shaman's Hut `98`) omit them, but all 91 vanilla player halls set them (`group` = `building_groups.json` build-menu tab, trainer halls use `"military"`, `min_area` 30 military / 20 crafters). `type: "military"` is a **different** field: 58 NPC barracks use it without `group`, and the 11 vanilla military trainer halls (Dojo 387, Collegium 389, …) set `type` **and** `group`. Scans report missing `group`/`min_area` as `(optional)`. NPC buildings may also omit `race` and `tier`. Occupation NPCs need `experience_gainer` and must not list `consumer` without a `consumer` object. Trainer begin conversations should include `core_2_train_1`.
+
+**Building maps (`.smap`).** Header is `map id|name|building id|w|h|…`: field 1 is the map's own unique id — special locations pick maps by it (`locations.json` → `special[].scenarios[].building_maps[]{count, ids, mode, placement}`; all 4169 core_2 references resolve this way), field 3 links to `buildings/*.json` `id`; vanilla filenames are `<map id>_…_<building id>.smap`. Vanilla trainer halls (Dojo 387, Collegium 389, …) ship **no** map — players lay them out; only Divine Monastery 482 has maps. `check-building-maps [mod]` reports broken links, map-id collisions (many arendeth halls reused vanilla map id `39`), duplicate files, and map-bearing player halls without `group`/`min_area`. `relink-building-maps <mod> [--apply]` gives each map a unique id, the right building id and the vanilla filename (dry run by default, backups under `Output/Soulash2/_building_map_backups/`). `link-building-map --mod <mod> --map <file.smap> --building <id> [--apply]` drops an existing/exported map into a mod already linked. `errors.log` `Unable to find building of id <modded id>` is **boot-order noise, not a broken map**: the game first initialises with only `core_2`, logs one line per building JSON of each enabled mod (in user_settings order; a duplicated id logs twice), then reloads with the full mod list, and that second pass is clean. Verified 2026-10-22 by moving `arendeth_astral_magic/building_maps` aside — the line for `astral_magic_hall` stayed. Judge mod load errors from the lines after the second `Loading mods:` block only.
 
 `building-guide --search wizard` shows the local docs section, vanilla training templates, and matching examples from `<game>/data/mods`. Building search and cloning include installed mods, `core_2`, and Workshop content. The Studio Buildings tab shows the same references and has a safe-field repair for buildings in the current spec.
 
@@ -218,6 +221,50 @@ Player settlement halls that **train a skill** use `enables: ["<skill_id>"]` (va
 `fix-mods` is the general 0.9→0.10 fixer for **workshop** (default) or `--enabled` mods. It patches `game_required`, `S.png`/`S2.png` → `icon.png`, `amplifiers.json` → `ability_amplifiers.json`, `only_party` → `apply_mode`, passive `movement_speed` → `move_speed`, amplifier `stamina_cost`/`range`/`cooldown` bonuses lifted to top-level fields, 0.10 building fields, and orphan `consumer` / missing `experience_gainer`. `--apply` snapshots to `Output/Soulash2/_fixed/<id>/`; `--in-place` patches the folder the game loads. Does **not** invent `.smap` maps, copy `particles32`, or `install`. Control-action *milestones* match vanilla Hunting/Necromancy; the fixer only writes a missing custom `character.json` control_action.
 
 Procedural terrain maps are supported in both the Studio and CLI. They can be searched and cloned from `core_2`, installed mods, and Workshop content, or authored from JSON. `write` emits `procedural_maps/*.json`; importing a mod preserves the existing `procedual_maps` spelling when that is the source folder. Static settlement/civilization `.smap` files remain copy-only.
+
+## Assets (tilesheets, sounds)
+
+**Tilesheets are per mod** (changelog 0.7.7): a mod that lists a sheet under a vanilla name (`glyph32`, `items`, `abilities`, …) draws *its own* content from *its own* sheet; otherwise core_2's applies. Indexes count from the **bottom-left** cell (verified: core_2 Fireball `image: 42`). So a vanilla index inside a mod that ships a small sheet points past its end — e.g. Arborborn's `core_2_Wicker_Doll` override uses glyph `2364` / item `1031` against Arborborn's 48-cell `glyph32` / 16-cell `items`. (Older notes here said such sheets replace vanilla art game-wide; the exe/changelog say per mod.) Missing sheet files make the game skip drawing ("Skipping draw for ability with unknown or missing tilesheet"). Sheet `file` paths are relative to the mod folder; `../core_2/...` only works next to core_2, not from Workshop.
+
+```powershell
+python s2_skill_cli.py check-assets                      # enabled mods; or name mods / core_2 / --installed
+python s2_skill_cli.py list-sheets --mod arendeth_arborborn --own
+python s2_skill_cli.py show-cells --mod arendeth_arborborn --sheet abilities --index 0-15
+```
+
+`check-assets` checks every sheet file exists, is a PNG, and divides into its `tiles` grid, and every index field (ability/amplifier/passive/stacker/skill `image`, entity glyph frames / `light_source.lit_image` / `item.image` / `persona.occupationIconIndex`, building `image` / `occupation_image`, production action `image`, race crests, animation `tile_id`) against the sheet it really resolves to. `show-cells` writes a labelled PNG (Output/Soulash2/_asset_preview/) — vision agents should open it to confirm an icon before setting `image`. core_2 itself checks clean (its 14 glyph `6462548` entities and uneven `portraits` grid are whitelisted vanilla quirks).
+
+**Sounds.** The exe's per-mod `assets.json` loader reads `sounds` (walk/equipment/ui/events/screens/combat, `music`) alongside `tilesheets`/`textures`, so mods can add sounds — but no shipped mod does yet: treat as engine-supported, test in game. Combat sounds are `sounds.combat[] {id, name, file}` (file relative to the mod; vanilla ids `"1"`–`"168"`, so use prefixed ids); animations play them with `"sound": {"id": ..., "volume": 100}` (`"0"` / `"-1"` = none). Production actions instead take a game-root path (`data/mods/<mod>/assets/sfx/x.ogg`), which only resolves for mods under `data/mods`. Ship Ogg Vorbis (`.ogg`), like every vanilla sfx.
+
+```powershell
+python s2_skill_cli.py list-sounds --search bash
+python s2_skill_cli.py add-sound --id arendeth_myskill --file D:\audio\rune_boom.ogg --name "Rune Boom" --bind-animation arendeth_myskill_boom_fx --volume 80
+python s2_skill_cli.py list-sounds --id arendeth_myskill
+```
+
+`add-sound` checks the file is Ogg/WAV, copies it to `assets/sfx/`, registers it in the spec's `assets.json`, and `write` re-copies it if the output folder lacks it. `validate` / `check-assets` flag missing files, duplicate or numeric ids, animation sound ids no loaded mod defines (or that come from a mod you don't require), and production-action sound paths that don't exist.
+
+## Weather
+
+`<mod>/weather.json` is an array (docs §11). Fields: `id` (string), `name`, `animation`, `animation_tick`, `ability[]`, `ability_trigger_time`, `disabled_under_roof`, `duration`, `trigger_every`, `trigger_chance` (0–1), `biomes[]`, `trigger_message`; optional `change_entities_on_start` `[{from, to: id|[ids]}]` (0.10.0), `force_night` (Blood Moon), `thirst_multiplier` (Heatwave 4.0), `stop_on_map_exit` (exe-only, untested). Empty `biomes` = never rolls on its own; start it from an ability `effects_keys.summon_weather: "<weather id>"` (vanilla Summon Rain → `"1"`). Ids `1`–`17` are vanilla and replace them; use prefixed ids.
+
+```powershell
+python s2_skill_cli.py list-weather --search rain
+python s2_skill_cli.py dump-weather "Blood Moon"
+python s2_skill_cli.py add-weather --id arendeth_myskill --name "Ashfall" --clone 7 --animation 190 --ability 142 --biome desert --chance 0.1 --change core_2_Dried_Short_Grass=1 --ignore-roof --summon-ability arendeth_myskill_call_ashfall
+python s2_skill_cli.py list-weather --id arendeth_myskill
+python s2_skill_cli.py remove-weather --id arendeth_myskill --weather arendeth_myskill_ashfall
+```
+
+`validate` checks required fields/types, chance range, ability/animation/entity references (vanilla numeric ids pass), unknown biomes, vanilla id replacement, and the exe rule that `change_entities_on_start.to` is a string or array of strings. Importing a mod folder carries `weather.json`; `write` emits it.
+
+## Auditing installed mods together
+
+`audit-mods` (default: the mods enabled in `user_settings.json`; `--installed` for every folder; or name mods) indexes core_2 plus the set and reports: ids defined twice across mods or inside one mod, rows replacing core_2 (`--verbose`; often deliberate edits like Arborborn's Dark Druid loot), references to ids no loaded mod defines (milestone rewards incl. wrong reward kind, entity `skills.milestones` / `ability_user`, `effects_keys` transform/summon/stacker/summon_weather, amplifier stacker bonuses, spell triggers, passive `ability_extend_duration` ability ids, building occupations/`enables`, weather abilities/entities), starting gear (`skills.json` `starting_gear` first/second) and race `items` that are not **item** entities (e.g. `core_2_Rope` is the placed rope object; the game throws `ECStorage::get: entity N is not in the store` building the kit and crashes on new character right after world gen), and file shapes the loader rejects (`skills.json` as a bare object → "Failed to load mod … type must be array"; `fix-mods --apply` wraps it). It also flags duplicate keys inside one JSON object (only the last survives), references that only resolve through a mod missing from `mods_required`, and a building `occupation` set to a job title: `occupation` / `occupation_per_race` must be the worker **entity id** (Collegium 389 → `457`); `persona.occupation` ("Wizard") is display text. Read-only.
+
+`check-building-maps` also validates `locations.json`: top-level keys must be `cultures` / `settlements` / `special` / `unknown_special_images` (a `locations` key is ignored by the game), each special needs `id, name, biomes, difficulty, image, algorithm, scenarios`, and every `building_maps` id must be a `.smap` header map id somewhere. `relink-building-maps` refuses to rename a map id that `locations.json` uses.
+
+`game-log` splits `logs/errors.log` into load passes, hides the core_2-only boot pass "Unable to find building" noise, and annotates known messages.
 
 ## Spell logic
 
@@ -231,7 +278,7 @@ Example confirmed slot: `python s2_skill_cli.py add-amplifier --id arendeth_mysk
 
 Do not fake these. Clone vanilla JSON with `--from-json` if the human needs them:
 
-- Static civ/building `.smap` authoring, world events, weather, portraits, Steam Workshop publishing
+- Static civ/building `.smap` authoring, world events (`events/settlement|wilderness/*.json`, 0.10.0), special-location authoring (only checked, see above), portraits, Steam Workshop publishing
 - Producer entities (docs §9: a producer cannot be both destructible and repeatedly gathered)
 
 ## Checks before you stop

@@ -28,7 +28,10 @@ from datetime import datetime
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parent
-MODS = Path(r"E:\SteamLibrary\steamapps\common\Soulash 2\data\mods")
+sys.path.insert(0, str(TOOLS))
+from s2_game_paths import mods_dir  # noqa: E402
+
+MODS = mods_dir()
 SD_SERVER = Path(r"E:\tools\sd3.5\sd3.5\server.py")
 GEN = TOOLS / "generate_mod_branding_assets.py"
 SD_PORT = 1338

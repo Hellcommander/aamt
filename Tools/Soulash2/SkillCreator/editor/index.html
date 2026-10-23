@@ -147,7 +147,7 @@
       </section>
       <section id="tab-skill" class="hidden">
         <h2>Skill / mod.json</h2>
-        <p class="hint">Official docs §5.1: <code>starting_gear</code> (first always grants, first+second is a create choice). Docs exp_sources omit <code>walk</code>, <code>carve</code>, and <code>production</code> — those are valid in live JSON. <code>thumbnail</code> is a 4:3 PNG for Steam. <code>disable_portraits</code> is global and overrides other mods — leave it off. File name is still <code>ability_amplifiers.json</code> (docs wrongly say amplifiers.json).</p>
+        <p class="hint">Official docs §5.1: <code>starting_gear</code> (first always grants, first+second is a create choice). Docs exp_sources are incomplete; the dropdown is mined from core_2 + workshop <code>skills.json</code> (e.g. <code>walk</code>, <code>carve</code>, <code>production</code>, <code>trade</code>). <code>thumbnail</code> is a 4:3 PNG for Steam. <code>disable_portraits</code> is global and overrides other mods — leave it off. File name is still <code>ability_amplifiers.json</code> (docs wrongly say amplifiers.json).</p>
         <div class="row">
           <label>Combat skill
             <select id="skillCombat">
@@ -156,7 +156,7 @@
             </select>
           </label>
           <label>Difficulty <input id="skillDiff" type="number" value="2" /></label>
-          <label>level_start <input id="skillLevelStart" type="number" placeholder="optional" /></label>
+          <label>start_level <input id="skillLevelStart" type="number" placeholder="optional" /></label>
           <label>Thumbnail <input id="skillThumb" placeholder="thumbnail.png" /></label>
         </div>
         <div class="row">
@@ -1142,7 +1142,7 @@
       const mod = (spec && spec.mod) || {};
       if ($("skillCombat")) $("skillCombat").value = skill.combat_skill === false ? "false" : "true";
       if ($("skillDiff")) $("skillDiff").value = skill.difficulty != null ? skill.difficulty : 2;
-      if ($("skillLevelStart")) $("skillLevelStart").value = skill.level_start != null ? skill.level_start : "";
+      if ($("skillLevelStart")) $("skillLevelStart").value = (skill.start_level ?? skill.level_start) != null ? (skill.start_level ?? skill.level_start) : "";
       if ($("skillThumb")) $("skillThumb").value = mod.thumbnail || "";
       if ($("skillDesc")) $("skillDesc").value = skill.description || "";
       if ($("skillStatList")) {
@@ -1539,8 +1539,8 @@
         starting_gear: spec.skill.starting_gear || [],
         mod: { thumbnail: $("skillThumb").value.trim() }
       };
-      if ($("skillLevelStart").value !== "") payload.level_start = Number($("skillLevelStart").value);
-      else payload.level_start = null;
+      if ($("skillLevelStart").value !== "") payload.start_level = Number($("skillLevelStart").value);
+      else payload.start_level = null;
       const data = await api("/api/skill", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
       spec = data.spec;
       log("Saved skill fields");

@@ -792,13 +792,16 @@ def scan_building_issues(building: Dict[str, Any]) -> List[str]:
     issues: List[str] = []
     bid = str(building.get("id") or "")
     label = bid or "<building>"
-    for key in ("id", "name", "occupation", "race"):
+    for key in ("id", "name", "occupation"):
         if not isinstance(building.get(key), str) or not building.get(key):
             issues.append(f"{label}: {key} must be a non-empty string")
+    # core_2 0.10.4: ~180 NPC buildings omit race and 195 omit tier, so only type-check when present.
+    if "race" in building and (not isinstance(building.get("race"), str) or not building.get("race")):
+        issues.append(f"{label}: race should be a non-empty string")
     tier = _as_int(building.get("tier"))
-    if tier is None:
-        issues.append(f"{label}: tier must be a number")
-    elif not 1 <= tier <= 3:
+    if "tier" in building and tier is None:
+        issues.append(f"{label}: tier should be a number")
+    elif tier is not None and not 1 <= tier <= 3:
         issues.append(f"{label}: tier should be between 1 and 3 unless locations.json defines more tiers")
     if _as_int(building.get("image")) is None:
         issues.append(f"{label}: image must be a number")
@@ -819,10 +822,24 @@ def scan_building_issues(building: Dict[str, Any]) -> List[str]:
         issues.append(f"{bid}: player building should set allow_player=true")
     if str(building.get("race") or "") != "-1":
         issues.append(f"{bid}: player building should set race='-1'")
-    if _as_int(building.get("min_area")) is None:
-        issues.append(f"{bid}: player building min_area must be a number")
-    if not isinstance(building.get("group"), str) or not building.get("group"):
-        issues.append(f"{bid}: player building group must be a non-empty string")
+    # Not proven required: NPC town buildings omit both, but every vanilla player hall sets them
+    # (group = building_groups.json build-menu tab; min_area 30 military / 20 crafters).
+    # `type: "military"` is a separate field: 58 NPC barracks use it without group, and the 11 vanilla
+    # military trainer halls (Dojo 387, Collegium 389, ...) set type AND group.
+    if "min_area" in building and _as_int(building.get("min_area")) is None:
+        issues.append(f"{bid}: player building min_area should be a number")
+    elif "min_area" not in building:
+        issues.append(f"{bid}: (optional) player building has no min_area; vanilla halls use 30 (military) / 20 (crafters)")
+    if "group" in building and (not isinstance(building.get("group"), str) or not building.get("group")):
+        issues.append(f"{bid}: player building group should be a building_groups.json id")
+    elif "group" not in building:
+        if building.get("type"):
+            issues.append(
+                f"{bid}: (optional) has type={building.get('type')!r} but no group; vanilla halls set both "
+                f"(type = military role, group = build-menu tab)"
+            )
+        else:
+            issues.append(f"{bid}: (optional) player building has no group; vanilla trainer halls use \"military\" (build-menu tab)")
     if not isinstance(building.get("occupation_image"), int) or isinstance(building.get("occupation_image"), bool):
         issues.append(f"{bid}: missing occupation_image")
     opr = building.get("occupation_per_race") or {}

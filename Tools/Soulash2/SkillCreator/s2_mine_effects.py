@@ -257,8 +257,34 @@ def _load_json(path: Path) -> Any:
         return None
 
 
-def _fx_example(fx: Dict[str, Any], file: str) -> Dict[str, Any]:
+def _owner(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The ability/passive/amplifier/stacker row an effect was seen on, for `explain` used_by."""
+    oid = item.get("id")
+    if oid is None:
+        return None
+    owner: Dict[str, Any] = {"id": str(oid)}
+    if item.get("name"):
+        owner["name"] = str(item["name"])
+    desc = _plain(item.get("description"))
+    if desc:
+        owner["description"] = desc[:300]
+    return owner
+
+
+def _plain(text: Any) -> str:
+    """Strip [color=…] tags and collapse whitespace from game text."""
+    if not isinstance(text, str):
+        return ""
+    text = re.sub(r"\[/?color[^\]]*\]", "", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _fx_example(fx: Dict[str, Any], file: str, owner: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     ex: Dict[str, Any] = {"file": file, "value": _compact(fx.get("value"))}
+    if owner:
+        ex["owner"] = owner["id"]
+        if owner.get("name"):
+            ex["owner_name"] = owner["name"]
     if "secondary_value" in fx:
         ex["secondary_value"] = _compact(fx["secondary_value"])
     if "third_value" in fx:
@@ -279,6 +305,7 @@ def _record(
     example: Optional[Dict[str, Any]] = None,
     docs_secondary: str = "",
     docs_third: str = "",
+    owner: Optional[Dict[str, Any]] = None,
 ) -> None:
     rec = store.setdefault(
         f"{kind}:{eid}",
@@ -304,7 +331,12 @@ def _record(
     if docs_third and not rec.get("docs_third"):
         rec["docs_third"] = docs_third
     if len(rec["examples"]) < 4:
-        rec["examples"].append(example or {"file": file, "value": _compact(value)})
+        rec["examples"].append(example or _fx_example({"value": value}, file, owner))
+    if owner:
+        owners = rec.setdefault("owners", [])
+        # Prefer vanilla owners: core_2 is mined before workshop, so the first few are vanilla.
+        if len(owners) < 4 and all(o["id"] != owner["id"] for o in owners):
+            owners.append({**owner, "source": source})
     if isinstance(value, str) and value not in rec["observed_values"] and len(rec["observed_values"]) < 40:
         rec["observed_values"].append(value)
     if isinstance(value, (int, float)) and not isinstance(value, bool):
@@ -322,10 +354,20 @@ def mine_abilities(root: Path, source: str, store: Dict[str, Dict[str, Any]], ex
         t = data.get("target")
         if isinstance(t, str) and t:
             targets[t] += 1
+        owner = _owner(data)
         effects = data.get("effects")
         if isinstance(effects, dict):
             for k, v in effects.items():
-                _record(store, eid=k, kind="ability", json_path=f"effects.{k}", value=v, source=source, file=str(path.name))
+                _record(
+                    store,
+                    eid=k,
+                    kind="ability",
+                    json_path=f"effects.{k}",
+                    value=v,
+                    source=source,
+                    file=str(path.name),
+                    owner=owner,
+                )
         keys = data.get("effects_keys") or data.get("effect_keys")
         if isinstance(keys, dict):
             for k, v in keys.items():
@@ -337,6 +379,7 @@ def mine_abilities(root: Path, source: str, store: Dict[str, Dict[str, Any]], ex
                     value=v,
                     source=source,
                     file=str(path.name),
+                    owner=owner,
                 )
 
 
@@ -360,6 +403,7 @@ def mine_passives_file(path: Path, source: str, store: Dict[str, Dict[str, Any]]
                 file=path.name,
                 description=f"Passive top-level field ({k}). apply_mode replaces only_party.",
             )
+        owner = _owner(item)
         for fx in item.get("effects") or []:
             if not isinstance(fx, dict) or not fx.get("effect"):
                 continue
@@ -374,9 +418,10 @@ def mine_passives_file(path: Path, source: str, store: Dict[str, Dict[str, Any]]
                 value=fx.get("value"),
                 source=source,
                 file=path.name,
-                example=_fx_example(fx, path.name),
+                example=_fx_example(fx, path.name, owner),
                 docs_secondary=f"{_schema_of(secondary)} (observed)" if "secondary_value" in fx else "",
                 docs_third=f"{_schema_of(third)} (observed)" if "third_value" in fx else "",
+                owner=owner,
             )
 
 
@@ -387,6 +432,7 @@ def mine_amplifiers_file(path: Path, source: str, store: Dict[str, Dict[str, Any
     for item in data:
         if not isinstance(item, dict):
             continue
+        owner = _owner(item)
         for fx in item.get("bonuses") or []:
             if not isinstance(fx, dict) or not fx.get("effect"):
                 continue
@@ -399,7 +445,8 @@ def mine_amplifiers_file(path: Path, source: str, store: Dict[str, Dict[str, Any
                 value=fx.get("value"),
                 source=source,
                 file=path.name,
-                example=_fx_example(fx, path.name),
+                example=_fx_example(fx, path.name, owner),
+                owner=owner,
             )
         for k in AMPLIFIER_TOPLEVEL:
             if k in item:
@@ -422,6 +469,7 @@ def mine_stackers_file(path: Path, source: str, store: Dict[str, Dict[str, Any]]
     for item in data:
         if not isinstance(item, dict):
             continue
+        owner = _owner(item)
         for fx in item.get("effects") or []:
             if not isinstance(fx, dict) or not fx.get("effect"):
                 continue
@@ -434,7 +482,8 @@ def mine_stackers_file(path: Path, source: str, store: Dict[str, Dict[str, Any]]
                 value=fx.get("value"),
                 source=source,
                 file=path.name,
-                example=_fx_example(fx, path.name),
+                example=_fx_example(fx, path.name, owner),
+                owner=owner,
             )
         for k in STACKER_FIELDS:
             if k not in item:
@@ -478,34 +527,166 @@ def mine_messages(path: Path) -> Dict[str, Any]:
     return enums
 
 
-def mine_skills_file(path: Path, source: str, store: Dict[str, Dict[str, Any]]) -> None:
+SKILL_OPTIONAL_FIELDS = {
+    "start_level": "Optional skills.json level the skill starts at (core_2 crafting skills and Economy use 1; default 10).",
+    "difficulty": "Optional skills.json difficulty shown on character creation (core_2 uses 0-2).",
+    "combat_skill": "skills.json flag: true for weapon/magic combat skills (planner + character creation grouping).",
+    "weapon_type": "skills.json weapon skill link (core_2 weapon skills use 0-6).",
+}
+
+# Docs list plus ids the miner has seen before; mined skills.json ids are unioned in.
+BASE_EXP_SOURCES = [
+    "location_discovery",
+    "location_details_discovery",
+    "resource_discovery",
+    "attack",
+    "parry",
+    "ability",
+    "craft",
+    "upgrade_item",
+    "drag",
+    "throw",
+    "climb",
+    "salvage",
+    "settle",
+    "jump_down",
+    "walk",
+    "carve",
+    "production",
+]
+
+BASE_REWARD_KINDS = ["ability", "passive", "amplifier", "recipe", "production_action"]
+
+
+# messages.json passive_effects is indexed by the engine enum, not by effect id. Names usually
+# slug to the id; these are the ones that do not and were matched by hand against vanilla passives.
+PASSIVE_TOOLTIP_ALIASES = {
+    "ability_extend_duration": "Ability Extra Duration",
+    "bonus_knockback_damage_percent": "Knockback Damage",
+    "bonus_one_handed_damage_percent": "Bonus One-Handed Damage",
+    "bonus_production_action": "Bonus Production",
+    "bonus_production_chance_item_type": "Bonus Production Chance",
+    "bonus_two_handed_damage_percent": "Bonus Two-Handed Damage",
+    "camp_unlimited": "Unlimited Camps",
+    "craft_save_resource_tier": "Efficient Crafting",
+    "damage_reduction_missing_health": "Damage Reduction on Missing Health",
+    "death_under_effect_gain_health": "Gain Health On Death Under Effect",
+    "death_under_effect_gain_stamina": "Gain Stamina On Death Under Effect",
+    "discover_all_tiers": "Discover All Locations",
+    "discover_poi_range": "Discovery Range",
+    "dot_on_crit": "Effect On Crit",
+    "fall_damage": "No Fall Damage",
+    "famine_display": "Display Famine",
+    "food_sabotage": "Sabotage Food Storage",
+    "heal_on_damage_type": "Heal on Damage",
+    "health_bonus_percent": "Max Health",
+    "health_tick": "Health Regeneration Tick",
+    "leader_stats": "Leader Statistics",
+    "move_speed": "Movement Speed",
+    "on_kill_create_item": "On Kill Create",
+    "party_move_speed": "Party Speed",
+    "production_action": "Unlock Production Action",
+    "range": "Bonus Range",
+    "regeneration_low_health": "Regeneration On Low Health",
+    "reveal_poi": "Reveal Discovery",
+    "sell_bonus_crafted": "Better Crafted Deals",
+    "sell_bonus_resource": "Better Resource Deals",
+    "settlement_upgrade_unlimited": "Unlimited Settlement Upgrade",
+    "sight_behind": "See Behind",
+    "statistic_percent": "Bonus Statistic",
+    "thirst_on_effect": "Thirst Under Effect",
+    "thorns_for_missing_health": "Thorns From Missing Health",
+    "tool_type": "Acquire Tool",
+    "uncover_resources_of_type": "Uncover Resource Of Type",
+}
+
+
+def _slug(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", str(text).lower()).strip("_")
+
+
+def mine_passive_tooltips(messages_path: Path, passives_path: Path, passive_ids: Iterable[str]) -> Dict[str, Dict[str, Any]]:
+    """Map passive effect ids to the in-game tooltip text in messages.json `passive_effects`."""
+    data = _load_json(messages_path) or {}
+    rows = data.get("passive_effects") if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        return {}
+    by_name: Dict[str, Dict[str, Any]] = {}
+    for row in rows:
+        if isinstance(row, dict) and row.get("name") and _plain(row.get("description")):
+            by_name.setdefault(_slug(row["name"]), row)
+    # A one-effect vanilla passive named like the tooltip (Festival -> festival) is a safe join.
+    via_passive: Dict[str, str] = {}
+    for item in _load_json(passives_path) or []:
+        if not isinstance(item, dict):
+            continue
+        effects = [fx.get("effect") for fx in item.get("effects") or [] if isinstance(fx, dict)]
+        if len(effects) == 1 and effects[0] and _slug(item.get("name") or "") in by_name:
+            via_passive.setdefault(str(effects[0]), _slug(item["name"]))
+    out: Dict[str, Dict[str, Any]] = {}
+    for eid in passive_ids:
+        key, how = None, ""
+        if eid in PASSIVE_TOOLTIP_ALIASES and _slug(PASSIVE_TOOLTIP_ALIASES[eid]) in by_name:
+            key, how = _slug(PASSIVE_TOOLTIP_ALIASES[eid]), "alias"
+        elif eid in by_name:
+            key, how = eid, "name"
+        elif eid in via_passive:
+            key, how = via_passive[eid], "vanilla passive name"
+        if key:
+            row = by_name[key]
+            out[eid] = {
+                "name": row.get("name"),
+                "description": _plain(row.get("description")),
+                "messages_id": row.get("id"),
+                "matched_by": how,
+            }
+    return out
+
+
+def mine_skills_file(path: Path, source: str, store: Dict[str, Dict[str, Any]], extras: Dict[str, Any]) -> None:
     data = _load_json(path)
     if not isinstance(data, list):
         return
+    exp_ids: Dict[str, int] = extras.setdefault("exp_sources", defaultdict(int))
     for item in data:
-        if not isinstance(item, dict) or "level_start" not in item:
+        if not isinstance(item, dict):
             continue
-        _record(
-            store,
-            eid="level_start",
-            kind="skill_field",
-            json_path="skills.json.level_start",
-            value=item["level_start"],
-            source=source,
-            file=path.name,
-            description="Optional skills.json starting level for this skill.",
-        )
+        for row in item.get("exp_sources") or []:
+            if isinstance(row, dict) and row.get("id"):
+                exp_ids[str(row["id"])] += 1
+        for key, desc in SKILL_OPTIONAL_FIELDS.items():
+            if key not in item:
+                continue
+            _record(
+                store,
+                eid=key,
+                kind="skill_field",
+                json_path=f"skills.json.{key}",
+                value=item[key],
+                source=source,
+                file=path.name,
+                description=desc,
+                owner=_owner(item),
+            )
 
 
-def mine_milestones(root: Path, source: str, store: Dict[str, Dict[str, Any]]) -> None:
+def mine_milestones(root: Path, source: str, store: Dict[str, Dict[str, Any]], extras: Dict[str, Any]) -> None:
     folder = root / "milestones"
     if not folder.is_dir():
         return
+    reward_kinds: Dict[str, int] = extras.setdefault("reward_kinds", defaultdict(int))
     for path in folder.rglob("*.json"):
         if "translations" in path.parts:
             continue
         data = _load_json(path)
-        if not isinstance(data, dict) or not data.get("innate"):
+        if not isinstance(data, dict):
+            continue
+        rewards = data.get("rewards")
+        for reward in rewards if isinstance(rewards, list) else [rewards] if isinstance(rewards, dict) else []:
+            if isinstance(reward, dict):
+                for kind in reward:
+                    reward_kinds[str(kind)] += 1
+        if not data.get("innate"):
             continue
         _record(
             store,
@@ -589,8 +770,8 @@ def mine_all() -> Dict[str, Any]:
     if (core / "ability_stackers.json").is_file():
         mine_stackers_file(core / "ability_stackers.json", "core_2", store)
     if (core / "skills.json").is_file():
-        mine_skills_file(core / "skills.json", "core_2", store)
-    mine_milestones(core, "core_2", store)
+        mine_skills_file(core / "skills.json", "core_2", store, extras)
+    mine_milestones(core, "core_2", store, extras)
     if (core / "character.json").is_file():
         mine_character_stats(core / "character.json", "core_2", extras)
 
@@ -607,8 +788,8 @@ def mine_all() -> Dict[str, Any]:
             if (mod / "ability_stackers.json").is_file():
                 mine_stackers_file(mod / "ability_stackers.json", "workshop", store)
             if (mod / "skills.json").is_file():
-                mine_skills_file(mod / "skills.json", "workshop", store)
-            mine_milestones(mod, "workshop", store)
+                mine_skills_file(mod / "skills.json", "workshop", store, extras)
+            mine_milestones(mod, "workshop", store, extras)
             if (mod / "character.json").is_file():
                 mine_character_stats(mod / "character.json", "workshop", extras)
 
@@ -673,30 +854,27 @@ def mine_all() -> Dict[str, Any]:
     target_set |= set(TARGET_IDS)
     enums["target"] = sorted(target_set)
     enums["amplifier_type"] = ["offensive", "defensive", "utility"]
-    enums["exp_source"] = [
-        "location_discovery",
-        "location_details_discovery",
-        "resource_discovery",
-        "attack",
-        "parry",
-        "ability",
-        "craft",
-        "upgrade_item",
-        "drag",
-        "throw",
-        "climb",
-        "salvage",
-        "settle",
-        "jump_down",
-        "walk",
-        "carve",
-        "production",
-    ]
-    enums["milestone_reward"] = ["ability", "passive", "amplifier", "recipe", "production_action"]
+    mined_exp = extras.get("exp_sources") or {}
+    enums["exp_source"] = BASE_EXP_SOURCES + sorted(k for k in mined_exp if k not in BASE_EXP_SOURCES)
+    mined_rewards = extras.get("reward_kinds") or {}
+    enums["milestone_reward"] = BASE_REWARD_KINDS + sorted(k for k in mined_rewards if k not in BASE_REWARD_KINDS)
+    enums["milestone_reward_counts"] = dict(sorted(mined_rewards.items()))
     enums["apply_mode"] = ["party_only", "solo_only"]
     race_stats = sorted(extras.get("race_statistics") or [])
     if race_stats:
         enums["race_statistics"] = race_stats
+
+    tooltips = mine_passive_tooltips(
+        core / "messages.json",
+        core / "passives.json",
+        {rec["id"] for rec in store.values() if rec["kind"] == "passive"},
+    )
+    for rec in store.values():
+        if rec["kind"] != "passive" or rec["id"] not in tooltips:
+            continue
+        rec["tooltip"] = tooltips[rec["id"]]
+        if not rec.get("description") or str(rec["description"]).startswith("Found in Soulash 2.exe"):
+            rec["description"] = f"In-game: {tooltips[rec['id']]['description']}"
 
     effects: List[Dict[str, Any]] = []
     for rec in store.values():
@@ -726,6 +904,8 @@ def mine_all() -> Dict[str, Any]:
                 "docs_secondary": rec.get("docs_secondary"),
                 "docs_third": rec.get("docs_third"),
                 "examples": rec["examples"],
+                "owners": rec.get("owners") or [],
+                "tooltip": rec.get("tooltip"),
                 "count": rec["count"],
                 "sources": sources,
                 "confidence": confidence,
@@ -777,6 +957,8 @@ def write_catalog(payload: Dict[str, Any]) -> Tuple[Path, Path, Path]:
         f"- damage_type: {', '.join(x['id'] for x in payload['enums'].get('damage_type') or [])}",
         f"- target: {', '.join(payload['enums'].get('target') or [])}",
         f"- amplifier type: {', '.join(payload['enums'].get('amplifier_type') or [])}",
+        f"- exp_source: {', '.join(payload['enums'].get('exp_source') or [])}",
+        f"- milestone reward: {', '.join(f'{k} ({v})' for k, v in (payload['enums'].get('milestone_reward_counts') or {}).items())}",
         "",
         "## Effects",
         "",

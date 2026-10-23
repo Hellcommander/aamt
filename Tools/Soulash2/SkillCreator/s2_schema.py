@@ -400,7 +400,7 @@ VALID_WHERE = {
     },
     "skill_field": {
         "place": "skills.json entry",
-        "how": "Optional field on the skill object itself (e.g. `level_start`).",
+        "how": "Optional field on the skill object itself (e.g. `start_level`, `difficulty`, `combat_skill`, `weapon_type`).",
         "path": "{id}",
     },
     "milestone_field": {
@@ -485,6 +485,10 @@ def effect_cards() -> Dict[str, Any]:
                     continue
                 seen_ex.add(key)
                 row_ex = {"file": ex.get("file"), "value": ex.get("value")}
+                if ex.get("owner"):
+                    row_ex["owner"] = ex["owner"]
+                if ex.get("owner_name"):
+                    row_ex["owner_name"] = ex["owner_name"]
                 if "secondary_value" in ex:
                     row_ex["secondary_value"] = ex["secondary_value"]
                 if "third_value" in ex:
@@ -511,7 +515,19 @@ def effect_cards() -> Dict[str, Any]:
                 break
         if not confidence:
             confidence = confs[0] if confs else ""
+        tooltip = next((r["tooltip"] for r in rows if isinstance(r.get("tooltip"), dict)), None)
+        used_by: List[Dict[str, Any]] = []
+        for r in rows:
+            for owner in r.get("owners") or []:
+                if isinstance(owner, dict) and owner not in used_by and len(used_by) < 6:
+                    used_by.append(owner)
         does = descs[0] if descs else ""
+        if not does and tooltip:
+            does = f"In-game tooltip ({tooltip.get('name')}): {tooltip.get('description')}"
+        if not does:
+            owner = next((o for o in used_by if o.get("description")), None)
+            if owner:
+                does = f"Used by {owner.get('name') or owner.get('id')} ({owner.get('id')}): {owner['description']}"
         if not does and examples:
             does = "No docs blurb; seen in game data (examples below)."
         if not does:
@@ -524,6 +540,8 @@ def effect_cards() -> Dict[str, Any]:
             "schemas": schemas,
             "docs_fields": docs_bits,
             "examples": examples,
+            "used_by": used_by,
+            "tooltip": tooltip,
             "sources": sources,
             "confidence": confidence,
             "kinds": kinds,

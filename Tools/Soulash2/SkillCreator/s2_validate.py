@@ -95,6 +95,62 @@ def _non_int_number(val: Any) -> bool:
     return False
 
 
+_CORE2_COMPONENTS: Optional[Dict[str, List[str]]] = None
+
+
+def _core2_components() -> Dict[str, List[str]]:
+    """core_2 entity id -> components, read once per process."""
+    global _CORE2_COMPONENTS
+    if _CORE2_COMPONENTS is None:
+        _CORE2_COMPONENTS = {}
+        folder = core2_dir() / "entities"
+        for path in folder.rglob("*.json") if folder.is_dir() else []:
+            if "translations" in path.parts:
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8-sig"))
+            except (OSError, ValueError):
+                continue
+            for row in data if isinstance(data, list) else [data]:
+                if isinstance(row, dict) and row.get("id") is not None:
+                    comps = row.get("components")
+                    _CORE2_COMPONENTS[str(row["id"])] = comps if isinstance(comps, list) else []
+    return _CORE2_COMPONENTS
+
+
+def _starting_item_issues(item_id: Any, amount: Any, spec_entities: Dict[str, Dict[str, Any]], what: str, where: str) -> List[Issue]:
+    """A starting item must exist, be an item entity, and come in a positive whole amount.
+
+    core_2_Rope (the placed rope object) in Void Magic's starting_gear crashed every new character:
+    0.10.4 throws "ECStorage::get: entity N is not in the store" when it files the kit into the backpack.
+    """
+    out: List[Issue] = []
+    iid = str(item_id)
+    if amount is not None and (isinstance(amount, bool) or not isinstance(amount, (int, float)) or _non_int_number(amount) or amount < 1):
+        out.append(Issue("error", f"{what} {iid} amount {amount!r} must be a whole number of at least 1", where))
+    if iid in spec_entities:
+        comps = spec_entities[iid].get("components")
+        comps = comps if isinstance(comps, list) else []
+    elif iid in _core2_components():
+        comps = _core2_components()[iid]
+    elif iid.isdigit() or iid.startswith("core_2_"):
+        out.append(Issue("error", f"{what} {iid} is not a core_2 entity id", where))
+        return out
+    else:
+        out.append(Issue("warn", f"{what} {iid} is not in this spec or core_2; make sure the mod that defines it is in mods_required", where))
+        return out
+    if "item" not in comps:
+        out.append(
+            Issue(
+                "error",
+                f"{what} {iid} is not an item entity (no 'item' component); the game crashes creating a new character "
+                "('ECStorage::get: entity N is not in the store')",
+                where,
+            )
+        )
+    return out
+
+
 def _encoding_issues(spec: Dict[str, Any], issues: List[Issue]) -> None:
     for ab in spec.get("abilities") or []:
         fx = ab.get("effects")
@@ -223,7 +279,8 @@ KNOWN_SKILL_TOP = {
     "starting_gear",
     "stat_points",
     "difficulty",
-    "level_start",
+    "start_level",
+    "weapon_type",
 }
 KNOWN_MOD_TOP = {
     "author",
@@ -438,7 +495,9 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
         )
     skill = spec.get("skill") or {}
     for extra in skill:
-        if extra not in KNOWN_SKILL_TOP:
+        if extra == "level_start":
+            issues.append(Issue("warn", "skills.json level_start is ignored by the game; core_2 uses start_level (load/write migrate it)"))
+        elif extra not in KNOWN_SKILL_TOP:
             issues.append(Issue("warn", f"Unknown skills.json field {extra}"))
     exp_ids = set(enums.get("exp_source") or [])
     for src in skill.get("exp_sources") or []:
@@ -447,7 +506,7 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
             continue
         sid = src.get("id")
         if sid and exp_ids and sid not in exp_ids:
-            issues.append(Issue("warn", f"Unknown exp_source id {sid} (docs list is incomplete; walk/carve/production are valid)"))
+            issues.append(Issue("warn", f"Unknown exp_source id {sid} (not in docs, core_2, or workshop skills.json; re-run mine after game updates)"))
         if sid == "production" and not src.get("production_action"):
             issues.append(Issue("warn", "exp_source production usually needs production_action (vanilla Agriculture uses it)"))
     map_ids = set()
@@ -462,7 +521,25 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
         if map_id in map_ids:
             issues.append(Issue("error", f"Duplicate procedural map id {map_id}", where))
         map_ids.add(map_id)
-    ent_ids = {str(e.get("id")) for e in spec.get("entities") or [] if e.get("id")}
+    combat_rows = (((spec.get("assets") or {}).get("sounds") or {}).get("combat")) or []
+    if combat_rows or any(isinstance(a.get("sound"), dict) for a in spec.get("animations") or []):
+        from s2_paths import staging_dir
+        from s2_sounds import check_sounds
+
+        for level, message in check_sounds(
+            staging_dir(spec),
+            rows=combat_rows,
+            animations=spec.get("animations") or [],
+            production_actions=spec.get("production_actions") or [],
+        ):
+            issues.append(Issue(level, message, "sounds"))
+    if spec.get("weather"):
+        from s2_weather import validate_spec_weather
+
+        for level, where, message in validate_spec_weather(spec):
+            if level != "info":  # info notes are shown by list-weather, not as validate noise
+                issues.append(Issue(level, message, where))
+    spec_entities = {str(e.get("id")): e for e in spec.get("entities") or [] if e.get("id")}
     for i, choice in enumerate(skill.get("starting_gear") or []):
         if not isinstance(choice, dict) or "first" not in choice:
             issues.append(Issue("error", "starting_gear choice needs first:{id, amount}", f"starting_gear[{i}]"))
@@ -471,19 +548,10 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
             item = choice.get(side)
             if not item:
                 continue
-            if not isinstance(item, dict) or not item.get("id"):
+            if not isinstance(item, dict) or not item.get("id") or "amount" not in item:
                 issues.append(Issue("error", f"starting_gear {side} needs id and amount", f"starting_gear[{i}]"))
                 continue
-            iid = str(item["id"])
-            if iid.isdigit() or iid.startswith("core_2_") or iid in ent_ids:
-                continue
-            issues.append(
-                Issue(
-                    "warn",
-                    f"starting_gear {side} id {iid} is not in this spec and is not a vanilla numeric / core_2_ id",
-                    f"starting_gear[{i}]",
-                )
-            )
+            issues.extend(_starting_item_issues(item["id"], item["amount"], spec_entities, f"starting_gear {side}", f"starting_gear[{i}]"))
     stats = [int(x) for x in (skill.get("stat_points") or [])]
     combat = skill.get("combat_skill") is not False
     if combat:
@@ -1036,6 +1104,13 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
                         str(rid),
                     )
                 )
+        for item in race.get("items") or []:
+            iid = item.get("id") if isinstance(item, dict) else item
+            if iid is None or str(iid) == "":
+                issues.append(Issue("error", "Race items entries need an entity id", str(rid)))
+                continue
+            amount = item.get("amount") if isinstance(item, dict) else None
+            issues.extend(_starting_item_issues(iid, amount, spec_entities, "Race starting item", str(rid)))
         for pid in race.get("passives") or []:
             sid = str(pid)
             if sid.startswith("core_2_"):

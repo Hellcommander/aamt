@@ -211,6 +211,12 @@ def scan_outdated_mod(folder: Path) -> List[str]:
             issues.append(f"{name}: JSON parse error line {exc.lineno}: {exc.msg}")
     if old_amps.is_file() and not new_amps.is_file():
         issues.append("amplifiers.json should be ability_amplifiers.json")
+    for name in ("skills.json", "passives.json", "ability_amplifiers.json", "ability_stackers.json"):
+        if isinstance(_load_optional(folder / name), dict):
+            issues.append(f"{name} is a single object; the game needs an array [ ] and drops the mod")
+    for row in _as_rows(_load_optional(folder / "skills.json")):
+        if isinstance(row, dict) and "level_start" in row and "start_level" not in row:
+            issues.append(f"skills.json {row.get('id') or '?'}: level_start is ignored by the game (want start_level)")
     passives = _load_optional(folder / "passives.json")
     for row in _as_rows(passives):
         if not isinstance(row, dict):
@@ -393,6 +399,36 @@ def _fix_skills_json_parse(folder: Path) -> List[str]:
         return ["skills.json unparseable (left as-is)"]
     path.write_text(patched, encoding="utf-8")
     return ["skills.json: inserted missing comma"]
+
+
+def _fix_list_file_shapes(folder: Path) -> List[str]:
+    """0.10.4 drops a mod whose list file is a bare object ("type must be array, but is object")."""
+    notes: List[str] = []
+    for name in ("skills.json", "passives.json", "ability_amplifiers.json", "ability_stackers.json"):
+        path = folder / name
+        data = _load_optional(path)
+        if isinstance(data, dict) and data.get("id") is not None:
+            _write_json(path, [data])
+            notes.append(f"{name}: wrapped single object in [ ]")
+    return notes
+
+
+def _fix_skills_start_level(folder: Path) -> List[str]:
+    """Older SkillCreator builds wrote level_start; core_2 and workshop skills use start_level."""
+    path = folder / "skills.json"
+    data = _load_optional(path)
+    if not isinstance(data, list):
+        return []
+    notes: List[str] = []
+    for row in data:
+        if isinstance(row, dict) and "level_start" in row:
+            value = row.pop("level_start")
+            if "start_level" not in row:
+                row["start_level"] = value
+            notes.append(f"skills.json {row.get('id') or '?'}: level_start -> start_level")
+    if notes:
+        _write_json(path, data)
+    return notes
 
 
 def _fix_amplifiers_filename(folder: Path) -> List[str]:
@@ -620,6 +656,8 @@ def upgrade_outdated_mod(folder: Path) -> List[str]:
         notes.extend(_fix_generic_buildings(folder))
     notes.extend(_ensure_assets_json(folder))
     notes.extend(_fix_skills_json_parse(folder))
+    notes.extend(_fix_list_file_shapes(folder))
+    notes.extend(_fix_skills_start_level(folder))
     notes.extend(_fix_amplifiers_filename(folder))
     notes.extend(_fix_passives_file(folder))
     notes.extend(_fix_amplifier_encoding(folder))

@@ -59,9 +59,9 @@ try:
 except Exception:
     OLLAMA_AVAILABLE = False
 
-DEFAULT_MOD = Path(
-    r"E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_reactive_crafting"
-)
+from s2_game_paths import mods_dir  # noqa: E402
+
+DEFAULT_MOD = mods_dir() / "arendeth_reactive_crafting"
 
 # Earthy alchemical base + the four reactive-terrain accent colors.
 REACTIVE_PALETTE = ["#120d0a", "#2c2015", "#5a3d22", "#a06a2c", "#e0b25e", "#f5e6c8"]

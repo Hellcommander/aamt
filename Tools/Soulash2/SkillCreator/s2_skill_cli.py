@@ -265,7 +265,7 @@ def cmd_new(args: argparse.Namespace) -> int:
     sid = raw_id if args.no_prefix else prefixed_skill_id(raw_id)
     if sid != raw_id:
         print(f"Prefixed id {raw_id} -> {sid} (vanilla uses core_2_*; pass --no-prefix to skip)")
-    spec = new_spec(sid, args.name, mod_id=args.mod or sid, level_start=args.level_start, prefix=False)
+    spec = new_spec(sid, args.name, mod_id=args.mod or sid, start_level=args.start_level, prefix=False)
     if args.no_combat:
         spec["skill"]["combat_skill"] = False
     if args.difficulty is not None:
@@ -308,8 +308,8 @@ def cmd_set_skill(args: argparse.Namespace) -> int:
     payload: dict = {}
     if args.difficulty is not None:
         payload["difficulty"] = args.difficulty
-    if args.level_start is not None:
-        payload["level_start"] = args.level_start
+    if args.start_level is not None:
+        payload["start_level"] = args.start_level
     if args.description is not None:
         payload["description"] = args.description
     if args.name:
@@ -2152,6 +2152,349 @@ def cmd_copy_building_map(args: argparse.Namespace) -> int:
     return 0
 
 
+def _map_mods(args: argparse.Namespace) -> list[Path]:
+    from s2_building_maps import map_files, resolve_mod
+    from s2_paths import mods_dir
+
+    if args.mods:
+        return [resolve_mod(m) for m in args.mods]
+    return [p for p in sorted(mods_dir().iterdir()) if p.is_dir() and p.name != "core_2" and map_files(p)]
+
+
+def cmd_check_building_maps(args: argparse.Namespace) -> int:
+    from s2_building_maps import known_map_ids, scan_mod_maps
+
+    every = known_map_ids()
+    errors = 0
+    for mod in _map_mods(args):
+        others = {k: [v for v in vals if not v.startswith(mod.name + "/")] for k, vals in every.items()}
+        others = {k: v for k, v in others.items() if v}
+        issues = scan_mod_maps(mod, other_map_ids=others)
+        shown = [i for i in issues if args.verbose or i["level"] != "info"]
+        print(f"== {mod.name}: {len(shown)} issue(s)")
+        for issue in shown:
+            print(f"  [{issue['level']}] {issue['file']}: {issue['message']}")
+        errors += sum(1 for i in issues if i["level"] == "error")
+    return 1 if errors else 0
+
+
+def cmd_relink_building_maps(args: argparse.Namespace) -> int:
+    from s2_building_maps import apply_plan, plan_relink, resolve_mod
+
+    for mod in [resolve_mod(m) for m in args.mods]:
+        plan = plan_relink(mod, only=args.only)
+        print(f"== {mod.name}")
+        for row in plan:
+            if row["action"] == "change":
+                print(f"  {row['file'].name}: " + "; ".join(row["changes"]))
+            elif row["action"] == "skip":
+                print(f"  {row['file'].name}: SKIP {row['why']}")
+            else:
+                print(f"  {row['file'].name}: ok")
+        if args.apply:
+            for note in apply_plan(mod, plan):
+                print("  applied", note)
+        elif any(r["action"] == "change" for r in plan):
+            print("  (dry run; add --apply to write. Originals are backed up under Output/Soulash2/_building_map_backups/)")
+    return 0
+
+
+def cmd_link_building_map(args: argparse.Namespace) -> int:
+    from s2_building_maps import link_map, resolve_mod
+
+    result = link_map(
+        resolve_mod(args.mod),
+        Path(args.map),
+        args.building,
+        map_id=args.map_id,
+        name=args.name,
+        apply=args.apply,
+    )
+    print(json.dumps(result, indent=2))
+    if not result["applied"]:
+        print("(dry run; add --apply to write)")
+    return 0
+
+
+def cmd_list_weather(args: argparse.Namespace) -> int:
+    from s2_weather import public_weather, search_weather, validate_spec_weather
+
+    if args.search is not None or not (args.id or args.spec):
+        rows = search_weather(args.search or "", limit=args.limit)
+        if args.json:
+            print(json.dumps(rows, ensure_ascii=False, indent=2))
+            return 0
+        for row in rows:
+            biomes = ", ".join(row["biomes"]) or "(none: ability/command only)"
+            extra = f" +{','.join(row['extras'])}" if row["extras"] else ""
+            print(f"{str(row['source']):28} {str(row['id']):>4} {row['name']:<20} anim={row['animation']} abilities={row['ability']} biomes={biomes}{extra}")
+        print(f"{len(rows)} weather events")
+        return 0
+    spec, _ = _load(args)
+    rows = spec.get("weather") or []
+    if args.json:
+        print(json.dumps([public_weather(r) for r in rows], ensure_ascii=False, indent=2))
+        return 0
+    for row in rows:
+        print(f"{row.get('id')}: {row.get('name')} anim={row.get('animation')} abilities={row.get('ability')} biomes={row.get('biomes')} chance={row.get('trigger_chance')}")
+    for level, where, message in validate_spec_weather(spec):
+        print(f"  [{level}] {where}: {message}")
+    print(f"{len(rows)} weather events in spec")
+    return 0
+
+
+def cmd_dump_weather(args: argparse.Namespace) -> int:
+    from s2_weather import load_weather, public_weather
+
+    try:
+        row = load_weather(args.weather_id)
+    except FileNotFoundError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(f"// from {row.get('_source')}", file=sys.stderr)
+    print(json.dumps(public_weather(row), ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_add_weather(args: argparse.Namespace) -> int:
+    from s2_weather import load_weather, make_weather, parse_change, upsert_weather, validate_spec_weather
+
+    spec, path = _load(args)
+    base = None
+    if args.clone:
+        try:
+            base = load_weather(args.clone)
+        except FileNotFoundError as exc:
+            raise SystemExit(str(exc)) from exc
+    owner = str(spec.get("skill_id") or spec.get("id") or "mod")
+    weather_id = args.weather_id or f"{owner}_{slug_name(args.name).lower()}"
+    existing = next((r for r in spec.get("weather") or [] if str(r.get("id")) == weather_id), None)
+    base = base or existing
+    animation = args.animation or (base or {}).get("animation")
+    message = args.message if args.message is not None else (base or {}).get("trigger_message")
+    if not animation:
+        raise SystemExit("--animation is required (vanilla rain 113, snow 182, core_2_Heavy_Rain, ... or one of your animations); or --clone a weather")
+    if message is None:
+        message = f"{args.name} begins."
+    try:
+        changes = parse_change(args.change) if args.change else None
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    row = make_weather(
+        weather_id,
+        args.name,
+        animation=str(animation),
+        trigger_message=message,
+        base=base,
+        ability=list(args.ability) if args.ability is not None else None,
+        biomes=list(args.biome) if args.biome is not None else ([] if args.no_biomes else None),
+        duration=args.duration,
+        trigger_every=args.trigger_every,
+        trigger_chance=args.chance,
+        animation_tick=args.animation_tick,
+        ability_trigger_time=args.ability_trigger_time,
+        disabled_under_roof=False if args.ignore_roof else (True if args.roof else None),
+        change_entities_on_start=changes,
+        force_night=True if args.force_night else None,
+        thirst_multiplier=args.thirst_multiplier,
+        stop_on_map_exit=True if args.stop_on_map_exit else None,
+    )
+    upsert_weather(spec, row)
+    if args.summon_ability:
+        ability = next((a for a in spec.get("abilities") or [] if str(a.get("id")) == args.summon_ability), None)
+        if ability is None:
+            raise SystemExit(f"Ability {args.summon_ability} not in this spec (add it first, then --summon-ability)")
+        ability.setdefault("effects_keys", {})["summon_weather"] = weather_id
+    save_spec(spec, path)
+    print(json.dumps(row, ensure_ascii=False, indent=2))
+    for level, where, message in validate_spec_weather(spec):
+        if where.endswith(weather_id):
+            print(f"  [{level}] {message}")
+    return 0
+
+
+def cmd_remove_weather(args: argparse.Namespace) -> int:
+    from s2_weather import remove_weather
+
+    spec, path = _load(args)
+    if not remove_weather(spec, args.weather):
+        raise SystemExit(f"No weather {args.weather} in spec")
+    for ability in spec.get("abilities") or []:
+        keys = ability.get("effects_keys") or {}
+        if str(keys.get("summon_weather")) == str(args.weather):
+            keys.pop("summon_weather")
+            print(f"  cleared summon_weather on {ability.get('id')}")
+    save_spec(spec, path)
+    print(f"Removed weather {args.weather}")
+    return 0
+
+
+def _asset_targets(args: argparse.Namespace) -> list[Path]:
+    from s2_building_maps import resolve_mod as resolve_mod_folder
+    from s2_fix_mod import iter_enabled_mods
+    from s2_paths import core2_dir, mods_dir
+
+    if args.mods:
+        return [core2_dir() if m == "core_2" else resolve_mod_folder(m) for m in args.mods]
+    if getattr(args, "installed", False):
+        return [p for p in sorted(mods_dir().iterdir()) if p.is_dir() and p.name != "core_2" and (p / "mod.json").is_file()]
+    return iter_enabled_mods()
+
+
+def cmd_check_assets(args: argparse.Namespace) -> int:
+    from s2_asset_check import check_mod_assets
+
+    errors = 0
+    for folder in _asset_targets(args):
+        issues = [i for i in check_mod_assets(folder) if args.verbose or i.level != "info"]
+        print(f"== {folder.name}: {len(issues)} issue(s)")
+        for issue in issues[: args.limit]:
+            print(f"  [{issue.level}] {issue.file}: {issue.message}")
+        if len(issues) > args.limit:
+            print(f"  ... {len(issues) - args.limit} more (--limit)")
+        errors += sum(1 for i in issues if i.level == "error")
+    return 1 if errors else 0
+
+
+def cmd_list_sheets(args: argparse.Namespace) -> int:
+    from s2_asset_check import effective_sheets
+    from s2_building_maps import resolve_mod as resolve_mod_folder
+    from s2_paths import core2_dir
+
+    folder = core2_dir() if args.mod in (None, "core_2") else resolve_mod_folder(args.mod)
+    sheets = effective_sheets(folder)
+    for name in sorted(sheets):
+        s = sheets[name]
+        if args.own and s.source == "core_2":
+            continue
+        if args.search and args.search.lower() not in name.lower():
+            continue
+        px = s.cell_px
+        cell = f"{px[0]:g}x{px[1]:g}px" if px else "png?"
+        print(f"{name:32} {s.cols:>3}x{s.rows:<4} {s.cells:>5} cells  cell {cell:<12} from {s.source}: {s.file}")
+    return 0
+
+
+def cmd_show_cells(args: argparse.Namespace) -> int:
+    from s2_asset_check import effective_sheets, render_cells
+    from s2_building_maps import resolve_mod as resolve_mod_folder
+    from s2_paths import core2_dir, output_root
+
+    folder = core2_dir() if args.mod in (None, "core_2") else resolve_mod_folder(args.mod)
+    sheet = effective_sheets(folder).get(args.sheet)
+    if sheet is None or not sheet.path.is_file():
+        raise SystemExit(f"No usable sheet {args.sheet!r} for {folder.name} (see list-sheets)")
+    indexes: list[int] = []
+    for part in str(args.index).split(","):
+        part = part.strip()
+        if "-" in part[1:]:
+            lo, hi = part.split("-", 1)
+            indexes.extend(range(int(lo), int(hi) + 1))
+        elif part:
+            indexes.append(int(part))
+    out = Path(args.out) if args.out else output_root() / "_asset_preview" / f"{folder.name}_{args.sheet}_{indexes[0]}-{indexes[-1]}.png"
+    render_cells(sheet, indexes[:256], out, scale=args.scale)
+    print(f"{sheet.source}'s {sheet.name}: {sheet.cells} cells; wrote {out}")
+    return 0
+
+
+def cmd_list_sounds(args: argparse.Namespace) -> int:
+    from s2_sounds import search_sounds
+
+    if args.id or args.spec:
+        spec, _ = _load(args)
+        rows = (((spec.get("assets") or {}).get("sounds") or {}).get("combat")) or []
+        for row in rows:
+            print(f"{row.get('id')}: {row.get('name')} -> {row.get('file')}")
+        bound = [(a.get("id"), a["sound"]) for a in spec.get("animations") or [] if isinstance(a.get("sound"), dict)]
+        for aid, snd in bound:
+            print(f"  animation {aid} plays {snd.get('id')} @ {snd.get('volume')}")
+        print(f"{len(rows)} custom combat sound(s) in spec")
+        return 0
+    rows = search_sounds(args.search or "", limit=args.limit)
+    for row in rows:
+        flag = "" if row["exists"] else "  [file missing]"
+        print(f"{row['source']:28} {str(row.get('id')):>24}  {str(row.get('name')):<28} {row.get('file')}{flag}")
+    print(f"{len(rows)} combat sound(s)")
+    return 0
+
+
+def cmd_add_sound(args: argparse.Namespace) -> int:
+    from s2_sounds import add_combat_sound, bind_animation_sound
+
+    spec, path = _load(args)
+    try:
+        row = add_combat_sound(spec, Path(args.file), name=args.name, sound_id=args.sound_id, staging=staging_dir(spec))
+        if args.bind_animation:
+            bind_animation_sound(spec, args.bind_animation, row["id"], args.volume)
+    except (ValueError, KeyError) as exc:
+        raise SystemExit(str(exc)) from exc
+    save_spec(spec, path)
+    print(json.dumps(row, indent=2))
+    if args.bind_animation:
+        print(f"animation {args.bind_animation} now plays {row['id']} at volume {args.volume}")
+    print("Note: mod combat sounds are read by the game's assets.json loader but no shipped mod uses them yet; test in game.")
+    return 0
+
+
+def cmd_audit_mods(args: argparse.Namespace) -> int:
+    from s2_building_maps import resolve_mod as resolve_mod_folder
+    from s2_fix_mod import iter_enabled_mods
+    from s2_mod_audit import audit
+    from s2_paths import mods_dir
+
+    if args.mods:
+        targets = [resolve_mod_folder(m) for m in args.mods]
+    elif args.installed:
+        targets = [p for p in sorted(mods_dir().iterdir()) if p.is_dir() and p.name != "core_2" and (p / "mod.json").is_file()]
+    else:
+        targets = iter_enabled_mods()
+    # Named mods are still resolved against everything enabled, so cross-mod references count.
+    result = audit(targets, universe_extra=iter_enabled_mods() if args.mods else ())
+    levels = {"error": 0, "warn": 1, "info": 2}
+    shown = [i for i in result["issues"] if args.verbose or i.level != "info"]
+    shown.sort(key=lambda i: (i.mod, levels.get(i.level, 3), i.file))
+    if args.json:
+        print(json.dumps([i.__dict__ for i in shown], indent=2))
+    else:
+        current = None
+        for issue in shown:
+            if issue.mod != current:
+                current = issue.mod
+                print(f"== {current}")
+            print(f"  [{issue.level}] {issue.file}: {issue.message}")
+        counts = {lvl: sum(1 for i in result["issues"] if i.level == lvl) for lvl in levels}
+        hidden = "" if args.verbose else " (info hidden; --verbose shows core_2 overrides)"
+        print(f"\nAudited {len(result['mods'])} mod(s): {counts['error']} error(s), {counts['warn']} warning(s), {counts['info']} info{hidden}")
+    return 1 if any(i.level == "error" for i in result["issues"]) else 0
+
+
+def cmd_game_log(args: argparse.Namespace) -> int:
+    from s2_mod_audit import errors_log_path, explain_log_line, read_game_log
+
+    path = Path(args.file) if args.file else errors_log_path()
+    if not path.is_file():
+        raise SystemExit(f"No log at {path} (launch the game once)")
+    passes = read_game_log(path)
+    print(f"{path}  ({len(passes)} load pass(es))")
+    for i, p in enumerate(passes, 1):
+        mods = ", ".join(p["mods"]) or "(none listed)"
+        tag = "  [boot pass: core_2 only, missing-building lines expected]" if p["boot_noise"] else ""
+        print(f"\n-- pass {i} at {p['start']}: {len(p['mods'])} mod(s){tag}")
+        if args.mods:
+            print(f"   mods: {mods}")
+        if p["boot_noise"] and not args.all:
+            noise = sum(n for msg, n in p["messages"].items() if "Unable to find building of id" in msg)
+            rest = {m: n for m, n in p["messages"].items() if "Unable to find building of id" not in m}
+            print(f"   {noise} 'Unable to find building' line(s) hidden (--all to show)")
+            messages = rest
+        else:
+            messages = p["messages"]
+        for msg, n in sorted(messages.items(), key=lambda kv: -kv[1]):
+            why = explain_log_line(msg)
+            print(f"   {n:>4}x {msg}" + (f"\n         -> {why}" if why else ""))
+    return 0
+
+
 def _fix_targets(args: argparse.Namespace) -> list[Path]:
     names = list(args.mods or [])
     if getattr(args, "installed", False):
@@ -2488,7 +2831,7 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("--mod")
     n.add_argument("--output", "-o")
     n.add_argument("--no-prefix", action="store_true", help="Do not prepend the author slug (arendeth_). Vanilla is core_2_*; custom skills should keep the prefix.")
-    n.add_argument("--level-start", type=int, help="Optional skills.json starting level (patch)")
+    n.add_argument("--start-level", "--level-start", dest="start_level", type=int, help="Optional skills.json start_level (crafting skills in core_2 use 1)")
     n.add_argument("--no-combat", action="store_true", help="Crafting/utility skill: no combat_skill, no level-30 mastery")
     n.add_argument("--no-mastery", action="store_true", help="Combat skill without the Skill Stat Rebalance level-30 +10% all-attributes passive")
     n.add_argument("--difficulty", type=int, help="skills.json difficulty (vanilla Adventuring is 0)")
@@ -2508,7 +2851,7 @@ def build_parser() -> argparse.ArgumentParser:
     ss.add_argument("--combat", action="store_true")
     ss.add_argument("--no-combat", action="store_true")
     ss.add_argument("--difficulty", type=int)
-    ss.add_argument("--level-start", type=int)
+    ss.add_argument("--start-level", "--level-start", dest="start_level", type=int)
     ss.add_argument("--description")
     ss.add_argument("--name", help="In-game skill name (skills.json)")
     ss.add_argument("--mod-name", help="mod.json display name (defaults to --name)")
@@ -3271,6 +3614,125 @@ def build_parser() -> argparse.ArgumentParser:
     cbm.add_argument("--dest", help="Destination building_maps folder")
     cbm.add_argument("--name", help="Destination filename")
     cbm.set_defaults(func=cmd_copy_building_map)
+
+    chm = sub.add_parser(
+        "check-building-maps",
+        help="Check .smap headers link to real buildings and use unique map ids (default: every installed mod with maps)",
+    )
+    chm.add_argument("mods", nargs="*", help="Mod folder name under data/mods, or a path")
+    chm.add_argument("--verbose", action="store_true", help="Also show filename-convention notes")
+    chm.set_defaults(func=cmd_check_building_maps)
+
+    rlm = sub.add_parser(
+        "relink-building-maps",
+        help="Give each .smap a unique map id, the right building id, and the vanilla <mapid>_<building>.smap name",
+    )
+    rlm.add_argument("mods", nargs="+", help="Mod folder name under data/mods, or a path")
+    rlm.add_argument("--only", help="Just this .smap filename")
+    rlm.add_argument("--apply", action="store_true", help="Write changes (default is a dry run); backs up originals")
+    rlm.set_defaults(func=cmd_relink_building_maps)
+
+    lbm = sub.add_parser("link-building-map", help="Point an existing .smap at a building id and place it in a mod")
+    lbm.add_argument("--mod", required=True, help="Mod folder name under data/mods, or a path")
+    lbm.add_argument("--map", required=True, help="Existing .smap (any mod, core_2, or the in-game editor export)")
+    lbm.add_argument("--building", required=True, help="buildings/*.json id to link to")
+    lbm.add_argument("--map-id", help="Unique map id (default <building>_1, bumped if taken)")
+    lbm.add_argument("--name", help="Map display name (default: the building name)")
+    lbm.add_argument("--apply", action="store_true", help="Write (default is a dry run)")
+    lbm.set_defaults(func=cmd_link_building_map)
+
+    am = sub.add_parser(
+        "audit-mods",
+        help="Check enabled mods together: duplicate ids, broken references, wrong file shapes (read-only)",
+    )
+    am.add_argument("mods", nargs="*", help="Mod folder names/paths (default: mods enabled in user_settings.json)")
+    am.add_argument("--installed", action="store_true", help="Every mod folder under data/mods instead of the enabled list")
+    am.add_argument("--verbose", action="store_true", help="Also list core_2 rows a mod replaces")
+    am.add_argument("--json", action="store_true")
+    am.set_defaults(func=cmd_audit_mods)
+
+    gl = sub.add_parser("game-log", help="Summarise logs/errors.log by load pass; hides the core_2-only boot pass noise")
+    gl.add_argument("--file", help="Another errors.log")
+    gl.add_argument("--all", action="store_true", help="Show boot-pass 'Unable to find building' lines too")
+    gl.add_argument("--mods", action="store_true", help="List the mods each pass loaded")
+    gl.set_defaults(func=cmd_game_log)
+
+    ca = sub.add_parser("check-assets", help="Check assets.json sheets (files, PNG grid) and every image/glyph index against the sheet it really uses")
+    ca.add_argument("mods", nargs="*", help="Mod names/paths or core_2 (default: enabled mods)")
+    ca.add_argument("--installed", action="store_true")
+    ca.add_argument("--verbose", action="store_true", help="Also show sheets that replace a bigger core_2 sheet")
+    ca.add_argument("--limit", type=int, default=40, help="Max issues printed per mod")
+    ca.set_defaults(func=cmd_check_assets)
+
+    ls = sub.add_parser("list-sheets", help="Tilesheets a mod's content draws from (its own, else core_2) with cell counts")
+    ls.add_argument("--mod", help="Mod name/path (default core_2)")
+    ls.add_argument("--own", action="store_true", help="Only sheets the mod defines")
+    ls.add_argument("--search")
+    ls.set_defaults(func=cmd_list_sheets)
+
+    sc = sub.add_parser("show-cells", help="Render tilesheet cells to a labelled PNG (index 0 = bottom-left)")
+    sc.add_argument("--mod", help="Mod name/path (default core_2)")
+    sc.add_argument("--sheet", required=True, help="abilities, glyph32, items, passive_skills, ...")
+    sc.add_argument("--index", required=True, help="e.g. 12 or 0-15 or 3,7,40")
+    sc.add_argument("--scale", type=int, default=4)
+    sc.add_argument("--out", help="PNG path (default Output/Soulash2/_asset_preview/)")
+    sc.set_defaults(func=cmd_show_cells)
+
+    lsd = sub.add_parser("list-sounds", help="Search combat sounds (core_2 / installed / Workshop), or list a spec's custom sounds")
+    spec_args(lsd)
+    lsd.add_argument("--search")
+    lsd.add_argument("--limit", type=int, default=60)
+    lsd.set_defaults(func=cmd_list_sounds)
+
+    asd = sub.add_parser("add-sound", help="Add an .ogg as a custom combat sound (assets.json sounds.combat), optionally bind to an animation")
+    spec_args(asd)
+    asd.add_argument("--file", required=True, help="Ogg Vorbis (.ogg) file; copied to assets/sfx/ in the mod")
+    asd.add_argument("--name", required=True)
+    asd.add_argument("--sound-id", help="Default <skill_id>_<name>")
+    asd.add_argument("--bind-animation", help="Animation id in this spec that should play it")
+    asd.add_argument("--volume", type=int, default=100)
+    asd.set_defaults(func=cmd_add_sound)
+
+    lw = sub.add_parser("list-weather", help="Search weather.json in core_2/installed/workshop, or list a spec's weather (+checks)")
+    spec_args(lw)
+    lw.add_argument("--search", help="Text in id/name/animation/biome/source ('' lists all)")
+    lw.add_argument("--limit", type=int, default=60)
+    lw.add_argument("--json", action="store_true")
+    lw.set_defaults(func=cmd_list_weather)
+
+    dw = sub.add_parser("dump-weather", help="Print one weather entry (vanilla, installed or workshop) by id or name")
+    dw.add_argument("weather_id")
+    dw.set_defaults(func=cmd_dump_weather)
+
+    aw = sub.add_parser("add-weather", help="Create/replace a weather event in the spec (write emits weather.json)")
+    spec_args(aw)
+    aw.add_argument("--name", required=True)
+    aw.add_argument("--weather-id", help="Default <skill_id>_<name>; vanilla ids 1-17 replace vanilla weather")
+    aw.add_argument("--clone", help="Start from an existing weather id/name (e.g. 7 or 'Heavy rain')")
+    aw.add_argument("--animation", help="Animation id: vanilla (113 rain, 182 snow, core_2_Heavy_Rain) or this mod's")
+    aw.add_argument("--message", help="trigger_message shown when it starts")
+    aw.add_argument("--ability", action="append", help="Ability applied while it lasts (repeatable; vanilla Wet = 88, 89)")
+    aw.add_argument("--biome", action="append", help="Biome where it can roll (repeatable): grasslands, forest, swamps, tundra, ...")
+    aw.add_argument("--no-biomes", action="store_true", help="biomes [] : only starts from summon_weather or the console")
+    aw.add_argument("--duration", type=float)
+    aw.add_argument("--trigger-every", type=float)
+    aw.add_argument("--chance", type=float, help="trigger_chance 0-1")
+    aw.add_argument("--animation-tick", type=float)
+    aw.add_argument("--ability-trigger-time", type=float)
+    roof = aw.add_mutually_exclusive_group()
+    roof.add_argument("--roof", action="store_true", help="disabled_under_roof true (default for rain)")
+    roof.add_argument("--ignore-roof", action="store_true", help="disabled_under_roof false: hits under roofs too (Blood Moon, Heatwave)")
+    aw.add_argument("--change", action="append", help="change_entities_on_start from=to[,to2] (repeatable), e.g. core_2_Dried_Mud=974")
+    aw.add_argument("--force-night", action="store_true", help="Night while active (Blood Moon)")
+    aw.add_argument("--thirst-multiplier", type=float, help="Thirst rate multiplier (Heatwave 4.0)")
+    aw.add_argument("--stop-on-map-exit", action="store_true", help="exe-only field, untested in vanilla")
+    aw.add_argument("--summon-ability", help="Set effects_keys.summon_weather on this spec ability")
+    aw.set_defaults(func=cmd_add_weather)
+
+    rw = sub.add_parser("remove-weather", help="Delete a weather event (and clear summon_weather links to it)")
+    spec_args(rw)
+    rw.add_argument("--weather", required=True)
+    rw.set_defaults(func=cmd_remove_weather)
 
     fb = sub.add_parser(
         "fix-buildings",
