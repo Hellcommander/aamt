@@ -1,6 +1,6 @@
 # Soulash 2 skill effect catalog
 
-Generated 2026-10-22T10:12:53.679506+00:00
+Generated 2026-10-24T03:27:27.015568+00:00
 
 Sources: official `data/docs/index.html`, vanilla `core_2`, Steam Workshop skill mods, `Soulash 2.exe` strings, `catalog/patch_overlay.json`.
 Hydromancy is excluded. EXE-only ids are `unconfirmed`. Patch overlay ids are `patch` (dropdown-valid).
