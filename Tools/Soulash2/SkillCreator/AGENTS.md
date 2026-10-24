@@ -24,7 +24,7 @@ Icons/sprites prefer Shared SD3.5 (`D:\games\Ai assisted toolkit\Tools\Shared\AG
 - Stackers live in `ability_stackers.json`. They are **not** milestone rewards. Abilities apply them via `effects_keys.stacker` + `effects.stacker_count`. Amplifiers can apply them with `bonuses: [{effect: stacker, value: "<id>", secondary_value: 1}]`.
 - **Never emit `control_action` as a skill milestone reward.** Engine ignores those. Tame-style control actions belong on `character.json` (`add-control-action`).
 - Passive `description` is ignored in-game. Tooltip comes from effects only.
-- Always `validate` then `write`. Stop on errors. Observed-count warnings (beyond highest seen in vanilla/workshop) are not blockers. Encoding warnings (knockback as a float, `stamina_cost` as an amplifier bonus, `heal`+`damage` instead of `damage_as_life`, `summon_count` above 24, passive `movement_speed` instead of `move_speed`) are the mistakes this tool made on the Hydromancy rebuild — fix them.
+- Always `validate` then `write`. Stop on errors. Observed-count `INFO` lines (beyond highest seen in vanilla/workshop) are not limits and need no change. Encoding warnings (knockback as a float, `stamina_cost` as an amplifier bonus, `heal`+`damage` instead of `damage_as_life`, `summon_count` above 24, passive `movement_speed` instead of `move_speed`) are the mistakes this tool made on the Hydromancy rebuild — fix them.
 - **Do not run `install` unless the human asked.** It requires `--yes`.
 
 ## Three effect encodings (do not mix)
@@ -166,13 +166,13 @@ Follow Geomancy, not vanilla numeric ability files.
 
 | Slot | Typical | Highest seen |
 |---|---|---|
-| Ability `effects` + `effects_keys` | 8 | 8 (F2 editor wipes past this; JSON may still load) |
+| Ability `effects` + `effects_keys` | 8 | 16+ (not a cap: abilities with more than 16 work in game; only the F2 editor may drop extras past 8 on re-save) |
 | Amplifier `bonuses[]` | 2 | 3 workshop JSON |
 | Passive `effects[]` | 3 | 6 workshop JSON |
 | Ability amplifier slots (all colors) | 4 | higher exists in test JSON |
 | Stacker `effects[]` | 2 | 2 |
 
-True engine limits have **not** been found; the game does not publish caps. Docs say “as many as you want.” Table numbers are **observed** in vanilla, workshop JSON, and the F2 editor. The in-game editor may wipe or fail to show extra rows past those counts; JSON written by this CLI can still work. This tool does not cap you. Validate warns only when a count exceeds the highest observed.
+True engine limits have **not** been found; the game does not publish caps. Docs say “as many as you want.” Table numbers are **observed** in vanilla, workshop JSON, and the F2 editor. The in-game editor may wipe or fail to show extra rows past those counts; JSON written by this CLI can still work. **These are not limits — do not trim abilities, amplifiers or passives to fit them.** Validate prints an `INFO` line (not a warning) when a count exceeds the highest observed; no change is needed.
 
 ## Confirmed working (Warlock NOTES + workshop)
 

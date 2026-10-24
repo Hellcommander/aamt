@@ -698,7 +698,7 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
         n_fx = (len(effects) if isinstance(effects, dict) else 0) + (len(keys) if isinstance(keys, dict) else 0)
         note = observed_count_warning("ability_effects", n_fx)
         if note:
-            issues.append(Issue("warn", note, ab.get("id") or ""))
+            issues.append(Issue("info", note, ab.get("id") or ""))
         slot_total = 0
         for color, n in (ab.get("slots") or {}).items():
             if color in slot_colors:
@@ -706,7 +706,7 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
                 slot_total += int(n or 0)
         note = observed_count_warning("ability_slots_total", slot_total)
         if note:
-            issues.append(Issue("warn", note, ab.get("id") or ""))
+            issues.append(Issue("info", note, ab.get("id") or ""))
 
     amp_colors = {"offensive": 0, "defensive": 0, "utility": 0}
     for amp in spec.get("amplifiers") or []:
@@ -719,7 +719,7 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
         n_bonus = len(bonuses)
         note = observed_count_warning("amplifier_bonuses", n_bonus)
         if note:
-            issues.append(Issue("warn", note, amp.get("id") or ""))
+            issues.append(Issue("info", note, amp.get("id") or ""))
         for fx in bonuses:
             eid = fx.get("effect")
             row = catalog.get(("amplifier", eid)) or catalog.get(("ability", eid)) if eid else None
@@ -737,7 +737,7 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
         n_pass = len(fx_list)
         note = observed_count_warning("passive_effects", n_pass)
         if note:
-            issues.append(Issue("warn", note, p.get("id") or ""))
+            issues.append(Issue("info", note, p.get("id") or ""))
         if p.get("description"):
             issues.append(
                 Issue(
@@ -898,7 +898,7 @@ def validate_spec(spec: Dict[str, Any]) -> List[Issue]:
         fx_list = s.get("effects") or []
         note = observed_count_warning("stacker_effects", len(fx_list))
         if note:
-            issues.append(Issue("warn", note, s.get("id") or ""))
+            issues.append(Issue("info", note, s.get("id") or ""))
         for fx in fx_list:
             eid = fx.get("effect")
             if not eid:

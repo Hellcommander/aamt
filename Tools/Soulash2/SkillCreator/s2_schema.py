@@ -312,9 +312,10 @@ def _is_dropdown_valid(row: Dict[str, Any]) -> bool:
 OBSERVED_LIMITS = {
     "ability_effects": {
         "normal": 8,
-        "seen": 8,
+        # Arendeth's own skills ship abilities with more than 16 effects that work in game (2026-10-23).
+        "seen": 16,
         "label": "ability effects + effects_keys",
-        "note": "F2 editor wipes past 8. Hand-written JSON may still load.",
+        "note": "Not an engine cap. Abilities with more than 16 effects are confirmed working in game; only the F2 editor may drop rows past 8 when re-saving.",
     },
     "amplifier_bonuses": {
         "normal": 2,
@@ -362,20 +363,20 @@ def observed_count_warning(key: str, count: int) -> Optional[str]:
     label = str(meta.get("label") or key)
     return (
         f"{count} {label} (vanilla typically {typical}; highest observed {seen}). "
-        "The F2 editor may wipe extra rows; JSON authored here can still work. "
-        "The game does not publish an engine cap."
+        "Not a limit: the engine has no known cap and this JSON loads. "
+        "Only the in-game F2 editor may drop extra rows if you re-save there. No change needed."
     )
 
 
 VALID_WHERE = {
     "ability": {
         "place": "Ability",
-        "how": "Numeric/status fields on the ability `effects` object. One key per type. Vanilla/F2 typically 8 effects+keys together; the F2 editor may wipe past that, JSON can still load.",
+        "how": "Numeric/status fields on the ability `effects` object. One key per type. Vanilla typically uses up to 8 effects+keys; that is not a cap — more load fine (only the F2 editor may drop extras on re-save).",
         "path": "effects.{id}",
     },
     "ability_key": {
         "place": "Ability (entity / ability ref)",
-        "how": "String ids on `effects_keys` (summon, construct, stacker, sense, aura, transform, cage, …). Counts toward the ability effect total (vanilla/F2 typically 8).",
+        "how": "String ids on `effects_keys` (summon, construct, stacker, sense, aura, transform, cage, …). Counts toward the ability effect total (vanilla typically up to 8; not a cap).",
         "path": "effects_keys.{id}",
     },
     "amplifier": {

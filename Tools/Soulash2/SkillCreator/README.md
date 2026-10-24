@@ -221,7 +221,7 @@ Passive effects carry the game's own tooltip from `core_2/messages.json` → `pa
 
 `explain bleed` (and the studio **Effect info** rail) show what an effect does and where it is valid: ability `effects`, ability `effects_keys`, amplifier `bonuses`, amplifier top-level fields, passives, or stackers. Click a catalog row or change an Add-tab dropdown to fill the box.
 
-Observed counts (vanilla typical / highest seen): **8** ability effects+keys, **2** / **3** amplifier bonuses, **3** / **6** passive effects, **4** amplifier slots on an ability (higher in test JSON), **2** stacker per-stack bonuses. The F2 editor may wipe extra rows past those counts; JSON authored here can still work. The game does not publish engine caps. Validate warns only when you go past the highest observed. The studio does not block you.
+Observed counts (vanilla typical / highest seen): **8** / **16+** ability effects+keys (more than 16 confirmed working in game), **2** / **3** amplifier bonuses, **3** / **6** passive effects, **4** amplifier slots on an ability (higher in test JSON), **2** stacker per-stack bonuses. The F2 editor may wipe extra rows past those counts; JSON authored here can still work. The game does not publish engine caps. These are **not limits**: validate prints an `INFO` note (not a warning) past the highest observed, and nothing needs trimming. The studio does not block you.
 
 ## Skill path planner
 
