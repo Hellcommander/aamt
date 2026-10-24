@@ -8,12 +8,14 @@ condition Stable Audio 3 on those references or fall back to a library mix.
   python audio_pipeline.py ingest --fast
   python audio_pipeline.py search --query "crunchy sci-fi UI click"
   python audio_pipeline.py generate --prompt "short plasma vent burst" --out vent.wav --archetype laser
+  python audio_pipeline.py check "path\\to\\mod\\Sound"
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -34,6 +36,8 @@ if str(_SHARED) not in sys.path:
     sys.path.insert(0, str(_SHARED))
 
 from audio_asset_library import (  # noqa: E402
+    NOISE_ALCHEMY_CREDIT,
+    OWN_DIR,
     AudioLibrary,
     RetrievalHit,
     blend_waveforms,
@@ -44,7 +48,13 @@ DEFAULT_NEGATIVE = (
     "music, singing, speech, lyrics, low quality, muffled, distortion, silence, hiss"
 )
 
-# Pack ToS: use library clips as DNA (mix/transform). Do not ship raw/near copies.
+# Pack ToS: "reference" tier packs (Noise Alchemy incl. its Dark Fantasy Studio packs, unknown)
+# are DNA only — unique SA3 mode. "direct" tier packs (Function Loops bt25, Tao &
+# Sound bundle) may also go through close-copy. No tier ships an original: every
+# output is altered until its source_corr against each raw reference clip is
+# under UNIQUE_MAX_CORR, so a pack file cannot be recovered from a mod.
+# "own" tier clips (D:\assets\audio\made, filled by --keep) are ours: they ship
+# and are reused as-is, and never count toward source_corr.
 # Unique mode blends several refs, mutates that mix, then SA3 with high init noise;
 # copy_corr is the "altered enough" bar (must stay under the cap after retries).
 UNIQUE_STRENGTH_CAP = 0.28
@@ -55,6 +65,10 @@ UNIQUE_CORR_RETRIES = 3
 UNIQUE_NOISE_BUMP = 0.18
 # How hard unique mode mutates the reference mix *before* SA3 sees it (0–1).
 UNIQUE_DNA_MUTATE = float(os.environ.get("AAMT_AUDIO_DNA_MUTATE", "0.72"))
+# Escalating DSP alteration for close-copy / blend output (stops once distinct).
+ADJUST_AMOUNTS = (0.45, 0.65, 0.85)
+# Formats `check` can read (soundfile); Bethesda .xwm/.fuz must be decoded first.
+CHECK_EXTS = {".wav", ".ogg", ".flac", ".mp3", ".aif", ".aiff"}
 
 
 def _env_flag(name: str, default: str = "1") -> bool:
@@ -107,6 +121,12 @@ def backfill_clap(
     return lib.backfill_clap(resume=resume, save_every=save_every)
 
 
+def rebuild_tags(*, src: Optional[Path] = None) -> Dict[str, Any]:
+    lib = _lib(src)
+    print(f"[audio] rebuild tag vectors {lib.index_dir}")
+    return lib.rebuild_tags()
+
+
 def search(
     query: str = "",
     *,
@@ -115,15 +135,16 @@ def search(
     archetype: str = "",
     tags: Optional[Sequence[str]] = None,
     library: Optional[Path] = None,
+    license: str = "",
 ) -> List[RetrievalHit]:
     lib = _lib(library)
     lib.load()
     if audio:
         wav, sr = _read_wav(Path(audio))
-        return lib.search_audio(wav, sr, k=k, archetype=archetype)
+        return lib.search_audio(wav, sr, k=k, archetype=archetype, license=license)
     if not query:
         raise ValueError("search needs --query or --audio")
-    return lib.search_text(query, k=k, archetype=archetype, tags=tags)
+    return lib.search_text(query, k=k, archetype=archetype, tags=tags, license=license)
 
 
 def generate_audio(
@@ -142,6 +163,8 @@ def generate_audio(
     library: Optional[Path] = None,
     engine: str = "auto",
     unique: Optional[bool] = None,
+    direct_only: bool = False,
+    keep: bool = False,
 ) -> Path:
     """Retrieve library DNA, generate a new clip, write WAV.
 
@@ -149,6 +172,9 @@ def generate_audio(
     unique (default on) caps strength, mixes several refs, skips filename
     style prompts and envelope matching, and refuses a library-mix fallback
     so shipped clips are not raw or near copies of D:\\assets\\audio packs.
+    direct_only restricts references to "direct" and "own" tier clips, which
+    makes close-copy (unique=False) output shippable. keep copies shippable
+    output into D:\\assets\\audio\\made as a reusable own-tier clip.
     """
     if unique is None:
         unique = _env_flag("AAMT_AUDIO_UNIQUE", "1")
@@ -165,19 +191,20 @@ def generate_audio(
     init_audio = None
     used_ids: List[str] = []
     lib = _lib(library)
+    lic = ("direct", "own") if direct_only else ""
     if not no_refs:
         lib.load()
         if example:
             wav, sr = _read_wav(Path(example))
-            hits = lib.search_audio(wav, sr, k=k, archetype=archetype)
+            hits = lib.search_audio(wav, sr, k=k, archetype=archetype, license=lic)
         elif lib.records:
-            hits = lib.search_text(prompt, k=k, archetype=archetype, tags=tags)
+            hits = lib.search_text(prompt, k=k, archetype=archetype, tags=tags, license=lic)
             # Unique mode must use pack DNA. Archetype/tag filters can wipe the
             # index; widen the search rather than falling through to text-only.
             if unique and not hits:
-                hits = lib.search_text(prompt, k=k, archetype=archetype)
+                hits = lib.search_text(prompt, k=k, archetype=archetype, license=lic)
             if unique and not hits:
-                hits = lib.search_text(prompt, k=k)
+                hits = lib.search_text(prompt, k=k, license=lic)
         if unique and not no_refs and not hits:
             raise RuntimeError(
                 "unique mode needs pack DNA hits (ToS: modify/mix/transform); "
@@ -290,8 +317,30 @@ def generate_audio(
     else:
         ref = init_audio[1] if init_audio else None
         arr = _postprocess(arr, reference=ref)
+    source_corr = 0.0
+    if hits:
+        refs = [h.record for h in hits]
+        if unique:
+            source_corr = _source_corr(lib, refs, arr, sr)
+        else:
+            arr, source_corr = _adjust_until_distinct(
+                lib,
+                refs,
+                arr,
+                sr,
+                seed=seed if seed is not None else abs(hash(conditioned)) % (2**31),
+            )
     _write_wav(output, arr, sr)
 
+    reference_tier = any(h.record.license_tier() == "reference" for h in hits)
+    shippable = source_corr <= UNIQUE_MAX_CORR and (bool(unique) or not reference_tier)
+    if not shippable:
+        why = (
+            "close-copy of reference-tier packs; use unique mode or --direct-only"
+            if reference_tier and not unique
+            else f"source-corr {source_corr:.3f} > {UNIQUE_MAX_CORR:.2f}"
+        )
+        print(f"[audio] WARNING: not shippable ({why}) — do not add it to a mod")
     meta = {
         "prompt": prompt,
         "conditioned_prompt": conditioned,
@@ -301,7 +350,10 @@ def generate_audio(
         "engine": engine_used,
         "unique": bool(unique),
         "copy_corr": copy_corr,
+        "source_corr": source_corr,
         "archetype": archetype,
+        "shippable": shippable,
+        "attribution": _attribution(lib, [h.record for h in hits]),
         "references": [
             {
                 "id": h.record.id,
@@ -309,6 +361,7 @@ def generate_audio(
                 "via": h.via,
                 "pack": h.record.pack,
                 "inner": h.record.inner,
+                "license": h.record.license_tier(),
                 "tags": h.record.tags,
                 "archetypes": h.record.archetypes,
             }
@@ -320,6 +373,8 @@ def generate_audio(
     }
     output.with_suffix(".meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
     print(f"[audio] wrote {output} ({engine_used}, {duration:.2f}s)")
+    if keep:
+        _keep(lib, output, meta)
     return output
 
 
@@ -331,6 +386,7 @@ def blend_assets(
     alpha: float = 0.5,
     library: Optional[Path] = None,
     duration: float = 0.0,
+    keep: bool = False,
 ) -> Path:
     lib = _lib(library)
     lib.load()
@@ -344,10 +400,140 @@ def blend_assets(
     if duration > 0:
         mixed = _fit_duration(mixed, sr, duration)
     mixed = _postprocess(mixed)
+    mixed, source_corr = _adjust_until_distinct(
+        lib, [rec_a, rec_b], mixed, sr, seed=int(id_a[:8], 16) ^ int(id_b[:8], 16)
+    )
     output = Path(output)
     _write_wav(output, mixed, sr)
     print(f"[audio] blend {rec_a.label()} × {rec_b.label()} α={alpha} → {output}")
+    reference_tier = "reference" in (rec_a.license_tier(), rec_b.license_tier())
+    shippable = source_corr <= UNIQUE_MAX_CORR and not reference_tier
+    if reference_tier:
+        print("[audio] WARNING: blend uses reference-tier clips — do not add it to a mod")
+    elif not shippable:
+        print(f"[audio] WARNING: source-corr {source_corr:.3f} still too close — do not add it to a mod")
+    if keep:
+        meta = {
+            "prompt": f"blend {rec_a.name} {rec_b.name}",
+            "archetype": next(iter(rec_a.archetypes or rec_b.archetypes), ""),
+            "alpha": alpha,
+            "source_corr": source_corr,
+            "shippable": shippable,
+            "attribution": _attribution(lib, [rec_a, rec_b]),
+            "references": [{"id": r.id, "pack": r.pack, "inner": r.inner, "license": r.license_tier()} for r in (rec_a, rec_b)],
+            "output": str(output),
+            "sample_rate": sr,
+        }
+        _keep(lib, output, meta)
     return output
+
+
+def _attribution(lib: AudioLibrary, records: Sequence[Any]) -> str:
+    """Credit owed by clips built from `records` (own clips carry theirs in a sidecar meta)."""
+    for rec in records:
+        tier = rec.license_tier()
+        if tier == "reference":
+            return NOISE_ALCHEMY_CREDIT
+        if tier == "own" and rec.source == "file":
+            try:
+                side = json.loads((lib.library / Path(rec.inner).with_suffix(".meta.json")).read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if side.get("attribution"):
+                return str(side["attribution"])
+    return ""
+
+
+def _keep(lib: AudioLibrary, wav: Path, meta: Dict[str, Any]) -> Optional[Path]:
+    """Copy a shippable output into the own tier (made/<archetype>/) and index it."""
+    if not meta.get("shippable"):
+        print("[audio] --keep skipped: output is not shippable")
+        return None
+    dest = lib.library / OWN_DIR / (meta.get("archetype") or "misc") / Path(wav).name
+    if dest.exists():
+        print(f"[audio] --keep skipped: {dest} already exists")
+        return None
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(wav, dest)
+    dest.with_suffix(".meta.json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    rec = lib.add_file(dest)
+    print(f"[audio] kept as own-tier clip {rec.id}: {dest}")
+    return dest
+
+
+def check_files(
+    paths: Sequence[Path],
+    *,
+    library: Optional[Path] = None,
+    k: int = 5,
+) -> List[Dict[str, Any]]:
+    """Flag sound files (e.g. a mod's Sound tree) that are near copies of library clips."""
+    lib = _lib(library)
+    lib.load()
+    files: List[Path] = []
+    for p in map(Path, paths):
+        if p.is_dir():
+            files.extend(sorted(f for f in p.rglob("*") if f.suffix.lower() in CHECK_EXTS))
+        else:
+            files.append(p)
+    rows: List[Dict[str, Any]] = []
+    for f in files:
+        try:
+            wav, sr = _read_wav(f)
+        except Exception as exc:
+            rows.append({"file": str(f), "ok": None, "error": str(exc)})
+            continue
+        hits = lib.search_audio(wav[: int(8.0 * sr)], sr, k=k)
+        best, closest = 0.0, ""
+        for hit in hits:
+            corr = _source_corr(lib, [hit.record], wav, sr)
+            if corr > best:
+                best, closest = corr, hit.record.label()
+        rows.append(
+            {"file": str(f), "ok": best <= UNIQUE_MAX_CORR, "source_corr": round(best, 3), "closest": closest}
+        )
+    return rows
+
+
+def _source_corr(lib: AudioLibrary, records: Sequence[Any], arr: np.ndarray, sr: int) -> float:
+    """Highest copy_corr of `arr` against the raw (unmixed, unmutated) source clips.
+
+    Fails closed: a source that cannot be decoded counts as 1.0 (too close), since
+    it cannot be proven distinct. `pip install av` decodes the library's MP3s.
+    """
+    best = 0.0
+    for rec in records:
+        if rec.license_tier() == "own":
+            continue
+        try:
+            raw, _ = load_asset_audio(rec, lib.library, max_seconds=30.0, sr=sr)
+        except Exception as exc:
+            print(f"  [audio] cannot verify against {rec.label()} (treated as too close): {exc}")
+            return 1.0
+        best = max(best, _copy_corr(arr, raw))
+    return best
+
+
+def _adjust_until_distinct(
+    lib: AudioLibrary,
+    records: Sequence[Any],
+    arr: np.ndarray,
+    sr: int,
+    *,
+    seed: int = 0,
+) -> Tuple[np.ndarray, float]:
+    """Alter a close-copy clip until no raw source clip can be recovered from it."""
+    best_arr, best_corr = arr, float("inf")
+    for amount in ADJUST_AMOUNTS:
+        y = _mutate_reference_dna(arr, sr, amount=amount, seed=seed)
+        y = _postprocess(_unique_post_morph(y, sr, seed=seed), reference=None)
+        corr = _source_corr(lib, records, y, sr)
+        print(f"[audio] adjust amount={amount:.2f} source-corr={corr:.3f}")
+        if corr < best_corr:
+            best_arr, best_corr = y, corr
+        if corr <= UNIQUE_MAX_CORR:
+            break
+    return best_arr, best_corr
 
 
 def _condition_prompt(
@@ -639,12 +825,16 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_clap.add_argument("--no-resume", action="store_true", help="Rebuild CLAP from scratch")
     p_clap.add_argument("--save-every", type=int, default=100)
 
+    p_rt = sub.add_parser("rebuild-tags", help="Re-embed tag vectors after the tag embedder changes")
+    p_rt.add_argument("--src", default="", help="Library root (default: D:\\assets\\audio)")
+
     p_s = sub.add_parser("search", help="Retrieve similar assets")
     p_s.add_argument("--query", "-q", default="")
     p_s.add_argument("--audio", default="", help="Query by example wav")
     p_s.add_argument("--k", type=int, default=8)
     p_s.add_argument("--archetype", default="")
     p_s.add_argument("--tags", default="")
+    p_s.add_argument("--direct-only", action="store_true", help="Only direct + own tier clips")
 
     p_g = sub.add_parser("generate", help="Generate a new clip from library DNA")
     p_g.add_argument("--prompt", "-p", required=True)
@@ -662,8 +852,18 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_g.add_argument(
         "--close-copy",
         action="store_true",
-        help="Opt out of unique mode (do not use for shipped Starfield mods)",
+        help="Opt out of unique mode (only shippable with --direct-only)",
     )
+    p_g.add_argument(
+        "--direct-only",
+        action="store_true",
+        help="Only reference direct + own tier clips (Function Loops bt25, Tao & Sound, made/)",
+    )
+    p_g.add_argument("--keep", action="store_true", help="Save shippable output to made/ as an own-tier clip")
+
+    p_c = sub.add_parser("check", help="Flag sound files that are near copies of library clips")
+    p_c.add_argument("paths", nargs="+", help="Files or folders (e.g. a mod's Sound dir)")
+    p_c.add_argument("--k", type=int, default=5)
 
     p_b = sub.add_parser("blend", help="Mix two catalogued assets")
     p_b.add_argument("--a", required=True, help="Asset id")
@@ -671,6 +871,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     p_b.add_argument("--out", "-o", required=True)
     p_b.add_argument("--alpha", type=float, default=0.5)
     p_b.add_argument("--duration", type=float, default=0.0)
+    p_b.add_argument("--keep", action="store_true", help="Save shippable output to made/ as an own-tier clip")
 
     args = parser.parse_args(argv)
 
@@ -702,6 +903,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(json.dumps(report, indent=2))
         return 0 if report.get("clap") else 1
 
+    if args.cmd == "rebuild-tags":
+        report = rebuild_tags(src=Path(args.src) if args.src else None)
+        print(json.dumps(report, indent=2))
+        return 0 if report.get("rebuilt") else 1
+
     if args.cmd == "search":
         tag_list = [t.strip() for t in args.tags.split(",") if t.strip()]
         hits = search(
@@ -710,6 +916,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             k=args.k,
             archetype=args.archetype,
             tags=tag_list or None,
+            license=("direct", "own") if args.direct_only else "",
         )
         _print_hits(hits)
         return 0 if hits else 1
@@ -730,11 +937,26 @@ def main(argv: Optional[List[str]] = None) -> int:
             example=Path(args.example) if args.example else None,
             engine=args.engine,
             unique=not bool(args.close_copy),
+            direct_only=bool(args.direct_only),
+            keep=bool(args.keep),
         )
         return 0
 
+    if args.cmd == "check":
+        rows = check_files([Path(p) for p in args.paths], k=args.k)
+        for row in rows:
+            if row["ok"] is None:
+                print(f"  skip  {row['file']}: {row['error']}")
+            elif row["ok"]:
+                print(f"  ok    {row['source_corr']:.3f}  {row['file']}")
+            else:
+                print(f"  COPY  {row['source_corr']:.3f}  {row['file']}  <- {row['closest']}")
+        return 0 if all(row["ok"] is not False for row in rows) else 1
+
     if args.cmd == "blend":
-        blend_assets(args.a, args.b, Path(args.out), alpha=args.alpha, duration=args.duration)
+        blend_assets(
+            args.a, args.b, Path(args.out), alpha=args.alpha, duration=args.duration, keep=bool(args.keep)
+        )
         return 0
 
     return 2

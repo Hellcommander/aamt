@@ -16,11 +16,10 @@ import json
 import os
 import re
 import sys
-import tempfile
 import zipfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
@@ -65,6 +64,21 @@ ARCHETYPE_RULES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
     ("water", ("water", "ice", "mud")),
     ("fire", ("fire",)),
 )
+
+# Pack license tiers, from the license files next to the packs in D:\assets\audio:
+#   direct    — royalty-free use inside a game/project (Function Loops bt25 bundle,
+#               via Humble; Tao & Sound $5 bundle: Magic Spells / Inventory / Puzzle
+#               Audio Kit / Buttons). Close-copy allowed, but AAMT still alters every
+#               clip before it ships so no original can be pulled out of a mod.
+#   reference — Noise Alchemy EULA (Dark Fantasy Studio packs are Noise Alchemy's),
+#               and any pack without its own license file: DNA only — never ship raw or slightly modified
+#               clips, and credit NOISE_ALCHEMY_CREDIT once in the project.
+#   own       — audio we made (D:\assets\audio\made, filled by `--keep`): ships and
+#               is reused as-is. Its sidecar .meta.json carries any credit still owed.
+DIRECT_USE_PACKS = ("magicspellssfxbundle", "inventorysfxbundle", "puzzleaudiokit", "buttonssfxlibrary")
+DIRECT_USE_DIRS = ("bt25_ultimatesfxforgames_softwarebundle",)
+OWN_DIR = "made"
+NOISE_ALCHEMY_CREDIT = "Sound effects created with NOISE ALCHEMY – NOISEALCHEMY.COM"
 
 
 def _library_dir() -> Path:
@@ -137,6 +151,19 @@ def infer_tags(pack: str, inner: str) -> List[str]:
     return out[:24]
 
 
+def license_tier(pack: str, inner: str = "") -> str:
+    """'own', 'direct' or 'reference' — see OWN_DIR / DIRECT_USE_PACKS / DIRECT_USE_DIRS."""
+    head = inner.replace("\\", "/").split("/", 1)[0].lower()
+    if head == OWN_DIR:
+        return "own"
+    if head in DIRECT_USE_DIRS:
+        return "direct"
+    stem = Path(pack).stem.lower()
+    if any(stem.startswith(p) for p in DIRECT_USE_PACKS):
+        return "direct"
+    return "reference"
+
+
 def asset_id(pack: str, inner: str) -> str:
     raw = f"{pack}::{inner}".encode("utf-8", errors="replace")
     return hashlib.sha1(raw).hexdigest()[:16]
@@ -159,6 +186,9 @@ class AssetRecord:
 
     def label(self) -> str:
         return f"{self.pack} :: {self.inner}"
+
+    def license_tier(self) -> str:
+        return license_tier(self.pack, self.inner)
 
     def search_text(self) -> str:
         bits = [self.name, _pack_stem(self.pack), " ".join(self.tags), " ".join(self.archetypes)]
@@ -186,21 +216,6 @@ def _is_audio_name(name: str) -> bool:
     if p.name.startswith("."):
         return False
     return p.suffix.lower() in AUDIO_EXTS
-
-
-def _guess_audio_suffix(data: bytes) -> str:
-    head = data[:12]
-    if head.startswith(b"ID3") or head[:2] in (b"\xff\xfb", b"\xff\xf3", b"\xff\xf2"):
-        return ".mp3"
-    if head.startswith(b"OggS"):
-        return ".ogg"
-    if head.startswith(b"fLaC"):
-        return ".flac"
-    if head.startswith(b"RIFF"):
-        return ".wav"
-    if b"ftyp" in head:
-        return ".m4a"
-    return ".bin"
 
 
 def _to_mono_float32(audio: Any) -> np.ndarray:
@@ -241,52 +256,35 @@ def _resample_audio(arr: np.ndarray, in_sr: int, sr: int) -> np.ndarray:
     return np.interp(x_new, x_old, audio).astype(np.float32)
 
 
-def _decode_compressed_file(path: str) -> Tuple[np.ndarray, int]:
-    """Decode MP3/OGG/etc without librosa (avoids numba/numpy pin fights)."""
+def _decode_compressed(data: bytes) -> Tuple[np.ndarray, int]:
+    """Decode MP3/OGG/M4A/etc from memory: PyAV (bundles FFmpeg), then torchcodec
+    (needs a shared FFmpeg on PATH). No librosa/numba — avoids numpy pin fights."""
     errors: List[str] = []
-    try:
-        import torchaudio
-
-        wav, in_sr = torchaudio.load(path)  # (C, T)
-        return _to_mono_float32(wav.detach().cpu().numpy()), int(in_sr)
-    except Exception as exc:
-        errors.append(f"torchaudio: {exc}")
     try:
         import av
 
-        container = av.open(path)
-        try:
-            stream = next(s for s in container.streams if s.type == "audio")
-            chunks: List[np.ndarray] = []
+        with av.open(io.BytesIO(data)) as container:
+            stream = container.streams.audio[0]
             in_sr = int(stream.rate or 0)
+            # Resampler normalizes any sample format/layout to float mono.
+            resampler = av.AudioResampler(format="fltp", layout="mono", rate=in_sr or None)
+            chunks: List[np.ndarray] = []
             for frame in container.decode(stream):
-                arr = frame.to_ndarray()
-                if arr.ndim == 2:
-                    arr = arr.mean(axis=0 if arr.shape[0] <= 8 else 1)
-                chunks.append(np.asarray(arr, dtype=np.float32).reshape(-1))
-                if not in_sr:
-                    in_sr = int(getattr(frame, "sample_rate", 0) or 0)
-            if not chunks or not in_sr:
-                raise RuntimeError("no audio frames")
-            mono = np.concatenate(chunks).astype(np.float32)
-            peak = float(np.max(np.abs(mono))) if mono.size else 0.0
-            # av may return int PCM; normalize later in _decode_bytes
-            if peak > 1.5:
-                mono = (mono / 32768.0).astype(np.float32)
-            return mono, int(in_sr)
-        finally:
-            container.close()
+                chunks.extend(out.to_ndarray().reshape(-1) for out in resampler.resample(frame))
+            chunks.extend(out.to_ndarray().reshape(-1) for out in resampler.resample(None))
+        if not chunks or not in_sr:
+            raise RuntimeError("no audio frames")
+        return np.concatenate(chunks).astype(np.float32), in_sr
     except Exception as exc:
         errors.append(f"av: {exc}")
-    # Last resort — may pull numba via librosa
     try:
-        import librosa
+        from torchcodec.decoders import AudioDecoder
 
-        audio, in_sr = librosa.load(path, sr=None, mono=False)
-        return _to_mono_float32(audio), int(in_sr)
+        samples = AudioDecoder(data).get_all_samples()  # (C, T) float32
+        return _to_mono_float32(samples.data.numpy()), int(samples.sample_rate)
     except Exception as exc:
-        errors.append(f"librosa: {exc}")
-    raise RuntimeError("; ".join(errors) or "no decoder available")
+        errors.append(f"torchcodec: {exc}")
+    raise RuntimeError("; ".join(errors))
 
 
 def _decode_bytes(data: bytes, *, max_seconds: float = EMBED_SECONDS, sr: int = EMBED_SR) -> Tuple[np.ndarray, int]:
@@ -301,20 +299,10 @@ def _decode_bytes(data: bytes, *, max_seconds: float = EMBED_SECONDS, sr: int = 
     except Exception:
         audio = None
     if audio is None:
-        tmp = None
         try:
-            tmp = tempfile.NamedTemporaryFile(suffix=_guess_audio_suffix(data), delete=False)
-            tmp.write(data)
-            tmp.close()
-            audio, in_sr = _decode_compressed_file(tmp.name)
+            audio, in_sr = _decode_compressed(data)
         except Exception as exc:
             raise RuntimeError(f"decode failed: {exc}") from exc
-        finally:
-            if tmp is not None:
-                try:
-                    os.unlink(tmp.name)
-                except OSError:
-                    pass
     arr = _to_mono_float32(audio)
     if in_sr != sr and arr.size:
         arr = _resample_audio(arr, int(in_sr), int(sr))
@@ -336,28 +324,19 @@ def _wav_info(data: bytes) -> Tuple[float, int, int]:
         return float(info.duration or 0.0), int(info.samplerate or 0), int(info.channels or 0)
     except Exception:
         pass
-    # MP3 / formats soundfile cannot probe — light torchaudio metadata read
-    tmp = None
+    # MP3 / formats soundfile cannot probe — PyAV header read (no decode)
     try:
-        import torchaudio
+        import av
 
-        tmp = tempfile.NamedTemporaryFile(suffix=_guess_audio_suffix(data), delete=False)
-        tmp.write(data)
-        tmp.close()
-        info = torchaudio.info(tmp.name)
-        sr = int(getattr(info, "sample_rate", 0) or 0)
-        frames = int(getattr(info, "num_frames", 0) or 0)
-        ch = int(getattr(info, "num_channels", 0) or 0)
-        dur = float(frames) / float(sr) if sr else 0.0
-        return dur, sr, ch
+        with av.open(io.BytesIO(data)) as container:
+            stream = container.streams.audio[0]
+            if stream.duration and stream.time_base:
+                dur = float(stream.duration * stream.time_base)
+            else:
+                dur = float(container.duration or 0) / 1e6
+            return dur, int(stream.rate or 0), int(stream.channels or 0)
     except Exception:
         return 0.0, 0, 0
-    finally:
-        if tmp is not None:
-            try:
-                os.unlink(tmp.name)
-            except OSError:
-                pass
 
 
 def spectral_fingerprint(mono: np.ndarray, sr: int) -> np.ndarray:
@@ -532,21 +511,31 @@ class _TagEmbedder:
         self.ok = False
         self.dim = 384
         self.model = None
+        self.name = "hash-384"  # stored in catalog.json as tag_model
         try:
             from sentence_transformers import SentenceTransformer
 
             self.model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
-            self.dim = int(self.model.get_sentence_embedding_dimension() or 384)
+            # sentence-transformers 6 renamed get_sentence_embedding_dimension
+            get_dim = getattr(self.model, "get_embedding_dimension", None) or self.model.get_sentence_embedding_dimension
+            self.dim = int(get_dim() or 384)
+            self.name = "all-MiniLM-L6-v2"
             self.ok = True
         except Exception:
             self.ok = False
 
     def embed(self, text: str) -> np.ndarray:
+        return self.embed_many([text])[0]
+
+    def embed_many(self, texts: Sequence[str], batch_size: int = 128) -> np.ndarray:
         if self.ok:
-            vec = np.asarray(self.model.encode([text], show_progress_bar=False)[0], dtype=np.float32)
-            nrm = float(np.linalg.norm(vec))
-            return vec / nrm if nrm > 1e-8 else vec
-        return _hash_embed(text, self.dim)
+            vecs = np.asarray(
+                self.model.encode(list(texts), batch_size=batch_size, show_progress_bar=False),
+                dtype=np.float32,
+            ).reshape(len(texts), -1)
+            nrm = np.linalg.norm(vecs, axis=1, keepdims=True)
+            return (vecs / np.maximum(nrm, 1e-8)).astype(np.float32)
+        return np.stack([_hash_embed(t, self.dim) for t in texts]).astype(np.float32)
 
 
 class _Whisper:
@@ -656,6 +645,8 @@ class AudioLibrary:
         self._clap: Optional[_ClapEmbedder] = None
         self._tags: Optional[_TagEmbedder] = None
         self._whisper: Optional[_Whisper] = None
+        # Embedder that built tag.npy; "" = legacy index from before this was recorded.
+        self.tag_model: str = ""
 
     def status(self) -> Dict[str, Any]:
         self.load()
@@ -670,6 +661,10 @@ class AudioLibrary:
             "has_clap_index": self.clap_vectors is not None,
             "has_spectral_index": self.spectral is not None,
             "archetypes": sorted({a for r in self.records for a in r.archetypes}),
+            "license_tiers": {
+                t: sum(1 for r in self.records if r.license_tier() == t)
+                for t in ("own", "direct", "reference")
+            },
         }
 
     def _catalog_path(self) -> Path:
@@ -680,6 +675,7 @@ class AudioLibrary:
         if not cat.is_file():
             return
         data = json.loads(cat.read_text(encoding="utf-8"))
+        self.tag_model = str(data.get("tag_model", ""))
         self.records = [AssetRecord(**r) for r in data.get("records", [])]
         self._reindex_ids()
         self.tag_vectors = _load_npy(self.index_dir / "tag.npy")
@@ -691,6 +687,7 @@ class AudioLibrary:
         payload = {
             "version": INDEX_VERSION,
             "library": str(self.library),
+            "tag_model": self.tag_model,
             "records": [asdict(r) for r in self.records],
         }
         self._catalog_path().write_text(json.dumps(payload, indent=0), encoding="utf-8")
@@ -713,7 +710,25 @@ class AudioLibrary:
     def _ensure_tags(self) -> _TagEmbedder:
         if self._tags is None:
             self._tags = _TagEmbedder()
+            if not self.records:
+                self.tag_model = self._tags.name
+            elif self.tag_model and self.tag_model != self._tags.name:
+                print(
+                    f"  [audio-lib] WARNING: tag index built with {self.tag_model} but the "
+                    f"embedder is {self._tags.name} — run `audio_pipeline.py rebuild-tags`"
+                )
         return self._tags
+
+    def rebuild_tags(self) -> Dict[str, Any]:
+        """Re-embed every record's tag text with the current embedder (no audio decode)."""
+        self.load()
+        tagger = self._ensure_tags()
+        before = self.tag_model or "unrecorded"
+        texts = [r.search_text() for r in self.records]
+        self.tag_vectors = tagger.embed_many(texts) if texts else None
+        self.tag_model = tagger.name
+        self.save()
+        return {"rebuilt": len(texts), "tag_model": self.tag_model, "previous": before}
 
     def _ensure_clap(self) -> _ClapEmbedder:
         if self._clap is None:
@@ -876,6 +891,36 @@ class AudioLibrary:
             "index_dir": str(self.index_dir),
         }
 
+    def add_file(self, path: Path) -> AssetRecord:
+        """Index one loose file under the library (e.g. a kept own clip) without a full rescan."""
+        self.load()
+        path = Path(path)
+        inner = path.relative_to(self.library).as_posix()
+        pack = path.parent.name or "loose"
+        aid = asset_id(pack, inner)
+        if aid in self._by_id:
+            return self.records[self._by_id[aid]]
+        n = len(self.records)
+        clap_e = None
+        if self.clap_vectors is not None and self.clap_vectors.shape[0] == n:
+            clap_e = self._ensure_clap()
+            if not clap_e.ok:
+                clap_e = None
+        rec, tag_v, clap_v, spec_v = self._ingest_one(
+            pack, inner, path.read_bytes(), "file", self._ensure_tags(), clap_e, None
+        )
+        self.records.append(rec)
+        self._reindex_ids()
+        self.tag_vectors = _vstack([r for r in (self.tag_vectors, tag_v) if r is not None])
+        self.spectral = _vstack([r for r in (self.spectral, spec_v) if r is not None])
+        if clap_e is not None:
+            if clap_v is None:
+                clap_v = np.zeros((int(clap_e.dim),), dtype=np.float32)
+            self.clap_vectors = _vstack([self.clap_vectors, clap_v])
+        # else: CLAP stays short until `backfill-clap` (search ignores a mismatched matrix)
+        self.save()
+        return rec
+
     def _load_record_mono(self, rec: AssetRecord, *, sr: int = EMBED_SR) -> Tuple[np.ndarray, int]:
         if rec.source == "file":
             data = (self.library / rec.inner).read_bytes()
@@ -919,6 +964,17 @@ class AudioLibrary:
         name = Path(inner).stem
         tags = infer_tags(pack, inner)
         archetypes = infer_archetypes(pack, inner, name)
+        if source == "file" and license_tier(pack, inner) == "own":
+            # Kept clips: the generate prompt/archetype describe them better than a filename.
+            side = self.library / Path(inner).with_suffix(".meta.json")
+            try:
+                meta = json.loads(side.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                meta = {}
+            extra = [t for t in _tokenize(meta.get("prompt", "")) if t not in tags]
+            tags = (tags + extra)[:24]
+            if meta.get("archetype") and meta["archetype"] not in archetypes:
+                archetypes.append(meta["archetype"])
         duration, sample_rate, channels = _wav_info(data)
         mono, sr = _decode_bytes(data, max_seconds=EMBED_SECONDS, sr=EMBED_SR)
         if duration <= 0 and sr:
@@ -950,12 +1006,13 @@ class AudioLibrary:
         k: int = 8,
         archetype: str = "",
         tags: Optional[Sequence[str]] = None,
+        license: Union[str, Sequence[str]] = "",
     ) -> List[RetrievalHit]:
         if not self.records:
             self.load()
         if not self.records:
             return []
-        mask = self._filter_mask(archetype=archetype, tags=tags)
+        mask = self._filter_mask(archetype=archetype, tags=tags, license=license)
         scores = np.zeros(len(self.records), dtype=np.float32)
         via = "tag"
         clap = self._ensure_clap()
@@ -984,6 +1041,7 @@ class AudioLibrary:
         *,
         k: int = 8,
         archetype: str = "",
+        license: Union[str, Sequence[str]] = "",
     ) -> List[RetrievalHit]:
         if not self.records:
             self.load()
@@ -1009,12 +1067,21 @@ class AudioLibrary:
         if q is not None and self.clap_vectors is not None and self.clap_vectors.shape[0] == len(self.records):
             scores = 0.55 * _cosine_scores(q, self.clap_vectors) + 0.45 * scores
             via = "clap+spectral"
-        mask = self._filter_mask(archetype=archetype)
+        mask = self._filter_mask(archetype=archetype, license=license)
         scores = np.where(mask, scores, -1.0)
         return self._hits_from_scores(scores, k, via)
 
-    def _filter_mask(self, *, archetype: str = "", tags: Optional[Sequence[str]] = None) -> np.ndarray:
+    def _filter_mask(
+        self,
+        *,
+        archetype: str = "",
+        tags: Optional[Sequence[str]] = None,
+        license: Union[str, Sequence[str]] = "",
+    ) -> np.ndarray:
         mask = np.ones(len(self.records), dtype=bool)
+        if license:
+            allowed = {license} if isinstance(license, str) else set(license)
+            mask &= np.array([r.license_tier() in allowed for r in self.records])
         if archetype:
             a = archetype.lower().strip()
             mask &= np.array([a in r.archetypes or a in r.tags for r in self.records])
