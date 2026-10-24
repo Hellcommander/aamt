@@ -60,6 +60,8 @@ def preview_root(spec_path: Optional[Path] = None) -> Path:
         folder = Path(spec_path)
         if folder.is_file():
             folder = folder.parent
+        if folder.name == ".skillcreator":  # private sidecar spec: name previews after the mod folder
+            folder = folder.parent
         sid = folder.name or "preview"
         return output_root() / "_fx_preview" / sid
     return output_root() / "_fx_preview"
