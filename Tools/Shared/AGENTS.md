@@ -52,7 +52,9 @@ Soulash 2 skill icons: `Tools\Soulash2\SkillCreator` — `generate-icons --id <i
 
 | Stage | Module | Port / kind |
 |---|---|---|
-| mesh | `trellis_http_client.py` | :7960 FP16 + RAM offload; `--precision half`; stops after each job unless `AAMT_TRELLIS_KEEP_SERVER=1` |
+| mesh | `trellis_http_client.py` | :7960 FP16 + RAM offload; `--precision half`; stops after each job unless `AAMT_TRELLIS_KEEP_SERVER=1`. **The default mesh stage**: creatures, characters, anything with limbs, thin parts or detail that matters (it rebuilds real volume and backs) |
+| fast mesh | `sf3d_client.py` (`ai_resources.make_fast_mesh` / `make_fast_meshes`) | Stable Fast 3D in its own venv (`AAMT_SF3D_HOME`, default `E:	ools\stable-fast-3d`); one model load per batch, seconds per mesh; stops SD/TRELLIS first (`AAMT_KEEP_SERVERS=1` to skip) and takes the GPU lock; cuts plain-white concepts itself. **Reserved for background props and simple compact objects** (crates, terminals, beacons, round drones): it guesses the back from one view, so backs come out pale and smooth, and thin limbs fuse into slabs. Use TRELLIS for everything else |
+| mesh fix | `mesh_edit.py` (`ai_resources.inspect_mesh` / `preview_mesh` / `edit_mesh`) | Post-generation repair loop: `info` (pieces, tris, texture hints) -> `preview` (4-view PNG to Read) -> `fix` op chain -> preview again. trimesh ops (drop-small, keep-largest, merge, cut, rotate, texture brightness/saturation/tint, match-back for pale guessed backs) plus headless Blender (newest under `D:\tools\Blender Foundation`, or `AAMT_BLENDER`) for `--remesh VOXEL` (fuses SF3D shards into one shell, rebakes texture) and `--decimate N`. Typical SF3D fix: `--remesh 0.008 --decimate 14000 --drop-small 0.02`; ~1 min with Blender |
 | material | `material_maker_client.py` | CLI |
 | pixels | `pixelorama_client.py` | Godot CLI + visible GUI; Magi-Tech: `Tools\Starbound\produce_pixelorama_sheets.py` |
 | layering | `ucupaint_support.py` / `ucupaint_bake.py` | Blender add-on; bake real maps onto mesh UVs |

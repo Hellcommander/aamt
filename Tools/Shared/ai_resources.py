@@ -370,13 +370,55 @@ def make_image(prompt: str, output: Path, **kwargs: Any) -> Path:
 
 
 def make_mesh(image: Path, output: Path, **kwargs: Any) -> Path:
-    """Image -> textured GLB via TRELLIS.2 FP16 + RAM offload (or TRELLIS 1).
+    """Image -> textured GLB via TRELLIS.2 FP16 + RAM offload (or TRELLIS 1). The default mesh stage: creatures,
+    characters and anything with limbs, thin parts or detail (make_fast_mesh is only for background props).
 
     Stops TRELLIS after the job unless AAMT_TRELLIS_KEEP_SERVER=1.
     """
     from trellis_http_client import generate_mesh
 
     return generate_mesh(Path(image), Path(output), **kwargs)
+
+
+def make_fast_mesh(image: Path, output: Path, **kwargs: Any) -> Path:
+    """Image -> textured GLB via Stable Fast 3D: seconds per mesh. Reserved for background props and simple compact
+    objects; it guesses the back from one view and fuses thin limbs, so use make_mesh (TRELLIS) for creatures,
+    characters and anything detailed. Frees the GPU and takes its lock. Plain-white concepts are cut out
+    automatically. See sf3d_client.py."""
+    from sf3d_client import generate_fast_mesh
+
+    return generate_fast_mesh(Path(image), Path(output), **kwargs)
+
+
+def make_fast_meshes(pairs: List[Any], **kwargs: Any) -> List[Dict[str, Any]]:
+    """Many (image, output) pairs through Stable Fast 3D with ONE model load. Returns a result dict per pair."""
+    from sf3d_client import generate_fast_meshes
+
+    return generate_fast_meshes(pairs, **kwargs)
+
+
+def _mesh_edit(*args: str) -> Any:
+    import json, subprocess, os
+    env = dict(os.environ); env.pop("NoDefaultCurrentDirectoryInExePath", None)
+    r = subprocess.run([sys.executable, str(Path(__file__).with_name("mesh_edit.py")), *args], capture_output=True, text=True, env=env)
+    if r.returncode: raise RuntimeError(r.stderr[-800:])
+    out = r.stdout.strip()
+    return json.loads(out) if out.startswith("{") else out
+
+
+def inspect_mesh(mesh: Path) -> Dict[str, Any]:
+    """Stats + fix hints for a generated .glb (pieces, tris, texture wash-out)."""
+    return _mesh_edit("info", str(mesh))
+
+
+def preview_mesh(mesh: Path, png: Path, size: int = 384) -> Path:
+    """Four-view PNG sheet (front/right/back/above) an agent can Read to judge a mesh."""
+    return Path(_mesh_edit("preview", str(mesh), str(png), "--size", str(size)))
+
+
+def edit_mesh(src: Path, dst: Path, ops: List[str], preview: Optional[Path] = None) -> Dict[str, Any]:
+    """Applies mesh_edit.py ops in order, e.g. ["--remesh", "0.008", "--decimate", "14000", "--drop-small", "0.02"]."""
+    return _mesh_edit("fix", str(src), str(dst), *ops, *(["--preview", str(preview)] if preview else []))
 
 
 def make_material(ptex: Path, out_dir: Path, **kwargs: Any) -> Dict[str, Any]:
