@@ -1,0 +1,10 @@
+{
+	"name": "AAMTSpriteForge",
+	"display_name": "AAMT Sprite Forge",
+	"description": "Starbound sprite pipeline for the AAMT toolkit: build .pxo projects from stills, frame folders or sheets; palette, pixelize and outline; export Starbound sheets with .frames/.animation; headless CLI + batch jobs; import candidates; opt-in SD img2img assist.",
+	"author": "AAMT toolkit",
+	"version": "1.0.0",
+	"license": "MIT",
+	"supported_api_versions": [9, 10],
+	"nodes": ["Main.tscn"]
+}

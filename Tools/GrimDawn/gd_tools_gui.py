@@ -40,7 +40,7 @@ class GdToolsGui(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Grim Dawn Mod Tools")
-        self.geometry("920x680")
+        self.geometry("960x720")
         self.minsize(720, 520)
 
         self.game_var = tk.StringVar(value=str(default_game_dir()))
@@ -48,6 +48,18 @@ class GdToolsGui(tk.Tk):
         self.out_var = tk.StringVar(value="SurvivalPlayground")
         self.skip_resources = tk.BooleanVar(value=True)
         self.dry_run_names = tk.BooleanVar(value=True)
+        self.update_out_var = tk.StringVar(value="")
+        self.upd_class_ui = tk.BooleanVar(value=True)
+        self.upd_combos = tk.BooleanVar(value=True)
+        self.upd_rebuild = tk.BooleanVar(value=False)
+        self.use_ollama = tk.BooleanVar(value=True)
+        self.ollama_model_var = tk.StringVar(value="")
+        self.class_mods_var = tk.StringVar(value="")
+        self.merge_use_rules = tk.BooleanVar(value=True)
+        self.merge_field_mode = tk.StringVar(value="rules")
+        self.merge_latest = tk.BooleanVar(value=True)
+        self.merge_skip_res = tk.BooleanVar(value=False)
+        self.merge_rebuild = tk.BooleanVar(value=False)
         self._proc: Optional[subprocess.Popen] = None
         self._busy = False
 
@@ -69,8 +81,8 @@ class GdToolsGui(tk.Tk):
         nb = ttk.Notebook(self)
         nb.pack(fill=tk.BOTH, expand=True, **pad)
 
+        nb.add(self._tab_compat(nb), text="Update mod (latest)")
         nb.add(self._tab_survival(nb), text="Survival playground")
-        nb.add(self._tab_compat(nb), text="FoA compat")
         nb.add(self._tab_nydiamar(nb), text="Nydiamar")
         nb.add(self._tab_merge(nb), text="Mod merge")
         nb.add(self._tab_rules(nb), text="Merge rules")
@@ -154,14 +166,32 @@ class GdToolsGui(tk.Tk):
         row = ttk.Frame(f)
         row.pack(fill=tk.X, padx=8, pady=8)
         ttk.Label(row, text="Mod folder name").pack(side=tk.LEFT)
-        ttk.Entry(row, textvariable=self.mod_var, width=40).pack(side=tk.LEFT, padx=6)
+        ttk.Entry(row, textvariable=self.mod_var, width=34).pack(side=tk.LEFT, padx=6)
         ttk.Button(row, text="Browse mods…", command=self._browse_mod).pack(side=tk.LEFT)
+        ttk.Label(row, text="Output").pack(side=tk.LEFT, padx=(12, 0))
+        ttk.Entry(row, textvariable=self.update_out_var, width=24).pack(side=tk.LEFT, padx=6)
         ttk.Label(
-            f, text="Pass A + B FoA/v1.3 compatibility (Berserker / DLC class hubs).", wraplength=700
+            f,
+            text="Updates a mod for the latest patch + every expansion: compat Pass A+B, all "
+            "official classes (Berserker / any new DLC class) selectable, class UI expanded, "
+            "dual-class combo names. Writes a new Custom Game (blank output = <mod>_Latest); "
+            "the original mod is not touched. Re-run after each game patch.",
+            wraplength=780,
         ).pack(anchor=tk.W, padx=8)
-        ttk.Button(f, text="Run FoA full compat", command=self._run_foa).pack(
-            anchor=tk.W, padx=8, pady=8
-        )
+        opts = ttk.Frame(f)
+        opts.pack(fill=tk.X, padx=8, pady=6)
+        ttk.Checkbutton(opts, text="Class selection UI (up to 120)", variable=self.upd_class_ui).grid(row=0, column=0, sticky=tk.W)
+        ttk.Checkbutton(opts, text="Combo names", variable=self.upd_combos).grid(row=0, column=1, sticky=tk.W, padx=12)
+        ttk.Checkbutton(opts, text="Name new combos with Ollama", variable=self.use_ollama).grid(row=0, column=2, sticky=tk.W)
+        ttk.Checkbutton(opts, text="Build .arz (arzedit)", variable=self.upd_rebuild).grid(row=1, column=0, sticky=tk.W)
+        ttk.Label(opts, text="Ollama model (blank = auto)").grid(row=1, column=1, sticky=tk.E, padx=12)
+        ttk.Entry(opts, textvariable=self.ollama_model_var, width=22).grid(row=1, column=2, sticky=tk.W)
+        ttk.Label(opts, text="Extra class mods (space-separated)").grid(row=2, column=0, sticky=tk.W, pady=4)
+        ttk.Entry(opts, textvariable=self.class_mods_var, width=50).grid(row=2, column=1, columnspan=2, sticky=tk.EW, pady=4)
+        btns = ttk.Frame(f)
+        btns.pack(fill=tk.X, padx=8, pady=8)
+        ttk.Button(btns, text="Update mod for latest patch", command=self._run_update_latest).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btns, text="Compat only (Pass A+B, in work dir)", command=self._run_foa).pack(side=tk.LEFT, padx=4)
         return f
 
     def _tab_nydiamar(self, parent) -> ttk.Frame:
@@ -177,6 +207,21 @@ class GdToolsGui(tk.Tk):
         ttk.Button(
             f, text="Open NydiamarIntegrated", command=lambda: self._open_mod("NydiamarIntegrated")
         ).pack(anchor=tk.W, padx=8, pady=4)
+        ttk.Label(
+            f,
+            text="Campaign world + portals: merges Nydiamar and all Crucible arenas into "
+            "CampaignKitchenSink's world, with two-way portals by the Devil's Crossing riftgate. "
+            "Re-run after game or mod updates.",
+            wraplength=780,
+        ).pack(anchor=tk.W, padx=8, pady=(12, 4))
+        ttk.Button(
+            f,
+            text="Build campaign world + portals (Nydiamar + Crucible)",
+            command=lambda: self._run_python(
+                [str(TOOLS_DIR / "world_link.py"), "--profile", "campaign", "--rebuild"],
+                "Campaign world + portals",
+            ),
+        ).pack(anchor=tk.W, padx=8, pady=4)
         return f
 
     def _tab_merge(self, parent) -> ttk.Frame:
@@ -187,10 +232,22 @@ class GdToolsGui(tk.Tk):
         ttk.Entry(row, textvariable=self.out_var, width=28).pack(side=tk.LEFT, padx=6)
         ttk.Label(
             f,
-            text="Simple later-wins merge. For Survival kitchen-sink with rules, use the Survival tab.",
-            wraplength=700,
+            text="Merge any mods into one Custom Game. With merge rules on, order comes from "
+            "profiles/merge_rules (higher priority wins; disabled mods skipped). Overlapping "
+            "records field-merge so unique fields from both mods survive; class hubs always "
+            "union their class lists. See merge_report.md in the output.",
+            wraplength=780,
         ).pack(anchor=tk.W, padx=8)
-        ttk.Label(f, text="Mods (one per line):").pack(anchor=tk.W, padx=8, pady=(8, 0))
+        opts = ttk.Frame(f)
+        opts.pack(fill=tk.X, padx=8, pady=4)
+        ttk.Checkbutton(opts, text="Use merge rules (priority order)", variable=self.merge_use_rules).grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(opts, text="Field merge").grid(row=0, column=1, sticky=tk.E, padx=(12, 4))
+        ttk.Combobox(opts, textvariable=self.merge_field_mode, values=("none", "hubs", "rules", "all"), width=8, state="readonly").grid(row=0, column=2, sticky=tk.W)
+        ttk.Checkbutton(opts, text="Update for latest patch + classes + combo names", variable=self.merge_latest).grid(row=1, column=0, sticky=tk.W)
+        ttk.Checkbutton(opts, text="Name new combos with Ollama", variable=self.use_ollama).grid(row=1, column=1, columnspan=2, sticky=tk.W, padx=12)
+        ttk.Checkbutton(opts, text="Database only (skip .arc)", variable=self.merge_skip_res).grid(row=2, column=0, sticky=tk.W)
+        ttk.Checkbutton(opts, text="Build .arz (arzedit)", variable=self.merge_rebuild).grid(row=2, column=1, columnspan=2, sticky=tk.W, padx=12)
+        ttk.Label(f, text="Mods (one per line; order only matters with rules off — later wins):").pack(anchor=tk.W, padx=8, pady=(8, 0))
         self.merge_mods = scrolledtext.ScrolledText(f, height=8, width=60, font=("Consolas", 9))
         self.merge_mods.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
         self.merge_mods.insert("1.0", "grimarillion\nRebirth\n")
@@ -477,7 +534,43 @@ class GdToolsGui(tk.Tk):
             messagebox.showwarning("Mods", "List at least one mod.")
             return
         args = [str(TOOLS_DIR / "merge_mod_databases.py"), "--out", out, "--mods", *mods]
+        args += ["--field-merge", self.merge_field_mode.get()]
+        if not self.merge_use_rules.get():
+            args.append("--keep-order")
+        if self.merge_latest.get():
+            args.append("--latest")
+            args += self._ollama_args()
+        if self.merge_skip_res.get():
+            args.append("--skip-resources")
+        if self.merge_rebuild.get():
+            args.append("--rebuild")
         self._run_python(args, f"Merge → {out}")
+
+    def _ollama_args(self) -> List[str]:
+        if not self.use_ollama.get():
+            return []
+        model = self.ollama_model_var.get().strip()
+        return ["--ollama", *(["--ollama-model", model] if model else [])]
+
+    def _run_update_latest(self) -> None:
+        mod = self.mod_var.get().strip()
+        if not mod:
+            messagebox.showwarning("Mod", "Enter a mod folder name.")
+            return
+        args = [str(TOOLS_DIR / "patch_mod_for_dlc.py"), "--mod", mod, "--full-compat", "--full-classes"]
+        out = self.update_out_var.get().strip() or f"{Path(mod).name}_Latest"
+        args += ["--out", out]
+        if self.upd_class_ui.get():
+            args.append("--class-ui")
+        if self.upd_combos.get():
+            args.append("--combo-names")
+            args += self._ollama_args()
+        if self.upd_rebuild.get():
+            args.append("--rebuild")
+        extra = self.class_mods_var.get().split()
+        if extra:
+            args += ["--class-mods", *extra]
+        self._run_python(args, f"Update {mod} → {out}")
 
     def _launch_gdstash(self) -> None:
         bat = self._game() / "GD Stash" / "gdstash.bat"

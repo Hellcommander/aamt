@@ -37,19 +37,35 @@ CLASS_SEL_REL = "records/ui/skills/classselection/skills_classselectiontable.dbr
 MASTER_REL = "records/ui/skills/skills_mastertable.dbr"
 SCROLL_REL = "records/ui/skills/classselection/skills_classselectionscrollbox.dbr"
 PC_REL = "records/creatures/pc/malepc01.dbr"
+PC_RELS = (PC_REL, "records/creatures/pc/femalepc01.dbr")
 
 
 def _norm(rel: str) -> str:
     return rel.replace("\\", "/").strip().lower()
 
 
-def index_classtables(db: Path) -> Dict[str, str]:
-    """Map lower-case relative path -> canonical relative path for classtable.dbr."""
+VANILLA_LAYERS = TOOLS_DIR / "work" / "_vanilla_cache" / "layers"
+
+
+def index_classtables(db: Path, extra_roots: Sequence[Path] = ()) -> Dict[str, str]:
+    """Map lower-case relative path -> canonical relative path for classtable.dbr.
+
+    extra_roots: official layers -- mods that don't override the stock class UI still use it.
+    """
     out: Dict[str, str] = {}
-    for p in db.rglob("classtable.dbr"):
-        rel = p.relative_to(db).as_posix()
-        out[_norm(rel)] = rel
+    for root in [*extra_roots, db]:
+        if not Path(root).is_dir():
+            continue
+        for p in Path(root).rglob("classtable.dbr"):
+            rel = p.relative_to(root).as_posix()
+            out[_norm(rel)] = rel
     return out
+
+
+def official_layer_roots() -> List[Path]:
+    if not VANILLA_LAYERS.is_dir():
+        return []
+    return [d for d in VANILLA_LAYERS.iterdir() if d.is_dir()]
 
 
 def map_tree_to_classtable(tree_rel: str, classtables: Dict[str, str]) -> Optional[str]:
@@ -121,7 +137,7 @@ def collect_roster(db: Path, max_classes: int) -> Tuple[List[str], List[str], Li
     if not pc.is_file():
         raise FileNotFoundError(f"Missing {pc}")
     trees = get_list_field(read_dbr(pc), "skillTree")
-    classtables = index_classtables(db)
+    classtables = index_classtables(db, official_layer_roots())
 
     out_trees: List[str] = []
     out_panes: List[str] = []
@@ -257,11 +273,62 @@ def patch_scrollbox(db: Path) -> None:
     write_dbr(path, data)
 
 
-def patch_mod_database(db: Path, max_classes: int = MAX_DEFAULT) -> str:
+def _newest_official(rel: str) -> Optional[Path]:
+    roots = sorted(official_layer_roots(), key=lambda d: (d.name.lower() != "database", d.name.lower()), reverse=True)
+    return next((r / rel for r in roots if (r / rel).is_file()), None)
+
+
+def _tree_exists(db: Path, tree: str) -> bool:
+    rel = tree.strip().replace("\\", "/")
+    return rel.lower().endswith(".dbr") and any((r / rel).is_file() for r in [db, *official_layer_roots()])
+
+
+def align_pc_trees(db: Path, roster: List[str], capped: bool) -> int:
+    """Make male/female PC skillTree start with the roster in pane order; returns dropped count.
+
+    Refuses (returns -1) when a real class tree would be dropped: only junk entries go.
+    """
+    pc = db / PC_REL
+    if pc.is_file():
+        keep_n = {_norm(t) for t in roster}
+        real_lost = [t for t in get_list_field(read_dbr(pc), "skillTree") if _norm(t) not in keep_n and _tree_exists(db, t)]
+        if real_lost and not capped:
+            print(f"  WARN: not aligning PC trees; {len(real_lost)} real class trees have no UI pane: {real_lost[:5]}", flush=True)
+            return -1
+    dropped = 0
+    keep = {_norm(t) for t in roster}
+    for rel in PC_RELS:
+        path = db / rel
+        if not path.is_file():
+            continue
+        data = read_dbr(path)
+        trees = get_list_field(data, "skillTree")
+        tail: List[str] = []
+        if capped:
+            # Trees cut by the cap stay (unselectable) after the last rostered tree
+            hits = [i for i, t in enumerate(trees) if _norm(t) in keep]
+            start = hits[-1] + 1 if hits else len(trees)
+            tail = [t for t in trees[start:] if _norm(t) not in keep]
+        aligned = list(roster) + tail
+        if [_norm(t) for t in aligned] != [_norm(t) for t in trees]:
+            set_list_field(data, "skillTree", aligned)
+            write_dbr(path, data)
+        dropped = max(dropped, len(trees) - len(aligned))
+    return dropped
+
+
+def patch_mod_database(db: Path, max_classes: int = MAX_DEFAULT, align_pc: bool = True) -> str:
     trees, panes, skipped = collect_roster(db, max_classes)
     n = len(panes)
     if n == 0:
         raise RuntimeError(f"No classtables mapped under {db}")
+
+    # Mods that don't override the stock UI records start from the newest official copy
+    for rel in (MASTER_REL, CLASS_SEL_REL, SCROLL_REL):
+        if not (db / rel).is_file():
+            src = _newest_official(rel)
+            if src:
+                _copy_dbr_replace(src, db / rel)
 
     # --- mastertable panes ---
     mt_path = db / MASTER_REL
@@ -315,12 +382,15 @@ def patch_mod_database(db: Path, max_classes: int = MAX_DEFAULT) -> str:
 
     patch_scrollbox(db)
 
-    # Align PC skillTree to the deduped roster (same order) when shorter/longer mismatch
-    # Keep all original trees on PC (skills still work); UI shows up to n panes.
+    # Mastery N on the PC must be pane N in the UI (and combo tag id N), so drop PC
+    # entries that have no pane; trees past the cap stay at the end (unselectable).
+    dropped = align_pc_trees(db, trees, capped=n >= max_classes) if align_pc else 0
     lines = [
         f"Patched class UI in {db}",
         f"  skillCtrlPane / selection slots: {n} (cap {max_classes})",
-        f"  PC skillTree (unchanged count): {len(get_list_field(read_dbr(db / PC_REL), 'skillTree'))}",
+        f"  PC skillTree count: {len(get_list_field(read_dbr(db / PC_REL), 'skillTree'))}"
+        + (f" (dropped {dropped} junk entries to keep indexes aligned)" if dropped > 0 else "")
+        + (" (left unaligned: see warning)" if dropped < 0 else ""),
         f"  scrollbox: {SCROLL_REL} (820x640, alwaysShowScroll=1)",
         f"  button grid: {GRID_COLS} cols, step ({GRID_STEP_X},{GRID_STEP_Y})",
     ]

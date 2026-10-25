@@ -1,6 +1,6 @@
 # Grim Dawn Mod Tools — TODOs
 
-Living checklist for `Transcendence/Tools/GrimDawn`.  
+Living checklist for `Ai assisted toolkit/Tools/GrimDawn`.  
 Game: `D:\games\Steam\steamapps\common\Grim Dawn`  
 Updated: 2026-07-28
 

@@ -1,0 +1,371 @@
+{
+  "_note": "Campaign Custom Game = FoA/Grimarillion world001 + Nydiamar + all FoA Crucible arenas, linked by two-way portals next to the Devil's Crossing riftgate. Rebuild after game/mod updates: python world_link.py --profile campaign --rebuild. Arena letter -> name follows the main-menu order (tagSurvivalArena_01..10); swap 'name' below if one is off.",
+  "output_mod": "CampaignKitchenSink",
+  "base": {
+    "mod": "grimarillion",
+    "arc": "Levels.arc",
+    "map": "world001.map"
+  },
+  "out_arc": "Levels.arc",
+  "remove_maps_from": {
+    "Maps.arc": [
+      "nydiamar.map",
+      "nydiamardungeons.map"
+    ]
+  },
+  "worlds": [
+    {
+      "id": "nydiamar",
+      "mod": "Nydiamar",
+      "arc": "Maps.arc",
+      "map": "nydiamar.map"
+    },
+    {
+      "id": "crucible_a",
+      "layer": "survivalmode3",
+      "arc": "Maps.arc",
+      "map": "survivalworld_a.map"
+    },
+    {
+      "id": "crucible_b",
+      "layer": "survivalmode3",
+      "arc": "Maps.arc",
+      "map": "survivalworld_b.map"
+    },
+    {
+      "id": "crucible_c",
+      "layer": "survivalmode3",
+      "arc": "Maps.arc",
+      "map": "survivalworld_c.map"
+    },
+    {
+      "id": "crucible_d",
+      "layer": "survivalmode3",
+      "arc": "Maps.arc",
+      "map": "survivalworld_d.map"
+    },
+    {
+      "id": "crucible_e",
+      "layer": "survivalmode3",
+      "arc": "Maps.arc",
+      "map": "survivalworld_e.map"
+    },
+    {
+      "id": "crucible_f",
+      "layer": "survivalmode3",
+      "arc": "Maps.arc",
+      "map": "survivalworld_f.map"
+    },
+    {
+      "id": "crucible_g",
+      "layer": "survivalmode3",
+      "arc": "Maps.arc",
+      "map": "survivalworld_g.map"
+    },
+    {
+      "id": "crucible_h",
+      "layer": "survivalmode3",
+      "arc": "Maps.arc",
+      "map": "survivalworld_h.map"
+    },
+    {
+      "id": "crucible_i",
+      "layer": "survivalmode3",
+      "arc": "Maps.arc",
+      "map": "survivalworld_i.map"
+    },
+    {
+      "id": "crucible_j",
+      "layer": "survivalmode3",
+      "arc": "Maps.arc",
+      "map": "survivalworld_j.map"
+    }
+  ],
+  "portals": [
+    {
+      "id": "nydiamar",
+      "template": "records/_edited records/catacombs/portal_to_ruins.dbr",
+      "template_mod": "Nydiamar",
+      "a": {
+        "world": "base",
+        "near_uid": "b77f0b80294f94f65069f7b7d76ce753",
+        "label": "Devil's Crossing riftgate",
+        "name": "Portal to Nydiamar"
+      },
+      "b": {
+        "world": "nydiamar",
+        "near": "start",
+        "label": "Nydiamar starting area",
+        "name": "Portal to Devil's Crossing"
+      }
+    },
+    {
+      "id": "crucible_a",
+      "template": "records/_edited records/catacombs/portal_to_ruins.dbr",
+      "template_mod": "Nydiamar",
+      "a": {
+        "world": "base",
+        "near_uid": "b77f0b80294f94f65069f7b7d76ce753",
+        "label": "Devil's Crossing riftgate",
+        "name": "Crucible: Crucible of the Dead",
+        "rmax": 40
+      },
+      "b": {
+        "world": "crucible_a",
+        "near": "start",
+        "label": "Crucible of the Dead arena start",
+        "name": "Return to Devil's Crossing"
+      }
+    },
+    {
+      "id": "crucible_b",
+      "template": "records/_edited records/catacombs/portal_to_ruins.dbr",
+      "template_mod": "Nydiamar",
+      "a": {
+        "world": "base",
+        "near_uid": "b77f0b80294f94f65069f7b7d76ce753",
+        "label": "Devil's Crossing riftgate",
+        "name": "Crucible: Crucible of the Deeps",
+        "rmax": 40
+      },
+      "b": {
+        "world": "crucible_b",
+        "near": "start",
+        "label": "Crucible of the Deeps arena start",
+        "name": "Return to Devil's Crossing"
+      }
+    },
+    {
+      "id": "crucible_c",
+      "template": "records/_edited records/catacombs/portal_to_ruins.dbr",
+      "template_mod": "Nydiamar",
+      "a": {
+        "world": "base",
+        "near_uid": "b77f0b80294f94f65069f7b7d76ce753",
+        "label": "Devil's Crossing riftgate",
+        "name": "Crucible: Crucible of the Sands",
+        "rmax": 40
+      },
+      "b": {
+        "world": "crucible_c",
+        "near": "start",
+        "label": "Crucible of the Sands arena start",
+        "name": "Return to Devil's Crossing"
+      }
+    },
+    {
+      "id": "crucible_d",
+      "template": "records/_edited records/catacombs/portal_to_ruins.dbr",
+      "template_mod": "Nydiamar",
+      "a": {
+        "world": "base",
+        "near_uid": "b77f0b80294f94f65069f7b7d76ce753",
+        "label": "Devil's Crossing riftgate",
+        "name": "Crucible: Crucible of the Grove",
+        "rmax": 40
+      },
+      "b": {
+        "world": "crucible_d",
+        "near": "start",
+        "label": "Crucible of the Grove arena start",
+        "name": "Return to Devil's Crossing"
+      }
+    },
+    {
+      "id": "crucible_e",
+      "template": "records/_edited records/catacombs/portal_to_ruins.dbr",
+      "template_mod": "Nydiamar",
+      "a": {
+        "world": "base",
+        "near_uid": "b77f0b80294f94f65069f7b7d76ce753",
+        "label": "Devil's Crossing riftgate",
+        "name": "Crucible: Crucible of the Void",
+        "rmax": 40
+      },
+      "b": {
+        "world": "crucible_e",
+        "near": "start",
+        "label": "Crucible of the Void arena start",
+        "name": "Return to Devil's Crossing"
+      }
+    },
+    {
+      "id": "crucible_f",
+      "template": "records/_edited records/catacombs/portal_to_ruins.dbr",
+      "template_mod": "Nydiamar",
+      "a": {
+        "world": "base",
+        "near_uid": "b77f0b80294f94f65069f7b7d76ce753",
+        "label": "Devil's Crossing riftgate",
+        "name": "Crucible: Crucible of the Legion",
+        "rmax": 40
+      },
+      "b": {
+        "world": "crucible_f",
+        "near": "start",
+        "label": "Crucible of the Legion arena start",
+        "name": "Return to Devil's Crossing"
+      }
+    },
+    {
+      "id": "crucible_g",
+      "template": "records/_edited records/catacombs/portal_to_ruins.dbr",
+      "template_mod": "Nydiamar",
+      "a": {
+        "world": "base",
+        "near_uid": "b77f0b80294f94f65069f7b7d76ce753",
+        "label": "Devil's Crossing riftgate",
+        "name": "Crucible: Crucible of the Bog",
+        "rmax": 40
+      },
+      "b": {
+        "world": "crucible_g",
+        "near": "start",
+        "label": "Crucible of the Bog arena start",
+        "name": "Return to Devil's Crossing"
+      }
+    },
+    {
+      "id": "crucible_h",
+      "template": "records/_edited records/catacombs/portal_to_ruins.dbr",
+      "template_mod": "Nydiamar",
+      "a": {
+        "world": "base",
+        "near_uid": "b77f0b80294f94f65069f7b7d76ce753",
+        "label": "Devil's Crossing riftgate",
+        "name": "Crucible: Crucible of the Woods",
+        "rmax": 40
+      },
+      "b": {
+        "world": "crucible_h",
+        "near": "start",
+        "label": "Crucible of the Woods arena start",
+        "name": "Return to Devil's Crossing"
+      }
+    },
+    {
+      "id": "crucible_i",
+      "template": "records/_edited records/catacombs/portal_to_ruins.dbr",
+      "template_mod": "Nydiamar",
+      "a": {
+        "world": "base",
+        "near_uid": "b77f0b80294f94f65069f7b7d76ce753",
+        "label": "Devil's Crossing riftgate",
+        "name": "Crucible: Crucible of the Stars",
+        "rmax": 40
+      },
+      "b": {
+        "world": "crucible_i",
+        "near": "start",
+        "label": "Crucible of the Stars arena start",
+        "name": "Return to Devil's Crossing"
+      }
+    },
+    {
+      "id": "crucible_j",
+      "template": "records/_edited records/catacombs/portal_to_ruins.dbr",
+      "template_mod": "Nydiamar",
+      "a": {
+        "world": "base",
+        "near_uid": "b77f0b80294f94f65069f7b7d76ce753",
+        "label": "Devil's Crossing riftgate",
+        "name": "Crucible: Crucible of the Crags",
+        "rmax": 40
+      },
+      "b": {
+        "world": "crucible_j",
+        "near": "start",
+        "label": "Crucible of the Crags arena start",
+        "name": "Return to Devil's Crossing"
+      }
+    }
+  ],
+  "content": [
+    {
+      "id": "crucible",
+      "sources": [
+        {
+          "mod": "survivalmode"
+        },
+        {
+          "layer": "survivalmode1"
+        },
+        {
+          "layer": "survivalmode2"
+        },
+        {
+          "layer": "survivalmode3"
+        }
+      ],
+      "scripts": {
+        "rename": {
+          "scripts/game/questevents.lua": "scripts/game/questeventssurvival.lua"
+        }
+      },
+      "resources": {
+        "refresh_words": [
+          "survival",
+          "crucible"
+        ]
+      }
+    }
+  ],
+  "resources": {
+    "_note": "Assets of every kitchen-sink mod, low -> high priority (later wins per file; text merged per tag; grimdawn.lua merges Script.Load lines). Levels/Maps are built by world_link itself.",
+    "sources": [
+      {
+        "mod": "Nydiamar"
+      },
+      {
+        "mod": "ShatteredAffixes"
+      },
+      {
+        "mod": "dom"
+      },
+      {
+        "mod": "grimarillion"
+      },
+      {
+        "mod": "Sparker"
+      },
+      {
+        "mod": "Rebirth"
+      },
+      {
+        "mod": "Wereform Buffs"
+      }
+    ],
+    "skip_arcs": [
+      "levels.arc",
+      "maps.arc"
+    ]
+  },
+  "database": {
+    "_note": "Database rebuilt from these CURRENT mods every build (merge rules decide order/conflicts). ReignOfTerror left out: its install lacks its main asset archives (act 4/act5, items_rot, models, diablo_ui...). Re-add it here and in resources.sources after reinstalling the full mod.",
+    "sources": [
+      {
+        "mod": "Nydiamar"
+      },
+      {
+        "mod": "ShatteredAffixes"
+      },
+      {
+        "mod": "dom"
+      },
+      {
+        "mod": "grimarillion"
+      },
+      {
+        "mod": "Sparker"
+      },
+      {
+        "mod": "Rebirth"
+      },
+      {
+        "mod": "Wereform Buffs"
+      }
+    ],
+    "field_merge": "rules",
+    "ollama": false
+  }
+}

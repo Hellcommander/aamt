@@ -118,7 +118,7 @@ def merge_arc_contents(game: GamePaths, base_arc: Path, overlay_arc: Path, dest_
     Additive ARC merge: keep every base file, add overlay-only files.
     Same relative path → keep base (no silent replace). Conflicts are counted.
     """
-    from archive_tool import ArchiveTool, kill_orphan_archivetool
+    from archive_tool import ArchiveTool, arc_root, kill_orphan_archivetool, pack_arc
 
     work = Path(__file__).resolve().parent / "work" / "arc_merge" / dest_arc.stem
     if work.exists():
@@ -135,6 +135,8 @@ def merge_arc_contents(game: GamePaths, base_arc: Path, overlay_arc: Path, dest_
     kill_orphan_archivetool()
     tool.extract_arc(overlay_arc, over_dir)
     kill_orphan_archivetool()
+    # compare/merge the archives' real top levels (ArchiveTool nests them under <stem>/)
+    base_dir, over_dir = arc_root(base_dir, base_arc), arc_root(over_dir, overlay_arc)
 
     added = kept_base = conflicts = 0
     for path in base_dir.rglob("*"):
@@ -165,7 +167,7 @@ def merge_arc_contents(game: GamePaths, base_arc: Path, overlay_arc: Path, dest_
 
     if dest_arc.exists():
         dest_arc.unlink()
-    tool.update_arc(dest_arc, merged)
+    pack_arc(merged, dest_arc)
     kill_orphan_archivetool()
     names = sorted({p.name for p in merged.rglob("*") if p.is_file()})
     preview = ", ".join(names[:12]) + ("…" if len(names) > 12 else "")

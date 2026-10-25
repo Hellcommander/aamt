@@ -1,9 +1,11 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 cd /d "%~dp0"
 if "%~1"=="" (
   echo Usage: Run-GdModMerger.bat OutName Mod1 [Mod2 ...]
-  echo Example: Run-GdModMerger.bat MergedMod grimarillion survivalmode
+  echo   Merge-rule priority decides order; result is patched for the latest
+  echo   game/DLC with class UI + Ollama combo names. See README for options.
+  echo Example: Run-GdModMerger.bat MergedMod grimarillion Rebirth
   pause
   exit /b 1
 )
@@ -14,7 +16,16 @@ if "%~1"=="" (
   pause
   exit /b 1
 )
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Run-GdModMerger.ps1" -Out "%OUT%" -Mods %*
+rem %%* ignores shift, so collect the remaining (quoted) mod names by hand
+set MODS=
+:collect
+if "%~1"=="" goto run
+set MODS=!MODS! "%~1"
+shift
+goto collect
+:run
+python -u "%~dp0merge_mod_databases.py" --out "%OUT%" --latest --ollama --mods !MODS!
+set RC=%ERRORLEVEL%
 echo.
 pause
-exit /b %ERRORLEVEL%
+exit /b %RC%

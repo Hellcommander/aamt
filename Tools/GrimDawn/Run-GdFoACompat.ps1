@@ -1,4 +1,5 @@
-# Bidirectional FoA / v1.3 compatibility for any Grim Dawn mod.
+# Bidirectional FoA / latest-patch compatibility for any Grim Dawn mod.
+# -Latest = compat + all classes + class UI + combo names (add -Ollama for AI names).
 param(
     [string]$Game = "",
     [Parameter(Mandatory = $true)]
@@ -6,8 +7,12 @@ param(
     [string]$Out = "",
     [string]$Work = "",
     [string]$Arzedit = "",
+    [string[]]$ClassMods = @(),
+    [string]$OllamaModel = "",
     [switch]$FullCompat,
     [switch]$PassBOnly,
+    [switch]$Latest,
+    [switch]$Ollama,
     [switch]$Rebuild
 )
 
@@ -26,7 +31,11 @@ if ($Work) { $argsList += @("--work", $Work) }
 if ($Out -and -not $PassBOnly) { $argsList += @("--out", $Out) }
 if ($Arzedit) { $argsList += @("--arzedit", $Arzedit) }
 if ($FullCompat -and -not $PassBOnly) { $argsList += "--full-compat" }
+if ($Latest -and -not $PassBOnly) { $argsList += "--latest" }
+if ($Ollama -and -not $PassBOnly) { $argsList += "--ollama" }
+if ($OllamaModel -and -not $PassBOnly) { $argsList += @("--ollama-model", $OllamaModel) }
 if ($Rebuild -and -not $PassBOnly) { $argsList += "--rebuild" }
+if ($ClassMods.Count -gt 0 -and -not $PassBOnly) { $argsList += @("--class-mods") + $ClassMods }
 
 Write-Host "Running: python $($argsList -join ' ')"
 & python @argsList

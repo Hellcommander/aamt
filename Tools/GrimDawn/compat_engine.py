@@ -5,11 +5,11 @@ from __future__ import annotations
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from archive_tool import ArchiveTool
 from dbr_io import get_list_field, merge_records, read_dbr, write_dbr
-from gd_paths import CLASS_HUB_RELATIVE, GamePaths
+from gd_paths import CLASS_HUB_RELATIVE, GamePaths, file_stamp
 
 
 BERSERKER_HINTS = (
@@ -84,24 +84,100 @@ class CompatEngine:
         self._layer_roots: Dict[str, Path] = {}
 
     def ensure_layers_extracted(self) -> None:
+        """Extract base + every gdxN layer; re-extract when Steam patched the .arz."""
         for arz in self.game.layer_arz_files():
             name = arz.stem.lower()
             dest = self.cache_dir / "layers" / name
             marker = dest / ".extracted"
-            if marker.is_file():
+            stamp = file_stamp([arz])
+            if marker.is_file() and marker.read_text(encoding="utf-8").strip() == stamp:
                 self._layer_roots[name] = dest
                 continue
+            if marker.is_file():
+                print(f"Game patch detected for {arz.name}; refreshing cache ...", flush=True)
+                self.report.notes.append(f"Refreshed vanilla cache for patched {arz.name}")
             print(f"Extracting layer {arz} ...", flush=True)
             if dest.exists():
                 shutil.rmtree(dest)
             dest.mkdir(parents=True)
             self.tool.extract_database(arz, dest)
-            marker.write_text("ok", encoding="utf-8")
+            marker.write_text(stamp, encoding="utf-8")
             self._layer_roots[name] = dest
 
+    def _layer_order_newest_first(self) -> List[str]:
+        return [*reversed(self.game.dlc_layer_names()), "database"]
+
+    def latest_class_roster(self) -> List[str]:
+        """PC skillTree list from the newest layer that defines the player (official roster)."""
+        for key in self._layer_order_newest_first():
+            root = self._layer_roots.get(key)
+            pc = root / "records/creatures/pc/malepc01.dbr" if root else None
+            if pc and pc.is_file():
+                trees = get_list_field(read_dbr(pc), "skillTree")
+                if trees:
+                    return trees
+        return []
+
+    def needs_update(self, *, stale_ratio: float = 0.05, stale_min: int = 10) -> Tuple[bool, List[str]]:
+        """
+        Is this mod behind the installed game? (manually maintained mods like Grimarillion
+        are skipped so compat never touches them.)
+
+        Out of date when its PC record / class tables lack official classes, or when many of
+        its copies of official records are missing fields the current game defines.
+        """
+        self.ensure_layers_extracted()
+        reasons: List[str] = []
+        roster = {t.lower() for t in self.latest_class_roster()}
+        pc = self.mod_db / "records/creatures/pc/malepc01.dbr"
+        if pc.is_file():
+            have = {t.lower() for t in get_list_field(read_dbr(pc), "skillTree")}
+            missing = sorted(roster - have)
+            if missing:
+                reasons.append(f"PC record lacks {len(missing)} official classes: {missing}")
+        mt = self.mod_db / "records/ui/skills/skills_mastertable.dbr"
+        van_mt = self._find_in_layers("records/ui/skills/skills_mastertable.dbr")
+        if mt.is_file() and van_mt:
+            have = {p.lower() for p in get_list_field(read_dbr(mt), "skillCtrlPane")}
+            missing = [p for p in get_list_field(read_dbr(van_mt), "skillCtrlPane") if p.lower() not in have]
+            if missing:
+                reasons.append(f"mastery table lacks {len(missing)} official panes")
+
+        shared = stale = 0
+        examples: List[str] = []
+        for mod_file in self.mod_db.rglob("*.dbr"):
+            rel = mod_file.relative_to(self.mod_db).as_posix()
+            vanilla = self._find_in_layers(rel)
+            if vanilla is None:
+                continue
+            shared += 1
+            try:
+                gap = set(read_dbr(vanilla)) - set(read_dbr(mod_file))
+            except Exception:
+                continue
+            if gap:
+                stale += 1
+                if len(examples) < 5:
+                    examples.append(f"{rel} (-{sorted(gap)[:3]})")
+        if shared and stale >= stale_min and stale / shared >= stale_ratio:
+            reasons.append(
+                f"{stale}/{shared} overridden official records miss current fields, e.g. {examples}"
+            )
+        return bool(reasons), reasons
+
+    def ensure_official_classes(self) -> bool:
+        """Cheap check for merged builds: add official classes only if the PC roster lacks some."""
+        self.ensure_layers_extracted()
+        pc = self.mod_db / "records/creatures/pc/malepc01.dbr"
+        have = {t.lower() for t in get_list_field(read_dbr(pc), "skillTree")} if pc.is_file() else set()
+        if all(t.lower() in have for t in self.latest_class_roster()):
+            self.report.notes.append("All official classes already on the PC roster")
+            return False
+        self.unlock_full_classes()
+        return True
+
     def _find_in_layers(self, rel: str) -> Optional[Path]:
-        order = ["gdx3", "gdx2", "gdx1", "database"]
-        for key in order:
+        for key in self._layer_order_newest_first():
             root = self._layer_roots.get(key)
             if not root:
                 continue
@@ -110,7 +186,7 @@ class CompatEngine:
                 return candidate
         return None
 
-    def _iter_layer_records(self, layer_key: str = "gdx3") -> List[Path]:
+    def _iter_layer_records(self, layer_key: str) -> List[Path]:
         root = self._layer_roots.get(layer_key)
         if not root:
             return []
@@ -257,7 +333,7 @@ class CompatEngine:
         self.ensure_layers_extracted()
         self.mod_db.mkdir(parents=True, exist_ok=True)
 
-        for layer in ("database", "gdx1", "gdx2", "gdx3"):
+        for layer in ("database", *self.game.dlc_layer_names()):
             root = self._layer_roots.get(layer)
             if root:
                 n = self.import_class_trees_from_root(root, layer)
@@ -309,7 +385,7 @@ class CompatEngine:
         self.ensure_layers_extracted()
         self.mod_db.mkdir(parents=True, exist_ok=True)
 
-        for layer in ("gdx3", "gdx2", "gdx1", "database"):
+        for layer in self._layer_order_newest_first():
             root = self._layer_roots.get(layer)
             if not root:
                 continue
@@ -333,18 +409,23 @@ class CompatEngine:
         if full_classes:
             self.unlock_full_classes()
         else:
+            # Newest expansion classes (Berserker today, any future gdxN class tomorrow)
+            for layer in self.game.dlc_layer_names():
+                root = self._layer_roots.get(layer)
+                if root:
+                    n = self.import_class_trees_from_root(root, layer)
+                    if n:
+                        self.report.notes.append(f"Imported {n} class-tree files from {layer}")
             self.merge_class_hubs()
-            for hint in ("records/ui/skills/class10", "records/skills/playerclass10"):
-                src_root = self._layer_roots.get("gdx3")
-                if not src_root:
-                    break
-                src_dir = src_root / hint
-                if src_dir.is_dir():
-                    dest_dir = self.mod_db / hint
-                    if not dest_dir.exists():
-                        shutil.copytree(src_dir, dest_dir)
-                        self.report.imported.append(hint + "/")
-                        self.report.notes.append(f"Copied Berserker tree {hint}")
+
+        roster = self.latest_class_roster()
+        if roster:
+            mod_trees = {t.lower() for t in self.report.class_lines}
+            missing = [t for t in roster if t.lower() not in mod_trees]
+            self.report.notes.append(
+                f"Official roster from latest patch: {len(roster)} classes"
+                + (f"; still missing on PC: {missing}" if missing else "; all present on PC")
+            )
 
         self.report.notes.append(
             "Pass A complete: missing DLC records imported; class hubs merged (mod class lines kept)."

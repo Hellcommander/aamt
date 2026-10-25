@@ -18,6 +18,7 @@ Supported fields:
   keep_base_field_substrings: string[] — on field conflicts, keep already-merged (base) value
   quest_remap / quest_prefix
   skip_world_maps
+  compat: auto | force | skip -- latest-patch compat for this mod (auto = only if out of date)
   items_mode: merge | isolate | namespace
     merge     — overlay items into the target mod (default)
     isolate   — keep items in the mod world only (do not flood Survival/base)
@@ -85,6 +86,8 @@ class ModMergeRules:
     items_mode: str = "merge"
     items_prefix: Optional[str] = None
     protect_achievements: bool = False
+    # auto = patch for the latest game/DLC only when detected out of date; force; skip
+    compat: str = "auto"
     notes: str = ""
 
     @classmethod
@@ -129,6 +132,7 @@ class ModMergeRules:
             items_mode=items_mode,
             items_prefix=data.get("items_prefix"),
             protect_achievements=bool(data.get("protect_achievements", False)),
+            compat=(str(data.get("compat") or "auto").lower() if str(data.get("compat") or "auto").lower() in ("auto", "force", "skip") else "auto"),
             notes=str(data.get("notes") or ""),
         )
 

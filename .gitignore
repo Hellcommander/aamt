@@ -151,6 +151,27 @@ Tools/GrimDawn/arzedit/arzedit-master/
 Tools/GrimDawn/bin/
 Tools/GrimDawn/work/
 Tools/GrimDawn/_smoke_extract/
+# extractions that land outside work/ (e.g. arzedit unarc without -o writes ./<ArcName>/)
+Tools/GrimDawn/Levels/
+Tools/GrimDawn/Maps/
+
+# --- Grim Dawn game/mod data (extracted or built; GBs, never commit) ---
+*.arc
+*.arz
+*.map
+*.lvl
+*.wrl
+*.tex
+*.msh
+*.anm
+*.pfx
+*.dbr
+*.qst
+*.cnv
+*.gdc
+*.gdd
+*.arc.bak*
+*.arz.bak*
 
 Tools/Transcendence/_x64_workspace/
 Tools/Transcendence/Output/
