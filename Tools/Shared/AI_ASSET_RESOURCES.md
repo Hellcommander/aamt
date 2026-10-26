@@ -1,6 +1,6 @@
 # Shared AI asset-generation resources
 
-Seven machine-wide resources any game toolset can use. Each owns one stage, and
+Eight machine-wide resources any game toolset can use. Each owns one stage, and
 they are deliberately not interchangeable — each is strong exactly where the
 others are weak.
 
@@ -9,6 +9,7 @@ others are weak.
 | `image` | Stable Diffusion 3.5 | HTTP :1338 | concept art, reference shots, detail overlays |
 | `mesh` | TRELLIS.2-4B FP16 | HTTP :7960 | one image → textured mesh; RAM-offload on 11 GB. The default for creatures, characters and anything detailed |
 | fast mesh | Stable Fast 3D | own venv (`sf3d_client.py`) | seconds per mesh; **only for background props and simple compact objects** (guessed backs, fused thin limbs) |
+| `animate` | UniRig + Wan2.2-TI2V-5B + CoTracker3 | own venvs (`anim_client.py`) | mesh → skinned .glb with idle/move/attack/hit/death/special fitted to generated video of that mesh. See [ANIMATION.md](ANIMATION.md) |
 | `material` | Material Maker | CLI | seamless tileable PBR base maps |
 | `pixels` | Pixelorama | CLI + visible GUI | pixel-art .pxo inspect/export; `see` screenshots the editor |
 | `layering` | Ucupaint | Blender add-on | compositing/masking onto a mesh's UVs |

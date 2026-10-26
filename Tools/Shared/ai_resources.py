@@ -21,6 +21,7 @@ Stages and who owns them:
 
   image     Stable Diffusion 3.5    concept art, reference shots, detail overlays
   mesh      TRELLIS.2-4B FP16      RAM-offload image -> textured mesh (11 GB)
+  animate   UniRig + Wan2.2 + CoTracker3   mesh -> skinned .glb with motion fitted to generated video
   material  Material Maker          seamless, tileable, exact PBR base maps
   pixels    Pixelorama              pixel-art .pxo inspect/export + visible GUI
   layering  Ucupaint (Blender)      composite + mask the above onto a mesh's UVs
@@ -46,7 +47,7 @@ _SHARED = Path(__file__).resolve().parent
 if str(_SHARED) not in sys.path:
     sys.path.insert(0, str(_SHARED))
 
-STAGES = ("image", "mesh", "material", "pixels", "layering", "compress", "audio")
+STAGES = ("image", "mesh", "animate", "material", "pixels", "layering", "compress", "audio")
 
 
 # --------------------------------------------------------------------------
@@ -260,9 +261,26 @@ def _compress_status() -> Dict[str, Any]:
     }
 
 
+def _animate_status() -> Dict[str, Any]:
+    from anim_client import status
+
+    s = status()
+    ready = all(s[k] for k in ("anim_venv", "unirig", "wan", "cotracker"))
+    return {
+        "stage": "animate",
+        "name": "UniRig rig + Wan2.2-TI2V-5B video + CoTracker3 motion fit",
+        "ready": ready,
+        "kind": "venv",
+        "gpu": True,
+        **s,
+        "note": "see Shared/ANIMATION.md",
+    }
+
+
 _PROBES: Dict[str, Callable[[], Dict[str, Any]]] = {
     "image": _image_status,
     "mesh": _mesh_status,
+    "animate": _animate_status,
     "material": _material_status,
     "pixels": _pixels_status,
     "layering": _layering_status,
@@ -395,6 +413,16 @@ def make_fast_meshes(pairs: List[Any], **kwargs: Any) -> List[Dict[str, Any]]:
     from sf3d_client import generate_fast_meshes
 
     return generate_fast_meshes(pairs, **kwargs)
+
+
+def make_animated_mesh(mesh: Path, output: Path, desc: str, **kwargs: Any) -> Dict[str, Any]:
+    """Generated mesh (facing -Y, feet down) -> skinned .glb with idle/move/attack/hit/death/special clips: UniRig
+    rigs it, Wan2.2 films each action from a render of it, CoTracker3 + a skinning fit turn the footage into bone
+    rotations. `desc` names the creature for the video prompts ("a lean robotic hound"); `body` (biped, quadruped,
+    crawler, hover, serpent) picks the gait. Hours on the 2080 Ti for a full set; cached per stage. See anim_client.py."""
+    from anim_client import animate
+
+    return animate(Path(mesh), Path(output), desc, **kwargs)
 
 
 def _mesh_edit(*args: str) -> Any:

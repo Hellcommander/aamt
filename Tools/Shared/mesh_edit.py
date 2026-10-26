@@ -24,6 +24,8 @@ Ops run in the order given:
     --floor               sit the lowest point on y = 0
     --cut AXIS:KEEP:VALUE keep one side of a plane, e.g. y:above:0.1 or x:below:0 (split a pair of legs, trim a base)
     --brightness F        texture brightness x F (1.2 = 20% brighter)
+    --min-luma L          lift a too-dark texture (gamma, highlights kept) until its mean luma is at least L (0..255);
+                          image-to-3D bakes dark or "metal" concepts near black, which reads as a hole in a game
     --contrast F          texture contrast x F
     --saturation F        texture saturation x F (wash-out fix: 1.3)
     --tint HEX:F          blend the texture toward a colour by F (0..1)
@@ -327,7 +329,7 @@ def fix(src: Path, dst: Path, ops: list) -> dict:
             normal = np.array(_axis(ax), float) * (1 if keep == "above" else -1)
             origin = np.array(_axis(ax), float) * float(at)
             m = m.slice_plane(origin, normal, cap=False)
-        elif name in ("brightness", "contrast", "saturation", "tint", "texture_size"):
+        elif name in ("brightness", "contrast", "saturation", "tint", "texture_size", "min_luma"):
             img = texture(m)
             if img is None:
                 log.append(f"{name} skipped: no texture"); continue
@@ -340,6 +342,19 @@ def fix(src: Path, dst: Path, ops: list) -> dict:
                 c = tuple(int(hexcol.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
                 img = Image.blend(img, Image.new("RGB", img.size, c), float(k))
             elif name == "texture_size": img = img.resize((int(val), int(val)), Image.LANCZOS)
+            elif name == "min_luma":
+                import numpy as np
+                a = np.asarray(img).astype(np.float32) / 255.0
+                used = a.max(-1) > 0.02  # the atlas's empty background isn't the model
+                mean = float(a[used].mean()) if used.any() else 0.0
+                want = float(val) / 255.0
+                if 0 < mean < want:
+                    lo, hi = 0.05, 1.0  # the gamma whose mean hits the target
+                    for _ in range(30):
+                        g = (lo + hi) / 2
+                        lo, hi = (g, hi) if float((a[used] ** g).mean()) > want else (lo, g)
+                    img = Image.fromarray((np.clip(a ** g, 0, 1) * 255).astype(np.uint8))
+                    log.append(f"min-luma: mean {mean * 255:.0f} -> {float((a[used] ** g).mean()) * 255:.0f} (gamma {g:.2f})")
             set_texture(m, img)
         else:
             log.append(f"unknown op {name}"); continue
@@ -367,7 +382,7 @@ def main() -> int:
 
     for flag, has_val in [("drop-small", True), ("keep-largest", False), ("merge", False), ("fill-holes", False), ("decimate", True),
                           ("rotate", True), ("mirror", True), ("scale", True), ("squash", True), ("center", False), ("floor", False), ("cut", True), ("remesh", True), ("match-back", True),
-                          ("brightness", True), ("contrast", True), ("saturation", True), ("tint", True), ("texture-size", True)]:
+                          ("brightness", True), ("min-luma", True), ("contrast", True), ("saturation", True), ("tint", True), ("texture-size", True)]:
         s.add_argument("--" + flag, dest=flag.replace("-", "_"), action=Ordered, nargs=None if has_val else 0)
     a = ap.parse_args()
     if a.cmd == "info":
