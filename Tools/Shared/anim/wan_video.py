@@ -5,6 +5,8 @@ Runs in the animation venv (AAMT_ANIM_HOME, default E:\\tools\\anim\\.venv); ani
 
 jobs.json: {"width": 832, "height": 480, "model": "fast", "steps": 24, "guidance": 5.0,
             "jobs": [{"image": "frame0.png", "prompt": "...", "out": "attack.mp4", "frames": 49, "seed": 1}]}
+Optional top-level "negative" replaces the creature-oriented NEGATIVE below (particle_client.py sets it), and
+"cut_check": false keeps the first take instead of re-rolling cuts.
 
 model "fast" (default): FastWan2.2-TI2V-5B (FastVideo's DMD distillation of the same model), three fixed denoising
 steps and no classifier-free guidance, so about a sixteenth of the base model's work; "base": Wan2.2-TI2V-5B with
@@ -171,10 +173,12 @@ def main():
     W, H = int(spec.get("width", 832)), int(spec.get("height", 480))
     model = spec.get("model", "fast")
     steps, cfg = (3, 1.0) if model == "fast" else (int(spec.get("steps", 24)), float(spec.get("guidance", 5.0)))
+    negative = spec.get("negative") or NEGATIVE
+    retries = RETRIES if spec.get("cut_check", True) else 0
     t0 = time.time()
     by_dir = {}
     for j in jobs:
-        by_dir.setdefault(str(Path(j["out"]).parent), set()).update([j["prompt"], NEGATIVE])
+        by_dir.setdefault(str(Path(j["out"]).parent), set()).update([j["prompt"], negative])
     emb = {}
     for d, ps in by_dir.items():
         Path(d).mkdir(parents=True, exist_ok=True)
@@ -197,12 +201,12 @@ def main():
                 prog.write_text(f"step {i + 1}/{steps} {time.time() - t:.0f}s")
                 return kw
             best = None
-            for attempt in range(1 + RETRIES):
+            for attempt in range(1 + retries):
                 s_ = seed + 1000 * attempt
                 if model == "fast":
                     object.__setattr__(pipe, "scheduler", DMDScheduler(seed=s_))
                 res = pipe(image=img, prompt_embeds=emb[j["prompt"]].to(DEV, torch.float16),
-                           negative_prompt_embeds=emb[NEGATIVE].to(DEV, torch.float16) if cfg > 1 else None,
+                           negative_prompt_embeds=emb[negative].to(DEV, torch.float16) if cfg > 1 else None,
                            height=H, width=W, num_frames=frames, guidance_scale=cfg, num_inference_steps=steps,
                            generator=torch.Generator("cpu").manual_seed(s_), output_type="np", callback_on_step_end=on_step)
                 vid = res.frames[0]
@@ -211,7 +215,7 @@ def main():
                 cut = cut_score(vid)
                 if best is None or cut < best[0]:
                     best = (cut, vid, s_)
-                if cut < CUT:
+                if cut < CUT or not retries:
                     break
                 print(json.dumps({"info": f"{Path(j['out']).name}: seed {s_} has a cut ({cut:.3f}), re-rolling"}), flush=True)
             cut, vid, seed = best

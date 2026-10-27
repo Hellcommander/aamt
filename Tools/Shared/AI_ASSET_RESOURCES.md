@@ -10,6 +10,7 @@ others are weak.
 | `mesh` | TRELLIS.2-4B FP16 | HTTP :7960 | one image → textured mesh; RAM-offload on 11 GB. The default for creatures, characters and anything detailed |
 | fast mesh | Stable Fast 3D | own venv (`sf3d_client.py`) | seconds per mesh; **only for background props and simple compact objects** (guessed backs, fused thin limbs) |
 | `animate` | UniRig + Wan2.2-TI2V-5B + CoTracker3 | own venvs (`anim_client.py`) | mesh → skinned .glb with idle/move/attack/hit/death/special fitted to generated video of that mesh. See [ANIMATION.md](ANIMATION.md) |
+| `particles` | SD3.5 + Wan2.2-TI2V-5B + BiRefNet | animation venv (`particle_client.py`) | description → flipbook / sprite-sheet particle texture with alpha + an emitter layer. See [PARTICLES.md](PARTICLES.md) |
 | `material` | Material Maker | CLI | seamless tileable PBR base maps |
 | `pixels` | Pixelorama | CLI + visible GUI | pixel-art .pxo inspect/export; `see` screenshots the editor |
 | `layering` | Ucupaint | Blender add-on | compositing/masking onto a mesh's UVs |

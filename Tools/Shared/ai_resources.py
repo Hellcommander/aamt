@@ -22,6 +22,7 @@ Stages and who owns them:
   image     Stable Diffusion 3.5    concept art, reference shots, detail overlays
   mesh      TRELLIS.2-4B FP16      RAM-offload image -> textured mesh (11 GB)
   animate   UniRig + Wan2.2 + CoTracker3   mesh -> skinned .glb with motion fitted to generated video
+  particles SD3.5 + Wan2.2 + BiRefNet      description -> flipbook / sprite-sheet particle texture + emitter layer
   material  Material Maker          seamless, tileable, exact PBR base maps
   pixels    Pixelorama              pixel-art .pxo inspect/export + visible GUI
   layering  Ucupaint (Blender)      composite + mask the above onto a mesh's UVs
@@ -47,7 +48,7 @@ _SHARED = Path(__file__).resolve().parent
 if str(_SHARED) not in sys.path:
     sys.path.insert(0, str(_SHARED))
 
-STAGES = ("image", "mesh", "animate", "material", "pixels", "layering", "compress", "audio")
+STAGES = ("image", "mesh", "animate", "particles", "material", "pixels", "layering", "compress", "audio")
 
 
 # --------------------------------------------------------------------------
@@ -277,10 +278,26 @@ def _animate_status() -> Dict[str, Any]:
     }
 
 
+def _particles_status() -> Dict[str, Any]:
+    from particle_client import status
+
+    s = status()
+    return {
+        "stage": "particles",
+        "name": "SD3.5 key + Wan2.2 clip + flipbook cut",
+        "ready": bool(s["anim_venv"]),  # missing weights are fetched on first use
+        "kind": "venv",
+        "gpu": True,
+        **s,
+        "note": "see Shared/PARTICLES.md",
+    }
+
+
 _PROBES: Dict[str, Callable[[], Dict[str, Any]]] = {
     "image": _image_status,
     "mesh": _mesh_status,
     "animate": _animate_status,
+    "particles": _particles_status,
     "material": _material_status,
     "pixels": _pixels_status,
     "layering": _layering_status,
@@ -423,6 +440,17 @@ def make_animated_mesh(mesh: Path, output: Path, desc: str, **kwargs: Any) -> Di
     from anim_client import animate
 
     return animate(Path(mesh), Path(output), desc, **kwargs)
+
+
+def make_particles(recipes: List[Dict[str, Any]], out_dir: Path, **kwargs: Any) -> List[Dict[str, Any]]:
+    """Particle textures from descriptions: SD3.5 draws each effect at its peak on black, Wan2.2 sets it in motion,
+    and the frames become a flipbook atlas (frame 0 top-left) with straight alpha, plus <name>_effect.json, an emitter
+    layer for it. Recipes are {"name", "preset", "desc"?, "motion"?, "seed"?, "layer"?}; presets: explosion, impact,
+    smoke_puff, electric, magic_burst, flame_loop, energy_orb (flipbooks), shards, glyph (sprite sheets). Fetches
+    missing weights. Stages cached per name in work/. See particle_client.py and PARTICLES.md."""
+    from particle_client import make_particles as run
+
+    return run(recipes, Path(out_dir), **kwargs)
 
 
 def _mesh_edit(*args: str) -> Any:
