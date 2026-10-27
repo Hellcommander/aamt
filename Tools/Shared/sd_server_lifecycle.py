@@ -164,6 +164,15 @@ def ensure_sd_server(
     Prefers ``loaded: true`` (preload finished) so the first generate is not a
     cold 401 against a gated repo. Ping-only is accepted if preload is off.
     """
+    if start_if_needed:
+        # Server startup loads SD3.5 onto the GPU outside any request lock: wait
+        # until no other batch holds the GPU job (one CUDA job at a time).
+        try:
+            from gpu_hub import hold_gpu_job
+        except ImportError:
+            pass
+        else:
+            hold_gpu_job("SD server start")
     deadline = time.time() + timeout_sec
     st = sd_status()
     if st and not is_aamt_status(st):

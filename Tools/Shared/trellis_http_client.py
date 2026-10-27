@@ -145,6 +145,13 @@ def server_busy() -> bool:
 
 def start_server(wait_seconds: float = STARTUP_TIMEOUT, log_path: Optional[Path] = None) -> Optional[str]:
     """Launch the TRELLIS API server and wait for it to answer /ping."""
+    # Model load happens outside any request lock: take the GPU job first.
+    try:
+        from gpu_hub import hold_gpu_job
+    except ImportError:
+        pass
+    else:
+        hold_gpu_job("TRELLIS server start")
     existing = detect_server()
     if existing:
         return existing
