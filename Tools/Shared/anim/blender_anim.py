@@ -1,7 +1,7 @@
 """Blender (headless) side of the animation pipeline (anim_client.py drives it):
 
   blender -b --factory-startup -P blender_anim.py -- prep   <in.glb> <work>      normalise -> work/norm.glb + work/mesh.npz
-  blender -b --factory-startup -P blender_anim.py -- render <work> [W H]         work/frame0.png, cam.json, visible.npy
+  blender -b --factory-startup -P blender_anim.py -- render <work> [W H [AZ EL]] work/frame0.png, cam.json, visible.npy
   blender -b --factory-startup -P blender_anim.py -- build  <work> <out.glb>     armature + skin (rig.npz) + clips (clips/*.npz)
   blender -b --factory-startup -P blender_anim.py -- preview <in.glb> <out.png>  contact sheet: each clip at 4 moments
 
@@ -136,12 +136,12 @@ def cv_projection(cam, w, h):
     return K @ Rt, K, Rt
 
 
-def render(work, w=832, h=480):
+def render(work, w=640, h=352, azimuth=35.0, elevation=16.0):
     fresh()
     sc = bpy.context.scene
     body = import_body(os.path.join(work, "norm.glb"))
     co = verts(body)
-    pos, target, lens, sensor = camera_for(co, w, h)
+    pos, target, lens, sensor = camera_for(co, w, h, azimuth=azimuth, elevation=elevation)
     cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
     sc.collection.objects.link(cam)
     sc.camera = cam
@@ -173,8 +173,8 @@ def render(work, w=832, h=480):
     sc.render.filepath = os.path.join(work, "frame0.png")
     bpy.ops.render.render(write_still=True)
     P, K, Rt = cv_projection(cam, w, h)
-    json.dump({"width": w, "height": h, "P": P.tolist(), "K": K.tolist(), "Rt": Rt.tolist(),
-               "cam": list(pos), "target": list(target)}, open(os.path.join(work, "cam.json"), "w"), indent=1)
+    json.dump({"width": w, "height": h, "P": P.tolist(), "K": K.tolist(), "Rt": Rt.tolist(), "azimuth": azimuth,
+               "elevation": elevation, "cam": list(pos), "target": list(target)}, open(os.path.join(work, "cam.json"), "w"), indent=1)
     # which vertices the camera sees in that frame (the tracker can only follow those)
     dg = bpy.context.evaluated_depsgraph_get()
     vis = np.zeros(len(co), bool)
@@ -325,7 +325,7 @@ def preview(src, out_png, size=240):
 if MODE == "prep":
     prep(argv[1], argv[2])
 elif MODE == "render":
-    render(argv[1], *(int(x) for x in argv[2:4]))
+    render(argv[1], *(int(x) for x in argv[2:4]), *(float(x) for x in argv[4:6]))
 elif MODE == "build":
     build(argv[1], argv[2])
 elif MODE == "preview":

@@ -45,6 +45,20 @@ Prompts that move: name body parts and verbs ("raises its front legs high, rears
 back down"), and add "Fast, energetic movement". Vague prompts ("strikes hard") give a creature that barely moves,
 or one that sprouts things (weapons, mouths) the rig can't follow.
 
+Walks, as tested on the Interlopers (scratch prompt tests score each take's motion and save a contact sheet):
+- "walks forward" mostly gets a creature that stands still.
+- Walking in place with the limbs named works: bipeds march on the spot lifting each knee high, quadrupeds trot on a
+  treadmill, crawlers walk slowly to the left lifting each leg.
+- "toward the camera" barely moves.
+- Hovering bodies: flying or dipping leaves the frame and bobbing doesn't move, but spinning on the spot with the
+  arms opening and closing does.
+- Serpents are the weakest; coiling and stretching moves a little.
+
+The mesh matters as much as the prompt. A creature that lies flat with its legs splayed (a concept drawn from above)
+reads as a sticker, and no prompt or camera angle makes it walk: regenerate it standing, from a side or
+three-quarter concept. TRELLIS sometimes collapses many-legged concepts into a flat card; try another seed or
+candidate, and check the raw mesh's extents.
+
 ## What runs where
 
 | Piece | Where | Licence |
@@ -115,6 +129,17 @@ down when the card is full.
 - `preview.png` (after `build`): one row per clip, four moments each.
 
 Re-roll a bad clip with `--only video,fit,build --redo video --clips <clip> --seed N`, or reword its prompt.
+
+Automatic re-films (`reroll_bad_fits`, after the fit stage, up to 2 rounds, keeping the best take):
+- A clip is re-filmed if its fit misses the tracks by more than `MAX_PX` (6 px), or if it barely moves:
+  `swing_deg` (90th percentile over joints of each joint's largest turn) is below `MIN_SWING` for that clip
+  (move 12, attack/attack2 15, special 12, hit 8, death 20, idle2 10).
+- A model keeping the creature still fits perfectly and looks like nothing in game.
+- `recut` also re-films clips made before the cut check, or with a cut or vanishing creature.
+
+Loops are cut at the stretch that both comes back to its first pose and travels away from it. Closing well alone
+picks the calm stretches. After changing `shape_clip`, `anim_client.reshape(work, clips)` re-cuts from the saved
+raw fits in seconds.
 
 What the fit can and can't do:
 - It sees one camera, so motion toward or away from the camera is weakly constrained. A synthetic test recovers the

@@ -57,11 +57,13 @@ _STILL = "Static camera, plain white background, the whole body stays in frame."
 MOTION = {
     "idle": ("loop", None, "{it} stands in place, breathing, shifting its weight from leg to leg and turning its head to look around."),
     "move": ("move", None, {
-        "biped": "{it} walks forward with heavy steps, lifting each leg in turn and swinging its arms.",
-        "quadruped": "{it} trots forward, lifting and stepping each of its four legs in turn.",
-        "crawler": "{it} scuttles forward, lifting and stepping each of its legs in turn.",
-        "hover": "{it} glides forward through the air, bobbing and tilting.",
-        "serpent": "{it} slithers forward along the ground, its body rippling in waves.",
+        # tested: "walks forward" mostly gets a creature standing still; marching or walking on the spot, with each
+        # limb named, gets real steps
+        "biped": "{it} marches on the spot, lifting its left knee high, then its right knee high, arms swinging, over and over.",
+        "quadruped": "{it} trots on a treadmill, lifting each paw high in a steady rhythm, head bobbing.",
+        "crawler": "{it} walks slowly to the left, each of its legs lifting high and stepping down in turn.",
+        "hover": "{it} slowly spins around in the air on the spot, its arms opening and closing as it turns.",
+        "serpent": "{it} coils its body into a tight curve and then stretches out straight again, over and over.",
     }),
     # played now and then instead of idle, as a one-shot from and back to rest
     "idle2": ("oneshot", 2.4, "{it} stands in place and turns to look left, then right, curious, then settles back."),
@@ -202,7 +204,7 @@ def clip_prompt(clip: str, desc: str, body: str, override: Optional[str] = None)
 
 
 def make_videos(work: Path, prompts: Dict[str, str], *, frames: int = 49, steps: int = 20, seed: int = 7, redo: bool = False,
-                model: Optional[str] = None) -> List[Dict]:
+                model: Optional[str] = None, seeds: Optional[Dict[str, int]] = None) -> List[Dict]:
     """One clip per prompt from frame0.png. model "fast" (FastWan, 3 steps; the default, AAMT_ANIM_VIDEO_MODEL) or
     "base" (Wan2.2-TI2V-5B, `steps` steps with guidance; better prompt following, about 16x the time)."""
     model = model or os.environ.get("AAMT_ANIM_VIDEO_MODEL", "base")
@@ -216,7 +218,7 @@ def make_videos(work: Path, prompts: Dict[str, str], *, frames: int = 49, steps:
             continue
         kind, secs = MOTION.get(clip, ("oneshot", None))[:2]
         n = 73 if kind in ("loop", "move", "death") or (secs or 0) > 1.8 else frames
-        jobs.append({"image": str((work / "frame0.png").resolve()), "prompt": prompt, "out": str(out.resolve()), "frames": n, "seed": seed + i})
+        jobs.append({"image": str((work / "frame0.png").resolve()), "prompt": prompt, "out": str(out.resolve()), "frames": n, "seed": (seeds or {}).get(clip, seed + i)})
     if not jobs:
         return []
     spec = work / "video" / "jobs.json"
@@ -231,6 +233,22 @@ def make_videos(work: Path, prompts: Dict[str, str], *, frames: int = 49, steps:
         if r and r.get("ok"):
             Path(j["out"]).with_suffix(".json").write_text(json.dumps({"prompt": j["prompt"], "seed": r.get("seed", j["seed"]), "model": model,
                                                                   "cut": r.get("cut"), "seconds": r.get("seconds")}))
+    return res
+
+
+def reshape(work: Path, clips: List[str]) -> List[Dict]:
+    """Re-cut clips from their saved raw fits (loop choice, in-place, settling), without tracking or fitting again:
+    for after a change to track_fit.shape_clip."""
+    res = []
+    for clip in clips:
+        if not (work / "fit" / f"{clip}_raw.npz").exists():
+            continue
+        kind, seconds, _ = MOTION.get(clip, ("oneshot", 1.2, ""))
+        cmd = [_py(), "-I", _ANIM / "track_fit.py", "--work", work, "--clip", clip, "--kind", kind, "--reshape"]
+        if seconds:
+            cmd += ["--seconds", seconds]
+        o = _run(cmd, f"reshape {clip}")
+        res.append(json.loads([l for l in o.splitlines() if l.startswith("{")][-1]))
     return res
 
 
@@ -302,6 +320,9 @@ def preview(glb: Path, png: Path) -> Path:
 
 
 MAX_PX = 6.0  # a clip whose fit misses its tracks by more than this (mean, pixels) is filmed again
+# ...and one that hardly moves (90th percentile over joints of each joint's largest turn, degrees): video models often
+# keep a creature nearly still, which fits perfectly and looks like nothing in game
+MIN_SWING = {"move": 12, "attack": 15, "attack2": 15, "special": 12, "hit": 8, "death": 20, "idle2": 10}
 
 
 def _fit_px(work: Path, clip: str) -> Optional[float]:
@@ -309,35 +330,65 @@ def _fit_px(work: Path, clip: str) -> Optional[float]:
     return json.loads(f.read_text()).get("mean_px") if f.exists() else None
 
 
+def _swing(work: Path, clip: str) -> Optional[float]:
+    f = work / "clips" / f"{clip}.npz"
+    if not f.exists():
+        return None
+    import numpy as np
+    q = np.load(f)["rot"]
+    ang = np.degrees(2 * np.arccos(np.clip(np.abs(q[..., 0]), 0, 1)))
+    return round(float(np.percentile(ang.max(0), 90)), 1)
+
+
+def _take_score(work: Path, clip: str, max_px: float):
+    """Better takes sort higher: one the fit follows first, then the one that moves more. Choosing between takes,
+    a fit a little past max_px still counts as followed (a big 63-degree lunge at 7.7 px beats a 0.6 px take that
+    barely moves); a clip is only re-filmed past max_px itself."""
+    px, sw = _fit_px(work, clip), _swing(work, clip)
+    return (px is not None and px <= 1.4 * max_px, sw or 0.0, -(px or 99.0))
+
+
 def reroll_bad_fits(work: Path, texts: Dict[str, str], body: str, *, steps: int = 20, seed: int = 7, rounds: int = 2,
-                    max_px: float = MAX_PX) -> List[Dict]:
-    """Clips the fit couldn't follow (the video redrew or spun the creature in ways the cut check missed) are filmed
-    again with new seeds and refitted, up to `rounds` times; whichever take fits best is kept."""
+                    max_px: float = MAX_PX, min_swing: Optional[Dict[str, float]] = None) -> List[Dict]:
+    """Clips the fit couldn't follow (the video redrew or spun the creature in ways the cut check missed), or that
+    barely move, are filmed again with new seeds and refitted, up to `rounds` times; the best take is kept (one the
+    fit follows, then the one with the most motion)."""
+    min_swing = MIN_SWING if min_swing is None else min_swing
     log: List[Dict] = []
     take = lambda c: [work / "video" / f"{c}.mp4", work / "video" / f"{c}.json", work / "clips" / f"{c}.npz",  # noqa: E731
                       work / "fit" / f"{c}.json", work / "fit" / f"{c}_raw.npz", work / "fit" / f"{c}_check.png"]
+
+    def needs(c):
+        px, sw = _fit_px(work, c), _swing(work, c)
+        return (px or 0) > max_px or (sw is not None and sw < min_swing.get(c, 0))
     for r in range(1, rounds + 1):
-        bad = {c: _fit_px(work, c) for c in texts if (_fit_px(work, c) or 0) > max_px}
+        bad = {c: (_fit_px(work, c), _swing(work, c), _take_score(work, c, max_px)) for c in texts if needs(c)}
         if not bad:
             break
-        for c in bad:
+        seeds = {}
+        for i, c in enumerate(bad):
+            meta = work / "video" / f"{c}.json"
+            # onward from the seed of the take being replaced: same prompt + same seed films the same clip again
+            last = json.loads(meta.read_text()).get("seed", seed + i) if meta.exists() else seed + i
+            seeds[c] = int(last) + 5000
             for f in take(c):
                 if f.exists():
                     shutil.copy2(f, f.with_name(f.name + ".prev"))
             for f in take(c)[:2]:
                 f.unlink(missing_ok=True)
-        make_videos(work, {c: texts[c] for c in bad}, steps=steps, seed=seed + 5000 * r)
+        make_videos(work, {c: texts[c] for c in bad}, steps=steps, seeds=seeds)
         fit_motions(work, list(bad), body=body, redo=True)
-        for c, before in bad.items():
-            after = _fit_px(work, c)
-            kept = "new" if after is not None and after < before else "old"
+        for c, (px0, sw0, score0) in bad.items():
+            px1, sw1 = _fit_px(work, c), _swing(work, c)
+            kept = "new" if px1 is not None and _take_score(work, c, max_px) > score0 else "old"
             for f in take(c):
                 prev = f.with_name(f.name + ".prev")
                 if kept == "old" and prev.exists():
                     shutil.move(str(prev), str(f))
                 prev.unlink(missing_ok=True)
-            log.append({"clip": c, "round": r, "before_px": before, "after_px": after, "kept": kept})
-            print(f"[ANIM] {work.name}/{c}: re-filmed, fit {before} -> {after} px, kept the {kept} take", file=sys.stderr, flush=True)
+            log.append({"clip": c, "round": r, "before": [px0, sw0], "after": [px1, sw1], "kept": kept})
+            print(f"[ANIM] {work.name}/{c}: re-filmed, fit {px0} -> {px1} px, swing {sw0} -> {sw1} deg, kept the {kept} take",
+                  file=sys.stderr, flush=True)
     return log
 
 

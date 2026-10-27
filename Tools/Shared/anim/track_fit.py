@@ -252,19 +252,23 @@ def pose_dist(q, i, k):
     return float((1 - np.abs((q[i] * q[k]).sum(-1))).sum())
 
 
-def shape_clip(q, tr, kind, fps_src=24, fps=30, seconds=None):
+def shape_clip(q, tr, kind, fps_src=24, fps=30, seconds=None, roots=()):
     q = qfix(q)
     T_ = len(q)
     t_src = np.arange(T_) / fps_src
     dur = t_src[-1]
     notes = {}
     if kind in ("loop", "move"):
-        # the longest stretch (at least ~1 s) whose last pose comes back to its first: that's the cycle
+        # the stretch (at least ~1 s) whose last pose comes back to its first: that's the cycle. Closing well isn't
+        # enough (a stretch where nothing moves closes perfectly), so it must also travel: how far its poses get
+        # from the first one counts for it.
         lo = max(int(0.9 * fps_src), 8)
+        away = np.array([[pose_dist(q, a, f) for f in range(T_)] for a in range(T_)])
         best = None
         for a in range(0, max(1, T_ - lo)):
             for b_ in range(a + lo, T_):
-                cost = pose_dist(q, a, b_) + 0.5 * pose_dist(q, a + 1 if a + 1 < T_ else a, b_ + 1 if b_ + 1 < T_ else b_) - 0.002 * (b_ - a)
+                close = pose_dist(q, a, b_) + 0.5 * pose_dist(q, a + 1 if a + 1 < T_ else a, b_ + 1 if b_ + 1 < T_ else b_)
+                cost = close - 2.0 * float(away[a, a:b_ + 1].mean()) - 0.002 * (b_ - a)
                 if best is None or cost < best[0]:
                     best = (cost, a, b_)
         _, a, b_ = best
@@ -279,6 +283,15 @@ def shape_clip(q, tr, kind, fps_src=24, fps=30, seconds=None):
             a_ = (Rotation.from_rotvec(gap * (f / (n - 1))) * Rotation.from_quat(xyzw(q[f]))).as_quat()
             q[f] = np.concatenate([a_[:, 3:], a_[:, :3]], 1)
         q = qfix(q)
+        # a creature that turned to walk across the shot would loop walking sideways: take the cycle's mean heading
+        # off the root(s), keeping only the sway
+        for j in roots:
+            R = Rotation.from_quat(xyzw(q[:, j])).as_matrix()
+            yaw = np.arctan2(R[:, 1, 0], R[:, 0, 0])
+            mean = float(np.arctan2(np.sin(yaw).mean(), np.cos(yaw).mean()))
+            a_ = (Rotation.from_euler("z", -mean) * Rotation.from_quat(xyzw(q[:, j]))).as_quat()
+            q[:, j] = np.concatenate([a_[:, 3:], a_[:, :3]], 1)
+            notes.setdefault("heading_removed_deg", []).append(round(float(np.degrees(mean)), 1))
         drift = tr[-1] - tr[0]
         tr = tr - np.outer(np.arange(n) / (n - 1), drift)
         tr[:, :2] -= tr[:, :2].mean(0)  # in place across the floor; bobbing stays
@@ -357,19 +370,40 @@ def check_sheet(d, video, qidx, tracks, tvis, R, tr, out, n=6):
     sheet.save(out)
 
 
+def swing_deg(q):
+    """How much a clip moves: the 90th percentile over joints of each joint's largest turn from rest, in degrees."""
+    ang = np.degrees(2 * np.arccos(np.clip(np.abs(q[..., 0]), 0, 1)))
+    return round(float(np.percentile(ang.max(0), 90)), 1)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--work", required=True)
-    ap.add_argument("--video", required=True)
+    ap.add_argument("--video")
     ap.add_argument("--clip", required=True)
     ap.add_argument("--kind", default="oneshot", choices=["loop", "move", "oneshot", "death"])
     ap.add_argument("--seconds", type=float, default=None)
     ap.add_argument("--iters", type=int, default=1100)
     ap.add_argument("--hover", action="store_true", help="no floor: skip the floor and planted-feet terms")
+    ap.add_argument("--reshape", action="store_true", help="only re-cut the clip from fit/<clip>_raw.npz (no tracking or fit)")
     a = ap.parse_args()
     work = Path(a.work)
     d = load_work(work)
     t0 = time.time()
+    roots = [j for j, p in enumerate(d["par"]) if p < 0]
+    (work / "clips").mkdir(exist_ok=True)
+    if a.reshape:
+        raw = np.load(work / "fit" / f"{a.clip}_raw.npz")
+        qo, to, notes = shape_clip(raw["rot"], raw["trans"], a.kind, seconds=a.seconds, roots=roots)
+        np.savez(work / "clips" / f"{a.clip}.npz", fps=30, rot=qo, trans=to)
+        jf = work / "fit" / f"{a.clip}.json"
+        stats = json.loads(jf.read_text()) if jf.exists() else {}
+        for k in ("cycle", "window", "heading_removed_deg"):
+            stats.pop(k, None)
+        stats.update(notes, frames=len(qo), swing_deg=swing_deg(qo))
+        jf.write_text(json.dumps(stats, indent=1))
+        print(json.dumps({"ok": True, "reshaped": True, **stats}), flush=True)
+        return
     video = read_video(a.video, d["w"], d["h"])
     qidx = pick_queries(d)
     q_pix = project(d["P"], d["V"][qidx])
@@ -379,10 +413,9 @@ def main():
     (work / "fit").mkdir(exist_ok=True)
     np.savez(work / "fit" / f"{a.clip}_raw.npz", rot=quats, trans=tr, tracks=tracks, vis=tvis, qidx=qidx)
     check_sheet(d, video, qidx, tracks, tvis, R, tr, work / "fit" / f"{a.clip}_check.png")
-    qo, to, notes = shape_clip(quats, tr, a.kind, seconds=a.seconds)
-    (work / "clips").mkdir(exist_ok=True)
+    qo, to, notes = shape_clip(quats, tr, a.kind, seconds=a.seconds, roots=roots)
     np.savez(work / "clips" / f"{a.clip}.npz", fps=30, rot=qo, trans=to)
-    stats.update(notes, clip=a.clip, frames=len(qo), video_frames=len(video), seconds=round(time.time() - t0, 1))
+    stats.update(notes, clip=a.clip, frames=len(qo), video_frames=len(video), swing_deg=swing_deg(qo), seconds=round(time.time() - t0, 1))
     (work / "fit" / f"{a.clip}.json").write_text(json.dumps(stats, indent=1))
     print(json.dumps({"ok": True, **stats}), flush=True)
 
