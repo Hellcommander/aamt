@@ -9,8 +9,8 @@ instead of Cursor's image generator. SD3.5 Medium owns pixel production.
   python ai_resources.py --ensure image
 
 POST path is /v1/images/generations (alias /generate). Do not POST / on :1338.
-Weights are gated: the server applies hf_token_switch profile "media"
-(display name "SD3.5 Token"). plan_sd_size(..., kind="icon") for tiles.
+Weights are gated: the server uses the machine's existing `hf auth login`
+(via hf_token_switch). plan_sd_size(..., kind="icon") for tiles.
 
 Every generation takes the shared GPU lock (gpu_hub.py).
 """
@@ -37,7 +37,8 @@ def _known_ports() -> list[int]:
         ports.append(int(sd_port()))
     except Exception:
         ports.append(1338)
-    for p in (1338, 1337, 7860, 8188, 8000, 9090):
+    # 1337 is deliberately not probed: other programs (WebSocket++) squat on it.
+    for p in (1338, 7860, 8188, 8000, 9090):
         if p not in ports:
             ports.append(p)
     return ports
@@ -179,12 +180,67 @@ DEFAULT_CONNECT_TIMEOUT = 30.0
 DEFAULT_READ_TIMEOUT = 9000.0  # 2.5h — SD3.5 Medium + CPU offload can exceed 1h
 
 
+# Loopback probes must never go through a system/env proxy (a proxy makes a healthy
+# local server look dead), so use an opener with proxies disabled.
+_NO_PROXY_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+# /ping can be slow while torch is loading or rendering; 0.6s made a busy server look
+# "not detected". Override with AAMT_SD_PING_TIMEOUT_SEC.
+PING_TIMEOUT = float(os.environ.get("AAMT_SD_PING_TIMEOUT_SEC") or 4.0)
+
+
+def url_host(host: str) -> str:
+    """Bracket IPv6 literals for use in a URL."""
+    return f"[{host}]" if ":" in host and not host.startswith("[") else host
+
+
+def candidate_hosts() -> list[str]:
+    """Loopback hosts to probe: AAMT_SD_HOST override, then 127.0.0.1, then ::1."""
+    hosts: list[str] = []
+    override = (os.environ.get("AAMT_SD_HOST") or "").strip().strip("[]")
+    if override:
+        hosts.append(override)
+    for h in ("127.0.0.1", "::1"):
+        if h == "::1" and os.environ.get("AAMT_SD_IPV6", "1").strip() == "0":
+            continue
+        if h not in hosts:
+            hosts.append(h)
+    return hosts
+
+
+def _is_refused(exc: BaseException) -> bool:
+    reason = getattr(exc, "reason", None)
+    return isinstance(exc, ConnectionRefusedError) or isinstance(reason, ConnectionRefusedError)
+
+
 def http_get(url: str, timeout: float = 3.0) -> tuple[int, str, dict[str, str]]:
     req = urllib.request.Request(url, method="GET")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        body = resp.read().decode("utf-8", errors="replace")
-        headers = {k.lower(): v for k, v in resp.headers.items()}
-        return resp.status, body, headers
+    try:
+        with _NO_PROXY_OPENER.open(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+            headers = {k.lower(): v for k, v in resp.headers.items()}
+            return resp.status, body, headers
+    except urllib.error.HTTPError as exc:
+        # Non-2xx (for example 426 from a WebSocket++ service) is still an answer.
+        body = exc.read().decode("utf-8", errors="replace") if exc.fp else ""
+        headers = {k.lower(): v for k, v in exc.headers.items()} if exc.headers else {}
+        return exc.code, body, headers
+
+
+def http_get_retry(url: str, timeout: float = PING_TIMEOUT, attempts: int = 2) -> tuple[int, str, dict[str, str]]:
+    """http_get with a retry for timeouts. A refused connection is definitive: no retry."""
+    last: Optional[BaseException] = None
+    for i in range(max(1, attempts)):
+        try:
+            return http_get(url, timeout=timeout)
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            if _is_refused(exc):
+                break
+            if i + 1 < attempts:
+                time.sleep(0.3)
+    assert last is not None
+    raise last
 
 
 def looks_like_sd_health(body: str) -> bool:
@@ -218,11 +274,11 @@ def detect_server(verbose: bool = False) -> Optional[str]:
     """
     for port in KNOWN_PORTS:
         foreign_on_port = False
-        for host in ("127.0.0.1",):
+        for host in candidate_hosts():
             for path in HEALTH_PATHS:
-                url = f"http://{host}:{port}{path}"
+                url = f"http://{url_host(host)}:{port}{path}"
                 try:
-                    status, body, headers = http_get(url, timeout=0.6)
+                    status, body, headers = http_get_retry(url)
                     server = headers.get("server", "")
                     if status == 426 or "websocket" in server.lower():
                         if verbose:
@@ -230,7 +286,7 @@ def detect_server(verbose: bool = False) -> Optional[str]:
                         foreign_on_port = True
                         break
                     if status == 200 and looks_like_aamt_sd(body):
-                        api = f"http://{host}:{port}/v1/images/generations"
+                        api = f"http://{url_host(host)}:{port}/v1/images/generations"
                         if verbose:
                             print(f"[OK] Detected AAMT SD server at {api}", file=sys.stderr)
                         return api
@@ -246,6 +302,8 @@ def detect_server(verbose: bool = False) -> Optional[str]:
                 except Exception as exc:
                     if verbose:
                         print(f"[SKIP] {url}: {exc}", file=sys.stderr)
+                    if _is_refused(exc):
+                        break  # nothing listens on this address family; try the next host
                     continue
         if foreign_on_port:
             return None
@@ -419,8 +477,7 @@ def generate_image(
     if not api_url:
         raise RuntimeError(
             "No Stable Diffusion server detected. Start SD3.5 with "
-            "Tools\\Start-StableDiffusionServer.ps1 (default port 1338). "
-            "Port 1337 may be occupied by another service (WebSocket++)."
+            "Tools\\Start-StableDiffusionServer.ps1 (default port 1338)."
         )
 
     body = build_request_body(

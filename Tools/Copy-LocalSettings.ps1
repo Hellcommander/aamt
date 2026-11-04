@@ -16,7 +16,6 @@ $ErrorActionPreference = 'Stop'
 $pairs = @(
     @{ Example = 'AssetGenerationSettings.example.ps1'; Target = 'AssetGenerationSettings.ps1' }
     @{ Example = 'TranscendenceTools.ini.example'; Target = 'TranscendenceTools.ini' }
-    @{ Example = 'HfTokenProfiles.example.ps1'; Target = 'HfTokenProfiles.local.ps1' }
     @{ Example = 'Qud\settings.example.json'; Target = 'Qud\settings.json' }
     @{ Example = 'apply_these.txt.example'; Target = 'apply_these.txt' }
     @{ Example = 'manual_review.txt.example'; Target = 'manual_review.txt' }

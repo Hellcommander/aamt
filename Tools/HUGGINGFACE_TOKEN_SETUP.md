@@ -68,29 +68,31 @@ cd "d:\games\Steam\steamapps\common\Transcendence\Tools"
 
 `Setup-StableAudio.ps1` and generators set the hub cache on E: automatically.
 
-## Auto token profiles (AAMT)
+## How AAMT tools authenticate
 
-Tools switch by **token display name** (from `hf auth login` / stored_tokens), never by embedding secrets:
+Tools use **whatever this machine is already logged in with** (`hf auth login`, or an
+`HF_TOKEN` you set yourself). The repo holds no token names, profiles or secrets, so there
+is nothing to configure per machine beyond logging in once.
 
-| Profile | Token name | Used for |
-|---------|------------|----------|
-| `media` | `SD3.5 Token` | SD3.5 + Stable Audio downloads |
-| `training` | `Custom Modul for creation` | Primordialis / LoRA / PEFT training |
+```powershell
+hf auth login
+hf auth whoami
+```
+
+Helpers (only confirm a login exists; the old `media` / `training` profile names are accepted and ignored):
 
 ```powershell
 Import-Module .\Shared\HfTokenSwitch.psm1
-Use-AamtHfToken -Profile media
-Use-AamtHfToken -Profile training
+Use-AamtHfToken
 ```
 
-Python:
 ```python
-from hf_token_switch import use_media_token, use_training_token
+from hf_token_switch import use_media_token
 use_media_token()
-use_training_token()
 ```
 
-Optional rename overrides (names only): copy `HfTokenProfiles.example.ps1` → `HfTokenProfiles.local.ps1` (gitignored).
+If a script moves `HF_HOME` to a weights drive, the helper falls back to the login in
+`%USERPROFILE%\.cache\huggingface` for that process.
 
 ## Troubleshooting
 

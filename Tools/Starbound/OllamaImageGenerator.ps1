@@ -1,4 +1,4 @@
-# OllamaImageGenerator.ps1
+﻿# OllamaImageGenerator.ps1
 # AI-Assisted Modding Tools (AAMT)
 # Enhanced image generator using Ollama + Stable Diffusion 3 for high-quality asset generation
 # Workflow: Ollama enhances description → SD3 generates high-quality image
@@ -20,7 +20,7 @@ param(
     [string]$OllamaUrl = "http://localhost:11434",
     
     [Parameter(Mandatory=$false)]
-    [string]$StableDiffusionUrl = "http://localhost:1337",
+    [string]$StableDiffusionUrl = "http://localhost:1338",
     
     [Parameter(Mandatory=$false)]
     [string]$Model = "",  # Auto-selected by OllamaIntegration.psm1
@@ -29,7 +29,8 @@ param(
     [switch]$UseStableDiffusion = $true,  # Use SD3 for actual image generation
     
     [Parameter(Mandatory=$false)]
-    [switch]$EnhanceOnly = $false,  # Only enhance description, don't generate image
+    [switch]$EnhanceOnly = $false  # Only enhance description, don't generate image
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -61,6 +62,7 @@ if ($tools.Tools["Ollama"].Available) {
 }
 
 # Use Stable Diffusion if available
+$SdRequested = [bool]$UseStableDiffusion
 if ($UseStableDiffusion -and $tools.Tools["StableDiffusion"].Available) {
     Use-StableDiffusionIfAvailable | Out-Null
     Write-Host "[OK] Stable Diffusion integration enabled" -ForegroundColor Green
@@ -351,8 +353,9 @@ if ($Description) {
                 -OutputPath $OutputPath `
                 -Width $Width `
                 -Height $Height `
-                -EnhanceWithOllama:$false `  # Already enhanced above
+                -EnhanceWithOllama:$false `
                 -AutoStartServer:$true
+            # (EnhanceWithOllama is off: the description was already enhanced above)
             
             Write-Host "✓ Image generated: $imagePath" -ForegroundColor Green
             
@@ -371,14 +374,19 @@ if ($Description) {
             
             Write-Output $imagePath
         } catch {
-            Write-Host "✗ SD3 generation failed: $_" -ForegroundColor Red
-            Write-Host "  Falling back to description enhancement only" -ForegroundColor Yellow
-            $EnhanceOnly = $true
-            # Fall through to enhance-only path
+            # An image was requested: fail loudly. No placeholder image and no silent
+            # "description only" success (exit 0) that would look like a generated asset.
+            Write-Host "[FAIL] SD3 generation failed: $_" -ForegroundColor Red
+            Write-Host "  No image was written. Re-run -EnhanceOnly if only the description is wanted." -ForegroundColor Yellow
+            exit 1
         }
+    } elseif ($SdRequested) {
+        # SD was requested (the default) but is not available: an image cannot be produced.
+        Write-Host "[FAIL] Stable Diffusion (:1338) is not available - no image generated." -ForegroundColor Red
+        Write-Host "  Start it with Tools\Start-StableDiffusionServer.ps1, or use -EnhanceOnly / -UseStableDiffusion:`$false for the description only." -ForegroundColor Yellow
+        exit 1
     } else {
-        # Fallback: return enhanced description
-        Write-Host "⚠ SD3 not available, returning enhanced description only" -ForegroundColor Yellow
+        # Explicitly description-only run (-UseStableDiffusion:$false): return enhanced description
         $result = @{
             OriginalDescription = $Description
             EnhancedDescription = $enhancedDescription
