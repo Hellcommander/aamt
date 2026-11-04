@@ -24,7 +24,10 @@ param(
     [switch]$GenerateDesignDraft,  # Generate design draft/concept art first using SD3 (requires SD3 server)
 
     [Parameter(Mandatory=$false)]
-    [switch]$Interactive  # Wait for keypress at end; default off for unattended runs
+    [switch]$Interactive,  # Wait for keypress at end; default off for unattended runs
+
+    [Parameter(Mandatory=$false)]
+    [switch]$AllowProcedural  # Explicit opt-in: procedural icons if local SD is down (default: fail; or AAMT_SD_STRICT=0)
 )
 
 function Test-InteractiveConsole {
@@ -327,7 +330,9 @@ Write-Host ""
 
 try {
     $qualityArg = if ($QualityAssessmentDepth -eq "fast") { "fast" } else { "full" }
-    python generate_vortex_professional.py "$ModPath" --quality $qualityArg
+    $vortexArgs = @("$ModPath", "--quality", $qualityArg)
+    if ($AllowProcedural) { $vortexArgs += "--allow-procedural" }
+    python generate_vortex_professional.py @vortexArgs
     $pythonExitCode = $LASTEXITCODE
     
     # Run quality assessment even if there were partial errors (non-zero exit code)

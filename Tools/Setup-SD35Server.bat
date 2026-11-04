@@ -30,11 +30,13 @@ echo Using: %PWSH_CMD%
 echo.
 
 REM Run the PowerShell setup script
-%PWSH_CMD% -NoProfile -ExecutionPolicy Bypass -File "%~dp0Setup-SD35Server.ps1"
+REM Extra arguments (e.g. -SkipModelDownload, -SkipT5, -InstallPath D:\x) are forwarded.
+%PWSH_CMD% -NoProfile -ExecutionPolicy Bypass -File "%~dp0Setup-SD35Server.ps1" %*
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
-    echo [ERROR] Setup failed!
+    echo [ERROR] Setup failed! If the model download was refused, run "hf auth login" and accept the license at
+    echo         https://huggingface.co/stabilityai/stable-diffusion-3.5-medium
     pause
     exit /b 1
 )

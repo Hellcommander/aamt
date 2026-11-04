@@ -20,8 +20,10 @@ from __future__ import annotations
 
 import argparse
 import base64
+import functools
 import json
 import os
+import socket
 import sys
 import threading
 import time
@@ -34,7 +36,7 @@ from typing import Any, Optional
 HOST = "127.0.0.1"
 PORT = 1338
 MODEL_ID = "stabilityai/stable-diffusion-3.5-medium"
-SERVER_VERSION = "aamt-1338.5"
+SERVER_VERSION = "aamt-1338.6"
 
 _pipe = None
 _pipe_i2i = None
@@ -47,6 +49,11 @@ _token_ok = False
 _token_name: Optional[str] = None
 _loading = False
 _generating = False
+# Requests that have entered generate_png (including ones queued on _lock).
+_inflight = 0
+_inflight_lock = threading.Lock()
+_httpds: list = []
+_listen: list = []
 
 _AUTH_MARKERS = (
     "401",
@@ -61,6 +68,55 @@ _GENERATE_PATHS = ("/v1/images/generations", "/generate")
 
 def _env_truthy(name: str, default: str = "0") -> bool:
     return os.environ.get(name, default).strip().lower() in ("1", "true", "yes", "on")
+
+
+_T5_FILES = (
+    "text_encoder_3/config.json",
+    "text_encoder_3/model.safetensors.index.json",
+    "text_encoder_3/model-00001-of-00002.safetensors",
+    "text_encoder_3/model-00002-of-00002.safetensors",
+)
+
+
+@functools.lru_cache(maxsize=1)
+def _t5_cached() -> bool:
+    """True when the T5-XXL shards are already in the local HF cache."""
+    try:
+        from huggingface_hub import try_to_load_from_cache
+
+        return all(isinstance(try_to_load_from_cache(MODEL_ID, f), str) for f in _T5_FILES)
+    except Exception:
+        return False
+
+
+def _skip_t5() -> bool:
+    """T5 is the biggest prompt-adherence win. SD_SKIP_T5 overrides; otherwise
+    T5 is used as soon as its weights are cached (never triggers a surprise download)."""
+    raw = os.environ.get("SD_SKIP_T5")
+    if raw not in (None, ""):
+        return _env_truthy("SD_SKIP_T5")
+    return not _t5_cached()
+
+
+def _t5_ram() -> bool:
+    """Keep T5 in system RAM via model_cpu_offload (11GB GPU). SD_ALLOW_T5_RAM overrides."""
+    raw = os.environ.get("SD_ALLOW_T5_RAM")
+    if raw not in (None, ""):
+        return _env_truthy("SD_ALLOW_T5_RAM")
+    return True
+
+
+def _max_guidance() -> float:
+    """SD3.5 is tuned for CFG ~3.5-4.5; callers hardcode 7+ (burnt, oversaturated).
+    Default cap 4.5 when T5 is active, none when running CLIP-only. SD_MAX_GUIDANCE
+    overrides (0 disables)."""
+    raw = os.environ.get("SD_MAX_GUIDANCE")
+    if raw not in (None, ""):
+        try:
+            return max(0.0, float(raw))
+        except ValueError:
+            return 0.0
+    return 0.0 if _skip_t5() else 4.5
 
 
 def _max_seq_len(body: Optional[dict] = None) -> int:
@@ -127,10 +183,11 @@ def load_pipeline():
 
             if not torch.cuda.is_available():
                 raise RuntimeError("CUDA is not available on this Python")
-            skip_t5 = _env_truthy("SD_SKIP_T5", "1")
-            t5_ram = _env_truthy("SD_ALLOW_T5_RAM", "0")
+            skip_t5 = _skip_t5()
+            t5_ram = _t5_ram()
             seq_len = _max_seq_len()
-            kwargs: dict[str, Any] = {"torch_dtype": torch.float16}
+            # diffusers >= 0.35 renamed torch_dtype -> dtype (torch_dtype warns, removed in 1.0).
+            kwargs: dict[str, Any] = {"dtype": torch.float16}
             token = os.environ.get("HF_TOKEN") or os.environ.get("HUGGING_FACE_HUB_TOKEN")
             if token:
                 kwargs["token"] = token
@@ -202,8 +259,8 @@ def load_img2img():
         _pipe_i2i = StableDiffusion3Img2ImgPipeline(**txt.components)
         # Match txt2img placement when T5 is enabled via cpu offload.
         if (
-            _env_truthy("SD_SKIP_T5", "1") is False
-            and _env_truthy("SD_ALLOW_T5_RAM", "0")
+            not _skip_t5()
+            and _t5_ram()
             and hasattr(_pipe_i2i, "enable_model_cpu_offload")
         ):
             try:
@@ -230,6 +287,19 @@ def _decode_init_image(body: dict, width: int, height: int):
 
 
 def generate_png(body: dict) -> bytes:
+    """Counts the request as in-flight so the idle watchdog never fires mid-job."""
+    global _inflight, _last_used
+    with _inflight_lock:
+        _inflight += 1
+    try:
+        return _generate_png_impl(body)
+    finally:
+        with _inflight_lock:
+            _inflight -= 1
+        _last_used = time.time()
+
+
+def _generate_png_impl(body: dict) -> bytes:
     global _last_used, _generating
     _last_used = time.time()
     prompt = str(body.get("prompt") or "")
@@ -238,6 +308,10 @@ def generate_png(body: dict) -> bytes:
     height = int(body.get("height") or 512)
     steps = int(body.get("steps") or 24)
     guidance = float(body.get("guidance_scale") or 7.0)
+    cap = _max_guidance()
+    if cap > 0 and guidance > cap:
+        print(f"[SD] guidance {guidance:g} capped to {cap:g} (SD_MAX_GUIDANCE)", flush=True)
+        guidance = cap
     seed = body.get("seed")
     generator = None
     if seed not in (None, "", -1):
@@ -246,7 +320,7 @@ def generate_png(body: dict) -> bytes:
         generator = torch.Generator(device="cuda").manual_seed(int(seed))
     init = _decode_init_image(body, width, height)
     seq_len = _max_seq_len(body)
-    skip_t5 = _env_truthy("SD_SKIP_T5", "1")
+    skip_t5 = _skip_t5()
     print(
         f"[SD] generate {width}x{height} steps={steps} seed={seed} "
         f"img2img={'yes' if init is not None else 'no'} "
@@ -265,6 +339,15 @@ def generate_png(body: dict) -> bytes:
     # Only meaningful when T5 is loaded; CLIP encoders stay at 77 regardless.
     if not skip_t5:
         call_kw["max_sequence_length"] = seq_len
+    # Progress in the server log (denoise has no other visible output when run hidden).
+    t_start = time.time()
+
+    def _on_step(_pipe, i, _t, cb_kwargs):
+        if i == 0 or (i + 1) % 5 == 0 or i + 1 == steps:
+            print(f"[SD] step {i + 1}/{steps} {time.time() - t_start:.0f}s", flush=True)
+        return cb_kwargs
+
+    call_kw["callback_on_step_end"] = _on_step
     # One CUDA job at a time; other request threads can still serve /ping.
     with _lock:
         _generating = True
@@ -286,17 +369,21 @@ def generate_png(body: dict) -> bytes:
 
 
 def _status_payload() -> dict:
-    skip_t5 = _env_truthy("SD_SKIP_T5", "1")
+    skip_t5 = _skip_t5()
     return {
         "status": "ok",
         "model": MODEL_ID,
         "loaded": _pipe is not None,
         "loading": bool(_loading),
         "generating": bool(_generating),
+        "inflight": int(_inflight),
+        "listen": list(_listen),
         "threaded": True,
         "version": SERVER_VERSION,
         "skip_t5": skip_t5,
-        "t5_ram": _env_truthy("SD_ALLOW_T5_RAM", "0"),
+        "t5_ram": _t5_ram(),
+        "t5_cached": _t5_cached(),
+        "max_guidance": _max_guidance(),
         "max_sequence_length": 77 if skip_t5 else _max_seq_len(),
         "token_ok": _token_ok,
         "token_name": _token_name,
@@ -359,40 +446,103 @@ class Handler(BaseHTTPRequestHandler):
 
 def _stop() -> None:
     time.sleep(0.2)
-    if _httpd is not None:
+    servers = list(_httpds) or ([_httpd] if _httpd is not None else [])
+    if servers:
         print("[SD] shutdown", flush=True)
-        threading.Thread(target=_httpd.shutdown, daemon=True).start()
+        for srv in servers:
+            threading.Thread(target=srv.shutdown, daemon=True).start()
 
 
 def _idle_watch() -> None:
+    global _last_used
     limit = _idle_sec()
     if limit <= 0:
         return
     while True:
         time.sleep(5.0)
+        # A generation can run far longer than the idle limit (330-490s on this GPU).
+        # Never shut down while loading, generating, or with queued requests.
+        if _loading or _generating or _inflight > 0:
+            _last_used = time.time()
+            continue
         if time.time() - _last_used >= limit:
             print(f"[SD] idle {limit:.0f}s — shutting down", flush=True)
             _stop()
             return
 
 
+class _SdServer(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+
+
+class _SdServer6(_SdServer):
+    """IPv6 listener. V6ONLY keeps it independent of the IPv4 socket on the same port."""
+
+    address_family = socket.AF_INET6
+
+    def server_bind(self) -> None:
+        try:
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+        except (AttributeError, OSError):
+            pass
+        super().server_bind()
+
+
+def _resolve_listen(host_arg: str) -> tuple[Optional[str], Optional[str]]:
+    """Return (ipv4_host, ipv6_host). Loopback names listen on BOTH 127.0.0.1 and ::1."""
+    h = (host_arg or "").strip().strip("[]").lower()
+    want_v6 = _env_truthy("SD_LISTEN_IPV6", "1") and socket.has_ipv6
+    if h in ("", "localhost", "loopback", "auto"):
+        return "127.0.0.1", ("::1" if want_v6 else None)
+    if h == "127.0.0.1":
+        return "127.0.0.1", None
+    if h == "::1":
+        return None, "::1"
+    if ":" in h:
+        return None, h
+    return h, None
+
+
 def main() -> int:
     global _httpd, _last_used
     parser = argparse.ArgumentParser()
-    parser.add_argument("--host", default="localhost")
+    parser.add_argument(
+        "--host",
+        default="localhost",
+        help="localhost = 127.0.0.1 AND ::1 (default); or a single literal address",
+    )
     parser.add_argument("--port", type=int, default=PORT)
     args = parser.parse_args()
-    host = "127.0.0.1" if args.host in ("localhost", "127.0.0.1") else args.host
+    host4, host6 = _resolve_listen(args.host)
+    port = int(args.port)
+
     # Threaded accept so /ping stays responsive while T5 loads or a generate runs.
     # CUDA work remains serialized under _lock.
-    class _SdServer(ThreadingHTTPServer):
-        daemon_threads = True
-        allow_reuse_address = True
+    if host4:
+        _httpd = _SdServer((host4, port), Handler)
+        _httpds.append(_httpd)
+        _listen.append(f"http://{host4}:{port}")
+    if host6:
+        try:
+            srv6 = _SdServer6((host6, port), Handler)
+        except OSError as exc:
+            if host4 is None:
+                raise
+            print(f"[SD] IPv6 listener on [{host6}]:{port} unavailable ({exc}); IPv4 only", flush=True)
+        else:
+            if _httpd is None:
+                _httpd = srv6
+            _httpds.append(srv6)
+            _listen.append(f"http://[{host6}]:{port}")
+            if srv6 is not _httpd:
+                threading.Thread(target=srv6.serve_forever, daemon=True).start()
+    if _httpd is None:
+        raise RuntimeError("no listener could be created")
 
-    _httpd = _SdServer((host, int(args.port)), Handler)
     _last_used = time.time()
     print(
-        f"SD3.5 API Server starting on http://{host}:{args.port} "
+        f"SD3.5 API Server starting on {', '.join(_listen)} "
         f"({SERVER_VERSION}, threaded)",
         flush=True,
     )

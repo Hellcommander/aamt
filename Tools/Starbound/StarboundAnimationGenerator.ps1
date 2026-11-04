@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Generate animation files for Starbound/OpenStarbound.
@@ -46,7 +46,16 @@ if (Test-Path $settingsPath) {
     
 .PARAMETER OutputDir
     Output directory for generated files
-    
+
+.PARAMETER AllowProcedural
+    The spritesheet is rendered with the local Stable Diffusion 3.5 server (:1338) via
+    StarboundSdArt.psm1. By default the script throws if SD cannot deliver. With this switch
+    (or AAMT_SD_STRICT=0) the legacy System.Drawing placeholder sheet may be drawn instead,
+    but only after an SD failure.
+
+.PARAMETER GeneratePlaceholderImage
+    Legacy switch kept for caller compatibility. A real SD spritesheet is always generated.
+
 .EXAMPLE
     .\StarboundAnimationGenerator.ps1 -AnimationName "myeffect" -FrameCount 8 -FrameSize @(32,32)
     
@@ -90,10 +99,13 @@ param(
     [string]$OutputDir = "StarboundAnimations",
     
     [Parameter(Mandatory=$false)]
-    [switch]$GeneratePlaceholderImage,
-    
+    [switch]$GeneratePlaceholderImage,   # legacy; ignored (real SD art is always generated)
+
     [Parameter(Mandatory=$false)]
-    [int[]]$PlaceholderColor = @(255, 255, 255, 128),
+    [switch]$AllowProcedural,            # permit the legacy System.Drawing sheet after an SD failure
+
+    [Parameter(Mandatory=$false)]
+    [int[]]$PlaceholderColor = @(255, 255, 255, 128),   # colour hint (prompt) / fallback fill colour
     
     [Parameter(Mandatory=$false)]
     [string]$Description = "",
@@ -146,6 +158,132 @@ function Write-Log {
     }
     Write-Host $logEntry -ForegroundColor $color
     Add-Content -Path $logFile -Value $logEntry -ErrorAction SilentlyContinue
+}
+
+# ---------------------------------------------------------------------------
+# Stable Diffusion art: real pixels from the local SD3.5 server (:1338).
+# There is no procedural placeholder unless -AllowProcedural / AAMT_SD_STRICT=0.
+# ---------------------------------------------------------------------------
+Import-Module (Join-Path $PSScriptRoot "StarboundSdArt.psm1") -Force
+$script:ProceduralAllowed = $AllowProcedural.IsPresent -or ($env:AAMT_SD_STRICT -eq '0')
+
+function Get-StarboundArtSeed {
+    param([string]$Text)
+    $h = 17
+    foreach ($ch in $Text.ToCharArray()) { $h = (($h * 31) + [int]$ch) % 899981 }
+    return ($h + 1)
+}
+
+function ConvertTo-StarboundColorWord {
+    param([int]$R, [int]$G, [int]$B)
+    $max = [Math]::Max($R, [Math]::Max($G, $B))
+    $min = [Math]::Min($R, [Math]::Min($G, $B))
+    $delta = $max - $min
+    if ($max -lt 50) { return "black" }
+    if ($delta -lt 30) {
+        if ($max -gt 215) { return "white" }
+        if ($max -gt 150) { return "light gray" }
+        return "dark gray"
+    }
+    if ($max -eq $R) { $hue = 60.0 * ((($G - $B) / [double]$delta) % 6) }
+    elseif ($max -eq $G) { $hue = 60.0 * ((($B - $R) / [double]$delta) + 2) }
+    else { $hue = 60.0 * ((($R - $G) / [double]$delta) + 4) }
+    if ($hue -lt 0) { $hue += 360 }
+    $name = "red"
+    if ($hue -ge 15 -and $hue -lt 40) { $name = "orange" }
+    elseif ($hue -ge 40 -and $hue -lt 70) { $name = "yellow" }
+    elseif ($hue -ge 70 -and $hue -lt 160) { $name = "green" }
+    elseif ($hue -ge 160 -and $hue -lt 200) { $name = "cyan" }
+    elseif ($hue -ge 200 -and $hue -lt 255) { $name = "blue" }
+    elseif ($hue -ge 255 -and $hue -lt 290) { $name = "purple" }
+    elseif ($hue -ge 290 -and $hue -lt 345) { $name = "magenta" }
+    if ($max -lt 120) { return "dark $name" }
+    if ($max -gt 230 -and $delta -lt 110) { return "pale $name" }
+    return $name
+}
+
+function Get-StarboundPaletteWords {
+    # Palette: array of @(r,g,b) triples (or one flat @(r,g,b)). Returns "red, dark blue, ...".
+    param($Palette)
+    if ($null -eq $Palette) { return "" }
+    $items = @($Palette)
+    if ($items.Count -eq 0) { return "" }
+    if ($items[0] -is [ValueType] -or $items[0] -is [string]) { $items = @(, $items) }
+    $words = @()
+    foreach ($c in $items) {
+        $arr = @($c)
+        if ($arr.Count -lt 3) { continue }
+        try { $w = ConvertTo-StarboundColorWord -R ([int]$arr[0]) -G ([int]$arr[1]) -B ([int]$arr[2]) } catch { continue }
+        if ($words -notcontains $w) { $words += $w }
+    }
+    return ($words -join ", ")
+}
+
+function Write-StarboundArt {
+    <#
+    .SYNOPSIS
+    Builds an SD prompt from asset type / name / description / palette and renders the PNG
+    (single sprite, or a Frames-cell sheet) through New-StarboundSdArt. Returns $true when
+    the PNG was written; $false only when SD failed AND procedural output is allowed;
+    throws otherwise.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$AssetType,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [string]$Description = "",
+        [Parameter(Mandatory = $true)][int]$Width,
+        [Parameter(Mandatory = $true)][int]$Height,
+        [Parameter(Mandatory = $true)][string]$OutputPath,
+        [int]$Frames = 1,
+        [int]$Columns = 0,
+        [string[]]$FrameNotes = @(),
+        $Palette = $null,
+        [bool]$Transparent = $true,
+        [bool]$Pixel = $true,
+        [int]$Colors = 24,
+        [string]$SdKind = "icon"
+    )
+
+    $subject = switch ($AssetType) {
+        "Animation"       { "animation spritesheet frame of" }
+        "AnimationSprite" { "animation spritesheet frame of" }
+        "Effect"          { "visual effect sprite of" }
+        default           { "game sprite of" }
+    }
+    $readable = (($Name -creplace '([a-z0-9])([A-Z])', '$1 $2') -replace '[_\-\.]+', ' ').Trim()
+    $desc = ($Description -replace '[\r\n\t]+', ' ' -replace '["`|]', '').Trim()
+    if ($desc.Length -gt 320) { $desc = $desc.Substring(0, 320) }
+    $parts = @("$subject $readable")
+    if ($desc) { $parts += $desc }
+    $pal = Get-StarboundPaletteWords -Palette $Palette
+    if ($pal) { $parts += "color palette: $pal" }
+    $prompt = ($parts -join ". ")
+
+    $common = @{
+        Prompt          = $prompt
+        OutputPath      = $OutputPath
+        Width           = $Width
+        Height          = $Height
+        Transparent     = $Transparent
+        Pixel           = $Pixel
+        Colors          = $Colors
+        Seed            = (Get-StarboundArtSeed "$AssetType|$Name")
+        SdKind          = $SdKind
+        AllowProcedural = $script:ProceduralAllowed
+    }
+    if ($Frames -gt 1) {
+        $notes = @($FrameNotes | ForEach-Object { ($_ -replace '["`|]', '').Trim() } | Where-Object { $_ })
+        $cols = if ($Columns -gt 0) { $Columns } else { $Frames }
+        $common['Kind'] = "sheet"
+        $common['Count'] = $Frames
+        $common['Columns'] = $cols
+        $common['Consistent'] = $true   # animation frames keep one subject (img2img from frame 1)
+        if ($notes.Count -gt 0) { $common['Variants'] = $notes }
+    } else {
+        $common['Kind'] = "sprite"
+    }
+    return [bool](New-StarboundSdArt @common)
 }
 
 Write-Log "═══════════════════════════════════════════════════════════"
@@ -386,10 +524,58 @@ Return ONLY the JSON object."
     }
 }
 
-# Always write a real spritesheet PNG (procedural/AI). External ImagePath can override afterward.
-if ($true) {
-    Write-Log "Generating animation spritesheet..." "INFO"
-    
+# Always write a real spritesheet PNG rendered by Stable Diffusion (one cell per frame,
+# one row per variant). An external -ImagePath replaces it, so SD is skipped in that case.
+$sheetPath = Join-Path $animOutputDir "$AnimationName.png"
+$haveExternalImage = (-not [string]::IsNullOrEmpty($ImagePath)) -and (Test-Path $ImagePath)
+$sdSheetOk = $false
+if (-not $haveExternalImage) {
+    Write-Log "Generating animation spritesheet with Stable Diffusion..." "INFO"
+
+    # Description + any Ollama visual design feed the prompt.
+    $artDescription = $Description
+    $artPalette = $null
+    $patternHint = ""
+    if ($script:visualDesign) {
+        if ($script:visualDesign.VisualStyle) { $artDescription = "$artDescription. $($script:visualDesign.VisualStyle)" }
+        if ($script:visualDesign.FrameVariations) { $artDescription = "$artDescription. $($script:visualDesign.FrameVariations)" }
+        if ($script:visualDesign.AnimationPattern) { $patternHint = "$($script:visualDesign.AnimationPattern)" }
+        if ($script:visualDesign.ColorPalette -and $script:visualDesign.ColorPalette.Count -gt 0) { $artPalette = $script:visualDesign.ColorPalette }
+    }
+    if ($null -eq $artPalette -and $PSBoundParameters.ContainsKey('PlaceholderColor')) {
+        $artPalette = @(, @($PlaceholderColor[0], $PlaceholderColor[1], $PlaceholderColor[2]))
+    }
+
+    # Per-frame motion phase notes (cells are rendered one at a time, row-major).
+    $frameNotes = @()
+    for ($v = 0; $v -lt $Variants; $v++) {
+        for ($f = 0; $f -lt $FrameCount; $f++) {
+            $progress = if ($FrameCount -gt 1) { $f / [double]($FrameCount - 1) } else { 0.0 }
+            $phase = if ($progress -lt 0.25) { "start of the animation, small and faint" }
+                     elseif ($progress -lt 0.5) { "building up, growing stronger" }
+                     elseif ($progress -lt 0.75) { "at peak intensity, largest and brightest" }
+                     else { "fading out, dissipating" }
+            $note = "frame $($f + 1) of $FrameCount, $phase"
+            if ($patternHint) { $note = "$note, motion: $patternHint" }
+            if ($Variants -gt 1) { $note = "$note, variant $($v + 1)" }
+            $frameNotes += $note
+        }
+    }
+
+    # Throws when SD cannot deliver unless -AllowProcedural / AAMT_SD_STRICT=0 (then returns $false).
+    $sdSheetOk = Write-StarboundArt -AssetType "Animation" -Name $AnimationName -Description $artDescription `
+        -Width $FrameSize[0] -Height $FrameSize[1] -OutputPath $sheetPath `
+        -Frames ($FrameCount * $Variants) -Columns $FrameCount -FrameNotes $frameNotes -Palette $artPalette
+    if ($sdSheetOk) {
+        Write-Log "Created animation spritesheet (Stable Diffusion): $sheetPath" "SUCCESS"
+        Write-Log "  Spritesheet size: $($FrameSize[0] * $FrameCount)x$($FrameSize[1] * $Variants)" "INFO"
+    }
+}
+
+# Legacy System.Drawing sheet: only after an SD failure with procedural output explicitly allowed.
+if (-not $haveExternalImage -and -not $sdSheetOk) {
+    Write-Log "Stable Diffusion unavailable - drawing procedural placeholder sheet (-AllowProcedural)" "WARN"
+
     try {
         Add-Type -AssemblyName System.Drawing
         
@@ -488,13 +674,12 @@ if ($true) {
         }
         
         $pen.Dispose()
-        $imagePath = Join-Path $animOutputDir "$AnimationName.png"
-        $bitmap.Save($imagePath, [System.Drawing.Imaging.ImageFormat]::Png)
-        
+        $bitmap.Save($sheetPath, [System.Drawing.Imaging.ImageFormat]::Png)
+
         $graphics.Dispose()
         $bitmap.Dispose()
-        
-        Write-Log "Created animation spritesheet: $imagePath" "SUCCESS"
+
+        Write-Log "Created procedural placeholder spritesheet: $sheetPath" "SUCCESS"
         Write-Log "  Spritesheet size: ${totalWidth}x${totalHeight}" "INFO"
     }
     catch {
@@ -502,7 +687,7 @@ if ($true) {
     }
 }
 
-# Optional: replace procedural sheet with a provided source image
+# Optional: use a provided source image as the spritesheet
 if (-not [string]::IsNullOrEmpty($ImagePath) -and (Test-Path $ImagePath)) {
     $destImagePath = Join-Path $animOutputDir "$AnimationName.png"
     $srcFullPath = (Resolve-Path $ImagePath).Path

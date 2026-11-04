@@ -24,7 +24,7 @@ Hydromancy is excluded. EXE-only ids are `unconfirmed`. Patch overlay ids are `p
 | ability | `attack_speed` | float | 6 | vanilla | buff stat |
 | ability | `bleed` | int | 9 | vanilla | ability will cause bleed status. |
 | ability | `bleed_per_damage` | null | 2 | workshop | how much bleed will this ability deal per damage. |
-| ability | `break_armor` | null | 1 | unconfirmed | Found in Soulash 2.exe string table; not seen in JSON or docs. |
+| ability | `break_armor` | null | 1 | unconfirmed | break armor is irrelevant for S2, it damaged durability in S1 |
 | ability | `burn` | int | 7 | vanilla | will apply burning effect on enemy. |
 | ability | `burn_stamina` | int | 3 | vanilla | removes stamina on target. |
 | ability | `burning_light` | int | 1 | vanilla |  |
@@ -53,7 +53,7 @@ Hydromancy is excluded. EXE-only ids are `unconfirmed`. Patch overlay ids are `p
 | ability | `damage_weapon` | float | 88 | vanilla | % damage of the weapon wielded will apply to ability damage. |
 | ability | `deflection` | float | 3 | vanilla | deflects arrows back at the attacker. |
 | ability | `dexterity` | int | 6 | vanilla | buff/debuff stat |
-| ability | `disadvantage` | null | 1 | unconfirmed | Found in Soulash 2.exe string table; not seen in JSON or docs. |
+| ability | `disadvantage` | null | 1 | unconfirmed | disadvantage is also S1 ability effect, deprecated in S2 |
 | ability | `disarm` | int | 4 | vanilla | ability will disarm enemy. |
 | ability | `dmg_on_cooldown` | int | 1 | workshop |  |
 | ability | `dmg_without_companions` | null | 1 | unconfirmed | Found in Soulash 2.exe string table; not seen in JSON or docs. |
@@ -204,7 +204,7 @@ Hydromancy is excluded. EXE-only ids are `unconfirmed`. Patch overlay ids are `p
 | passive | `aura_extra_aoe_range` | string | 1 | vanilla |  |
 | passive | `better_deals` | unknown | 0 | patch | Better sale prices for a specific item type. value is likely the bonus; secondary_value is item_type index from messages |
 | passive | `block_counter` | int | 1 | vanilla |  |
-| passive | `bloodlust` | null | 1 | vanilla |  |
+| passive | `bloodlust` | null | 1 | vanilla | bloodlust is vampire passive effect it changes hunger and thirst to bloodlust |
 | passive | `bonus_attack` | float | 1 | vanilla | Chance for an extra attack when attacking (not abilities). Docs: 0.1 = 10%. |
 | passive | `bonus_crafting_unit` | float | 3 | vanilla |  |
 | passive | `bonus_damage` | int | 1 | vanilla |  |

@@ -65,10 +65,17 @@ param(
     [switch]$GenerateSpritesheets,
     
     [ValidateSet("low", "medium", "high", "ultra")]
-    [string]$Quality = "high"
+    [string]$Quality = "high",
+
+    # Accept procedural (PIL/GDI) placeholder art when local Stable Diffusion is down or fails.
+    # Default: the asset fails instead. (AAMT_SD_STRICT=0 in the environment does the same.)
+    [switch]$AllowProcedural
 )
 
 $ErrorActionPreference = "Stop"
+
+# SD policy: procedural placeholder art is never a silent fallback.
+$sdStrict = (-not $AllowProcedural) -and ($env:AAMT_SD_STRICT -ne '0')
 
 # Set PSScriptRoot if not set (when script is dot-sourced)
 if (-not $PSScriptRoot) {
@@ -533,8 +540,12 @@ function Generate-Asset {
                 "Check that you're running from the correct directory",
                 "Ensure generate_asset_image.py is in the same directory as OllamaAssetGenerator.ps1"
             )
-        # Create placeholder using PowerShell
-        Create-PlaceholderAsset -OutputPath $outputFile -Specification $Specification -AssetType $AssetType
+        if (-not $sdStrict) {
+            # Procedural placeholder only when explicitly allowed (-AllowProcedural / AAMT_SD_STRICT=0)
+            Create-PlaceholderAsset -OutputPath $outputFile -Specification $Specification -AssetType $AssetType
+        } else {
+            Write-Host "  [SD] No placeholder written: SD art is required (use -AllowProcedural to override)" -ForegroundColor Red
+        }
         return $false
     }
     
@@ -563,7 +574,8 @@ function Generate-Asset {
                 "--type", $AssetType
                 "--size", $Specification.size
             )
-            
+            if (-not $sdStrict) { $args += "--allow-procedural" }
+
             $result = & $pythonCmd.Source $args 2>&1
             $exitCode = $LASTEXITCODE
             
@@ -600,7 +612,12 @@ function Generate-Asset {
                     "Add Python to your system PATH",
                     "Or use python3 if installed"
                 )
-            Create-PlaceholderAsset -OutputPath $outputFile -Specification $Specification -AssetType $AssetType
+            if (-not $sdStrict) {
+                # Procedural placeholder only when explicitly allowed (-AllowProcedural / AAMT_SD_STRICT=0)
+                Create-PlaceholderAsset -OutputPath $outputFile -Specification $Specification -AssetType $AssetType
+            } else {
+                Write-Host "  [SD] No placeholder written: SD art is required (use -AllowProcedural to override)" -ForegroundColor Red
+            }
             $success = $false
         }
     }
@@ -631,6 +648,7 @@ function Create-PlaceholderAsset {
     <#
     .SYNOPSIS
     Creates a real procedural PNG when Python is unavailable (never a no-op).
+    Callers only invoke this when procedural art is explicitly allowed (see $sdStrict).
     #>
     param(
         [string]$OutputPath,

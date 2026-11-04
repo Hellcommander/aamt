@@ -25,18 +25,41 @@ START_PS1 = TOOLS_ROOT / "Start-StableDiffusionServer.ps1"
 STOP_PS1 = TOOLS_ROOT / "Stop-StableDiffusionServer.ps1"
 
 
-def _sd_base_url() -> str:
+def _sd_port() -> int:
     try:
         from tool_paths import sd_port
 
-        port = int(sd_port())
+        return int(sd_port())
     except Exception:
-        port = 1338
-    return f"http://127.0.0.1:{port}"
+        return 1338
 
 
+def _sd_base_url() -> str:
+    return f"http://127.0.0.1:{_sd_port()}"
+
+
+def _sd_base_urls() -> list:
+    """IPv4 and IPv6 loopback bases (the server listens on both)."""
+    port = _sd_port()
+    hosts = []
+    override = (os.environ.get("AAMT_SD_HOST") or "").strip().strip("[]")
+    if override:
+        hosts.append(override)
+    for h in ("127.0.0.1", "::1"):
+        if h == "::1" and os.environ.get("AAMT_SD_IPV6", "1").strip() == "0":
+            continue
+        if h not in hosts:
+            hosts.append(h)
+    return [f"http://[{h}]:{port}" if ":" in h else f"http://{h}:{port}" for h in hosts]
+
+
+# Kept for callers that import them (IPv4 form).
 PING_URL = f"{_sd_base_url()}/ping"
 SHUTDOWN_URL = f"{_sd_base_url()}/shutdown"
+
+# Never send loopback probes through a system proxy.
+_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+PING_TIMEOUT = float(os.environ.get("AAMT_SD_PING_TIMEOUT_SEC") or 4.0)
 
 
 def _env_truthy(name: str, default: bool = False) -> bool:
@@ -46,18 +69,28 @@ def _env_truthy(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
-def sd_status(timeout: float = 2.0) -> Optional[Dict[str, Any]]:
-    """GET /ping JSON, or None if the server is down."""
-    try:
-        with urllib.request.urlopen(PING_URL, timeout=timeout) as resp:
-            if resp.status != 200:
-                return None
-            return json.loads(resp.read().decode("utf-8", errors="replace"))
-    except Exception:
-        return None
+def sd_status(timeout: float = PING_TIMEOUT) -> Optional[Dict[str, Any]]:
+    """GET /ping JSON over IPv4 then IPv6, or None if the server is down.
+
+    A timeout is retried once (busy server); a refused connection is not.
+    """
+    for base in _sd_base_urls():
+        for attempt in range(2):
+            try:
+                with _OPENER.open(base + "/ping", timeout=timeout) as resp:
+                    if resp.status != 200:
+                        break
+                    return json.loads(resp.read().decode("utf-8", errors="replace"))
+            except Exception as exc:
+                reason = getattr(exc, "reason", None)
+                if isinstance(exc, ConnectionRefusedError) or isinstance(reason, ConnectionRefusedError):
+                    break
+                if attempt == 0:
+                    time.sleep(0.3)
+    return None
 
 
-def sd_ping(timeout: float = 2.0) -> bool:
+def sd_ping(timeout: float = PING_TIMEOUT) -> bool:
     return sd_status(timeout=timeout) is not None
 
 
@@ -91,15 +124,17 @@ def _wait_for_ping_and_load(deadline: float) -> bool:
 
 def stop_sd_server(*, force: bool = True) -> bool:
     """Ask the server to shut down; optionally kill listeners if still up."""
-    try:
-        urllib.request.urlopen(SHUTDOWN_URL, timeout=3).read()
-    except Exception:
-        pass
+    for base in _sd_base_urls():
+        try:
+            _OPENER.open(base + "/shutdown", timeout=3).read()
+            break
+        except Exception:
+            continue
     time.sleep(1.0)
-    if not sd_ping(timeout=1.0):
+    if not sd_ping(timeout=1.5):
         return True
     if not force or not STOP_PS1.exists():
-        return not sd_ping(timeout=1.0)
+        return not sd_ping(timeout=1.5)
     try:
         subprocess.run(
             [
@@ -116,7 +151,7 @@ def stop_sd_server(*, force: bool = True) -> bool:
     except Exception as exc:
         print(f"[SD] stop script failed: {exc}", file=sys.stderr)
     time.sleep(1.0)
-    return not sd_ping(timeout=1.0)
+    return not sd_ping(timeout=1.5)
 
 
 def ensure_sd_server(
