@@ -172,7 +172,11 @@ def ensure_sd_server(
         except ImportError:
             pass
         else:
-            hold_gpu_job("SD server start")
+            try:
+                hold_gpu_job("SD server start", timeout=timeout_sec)
+            except TimeoutError as exc:
+                print(f"[SD] GPU busy with another job: {exc}", file=sys.stderr)
+                return False
     deadline = time.time() + timeout_sec
     st = sd_status()
     if st and not is_aamt_status(st):

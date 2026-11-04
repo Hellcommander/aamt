@@ -273,7 +273,6 @@ def detect_server(verbose: bool = False) -> Optional[str]:
     A foreign SD process on :1338 (Starfield SFMAG) is not treated as ready.
     """
     for port in KNOWN_PORTS:
-        foreign_on_port = False
         for host in candidate_hosts():
             for path in HEALTH_PATHS:
                 url = f"http://{url_host(host)}:{port}{path}"
@@ -283,7 +282,6 @@ def detect_server(verbose: bool = False) -> Optional[str]:
                     if status == 426 or "websocket" in server.lower():
                         if verbose:
                             print(f"[SKIP] {url} requires HTTP/2 or is WebSocket++ ({server})", file=sys.stderr)
-                        foreign_on_port = True
                         break
                     if status == 200 and looks_like_aamt_sd(body):
                         api = f"http://{url_host(host)}:{port}/v1/images/generations"
@@ -297,7 +295,6 @@ def detect_server(verbose: bool = False) -> Optional[str]:
                                 "AAMT will replace it on ensure/start.",
                                 file=sys.stderr,
                             )
-                        foreign_on_port = True
                         break
                 except Exception as exc:
                     if verbose:
@@ -305,8 +302,7 @@ def detect_server(verbose: bool = False) -> Optional[str]:
                     if _is_refused(exc):
                         break  # nothing listens on this address family; try the next host
                     continue
-        if foreign_on_port:
-            return None
+        # a foreign service here does not rule out the AAMT server on a later port
     return None
 
 

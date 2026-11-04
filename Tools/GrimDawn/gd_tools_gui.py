@@ -51,7 +51,7 @@ class GdToolsGui(tk.Tk):
         self.update_out_var = tk.StringVar(value="")
         self.upd_class_ui = tk.BooleanVar(value=True)
         self.upd_combos = tk.BooleanVar(value=True)
-        self.upd_rebuild = tk.BooleanVar(value=False)
+        self.upd_rebuild = tk.BooleanVar(value=True)  # without it the new mod has no .arz
         self.use_ollama = tk.BooleanVar(value=True)
         self.ollama_model_var = tk.StringVar(value="")
         self.class_mods_var = tk.StringVar(value="")
@@ -59,7 +59,7 @@ class GdToolsGui(tk.Tk):
         self.merge_field_mode = tk.StringVar(value="rules")
         self.merge_latest = tk.BooleanVar(value=True)
         self.merge_skip_res = tk.BooleanVar(value=False)
-        self.merge_rebuild = tk.BooleanVar(value=False)
+        self.merge_rebuild = tk.BooleanVar(value=True)
         self._proc: Optional[subprocess.Popen] = None
         self._busy = False
 

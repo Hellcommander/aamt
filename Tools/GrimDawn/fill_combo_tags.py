@@ -135,12 +135,14 @@ def inject_tags_into_text_arc(
     tag_files = [tag_file] if isinstance(tag_file, Path) else [Path(f) for f in tag_file]
     for f in tag_files:
         shutil.copy2(f, root / f.name)
-    stripped = strip_conflicting_combo_tags(root, tag_files)
-    if stripped:
-        print(f"Removed {stripped} superseded tag lines from the mod's other text files", flush=True)
+    # Merge first: the merge re-adds game lines a shadowing mod file lacks, which would bring
+    # back the keys we regenerate if the strip ran before it.
     n_merged = merge_with_game_text(game, root)
     if n_merged:
         print(f"Merged current game tags into {n_merged} mod text files that shadow game files", flush=True)
+    stripped = strip_conflicting_combo_tags(root, tag_files)
+    if stripped:
+        print(f"Removed {stripped} superseded tag lines from the mod's other text files", flush=True)
 
     if resolve_arzedit() is None:
         return f"Tags copied to {root} but arzedit missing — Text_EN.arc not repacked"

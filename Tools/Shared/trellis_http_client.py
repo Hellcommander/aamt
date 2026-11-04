@@ -151,7 +151,10 @@ def start_server(wait_seconds: float = STARTUP_TIMEOUT, log_path: Optional[Path]
     except ImportError:
         pass
     else:
-        hold_gpu_job("TRELLIS server start")
+        try:
+            hold_gpu_job("TRELLIS server start", timeout=wait_seconds)
+        except TimeoutError as exc:
+            raise RuntimeError(f"GPU job lease not acquired: {exc}") from exc
     existing = detect_server()
     if existing:
         return existing

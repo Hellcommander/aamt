@@ -14,7 +14,7 @@ Ops run in the order given:
     --keep-largest        keep only the largest connected piece
     --merge               weld duplicate vertices, drop degenerate/duplicate faces, fix winding and normals
     --fill-holes          close small holes
-    --decimate N          reduce to about N triangles (fast-simplification if installed, else Blender)
+    --decimate N          reduce to about N triangles (Blender for textured meshes, so UVs survive; else fast-simplification if installed)
     --remesh VOXEL        Blender voxel remesh (fuses shards into one shell; VOXEL ~0.01 of a 1 m mesh), texture rebaked
     --rotate AXIS:DEG     e.g. x:90 (repeatable)
     --mirror AXIS
@@ -299,10 +299,14 @@ def fix(src: Path, dst: Path, ops: list) -> dict:
         elif name == "fill_holes":
             trimesh.repair.fill_holes(m)
         elif name == "decimate":
-            try:
-                m = m.simplify_quadric_decimation(face_count=int(val))
-            except Exception:  # noqa: BLE001
+            # trimesh's decimation returns bare geometry (no UVs or texture); Blender keeps them
+            if texture(m) is not None or getattr(m.visual, "uv", None) is not None:
                 m = blender_op(m, "decimate", float(val))
+            else:
+                try:
+                    m = m.simplify_quadric_decimation(face_count=int(val))
+                except Exception:  # noqa: BLE001
+                    m = blender_op(m, "decimate", float(val))
         elif name == "remesh":
             m = blender_op(m, "remesh", float(val))
         elif name == "match_back":

@@ -215,6 +215,8 @@ def build(profile_name: str, *, rebuild: bool = False, dry_run: bool = False) ->
         if out_mod.exists():
             shutil.rmtree(out_mod)
         build_database_from_mods(game, db_cfg, out_mod)
+        # The staging folder starts empty, so its .arz must be built or the swapped-in mod has no database.
+        rebuild = True
     if not out_mod.is_dir():
         raise FileNotFoundError(f"output mod {out_mod} missing (add a 'database' section or build it first)")
 
@@ -357,7 +359,7 @@ def build(profile_name: str, *, rebuild: bool = False, dry_run: bool = False) ->
                "Re-run after game/mod updates: `python world_link.py --profile " + profile_name + " --rebuild`"]
     (out_mod / "WORLD_LINKS.md").write_text("\n".join(report) + "\n", encoding="utf-8")
     if out_mod != final_mod:
-        if db_cfg and rebuild and not list((out_mod / "database").glob("*.arz")):
+        if db_cfg and not list((out_mod / "database").glob("*.arz")):
             raise RuntimeError(f"no .arz was built in {out_mod}; keeping the current {final_mod.name}")
         prev = final_mod.with_name(final_mod.name + "__previous")
         if prev.exists():
