@@ -30,22 +30,36 @@ except ImportError:  # pragma: no cover
         return Path(default) if default else None
 
 
+# D: is the live install (0.10.4+). E:\SteamLibrary only has an empty leftover folder.
 GAME_CANDIDATES = [
-    Path(r"E:\SteamLibrary\steamapps\common\Soulash 2"),
     Path(r"D:\games\Steam\steamapps\common\Soulash 2"),
+    Path(r"E:\SteamLibrary\steamapps\common\Soulash 2"),
     Path(r"C:\Program Files (x86)\Steam\steamapps\common\Soulash 2"),
     Path(r"C:\Program Files\Steam\steamapps\common\Soulash 2"),
 ]
 
 WORKSHOP_CANDIDATES = [
-    Path(r"E:\SteamLibrary\steamapps\workshop\content\2399160"),
     Path(r"D:\games\Steam\steamapps\workshop\content\2399160"),
+    Path(r"E:\SteamLibrary\steamapps\workshop\content\2399160"),
     Path(r"C:\Program Files (x86)\Steam\steamapps\workshop\content\2399160"),
 ]
+
+_warned_paths: set[str] = set()
+
+
+def _warn_bad_config(key: str, value: Path) -> None:
+    """A configured path that no longer exists silently fell through before; say so once."""
+    if key in _warned_paths:
+        return
+    _warned_paths.add(key)
+    print(f"[s2_paths] {key} = {value} is not a usable Soulash 2 folder; falling back to auto-detect.", file=sys.stderr)
 
 # Formerly blocked hydromancy/water_magic paths after a bad milestone rebuild.
 # Cleared: Hydromancy is a normal skill id; prefer Geomancy/Warlock layout still.
 SKIP_MOD_NAME_FRAGMENTS: tuple[str, ...] = ()
+
+STUDIO_DIRNAME = ".skillcreator"
+STUDIO_SPEC_NAME = "skill.json"
 
 
 def tool_dir() -> Path:
@@ -71,6 +85,8 @@ def soulash2_root() -> Path:
     )
     if env and _looks_like_soulash(env):
         return env.resolve()
+    if env:
+        _warn_bad_config("Soulash2Path", env)
     for cand in GAME_CANDIDATES:
         if _looks_like_soulash(cand):
             return cand.resolve()
@@ -87,6 +103,8 @@ def workshop_root() -> Optional[Path]:
     )
     if env and env.is_dir():
         return env.resolve()
+    if env:
+        _warn_bad_config("Soulash2WorkshopPath", env)
     for cand in WORKSHOP_CANDIDATES:
         if cand.is_dir():
             return cand.resolve()
@@ -135,3 +153,26 @@ def skip_mod_path(path: Path) -> bool:
 def staging_dir(spec: dict) -> Path:
     sid = str(spec.get("id") or spec.get("mod_id") or "unnamed")
     return output_root() / sid
+
+
+def studio_spec_path(folder: Path) -> Path:
+    """Private editor state lives below the mod root so it is never a game asset."""
+    return Path(folder) / STUDIO_DIRNAME / STUDIO_SPEC_NAME
+
+
+def find_studio_spec_path(folder: Path) -> Optional[Path]:
+    """Find current editor state, falling back to the pre-.skillcreator layout."""
+    folder = Path(folder)
+    current = studio_spec_path(folder)
+    if current.is_file():
+        return current
+    legacy = folder / STUDIO_SPEC_NAME
+    return legacy if legacy.is_file() else None
+
+
+def project_dir_for_spec(path: Path) -> Path:
+    """Return the mod/staging root for either a private spec or a legacy root spec."""
+    path = Path(path)
+    if path.parent.name == STUDIO_DIRNAME:
+        return path.parent.parent
+    return path.parent

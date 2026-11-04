@@ -4,13 +4,14 @@ import sys
 import time
 from pathlib import Path
 
-sys.path.insert(0, r"D:\games\Steam\steamapps\common\Transcendence\Tools\Soulash2")
-sys.path.insert(0, r"D:\games\Steam\steamapps\common\Transcendence\Tools\Shared")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Shared"))
 
 from PIL import Image
 from hydromancy_quality import finalize_thumbnail_from_sd, validate_thumbnail, score_palette_match
+from s2_game_paths import mods_dir
 
-MOD = Path(r"E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_water_magic")
+MOD = mods_dir() / "arendeth_hydromancy"
 DRAFTS = MOD / "DesignDrafts"
 DRAFT = DRAFTS / "thumbnail_design_draft.png"
 OUT = MOD / "thumbnail2.png"

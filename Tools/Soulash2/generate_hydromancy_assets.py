@@ -48,7 +48,11 @@ try:
 except ImportError:
     OLLAMA_AVAILABLE = False
 
-DEFAULT_MOD = Path(r"E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_water_magic")
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+from s2_game_paths import mods_dir  # noqa: E402
+
+DEFAULT_MOD = mods_dir() / "arendeth_hydromancy"
 DRAFT_ICON_NAME = "icon_design_draft.png"
 DRAFT_THUMB_NAME = "thumbnail_design_draft.png"
 

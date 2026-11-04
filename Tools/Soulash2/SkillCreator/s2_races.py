@@ -18,7 +18,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from s2_paths import core2_dir, skip_mod_path, workshop_root
+from s2_paths import core2_dir, mods_dir, skip_mod_path, workshop_root
 from s2_schema import slug_name
 
 CIV_KEYS = (
@@ -68,15 +68,25 @@ def _iter_character_files() -> Iterable[Tuple[str, Path]]:
     core = core2_dir() / "character.json"
     if core.is_file():
         yield "core_2", core
+    roots = []
+    try:
+        roots.append(mods_dir())
+    except FileNotFoundError:
+        pass
     ws = workshop_root()
-    if not ws or not ws.is_dir():
-        return
-    for mod in sorted(ws.iterdir()):
-        if not mod.is_dir() or skip_mod_path(mod):
+    if ws:
+        roots.append(ws)
+    seen = {core.resolve()} if core.is_file() else set()
+    for root in roots:
+        if not root.is_dir():
             continue
-        path = mod / "character.json"
-        if path.is_file():
-            yield mod.name, path
+        for mod in sorted(root.iterdir()):
+            if not mod.is_dir() or mod.name.lower() == "core_2" or skip_mod_path(mod):
+                continue
+            path = mod / "character.json"
+            if path.is_file() and path.resolve() not in seen:
+                seen.add(path.resolve())
+                yield mod.name, path
 
 
 def _blob(race: Dict[str, Any]) -> str:
@@ -356,14 +366,22 @@ def _read_name_text(rel: str) -> Optional[str]:
     core = core2_dir() / rel
     if core.is_file():
         return core.read_text(encoding="utf-8")
+    roots = []
+    try:
+        roots.append(mods_dir())
+    except FileNotFoundError:
+        pass
     ws = workshop_root()
-    if ws and ws.is_dir():
-        for mod in ws.iterdir():
-            if not mod.is_dir() or skip_mod_path(mod):
-                continue
-            cand = mod / rel
-            if cand.is_file():
-                return cand.read_text(encoding="utf-8")
+    if ws:
+        roots.append(ws)
+    for root in roots:
+        if root.is_dir():
+            for mod in root.iterdir():
+                if not mod.is_dir() or mod.name.lower() == "core_2" or skip_mod_path(mod):
+                    continue
+                cand = mod / rel
+                if cand.is_file():
+                    return cand.read_text(encoding="utf-8")
     return None
 
 
@@ -507,6 +525,8 @@ def make_settlement(
     war_causes: Optional[List[str]] = None,
     birth_resource: Optional[str] = None,
     birth_amount: int = 1,
+    birth_resource_type: Optional[int] = None,
+    birth_max_population: Optional[int] = None,
     aggression_default: Optional[bool] = None,
     single_family: bool = False,
     migration: Optional[bool] = None,
@@ -520,8 +540,15 @@ def make_settlement(
         out["collapse_on_leader_death"] = bool(collapse_on_leader_death)
     if war_causes:
         out["war_causes"] = list(war_causes)
-    if birth_resource:
-        out["birth_cost"] = {"amount": int(birth_amount), "resource": str(birth_resource)}
+    if birth_resource or birth_resource_type is not None or birth_max_population is not None:
+        birth_cost: Dict[str, Any] = {"amount": int(birth_amount)}
+        if birth_resource:
+            birth_cost["resource"] = str(birth_resource)
+        if birth_resource_type is not None:
+            birth_cost["resource_type"] = int(birth_resource_type)
+        if birth_max_population is not None:
+            birth_cost["max_population"] = int(birth_max_population)
+        out["birth_cost"] = birth_cost
     if aggression_default is not None:
         out["aggression_default"] = bool(aggression_default)
     if single_family:
@@ -565,6 +592,110 @@ def make_character_tag(*, tag_id: str, name: str, options: Optional[List[str]] =
     tag: Dict[str, Any] = {"id": str(tag_id), "name": str(name)}
     tag["options"] = list(options or ["sleep_in_bed", "cover_from_weather"])
     return tag
+
+
+def make_custom_equipment_slot(
+    *,
+    slot_id: str,
+    name: str,
+    item_types: List[int],
+    replace: str,
+    icon: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Build a character.json custom_eq_slots entry (used by custom equipment races)."""
+    sid = str(slot_id or "").strip()
+    if not sid:
+        raise ValueError("Custom equipment slot needs an id")
+    types = [int(value) for value in item_types]
+    if not types:
+        raise ValueError("Custom equipment slot needs at least one item type")
+    target = str(replace or "").strip()
+    if not target:
+        raise ValueError("Custom equipment slot needs a replace slot")
+    out: Dict[str, Any] = {
+        "id": sid,
+        "name": str(name or sid),
+        "item_types": types,
+        "replace": target,
+    }
+    if icon is not None:
+        out["icon"] = int(icon)
+    return out
+
+
+def add_custom_equipment_slot(spec: Dict[str, Any], slot: Dict[str, Any]) -> Dict[str, Any]:
+    rows = spec.setdefault("custom_eq_slots", [])
+    slot = deepcopy(slot)
+    sid = str(slot.get("id") or "").strip()
+    if not sid:
+        raise ValueError("Custom equipment slot needs an id")
+    for index, existing in enumerate(rows):
+        if isinstance(existing, dict) and str(existing.get("id") or "") == sid:
+            rows[index] = slot
+            return slot
+    rows.append(slot)
+    return slot
+
+
+CHARACTER_SPEC_KEYS = {
+    "races": "races",
+    "control_actions": "control_actions",
+    "tags": "character_tags",
+    "production_actions": "production_actions",
+    "custom_eq_slots": "custom_eq_slots",
+}
+
+
+def _merge_rows_by_id(existing: List[Any], incoming: List[Any], *, key: str) -> List[Any]:
+    rows = deepcopy(existing)
+    positions = {
+        str(row.get("id")): index
+        for index, row in enumerate(rows)
+        if isinstance(row, dict) and row.get("id") is not None
+    }
+    for row in incoming:
+        if not isinstance(row, dict):
+            raise ValueError(f"{key} entries must be JSON objects")
+        rid = str(row.get("id") or "").strip()
+        if not rid:
+            raise ValueError(f"Every {key} entry needs an id")
+        if rid in positions:
+            rows[positions[rid]] = deepcopy(row)
+        else:
+            positions[rid] = len(rows)
+            rows.append(deepcopy(row))
+    return rows
+
+
+def merge_character_json_into_spec(spec: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, int]:
+    """Merge partial game character.json data into a SkillCreator spec by entry id.
+
+    Recognized sections retain every field inside each entry. Unknown top-level
+    sections are saved verbatim and emitted again, so newer game data can round-trip.
+    """
+    if not isinstance(payload, dict):
+        raise ValueError("character.json must contain a JSON object")
+    counts: Dict[str, int] = {}
+    for public_key, spec_key in CHARACTER_SPEC_KEYS.items():
+        incoming = payload.get(public_key)
+        if incoming is None:
+            continue
+        if not isinstance(incoming, list):
+            raise ValueError(f"character.json {public_key} must be an array")
+        spec[spec_key] = _merge_rows_by_id(spec.get(spec_key) or [], incoming, key=public_key)
+        counts[public_key] = len(incoming)
+    extra = spec.setdefault("character_json_extra", {})
+    if not isinstance(extra, dict):
+        extra = spec["character_json_extra"] = {}
+    for key, value in payload.items():
+        if key in CHARACTER_SPEC_KEYS:
+            continue
+        if isinstance(value, list) and isinstance(extra.get(key), list):
+            extra[key] = _merge_rows_by_id(extra[key], value, key=key)
+        else:
+            extra[key] = deepcopy(value)
+        counts[key] = len(value) if isinstance(value, list) else 1
+    return counts
 
 
 def add_race(spec: Dict[str, Any], race: Dict[str, Any], *, name_files: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
@@ -651,12 +782,53 @@ def public_race(race: Dict[str, Any]) -> Dict[str, Any]:
     return {k: v for k, v in race.items() if not str(k).startswith("_")}
 
 
+def _safe_relative_file(root: Path, rel: Any) -> Optional[Path]:
+    if not isinstance(rel, str) or not rel.strip():
+        return None
+    raw = Path(rel.replace("\\", "/"))
+    if raw.is_absolute():
+        return None
+    base = Path(root).resolve()
+    candidate = (base / raw).resolve()
+    try:
+        candidate.relative_to(base)
+    except ValueError:
+        return None
+    return candidate
+
+
+def load_referenced_character_files(spec: Dict[str, Any], folder: Path) -> None:
+    """Copy in-repo files referenced by race names into the private spec."""
+    root = Path(folder)
+    files = spec.setdefault("name_files", {})
+    if not isinstance(files, dict):
+        files = spec["name_files"] = {}
+    refs = set()
+    for race in spec.get("races") or []:
+        names = race.get("names") if isinstance(race, dict) else None
+        if isinstance(names, dict):
+            refs.update(value for value in names.values() if isinstance(value, str))
+    # Keep the older behavior of carrying all name lists from a loaded mod.
+    names_dir = root / "npc" / "names"
+    if names_dir.is_dir():
+        refs.update(f"npc/names/{path.name}" for path in names_dir.glob("*.txt"))
+    for rel in refs:
+        source = _safe_relative_file(root, rel)
+        if source and source.is_file():
+            files[str(rel).replace("\\", "/")] = source.read_text(encoding="utf-8-sig")
+
+
 def write_character_json(spec: Dict[str, Any], root: Path) -> Optional[Path]:
     """Emit a merge-only character.json plus npc/names stubs. Returns the json path or None."""
     races = [public_race(r) for r in spec.get("races") or []]
     actions = [{k: v for k, v in a.items() if not str(k).startswith("_")} for a in spec.get("control_actions") or []]
     tags = list(spec.get("character_tags") or [])
     prod = [{k: v for k, v in a.items() if not str(k).startswith("_")} for a in spec.get("production_actions") or []]
+    custom_slots = [
+        {k: v for k, v in row.items() if not str(k).startswith("_")}
+        for row in spec.get("custom_eq_slots") or []
+        if isinstance(row, dict)
+    ]
     payload: Dict[str, Any] = {}
     if races:
         payload["races"] = races
@@ -666,6 +838,11 @@ def write_character_json(spec: Dict[str, Any], root: Path) -> Optional[Path]:
         payload["tags"] = tags
     if prod:
         payload["production_actions"] = prod
+    if custom_slots:
+        payload["custom_eq_slots"] = custom_slots
+    for key, value in (spec.get("character_json_extra") or {}).items():
+        if key not in payload and key not in CHARACTER_SPEC_KEYS and not str(key).startswith("_"):
+            payload[key] = deepcopy(value)
     if not payload:
         return None
     root = Path(root)
@@ -678,7 +855,9 @@ def write_character_json(spec: Dict[str, Any], root: Path) -> Optional[Path]:
             rel = names.get(gender)
             if not rel or not isinstance(rel, str):
                 continue
-            dest = root / rel.replace("\\", "/")
+            dest = _safe_relative_file(root, rel)
+            if not dest:
+                continue
             dest.parent.mkdir(parents=True, exist_ok=True)
             if dest.is_file():
                 continue
@@ -687,6 +866,13 @@ def write_character_json(spec: Dict[str, Any], root: Path) -> Optional[Path]:
                 female=(gender == "female"),
             )
             dest.write_text(text, encoding="utf-8")
+    for rel, text in files.items():
+        dest = _safe_relative_file(root, rel)
+        if not dest:
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if not dest.is_file():
+            dest.write_text(str(text), encoding="utf-8")
     return path
 
 
@@ -705,14 +891,12 @@ def load_character_into_spec(spec: Dict[str, Any], folder: Path) -> None:
         spec["character_tags"] = data["tags"]
     if isinstance(data.get("production_actions"), list):
         spec["production_actions"] = data["production_actions"]
-    name_files: Dict[str, str] = {}
-    names_dir = Path(folder) / "npc" / "names"
-    if names_dir.is_dir():
-        for txt in names_dir.glob("*.txt"):
-            rel = f"npc/names/{txt.name}"
-            name_files[rel] = txt.read_text(encoding="utf-8")
-    if name_files:
-        spec["name_files"] = name_files
+    if isinstance(data.get("custom_eq_slots"), list):
+        spec["custom_eq_slots"] = data["custom_eq_slots"]
+    spec["character_json_extra"] = {
+        key: value for key, value in data.items() if key not in CHARACTER_SPEC_KEYS
+    }
+    load_referenced_character_files(spec, folder)
 
 
 def grant_sources(spec: Dict[str, Any]) -> Tuple[set, set]:

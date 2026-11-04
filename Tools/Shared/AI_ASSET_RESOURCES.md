@@ -195,10 +195,30 @@ and power-of-two dimensions.
 
 The audio stage does **not** invent SFX from a blank prompt when you already
 own the timbre. It turns `D:\assets\audio` (purchased zip packs, including
-Noise Alchemy / Dark Fantasy Studio) into a queryable conditioning space, then
+Noise Alchemy, whose packs include the Dark Fantasy Studio line) into a queryable conditioning space, then
 generates a *new* clip that inherits that spectral DNA.
 
-**ToS / unique mode (default on):** pack WAVs are **reference DNA only**. Never
+**License tiers** (from the license files in `D:\assets\audio`;
+`license_tier()` in `audio_asset_library.py`):
+
+| Tier | Packs | How it may reach a game/mod | Credit |
+|---|---|---|---|
+| `own` | `D:\assets\audio\made\<archetype>\` — audio we made (filled by `--keep`, or drop files in and re-run `ingest`) | As-is; reusable as references | Whatever its sidecar `.meta.json` `attribution` says (carried forward on reuse) |
+| `direct` | `bt25_ultimatesfxforgames_softwarebundle\` (Function Loops, functionloops.com, sold via Humble Bundle), `magicspellssfxbundle_audio.zip`, `inventorysfxbundle_audio.zip`, `puzzleaudiokit.zip`, `buttonssfxlibrary.zip` (Tao & Sound $5 bundle, royalty-free EULA) | Unique mode, or close-copy (`--close-copy --direct-only`) — altered either way | — |
+| `reference` | Noise Alchemy packs — both `NOISE ALCHEMY- *` and `Dark Fantasy Studio- *` zips (one vendor, one EULA) — plus any pack without its own license file | Unique mode only | `Sound effects created with NOISE ALCHEMY – NOISEALCHEMY.COM` once in the project credits/description |
+
+**No purchased original ever ships, whatever the tier.** Even where a license
+would allow raw use, every pack clip is altered first so nobody can pull the pack
+file back out of a mod. Only `own` clips ship as-is. No tier allows redistributing
+clips as a standalone sound pack or library.
+
+**Reusing what we make:** add `--keep` to `generate` or `blend` and a shippable
+result is copied to `made\<archetype>\` with its `.meta.json` and indexed on the
+spot (no full rescan; its prompt and archetype become tags). Non-shippable output
+is never kept. Own clips count as `--direct-only` references and are ignored by
+the `source_corr` / `check` copy test.
+
+**ToS / unique mode (default on):** `reference`-tier WAVs are **DNA only**. Never
 copy, resample, trim, or lightly edit them into a game `Data/Sound` tree.
 `generate_audio(..., unique=True)` (AAMT default) mixes several hits, **mutates
 that mix** (pitch / time / EQ / waveshape / reverse-slice / noise), runs Stable
@@ -207,6 +227,21 @@ Audio 3 with high `init_noise` + harder negatives + extra steps, retries when
 fallback is refused in unique mode. Override mutate strength with
 `AAMT_AUDIO_DNA_MUTATE` (default `0.72`); SA3 unique steps/negative via
 `AAMT_STABLE_AUDIO_UNIQUE_STEPS` / `AAMT_STABLE_AUDIO_UNIQUE_NEGATIVE`.
+
+`--direct-only` (`direct_only=True`) limits retrieval to `direct` and `own` clips.
+`--close-copy` output and `blend` output are always run through the DSP
+alteration (pitch / EQ / waveshape / reverse-slice / noise), escalating
+`0.45 → 0.65 → 0.85` until `source_corr` — similarity to each **raw** source
+clip, not the mixed reference — is ≤ 0.22. Every `.meta.json` records each
+reference's `license`, `source_corr`, a `shippable` flag, and the `attribution`
+line owed (if any). Only ship clips with `"shippable": true`.
+
+Before packaging a mod, scan its sound folder for anything that slipped in
+unaltered: `audio_pipeline.py check <folder>` prints `COPY` with the matching
+pack clip and exits 1 if any file is too close. It reads wav/ogg/flac/mp3/aiff;
+decode `.xwm` / `.fuz` to wav first. The check fails closed: a library clip it
+cannot decode counts as a match. `pip install av` lets it decode the library's MP3s
+(e.g. `puzzleaudiokit.zip`'s MP3 folder).
 
 **SFMAG crapping / accident SFX:** use archetype `bodily` (indexes
 `Dark Fantasy Studio- Farts!.zip` and related tags: `fart`, `gas`, `waste`,
@@ -219,7 +254,13 @@ python Shared\audio_pipeline.py status
 python Shared\audio_pipeline.py ingest --fast          # tags + spectral (all packs)
 python Shared\audio_pipeline.py ingest --fast --pack Farts   # new bodily pack only
 python Shared\audio_pipeline.py ingest                 # also CLAP + Whisper on vocals
+python Shared\audio_pipeline.py backfill-clap          # fill CLAP rows missing after a --fast/--no-clap ingest
+python Shared\audio_pipeline.py rebuild-tags           # re-embed tags after installing/changing sentence-transformers
 python Shared\audio_pipeline.py search --query "muffled gas release waste" --archetype bodily
+python Shared\audio_pipeline.py search --query "sci-fi ui click" --direct-only
+python Shared\audio_pipeline.py generate --prompt "soft inventory pickup" --out pickup.wav --close-copy --direct-only
+python Shared\audio_pipeline.py generate --prompt "short plasma vent burst" --out vent.wav --archetype laser --keep   # reuse later as own tier
+python Shared\audio_pipeline.py check "D:\path\to\mod\Sound"   # flag near copies before shipping
 python Shared\audio_pipeline.py generate --prompt "short plasma vent burst" --out vent.wav --archetype laser
 python Shared\audio_pipeline.py generate --prompt "short muffled MAG accident gas release" --out mess.wav --archetype bodily
 ```
@@ -257,7 +298,12 @@ make_audio(
 3. Pass `archetype` / `tags` when you know the family (Starfield ship hatch →
    `ship`, UI beep → `ui`, spell → `magic`, SFMAG mess gas → `bodily`).
 4. SA3 takes the GPU lock. Do not generate audio while SD/TRELLIS is rendering.
-5. Never ship pack files or near copies. Unique mode is mandatory for Starfield mods.
+5. Never put an original pack file, or a near copy, into a mod — any purchased
+   tier. Ship only `own` clips or generated clips whose meta says `"shippable": true`
+   (`--keep` the good ones so they're reusable); `reference`-tier DNA
+   needs unique mode (Starfield mods included). Run `check` on the mod's sound
+   folder before packaging. Add the Noise Alchemy credit whenever a meta's
+   `attribution` is non-empty.
 6. `doomnoisealchemy.zip` / `downsweeps.zip` may be skipped if Python cannot
    open them as zip; the rest of the library still indexes.
 

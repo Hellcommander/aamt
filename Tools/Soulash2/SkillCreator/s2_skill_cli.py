@@ -7,6 +7,7 @@ import argparse
 import json
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -19,14 +20,18 @@ from s2_animations import PRESETS, compose_animation, list_particle_usage, list_
 from s2_particle_art import THEMES, paint_animations
 from s2_buildings import (
     add_building,
+    building_reference_aid,
     clone_building,
     copy_building_map,
     copy_mod_to_output,
     find_building_map,
+    fix_buildings_folder,
+    iter_installed_mods,
     load_building,
     make_training_building,
     public_building,
     resolve_workshop_mod,
+    scan_buildings_folder,
     scan_mod_folder,
     search_buildings,
     upgrade_mod_folder,
@@ -39,6 +44,14 @@ from s2_fix_mod import (
     upgrade_outdated_mod,
 )
 from s2_mine_effects import mine_all, write_catalog
+from s2_procedural_maps import (
+    add_procedural_map,
+    clone_procedural_map,
+    load_procedural_map,
+    public_procedural_map,
+    search_procedural_maps,
+    validate_procedural_map,
+)
 from s2_entities import (
     attach_granted_passive,
     clone_entity,
@@ -47,9 +60,20 @@ from s2_entities import (
     make_item,
     make_tile,
     search_entities,
+    revoke_entity_milestones,
 )
-from s2_paths import mods_dir, output_root, staging_dir
+from s2_paths import (
+    STUDIO_DIRNAME,
+    STUDIO_SPEC_NAME,
+    find_studio_spec_path,
+    mods_dir,
+    output_root,
+    project_dir_for_spec,
+    staging_dir,
+    studio_spec_path,
+)
 from s2_races import (
+    add_custom_equipment_slot,
     add_character_tag,
     add_control_action,
     add_production_action,
@@ -58,11 +82,14 @@ from s2_races import (
     load_vanilla_control_action,
     load_vanilla_production_action,
     load_vanilla_race,
+    load_referenced_character_files,
     make_character_tag,
+    make_custom_equipment_slot,
     make_control_action,
     make_production_action,
     make_race,
     make_settlement,
+    merge_character_json_into_spec,
     parse_base_entity,
     parse_stat_flag,
     public_race,
@@ -134,17 +161,44 @@ def _spec_path(args: argparse.Namespace) -> Path:
     if getattr(args, "spec", None):
         return Path(args.spec)
     if getattr(args, "id", None):
-        return output_root() / args.id / "skill.json"
+        folder = output_root() / args.id
+        return find_studio_spec_path(folder) or studio_spec_path(folder)
     raise SystemExit("Provide --spec or --id")
 
 
 def _load(args: argparse.Namespace) -> tuple[dict, Path]:
     path = _spec_path(args)
     if path.is_dir():
+        studio_path = find_studio_spec_path(path)
+        if studio_path:
+            spec = load_spec(studio_path)
+            canonical = _canonical_staging_spec_path(studio_path, spec)
+            return (load_spec(canonical) if canonical != studio_path else spec), canonical
         spec = load_mod_folder(path)
-        return spec, path / "skill.json"
+        return spec, studio_spec_path(path)
     spec = load_spec(path)
-    return spec, path
+    canonical = _canonical_staging_spec_path(path, spec)
+    return (load_spec(canonical) if canonical != path else spec), canonical
+
+
+def _canonical_staging_spec_path(path: Path, spec: dict) -> Path:
+    """Move legacy Output-root specs into the private sidecar location."""
+    path = Path(path)
+    if path.name != STUDIO_SPEC_NAME or path.parent.name == STUDIO_DIRNAME:
+        return path
+    try:
+        relative = path.resolve().relative_to(output_root().resolve())
+    except (OSError, ValueError):
+        return path
+    if len(relative.parts) != 2 or not isinstance(spec.get("skill"), dict) or not spec.get("skill_id"):
+        return path
+    target = studio_spec_path(path.parent)
+    if target != path:
+        if target.is_file():
+            return target
+        save_spec(spec, target)
+        path.unlink()
+    return target
 
 
 def _csv_list(items: Optional[list]) -> list:
@@ -211,7 +265,7 @@ def cmd_new(args: argparse.Namespace) -> int:
     sid = raw_id if args.no_prefix else prefixed_skill_id(raw_id)
     if sid != raw_id:
         print(f"Prefixed id {raw_id} -> {sid} (vanilla uses core_2_*; pass --no-prefix to skip)")
-    spec = new_spec(sid, args.name, mod_id=args.mod or sid, level_start=args.level_start, prefix=False)
+    spec = new_spec(sid, args.name, mod_id=args.mod or sid, start_level=args.start_level, prefix=False)
     if args.no_combat:
         spec["skill"]["combat_skill"] = False
     if args.difficulty is not None:
@@ -235,7 +289,7 @@ def cmd_new(args: argparse.Namespace) -> int:
             steam_publish_id=args.steam_publish_id,
             disable_portraits=True if args.disable_portraits else None,
         )
-    path = Path(args.output) if args.output else (staging_dir(spec) / "skill.json")
+    path = Path(args.output) if args.output else studio_spec_path(staging_dir(spec))
     if not args.no_combat and not args.no_mastery:
         mastery = add_combat_mastery(spec)
         print(f"Combat mastery {mastery.get('id')} at level 30 (+10% all attributes)")
@@ -254,8 +308,8 @@ def cmd_set_skill(args: argparse.Namespace) -> int:
     payload: dict = {}
     if args.difficulty is not None:
         payload["difficulty"] = args.difficulty
-    if args.level_start is not None:
-        payload["level_start"] = args.level_start
+    if args.start_level is not None:
+        payload["start_level"] = args.start_level
     if args.description is not None:
         payload["description"] = args.description
     if args.name:
@@ -309,19 +363,19 @@ def cmd_rename_id(args: argparse.Namespace) -> int:
     n = retarget_owned_ids(spec, old, new)
     if spec.get("milestone_dir") == old:
         spec.pop("milestone_dir")
-    old_dir = path.parent
+    old_dir = project_dir_for_spec(path)
     new_dir = output_root() / new
     if old_dir.resolve() != new_dir.resolve():
         if new_dir.exists():
             raise SystemExit(f"Destination already exists: {new_dir}")
         shutil.move(str(old_dir), str(new_dir))
-        path = new_dir / "skill.json"
+        path = studio_spec_path(new_dir)
     save_spec(spec, path)
-    leftover = path.parent / "milestones" / old
+    leftover = project_dir_for_spec(path) / "milestones" / old
     if leftover.is_dir():
         shutil.rmtree(leftover)
     print(f"Retargeted {n} ids: {old} -> {new}")
-    print(f"Staging: {path.parent}")
+    print(f"Staging: {project_dir_for_spec(path)}")
     return 0
 
 
@@ -416,7 +470,13 @@ def cmd_add_ability(args: argparse.Namespace) -> int:
         duration=args.duration,
     )
     existed = any(a.get("id") == ability.get("id") for a in spec.get("abilities") or [])
-    add_ability(spec, ability, unlock_level=args.unlock_level, no_milestone=args.no_milestone)
+    add_ability(
+        spec,
+        ability,
+        unlock_level=args.unlock_level,
+        no_milestone=args.no_milestone,
+        innate=bool(args.innate),
+    )
     if args.clone_animation:
         _clone_ability_animation(spec, ability)
     save_spec(spec, path)
@@ -433,7 +493,8 @@ def cmd_add_amplifier(args: argparse.Namespace) -> int:
             kind="amplifier",
             reward_id=args.grant_existing,
             name=args.name or args.grant_existing,
-            unlock_level=args.unlock_level if args.unlock_level is not None else 1,
+            unlock_level=args.unlock_level if args.unlock_level is not None else (None if args.innate else 1),
+            innate=bool(args.innate),
         )
         save_spec(spec, path)
         print(f"Linked existing amplifier {args.grant_existing}")
@@ -463,7 +524,13 @@ def cmd_add_amplifier(args: argparse.Namespace) -> int:
         if args.description:
             amp["description"] = args.description
     existed = any(a.get("id") == amp.get("id") for a in spec.get("amplifiers") or [])
-    add_amplifier(spec, amp, unlock_level=args.unlock_level, no_milestone=args.no_milestone)
+    add_amplifier(
+        spec,
+        amp,
+        unlock_level=args.unlock_level,
+        no_milestone=args.no_milestone,
+        innate=bool(args.innate),
+    )
     save_spec(spec, path)
     verb = "Replaced" if existed else "Added"
     print(f"{verb} amplifier {amp.get('id')} -> {path}")
@@ -507,6 +574,36 @@ def cmd_add_passive(args: argparse.Namespace) -> int:
     save_spec(spec, path)
     verb = "Replaced" if existed else "Added"
     print(f"{verb} passive {passive.get('id')} -> {path}")
+    return 0
+
+
+def cmd_add_spell_trigger(args: argparse.Namespace) -> int:
+    spec, path = _load(args)
+    if not 0 <= args.chance <= 1:
+        raise SystemExit("--chance must be between 0 and 1")
+    if not args.source.strip() or not args.cast.strip():
+        raise SystemExit("--source and --cast must be non-empty ability ids")
+    passive = next((p for p in spec.get("passives") or [] if str(p.get("id")) == args.passive), None)
+    if passive is None:
+        raise SystemExit(f"Passive {args.passive} not found; create it with add-passive first")
+    effect = {
+        "effect": "trigger_ability_on_cast",
+        "value": args.source,
+        "secondary_value": args.cast,
+        "third_value": args.chance,
+    }
+    effects = passive.setdefault("effects", [])
+    if not isinstance(effects, list):
+        raise SystemExit(f"Passive {args.passive} effects must be a list")
+    effects.append(effect)
+    if args.restrict_tag:
+        tags = [str(x) for x in passive.get("restrict_tags") or []]
+        for tag in args.restrict_tag:
+            if tag not in tags:
+                tags.append(tag)
+        passive["restrict_tags"] = tags
+    save_spec(spec, path)
+    print(f"Added trigger to {args.passive}: cast {args.cast} after {args.source} ({args.chance:.0%}) -> {path}")
     return 0
 
 
@@ -625,7 +722,7 @@ def _art_color(args: argparse.Namespace) -> Optional[str]:
 
 def _add_composed_animations(spec: dict, path: Path, anims: list, bind: list, *, paint: Optional[dict] = None) -> int:
     if paint:
-        notes = paint_animations(spec, anims, root=path.parent, **paint)
+        notes = paint_animations(spec, anims, root=project_dir_for_spec(path), **paint)
         for line in notes:
             print(f"Art {line}")
     main = anims[0]
@@ -846,11 +943,12 @@ def cmd_use_vanilla_particles(args: argparse.Namespace) -> int:
     if not theme:
         blob = f"{spec.get('skill_id') or ''} {(spec.get('skill') or {}).get('name') or ''}".lower()
         theme = "blood" if any(w in blob for w in ("sangui", "hemo", "blood")) else "water"
-    notes = use_vanilla_particles(spec, theme=theme, root=path.parent)
+    project_root = project_dir_for_spec(path)
+    notes = use_vanilla_particles(spec, theme=theme, root=project_root)
     save_spec(spec, path)
     assets = spec.get("assets")
     if assets:
-        (path.parent / "assets.json").write_text(json.dumps(assets, indent="\t") + "\n", encoding="utf-8")
+        (project_root / "assets.json").write_text(json.dumps(assets, indent="\t") + "\n", encoding="utf-8")
     for line in notes:
         print(line)
     print(f"Vanilla particles bound ({theme}) -> {path}")
@@ -965,7 +1063,13 @@ def cmd_clone_ability(args: argparse.Namespace) -> int:
         )
     except (FileNotFoundError, ValueError) as exc:
         raise SystemExit(str(exc)) from exc
-    add_ability(spec, ability, unlock_level=args.unlock_level, no_milestone=args.no_milestone)
+    add_ability(
+        spec,
+        ability,
+        unlock_level=args.unlock_level,
+        no_milestone=args.no_milestone,
+        innate=bool(args.innate),
+    )
     if args.clone_animation:
         _clone_ability_animation(spec, ability)
     save_spec(spec, path)
@@ -1063,7 +1167,7 @@ def cmd_generate_icons(args: argparse.Namespace) -> int:
         names = [part.strip() for part in str(args.names).split(",") if part.strip()]
     written = generate_spritesheets(
         spec,
-        path.parent,
+        project_dir_for_spec(path),
         kinds=kinds,
         use_sd=not args.no_sd,
         overwrite=bool(args.overwrite),
@@ -1099,7 +1203,7 @@ def cmd_inject_icon(args: argparse.Namespace) -> int:
         inj["sheet"] = args.sheet
     if args.index is not None:
         inj["index"] = int(args.index)
-    written = inject_external_icons(spec, [inj], path.parent)
+    written = inject_external_icons(spec, [inj], project_dir_for_spec(path))
     save_spec(spec, path)
     for rel in written:
         print(f"Wrote {rel}")
@@ -1461,6 +1565,8 @@ def cmd_add_race(args: argparse.Namespace) -> int:
         war_causes=_csv_list(args.war_cause) or None,
         birth_resource=args.birth_resource,
         birth_amount=args.birth_amount if args.birth_amount is not None else 1,
+        birth_resource_type=args.birth_resource_type,
+        birth_max_population=args.birth_max_population,
         aggression_default=True if args.aggression_default else None,
         single_family=bool(args.single_family),
         migration=False if args.no_migration else None,
@@ -1492,7 +1598,10 @@ def cmd_add_race(args: argparse.Namespace) -> int:
     )
     if args.new_tag:
         tag_id = args.new_tag_id or rid
-        add_character_tag(spec, make_character_tag(tag_id=tag_id, name=args.new_tag))
+        add_character_tag(
+            spec,
+            make_character_tag(tag_id=tag_id, name=args.new_tag, options=_csv_list(args.tag_option) or None),
+        )
         tags = list(race.get("tags") or [])
         if str(tag_id) not in tags:
             tags.append(str(tag_id))
@@ -1523,6 +1632,53 @@ def cmd_add_control_action(args: argparse.Namespace) -> int:
     add_control_action(spec, action)
     save_spec(spec, path)
     print(f"Added control action {action.get('id')} -> {path}")
+    return 0
+
+
+def cmd_import_character_json(args: argparse.Namespace) -> int:
+    spec, path = _load(args)
+    source = Path(args.file)
+    if not source.is_file():
+        raise SystemExit(f"character.json file not found: {source}")
+    try:
+        payload = json.loads(source.read_text(encoding="utf-8-sig"))
+        counts = merge_character_json_into_spec(spec, payload)
+        load_referenced_character_files(spec, source.parent)
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        raise SystemExit(f"Could not import character.json: {exc}") from exc
+    save_spec(spec, path)
+    summary = ", ".join(f"{key}={count}" for key, count in sorted(counts.items())) or "no sections"
+    print(f"Merged character.json ({summary}) -> {path}")
+    return 0
+
+
+def cmd_add_equipment_slot(args: argparse.Namespace) -> int:
+    spec, path = _load(args)
+    if args.from_json:
+        raw_text = str(args.from_json)
+        try:
+            source = Path(raw_text)
+            text = raw_text if raw_text.lstrip().startswith("{") else source.read_text(encoding="utf-8-sig")
+            slot = json.loads(text)
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"Could not read equipment slot JSON: {exc}") from exc
+        if not isinstance(slot, dict):
+            raise SystemExit("Equipment slot JSON must be an object")
+        add_custom_equipment_slot(spec, slot)
+    else:
+        if not args.name or not args.replace or not args.item_type:
+            raise SystemExit("add-equipment-slot needs --slot-id, --name, --replace, and at least one --item-type (or --from-json)")
+        slot_id = args.slot_id or f"{spec['skill_id']}_{slug_name(args.name).lower()}"
+        slot = make_custom_equipment_slot(
+            slot_id=slot_id,
+            name=args.name,
+            item_types=args.item_type,
+            replace=args.replace,
+            icon=args.icon,
+        )
+        add_custom_equipment_slot(spec, slot)
+    save_spec(spec, path)
+    print(f"Added custom equipment slot {slot.get('id')} -> {path}")
     return 0
 
 
@@ -1655,7 +1811,27 @@ def cmd_grant_existing(args: argparse.Namespace) -> int:
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
     save_spec(spec, path)
-    print(f"Granted {args.kind} {args.reward} at L{args.unlock_level}")
+    print(f"Granted {args.kind} {args.reward}" + (" as innate" if args.innate else f" at L{args.unlock_level}"))
+    return 0
+
+
+def cmd_entity_milestone(args: argparse.Namespace) -> int:
+    spec, path = _load(args)
+    try:
+        entity = find_row(spec.get("entities") or [], args.entity, what="Entity")
+        for milestone_id in args.milestone:
+            milestone = find_row(spec.get("milestones") or [], milestone_id, what="Milestone")
+            if not milestone.get("innate"):
+                raise ValueError(f"Milestone is not innate: {milestone_id}")
+        if args.remove:
+            revoke_entity_milestones(entity, args.milestone)
+        else:
+            grant_entity_milestones(entity, args.milestone)
+    except (ValueError, KeyError) as exc:
+        raise SystemExit(str(exc)) from exc
+    save_spec(spec, path)
+    verb = "Removed" if args.remove else "Granted"
+    print(f"{verb} innate milestone(s) {', '.join(args.milestone)} {'from' if args.remove else 'to'} {args.entity}")
     return 0
 
 
@@ -1711,6 +1887,30 @@ def cmd_list_buildings(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_building_guide(args: argparse.Namespace) -> int:
+    guide = building_reference_aid(args.search, limit=args.limit)
+    if args.json:
+        print(json.dumps(guide, ensure_ascii=False, indent=2))
+        return 0
+    print("Soulash 2 building guide")
+    print(f"Docs: {guide['docs_path']}")
+    print(f"Installed mods: {guide['mods_path']}")
+    print("\nCurrent contract")
+    for rule in guide["contract"]:
+        print(f"  - {rule}")
+    print("\nVanilla templates")
+    for row in guide["templates"]:
+        print(f"  {row['template']:8} {row['id']:>4} {row['name']} (occupation_image={row['occupation_image']}, workers={row['workers']})")
+    if args.search:
+        print(f"\nInstalled matches for {args.search!r}")
+        for row in guide["installed_matches"]:
+            print(f"  {row['source']:24} {row['id']:32} {row['name']} ({'player' if row['allow_player'] else 'civilian'})")
+        if not guide["installed_matches"]:
+            print("  no matches")
+    print(f"\nOfficial docs excerpt: {guide['docs_excerpt']}")
+    return 0
+
+
 def cmd_dump_building(args: argparse.Namespace) -> int:
     try:
         row = load_building(args.building_id)
@@ -1743,6 +1943,188 @@ def cmd_clone_building(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_list_procedural_maps(args: argparse.Namespace) -> int:
+    if args.search:
+        rows = search_procedural_maps(args.search, limit=args.limit)
+        if args.json:
+            print(json.dumps(rows, ensure_ascii=False, indent=2))
+            return 0
+        for row in rows:
+            print(f"{str(row.get('source') or 'unknown'):20} {str(row.get('id')):>6} biome={str(row.get('biome')):>3} {row.get('name')} [{row.get('file')}]")
+        print(f"{len(rows)} matches")
+        return 0
+    spec, _ = _load(args)
+    rows = spec.get("procedural_maps") or []
+    if args.json:
+        print(json.dumps([public_procedural_map(row) for row in rows], ensure_ascii=False, indent=2))
+        return 0
+    for row in rows:
+        print(f"{str(row.get('id')):>6} biome={str(row.get('biome')):>3} {row.get('name')} [{row.get('_map_dir') or spec.get('procedural_map_dir') or 'procedural_maps'}]")
+    print(f"{len(rows)} procedural maps in spec")
+    return 0
+
+
+def cmd_dump_procedural_map(args: argparse.Namespace) -> int:
+    try:
+        row = load_procedural_map(args.map_id)
+    except FileNotFoundError:
+        if getattr(args, "spec", None) or getattr(args, "id", None):
+            spec, _ = _load(args)
+            row = next((m for m in spec.get("procedural_maps") or [] if str(m.get("id")) == str(args.map_id) or str(m.get("name") or "").casefold() == str(args.map_id).casefold()), None)
+            if row is not None:
+                print(json.dumps(public_procedural_map(row), ensure_ascii=False, indent=2))
+                return 0
+        print(f"Procedural map not found: {args.map_id}", file=sys.stderr)
+        return 1
+    print(json.dumps(public_procedural_map(row), ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_clone_procedural_map(args: argparse.Namespace) -> int:
+    spec, path = _load(args)
+    try:
+        row = clone_procedural_map(args.source, new_id=args.map_id, name=args.name)
+        add_procedural_map(spec, row)
+    except (FileNotFoundError, KeyError, TypeError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
+    save_spec(spec, path)
+    print(f"Cloned procedural map {args.source} -> {row['id']} {row['name']!r} (biome {row['biome']})")
+    return 0
+
+
+def cmd_add_procedural_map(args: argparse.Namespace) -> int:
+    spec, path = _load(args)
+    source = Path(args.from_json)
+    try:
+        row = json.loads(source.read_text(encoding="utf-8-sig"))
+        validate_procedural_map(row)
+        add_procedural_map(spec, row)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        raise SystemExit(f"Could not add procedural map from {source}: {exc}") from exc
+    save_spec(spec, path)
+    print(f"Added procedural map {row['id']} {row['name']!r} (biome {row['biome']})")
+    return 0
+
+
+def _conversation_json_arg(raw: str) -> Any:
+    stripped = raw.lstrip()
+    if stripped.startswith(("{", "[")):
+        text = raw
+    else:
+        source = Path(raw)
+        try:
+            text = source.read_text(encoding="utf-8-sig") if source.is_file() else raw
+        except OSError:
+            text = raw
+    return json.loads(text)
+
+
+def cmd_list_conversations(args: argparse.Namespace) -> int:
+    spec, _ = _load(args)
+    conversations = spec.get("conversations") or []
+    family = spec.get("family_conversations") or []
+    if not isinstance(conversations, list) or not isinstance(family, list):
+        raise SystemExit("Conversation sections must be arrays; repair conversations.json or the studio spec first")
+    query = str(args.search or "").casefold()
+    convo_rows = [row for row in conversations if isinstance(row, dict) and (not query or query in json.dumps(row, ensure_ascii=False).casefold())]
+    family_rows = [row for row in family if isinstance(row, dict) and (not query or query in json.dumps(row, ensure_ascii=False).casefold())]
+    if args.json:
+        print(json.dumps({"conversations": convo_rows, "family_conversations": family_rows}, ensure_ascii=False, indent=2))
+        return 0
+    local_ids = {str(row.get("id")) for row in conversations if isinstance(row, dict) and row.get("id")}
+    for row in convo_rows:
+        options = row.get("options") if isinstance(row.get("options"), list) else []
+        unresolved = [str(option) for option in options if str(option) not in local_ids and not str(option).startswith("core_2_")]
+        refs = ", ".join(str(option) for option in options) or "(none)"
+        suffix = f"  unresolved-local={','.join(unresolved)}" if unresolved else ""
+        print(f"{str(row.get('id') or '(missing id)'):36} {str(row.get('type') or '(missing type)'):24} {row.get('text') or ''} -> {refs}{suffix}")
+    if family_rows:
+        print("\nFamily conversations:")
+        for row in family_rows:
+            print(f"race={row.get('race')} comment={row.get('comment')!r}: {row.get('answer_positive')}")
+    print(f"{len(convo_rows)} nodes; {len(family_rows)} family rows")
+    return 0
+
+
+def cmd_set_conversation(args: argparse.Namespace) -> int:
+    spec, path = _load(args)
+    try:
+        row = _conversation_json_arg(args.from_json)
+    except (OSError, ValueError) as exc:
+        raise SystemExit(f"Could not read conversation JSON: {exc}") from exc
+    if not isinstance(row, dict):
+        raise SystemExit("Conversation JSON must be one object")
+    family_key = bool(args.family)
+    key = "family_conversations" if family_key else "conversations"
+    rows = spec.get(key)
+    if rows is None:
+        rows = []
+    if not isinstance(rows, list):
+        raise SystemExit(f"{key} in this spec is not an array; repair it before editing")
+    if family_key:
+        if row.get("race") is None:
+            raise SystemExit("Family conversation JSON needs a race field")
+        match = [i for i, old in enumerate(rows) if isinstance(old, dict) and str(old.get("race")) == str(row["race"])]
+        identity = f"family conversation for race {row['race']}"
+    else:
+        if not row.get("id") or not row.get("type"):
+            raise SystemExit("Conversation node JSON needs id and type fields")
+        match = [i for i, old in enumerate(rows) if isinstance(old, dict) and str(old.get("id")) == str(row["id"])]
+        identity = f"conversation {row['id']}"
+    if args.row_index is not None:
+        index = args.row_index
+        if index < 0 or index >= len(rows):
+            raise SystemExit(f"Row index {index} is outside {key} (0–{len(rows)-1})")
+        rows[index] = row
+        verb = "Updated"
+    elif len(match) > 1:
+        raise SystemExit(f"More than one row matches {identity}; select the intended one with --row-index")
+    elif match:
+        rows[match[0]] = row
+        verb = "Updated"
+    else:
+        rows.append(row)
+        verb = "Added"
+    spec[key] = rows
+    spec["_conversation_file_present"] = True
+    spec["_conversation_root_invalid"] = False
+    spec["_conversation_invalid_root"] = None
+    spec["_conversation_sections_present"] = sorted(set(spec.get("_conversation_sections_present") or []) | {key})
+    save_spec(spec, path)
+    print(f"{verb} {identity} -> {path}")
+    return 0
+
+
+def cmd_remove_conversation(args: argparse.Namespace) -> int:
+    spec, path = _load(args)
+    family_key = bool(args.family)
+    key = "family_conversations" if family_key else "conversations"
+    rows = spec.get(key) or []
+    if not isinstance(rows, list):
+        raise SystemExit(f"{key} in this spec is not an array; repair it before editing")
+    if args.row_index is not None:
+        matches = [args.row_index] if 0 <= args.row_index < len(rows) else []
+    elif family_key:
+        if args.race is None:
+            raise SystemExit("Use --race with --family, or select a row with --row-index")
+        matches = [i for i, row in enumerate(rows) if isinstance(row, dict) and str(row.get("race")) == str(args.race)]
+    else:
+        if not args.conversation_id:
+            raise SystemExit("Use --conversation-id or --row-index")
+        matches = [i for i, row in enumerate(rows) if isinstance(row, dict) and str(row.get("id")) == str(args.conversation_id)]
+    if len(matches) > 1:
+        raise SystemExit("More than one row matches; use --row-index to select one")
+    if not matches:
+        raise SystemExit("No matching conversation row")
+    removed = rows.pop(matches[0])
+    spec[key] = rows
+    spec["_conversation_file_present"] = True
+    spec["_conversation_sections_present"] = sorted(set(spec.get("_conversation_sections_present") or []) | {key})
+    save_spec(spec, path)
+    print(f"Removed {key} row {removed.get('id', removed.get('race', ''))} -> {path}")
+    return 0
+
+
 def cmd_add_training_building(args: argparse.Namespace) -> int:
     spec, path = _load(args)
     name = args.name or f"{spec['skill'].get('name') or spec['skill_id']} Hall"
@@ -1770,8 +2152,354 @@ def cmd_copy_building_map(args: argparse.Namespace) -> int:
     return 0
 
 
+def _map_mods(args: argparse.Namespace) -> list[Path]:
+    from s2_building_maps import map_files, resolve_mod
+    from s2_paths import mods_dir
+
+    if args.mods:
+        return [resolve_mod(m) for m in args.mods]
+    return [p for p in sorted(mods_dir().iterdir()) if p.is_dir() and p.name != "core_2" and map_files(p)]
+
+
+def cmd_check_building_maps(args: argparse.Namespace) -> int:
+    from s2_building_maps import known_map_ids, scan_mod_maps
+
+    every = known_map_ids()
+    errors = 0
+    for mod in _map_mods(args):
+        others = {k: [v for v in vals if not v.startswith(mod.name + "/")] for k, vals in every.items()}
+        others = {k: v for k, v in others.items() if v}
+        issues = scan_mod_maps(mod, other_map_ids=others)
+        shown = [i for i in issues if args.verbose or i["level"] != "info"]
+        print(f"== {mod.name}: {len(shown)} issue(s)")
+        for issue in shown:
+            print(f"  [{issue['level']}] {issue['file']}: {issue['message']}")
+        errors += sum(1 for i in issues if i["level"] == "error")
+    return 1 if errors else 0
+
+
+def cmd_relink_building_maps(args: argparse.Namespace) -> int:
+    from s2_building_maps import apply_plan, plan_relink, resolve_mod
+
+    for mod in [resolve_mod(m) for m in args.mods]:
+        plan = plan_relink(mod, only=args.only)
+        print(f"== {mod.name}")
+        for row in plan:
+            if row["action"] == "change":
+                print(f"  {row['file'].name}: " + "; ".join(row["changes"]))
+            elif row["action"] == "skip":
+                print(f"  {row['file'].name}: SKIP {row['why']}")
+            else:
+                print(f"  {row['file'].name}: ok")
+        if args.apply:
+            for note in apply_plan(mod, plan):
+                print("  applied", note)
+        elif any(r["action"] == "change" for r in plan):
+            print("  (dry run; add --apply to write. Originals are backed up under Output/Soulash2/_building_map_backups/)")
+    return 0
+
+
+def cmd_link_building_map(args: argparse.Namespace) -> int:
+    from s2_building_maps import link_map, resolve_mod
+
+    result = link_map(
+        resolve_mod(args.mod),
+        Path(args.map),
+        args.building,
+        map_id=args.map_id,
+        name=args.name,
+        apply=args.apply,
+    )
+    print(json.dumps(result, indent=2))
+    if not result["applied"]:
+        print("(dry run; add --apply to write)")
+    return 0
+
+
+def cmd_list_weather(args: argparse.Namespace) -> int:
+    from s2_weather import public_weather, search_weather, validate_spec_weather
+
+    if args.search is not None or not (args.id or args.spec):
+        rows = search_weather(args.search or "", limit=args.limit)
+        if args.json:
+            print(json.dumps(rows, ensure_ascii=False, indent=2))
+            return 0
+        for row in rows:
+            biomes = ", ".join(row["biomes"]) or "(none: ability/command only)"
+            extra = f" +{','.join(row['extras'])}" if row["extras"] else ""
+            print(f"{str(row['source']):28} {str(row['id']):>4} {row['name']:<20} anim={row['animation']} abilities={row['ability']} biomes={biomes}{extra}")
+        print(f"{len(rows)} weather events")
+        return 0
+    spec, _ = _load(args)
+    rows = spec.get("weather") or []
+    if args.json:
+        print(json.dumps([public_weather(r) for r in rows], ensure_ascii=False, indent=2))
+        return 0
+    for row in rows:
+        print(f"{row.get('id')}: {row.get('name')} anim={row.get('animation')} abilities={row.get('ability')} biomes={row.get('biomes')} chance={row.get('trigger_chance')}")
+    for level, where, message in validate_spec_weather(spec):
+        print(f"  [{level}] {where}: {message}")
+    print(f"{len(rows)} weather events in spec")
+    return 0
+
+
+def cmd_dump_weather(args: argparse.Namespace) -> int:
+    from s2_weather import load_weather, public_weather
+
+    try:
+        row = load_weather(args.weather_id)
+    except FileNotFoundError as exc:
+        raise SystemExit(str(exc)) from exc
+    print(f"// from {row.get('_source')}", file=sys.stderr)
+    print(json.dumps(public_weather(row), ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_add_weather(args: argparse.Namespace) -> int:
+    from s2_weather import load_weather, make_weather, parse_change, upsert_weather, validate_spec_weather
+
+    spec, path = _load(args)
+    base = None
+    if args.clone:
+        try:
+            base = load_weather(args.clone)
+        except FileNotFoundError as exc:
+            raise SystemExit(str(exc)) from exc
+    owner = str(spec.get("skill_id") or spec.get("id") or "mod")
+    weather_id = args.weather_id or f"{owner}_{slug_name(args.name).lower()}"
+    existing = next((r for r in spec.get("weather") or [] if str(r.get("id")) == weather_id), None)
+    base = base or existing
+    animation = args.animation or (base or {}).get("animation")
+    message = args.message if args.message is not None else (base or {}).get("trigger_message")
+    if not animation:
+        raise SystemExit("--animation is required (vanilla rain 113, snow 182, core_2_Heavy_Rain, ... or one of your animations); or --clone a weather")
+    if message is None:
+        message = f"{args.name} begins."
+    try:
+        changes = parse_change(args.change) if args.change else None
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    row = make_weather(
+        weather_id,
+        args.name,
+        animation=str(animation),
+        trigger_message=message,
+        base=base,
+        ability=list(args.ability) if args.ability is not None else None,
+        biomes=list(args.biome) if args.biome is not None else ([] if args.no_biomes else None),
+        duration=args.duration,
+        trigger_every=args.trigger_every,
+        trigger_chance=args.chance,
+        animation_tick=args.animation_tick,
+        ability_trigger_time=args.ability_trigger_time,
+        disabled_under_roof=False if args.ignore_roof else (True if args.roof else None),
+        change_entities_on_start=changes,
+        force_night=True if args.force_night else None,
+        thirst_multiplier=args.thirst_multiplier,
+        stop_on_map_exit=True if args.stop_on_map_exit else None,
+    )
+    upsert_weather(spec, row)
+    if args.summon_ability:
+        ability = next((a for a in spec.get("abilities") or [] if str(a.get("id")) == args.summon_ability), None)
+        if ability is None:
+            raise SystemExit(f"Ability {args.summon_ability} not in this spec (add it first, then --summon-ability)")
+        ability.setdefault("effects_keys", {})["summon_weather"] = weather_id
+    save_spec(spec, path)
+    print(json.dumps(row, ensure_ascii=False, indent=2))
+    for level, where, message in validate_spec_weather(spec):
+        if where.endswith(weather_id):
+            print(f"  [{level}] {message}")
+    return 0
+
+
+def cmd_remove_weather(args: argparse.Namespace) -> int:
+    from s2_weather import remove_weather
+
+    spec, path = _load(args)
+    if not remove_weather(spec, args.weather):
+        raise SystemExit(f"No weather {args.weather} in spec")
+    for ability in spec.get("abilities") or []:
+        keys = ability.get("effects_keys") or {}
+        if str(keys.get("summon_weather")) == str(args.weather):
+            keys.pop("summon_weather")
+            print(f"  cleared summon_weather on {ability.get('id')}")
+    save_spec(spec, path)
+    print(f"Removed weather {args.weather}")
+    return 0
+
+
+def _asset_targets(args: argparse.Namespace) -> list[Path]:
+    from s2_building_maps import resolve_mod as resolve_mod_folder
+    from s2_fix_mod import iter_enabled_mods
+    from s2_paths import core2_dir, mods_dir
+
+    if args.mods:
+        return [core2_dir() if m == "core_2" else resolve_mod_folder(m) for m in args.mods]
+    if getattr(args, "installed", False):
+        return [p for p in sorted(mods_dir().iterdir()) if p.is_dir() and p.name != "core_2" and (p / "mod.json").is_file()]
+    return iter_enabled_mods()
+
+
+def cmd_check_assets(args: argparse.Namespace) -> int:
+    from s2_asset_check import check_mod_assets
+
+    errors = 0
+    for folder in _asset_targets(args):
+        issues = [i for i in check_mod_assets(folder) if args.verbose or i.level != "info"]
+        print(f"== {folder.name}: {len(issues)} issue(s)")
+        for issue in issues[: args.limit]:
+            print(f"  [{issue.level}] {issue.file}: {issue.message}")
+        if len(issues) > args.limit:
+            print(f"  ... {len(issues) - args.limit} more (--limit)")
+        errors += sum(1 for i in issues if i.level == "error")
+    return 1 if errors else 0
+
+
+def cmd_list_sheets(args: argparse.Namespace) -> int:
+    from s2_asset_check import effective_sheets
+    from s2_building_maps import resolve_mod as resolve_mod_folder
+    from s2_paths import core2_dir
+
+    folder = core2_dir() if args.mod in (None, "core_2") else resolve_mod_folder(args.mod)
+    sheets = effective_sheets(folder)
+    for name in sorted(sheets):
+        s = sheets[name]
+        if args.own and s.source == "core_2":
+            continue
+        if args.search and args.search.lower() not in name.lower():
+            continue
+        px = s.cell_px
+        cell = f"{px[0]:g}x{px[1]:g}px" if px else "png?"
+        print(f"{name:32} {s.cols:>3}x{s.rows:<4} {s.cells:>5} cells  cell {cell:<12} from {s.source}: {s.file}")
+    return 0
+
+
+def cmd_show_cells(args: argparse.Namespace) -> int:
+    from s2_asset_check import effective_sheets, render_cells
+    from s2_building_maps import resolve_mod as resolve_mod_folder
+    from s2_paths import core2_dir, output_root
+
+    folder = core2_dir() if args.mod in (None, "core_2") else resolve_mod_folder(args.mod)
+    sheet = effective_sheets(folder).get(args.sheet)
+    if sheet is None or not sheet.path.is_file():
+        raise SystemExit(f"No usable sheet {args.sheet!r} for {folder.name} (see list-sheets)")
+    indexes: list[int] = []
+    for part in str(args.index).split(","):
+        part = part.strip()
+        if "-" in part[1:]:
+            lo, hi = part.split("-", 1)
+            indexes.extend(range(int(lo), int(hi) + 1))
+        elif part:
+            indexes.append(int(part))
+    out = Path(args.out) if args.out else output_root() / "_asset_preview" / f"{folder.name}_{args.sheet}_{indexes[0]}-{indexes[-1]}.png"
+    render_cells(sheet, indexes[:256], out, scale=args.scale)
+    print(f"{sheet.source}'s {sheet.name}: {sheet.cells} cells; wrote {out}")
+    return 0
+
+
+def cmd_list_sounds(args: argparse.Namespace) -> int:
+    from s2_sounds import search_sounds
+
+    if args.id or args.spec:
+        spec, _ = _load(args)
+        rows = (((spec.get("assets") or {}).get("sounds") or {}).get("combat")) or []
+        for row in rows:
+            print(f"{row.get('id')}: {row.get('name')} -> {row.get('file')}")
+        bound = [(a.get("id"), a["sound"]) for a in spec.get("animations") or [] if isinstance(a.get("sound"), dict)]
+        for aid, snd in bound:
+            print(f"  animation {aid} plays {snd.get('id')} @ {snd.get('volume')}")
+        print(f"{len(rows)} custom combat sound(s) in spec")
+        return 0
+    rows = search_sounds(args.search or "", limit=args.limit)
+    for row in rows:
+        flag = "" if row["exists"] else "  [file missing]"
+        print(f"{row['source']:28} {str(row.get('id')):>24}  {str(row.get('name')):<28} {row.get('file')}{flag}")
+    print(f"{len(rows)} combat sound(s)")
+    return 0
+
+
+def cmd_add_sound(args: argparse.Namespace) -> int:
+    from s2_sounds import add_combat_sound, bind_animation_sound
+
+    spec, path = _load(args)
+    try:
+        row = add_combat_sound(spec, Path(args.file), name=args.name, sound_id=args.sound_id, staging=staging_dir(spec))
+        if args.bind_animation:
+            bind_animation_sound(spec, args.bind_animation, row["id"], args.volume)
+    except (ValueError, KeyError) as exc:
+        raise SystemExit(str(exc)) from exc
+    save_spec(spec, path)
+    print(json.dumps(row, indent=2))
+    if args.bind_animation:
+        print(f"animation {args.bind_animation} now plays {row['id']} at volume {args.volume}")
+    print("Note: mod combat sounds are read by the game's assets.json loader but no shipped mod uses them yet; test in game.")
+    return 0
+
+
+def cmd_audit_mods(args: argparse.Namespace) -> int:
+    from s2_building_maps import resolve_mod as resolve_mod_folder
+    from s2_fix_mod import iter_enabled_mods
+    from s2_mod_audit import audit
+    from s2_paths import mods_dir
+
+    if args.mods:
+        targets = [resolve_mod_folder(m) for m in args.mods]
+    elif args.installed:
+        targets = [p for p in sorted(mods_dir().iterdir()) if p.is_dir() and p.name != "core_2" and (p / "mod.json").is_file()]
+    else:
+        targets = iter_enabled_mods()
+    # Named mods are still resolved against everything enabled, so cross-mod references count.
+    result = audit(targets, universe_extra=iter_enabled_mods() if args.mods else ())
+    levels = {"error": 0, "warn": 1, "info": 2}
+    shown = [i for i in result["issues"] if args.verbose or i.level != "info"]
+    shown.sort(key=lambda i: (i.mod, levels.get(i.level, 3), i.file))
+    if args.json:
+        print(json.dumps([i.__dict__ for i in shown], indent=2))
+    else:
+        current = None
+        for issue in shown:
+            if issue.mod != current:
+                current = issue.mod
+                print(f"== {current}")
+            print(f"  [{issue.level}] {issue.file}: {issue.message}")
+        counts = {lvl: sum(1 for i in result["issues"] if i.level == lvl) for lvl in levels}
+        hidden = "" if args.verbose else " (info hidden; --verbose shows core_2 overrides)"
+        print(f"\nAudited {len(result['mods'])} mod(s): {counts['error']} error(s), {counts['warn']} warning(s), {counts['info']} info{hidden}")
+    return 1 if any(i.level == "error" for i in result["issues"]) else 0
+
+
+def cmd_game_log(args: argparse.Namespace) -> int:
+    from s2_mod_audit import errors_log_path, explain_log_line, read_game_log
+
+    path = Path(args.file) if args.file else errors_log_path()
+    if not path.is_file():
+        raise SystemExit(f"No log at {path} (launch the game once)")
+    passes = read_game_log(path)
+    print(f"{path}  ({len(passes)} load pass(es))")
+    for i, p in enumerate(passes, 1):
+        mods = ", ".join(p["mods"]) or "(none listed)"
+        tag = "  [boot pass: core_2 only, missing-building lines expected]" if p["boot_noise"] else ""
+        print(f"\n-- pass {i} at {p['start']}: {len(p['mods'])} mod(s){tag}")
+        if args.mods:
+            print(f"   mods: {mods}")
+        if p["boot_noise"] and not args.all:
+            noise = sum(n for msg, n in p["messages"].items() if "Unable to find building of id" in msg)
+            rest = {m: n for m, n in p["messages"].items() if "Unable to find building of id" not in m}
+            print(f"   {noise} 'Unable to find building' line(s) hidden (--all to show)")
+            messages = rest
+        else:
+            messages = p["messages"]
+        for msg, n in sorted(messages.items(), key=lambda kv: -kv[1]):
+            why = explain_log_line(msg)
+            print(f"   {n:>4}x {msg}" + (f"\n         -> {why}" if why else ""))
+    return 0
+
+
 def _fix_targets(args: argparse.Namespace) -> list[Path]:
     names = list(args.mods or [])
+    if getattr(args, "installed", False):
+        root = Path(args.mod_root) if args.mod_root else None
+        return iter_installed_mods(root)
     if not names:
         names = ["officers", "battlemages", "silkworm"]
     out = []
@@ -1780,8 +2508,31 @@ def _fix_targets(args: argparse.Namespace) -> list[Path]:
         if p.is_dir() and (p / "mod.json").is_file():
             out.append(p.resolve())
             continue
+        if p.is_dir():
+            children = iter_installed_mods(p)
+            if children:
+                out.extend(children)
+                continue
         out.append(resolve_workshop_mod(name))
     return out
+
+
+def _prepare_mod_destination(source: Path, destination: Path) -> Path:
+    source = Path(source).resolve()
+    destination = Path(destination)
+    if destination.resolve() == source:
+        return destination
+    if destination.exists():
+        if not destination.is_dir():
+            raise SystemExit(f"Output destination is not a folder: {destination}")
+        if any(destination.iterdir()):
+            if not (destination / "mod.json").is_file():
+                raise SystemExit(f"Output destination already exists and is not a Soulash 2 mod: {destination}")
+            return destination
+    else:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source, destination, ignore=shutil.ignore_patterns("skill.json", STUDIO_DIRNAME), dirs_exist_ok=True)
+    return destination
 
 
 def cmd_fix_buildings(args: argparse.Namespace) -> int:
@@ -1802,9 +2553,14 @@ def cmd_fix_buildings(args: argparse.Namespace) -> int:
         folders = _fix_targets(args)
     except FileNotFoundError as exc:
         raise SystemExit(str(exc)) from exc
+    if not folders:
+        raise SystemExit("No mod.json folders found in the selected mods root.")
     rc = 0
     for folder in folders:
-        issues = scan_mod_folder(folder)
+        specialized = folder.name in {"3525259869", "3525970281", "3558726977"}
+        scan = scan_mod_folder if specialized else scan_buildings_folder
+        fix = upgrade_mod_folder if specialized else fix_buildings_folder
+        issues = scan(folder)
         print(f"== {folder.name} {folder} ==")
         if issues:
             for line in issues:
@@ -1816,18 +2572,23 @@ def cmd_fix_buildings(args: argparse.Namespace) -> int:
         if not args.apply:
             print("  pass --apply to write Output (and --in-place to patch workshop)")
             continue
-        dest = Path(args.dest) if args.dest and len(folders) == 1 else copy_mod_to_output(folder)
+        dest = _prepare_mod_destination(folder, Path(args.dest)) if args.dest and len(folders) == 1 else copy_mod_to_output(folder)
         if dest.resolve() != folder.resolve():
-            notes = upgrade_mod_folder(dest)
+            notes = fix(dest)
             print(f"  Output {dest}")
             for n in notes:
                 print(f"    {n}")
         if args.in_place:
-            notes = upgrade_mod_folder(folder)
+            backup_dir = None
+            if fix is fix_buildings_folder:
+                backup_dir = output_root() / "_building_fix_backups" / f"{folder.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            notes = fix(folder, backup_dir=backup_dir) if backup_dir else fix(folder)
             print(f"  In-place {folder}")
+            if backup_dir and backup_dir.exists():
+                print(f"  Backup {backup_dir}")
             for n in notes:
                 print(f"    {n}")
-        leftover = scan_mod_folder(dest if dest.exists() else folder)
+        leftover = scan(dest if dest.exists() else folder)
         if leftover:
             print("  remaining:")
             for line in leftover:
@@ -1869,7 +2630,7 @@ def cmd_fix_mods(args: argparse.Namespace) -> int:
         if not issues and not args.force:
             clean += 1
             continue
-        dest = Path(args.dest) if args.dest and len(folders) == 1 else copy_mod_to_fixed(folder)
+        dest = _prepare_mod_destination(folder, Path(args.dest)) if args.dest and len(folders) == 1 else copy_mod_to_fixed(folder)
         wrote = False
         if dest.resolve() != folder.resolve():
             notes = upgrade_outdated_mod(dest)
@@ -1940,7 +2701,7 @@ def cmd_install(args: argparse.Namespace) -> int:
         return 1
     root = write_mod(spec)
     dest.mkdir(parents=True, exist_ok=True)
-    skip_names = {"skill.json", "_sd_work", "__pycache__", "_fx_preview", "_icon_preview"}
+    skip_names = {STUDIO_DIRNAME, STUDIO_SPEC_NAME, "_sd_work", "__pycache__", "_fx_preview", "_icon_preview"}
     leftover_preview = dest / "_fx_preview"
     if leftover_preview.is_dir():
         shutil.rmtree(leftover_preview)
@@ -1984,7 +2745,8 @@ def cmd_editor(args: argparse.Namespace) -> int:
     if getattr(args, "spec", None):
         spec = Path(args.spec)
     elif getattr(args, "id", None):
-        spec = output_root() / args.id / "skill.json"
+        folder = output_root() / args.id
+        spec = find_studio_spec_path(folder) or studio_spec_path(folder)
     run_server(
         args.host or "127.0.0.1",
         int(args.port or 8775),
@@ -2069,7 +2831,7 @@ def build_parser() -> argparse.ArgumentParser:
     n.add_argument("--mod")
     n.add_argument("--output", "-o")
     n.add_argument("--no-prefix", action="store_true", help="Do not prepend the author slug (arendeth_). Vanilla is core_2_*; custom skills should keep the prefix.")
-    n.add_argument("--level-start", type=int, help="Optional skills.json starting level (patch)")
+    n.add_argument("--start-level", "--level-start", dest="start_level", type=int, help="Optional skills.json start_level (crafting skills in core_2 use 1)")
     n.add_argument("--no-combat", action="store_true", help="Crafting/utility skill: no combat_skill, no level-30 mastery")
     n.add_argument("--no-mastery", action="store_true", help="Combat skill without the Skill Stat Rebalance level-30 +10% all-attributes passive")
     n.add_argument("--difficulty", type=int, help="skills.json difficulty (vanilla Adventuring is 0)")
@@ -2089,7 +2851,7 @@ def build_parser() -> argparse.ArgumentParser:
     ss.add_argument("--combat", action="store_true")
     ss.add_argument("--no-combat", action="store_true")
     ss.add_argument("--difficulty", type=int)
-    ss.add_argument("--level-start", type=int)
+    ss.add_argument("--start-level", "--level-start", dest="start_level", type=int)
     ss.add_argument("--description")
     ss.add_argument("--name", help="In-game skill name (skills.json)")
     ss.add_argument("--mod-name", help="mod.json display name (defaults to --name)")
@@ -2166,6 +2928,7 @@ def build_parser() -> argparse.ArgumentParser:
     ab.add_argument("--animation", help="Vanilla animation id (0, 3, 65, core_2_…) or a cloned id from add-animation")
     ab.add_argument("--effect", action="append", help="Repeatable key=value. summon/construct/stacker go to effects_keys automatically. Example: --effect bleed=1 --effect aoe_range=2")
     ab.add_argument("--unlock-level", type=int)
+    ab.add_argument("--innate", action="store_true", help="Create an innate milestone; grant its id through entity skills.milestones")
     ab.add_argument("--no-milestone", action="store_true")
     ab.set_defaults(func=cmd_add_ability)
 
@@ -2183,6 +2946,7 @@ def build_parser() -> argparse.ArgumentParser:
     am.add_argument("--description", help="Amplifier tooltip (unlike passives, this is used)")
     am.add_argument("--grant-existing")
     am.add_argument("--unlock-level", type=int)
+    am.add_argument("--innate", action="store_true", help="Create an innate milestone; grant its id through entity skills.milestones")
     am.add_argument("--no-milestone", action="store_true")
     am.set_defaults(func=cmd_add_amplifier)
 
@@ -2204,6 +2968,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     ap.add_argument("--no-milestone", action="store_true")
     ap.set_defaults(func=cmd_add_passive)
+
+    ast = sub.add_parser("add-spell-trigger", help="Append a documented trigger_ability_on_cast rule to an existing passive")
+    spec_args(ast)
+    ast.add_argument("--passive", required=True, help="Passive id to receive the trigger rule")
+    ast.add_argument("--source", required=True, help="Ability id whose cast activates the rule")
+    ast.add_argument("--cast", required=True, help="Ability id cast by the rule")
+    ast.add_argument("--chance", type=float, default=1.0, help="Trigger chance from 0 to 1 (default: 1)")
+    ast.add_argument("--restrict-tag", action="append", help="Optional tag gate added to the passive")
+    ast.set_defaults(func=cmd_add_spell_trigger)
 
     acm = sub.add_parser(
         "add-combat-mastery",
@@ -2376,7 +3149,7 @@ def build_parser() -> argparse.ArgumentParser:
     ac.add_argument("--damage-type")
     ac.add_argument("--glyph", type=int)
     ac.add_argument("--no-health-regen", action="store_true", help="can_regenerate_health=false (Ghast / monuments)")
-    ac.add_argument("--grant-milestone", action="append", help="Entity skills.milestones id (innate passives)")
+    ac.add_argument("--grant-milestone", action="append", help="Entity skills.milestones id (innate milestone grant)")
     ac.add_argument("--summon-ability", help="Set this ability's effects_keys.summon to the new creature")
     ac.set_defaults(func=cmd_add_creature)
 
@@ -2395,6 +3168,7 @@ def build_parser() -> argparse.ArgumentParser:
     ca.add_argument("--ability-id", help=argparse.SUPPRESS)
     ca.add_argument("--name")
     ca.add_argument("--unlock-level", type=int)
+    ca.add_argument("--innate", action="store_true", help="Create an innate milestone; grant its id through entity skills.milestones")
     ca.add_argument("--no-milestone", action="store_true")
     ca.add_argument("--clone-animation", action="store_true", help="Also copy the animation JSON into this mod")
     ca.add_argument("--keep-image", action="store_true", help="Keep the source image index (default 0 for placeholder sheets)")
@@ -2653,13 +3427,31 @@ def build_parser() -> argparse.ArgumentParser:
     ar.add_argument("--war-cause", action="append", help="conquest, ride_for_wealth, soul_harvest")
     ar.add_argument("--birth-resource")
     ar.add_argument("--birth-amount", type=int)
+    ar.add_argument("--birth-resource-type", type=int, help="settlement.birth_cost.resource_type, e.g. 6")
+    ar.add_argument("--birth-max-population", type=int, help="settlement.birth_cost.max_population")
     ar.add_argument("--aggression-default", action="store_true")
     ar.add_argument("--single-family", action="store_true")
     ar.add_argument("--no-migration", action="store_true")
     ar.add_argument("--no-settle", action="store_true", help="Playable race without a civ (no settlement block)")
     ar.add_argument("--new-tag", help="Also emit a character tag with this name (like Servile Imp)")
     ar.add_argument("--new-tag-id")
+    ar.add_argument("--tag-option", action="append", help="Repeatable custom tag option, e.g. immune_to_fear")
     ar.set_defaults(func=cmd_add_race)
+
+    icj = sub.add_parser("import-character-json", help="Merge game character.json races/actions/tags/custom equipment slots")
+    spec_args(icj)
+    icj.add_argument("--file", required=True, help="Source character.json; entries merge by id and retain all fields")
+    icj.set_defaults(func=cmd_import_character_json)
+
+    aes = sub.add_parser("add-equipment-slot", help="Add a custom_eq_slots entry for custom race equipment")
+    spec_args(aes)
+    aes.add_argument("--from-json", help="Full slot object as a JSON file path or inline JSON")
+    aes.add_argument("--slot-id", dest="slot_id")
+    aes.add_argument("--name")
+    aes.add_argument("--item-type", type=int, action="append", help="Repeatable item type id")
+    aes.add_argument("--replace", help="Base slot to replace, e.g. head_armor or right_hand")
+    aes.add_argument("--icon", type=int)
+    aes.set_defaults(func=cmd_add_equipment_slot)
 
     aca = sub.add_parser("add-control-action", help="Tame-style character.json control_actions (NOT a skill milestone)")
     spec_args(aca)
@@ -2699,9 +3491,16 @@ def build_parser() -> argparse.ArgumentParser:
     ge.add_argument("--kind", required=True, choices=["ability", "passive", "amplifier", "recipe", "production_action"])
     ge.add_argument("--reward", required=True)
     ge.add_argument("--name")
-    ge.add_argument("--unlock-level", type=int, required=True)
+    ge.add_argument("--unlock-level", type=int)
     ge.add_argument("--innate", action="store_true")
     ge.set_defaults(func=cmd_grant_existing)
+
+    em = sub.add_parser("entity-milestone", help="Grant or remove innate milestone ids on an existing entity")
+    spec_args(em)
+    em.add_argument("--entity", required=True)
+    em.add_argument("--milestone", action="append", required=True, help="Innate milestone id (repeatable)")
+    em.add_argument("--remove", action="store_true", help="Remove the selected milestone ids")
+    em.set_defaults(func=cmd_entity_milestone)
 
     lt = sub.add_parser("list-tags", help="Search character.json tags (alive=9, undead=4, animal=2)")
     lt.add_argument("--search", default="")
@@ -2726,19 +3525,70 @@ def build_parser() -> argparse.ArgumentParser:
     dca.add_argument("action_id")
     dca.set_defaults(func=cmd_dump_control_action)
 
-    lb = sub.add_parser("list-buildings", help="Search vanilla/workshop buildings, or list this spec")
+    lpm = sub.add_parser("list-procedural-maps", help="Search core, installed-mod, and Workshop procedural maps, or list this spec")
+    spec_args(lpm)
+    lpm.add_argument("--search", default="", help="Search map id, name, biome, source, or filename")
+    lpm.add_argument("--limit", type=int, default=40)
+    lpm.add_argument("--json", action="store_true")
+    lpm.set_defaults(func=cmd_list_procedural_maps)
+
+    dpm = sub.add_parser("dump-procedural-map", help="Print a procedural map JSON definition")
+    spec_args(dpm)
+    dpm.add_argument("map_id", help="Map id, name, filename stem, or path to a map JSON")
+    dpm.set_defaults(func=cmd_dump_procedural_map)
+
+    cpm = sub.add_parser("clone-procedural-map", help="Clone a core/installed-mod/Workshop map into this spec with a new numeric id")
+    spec_args(cpm)
+    cpm.add_argument("--source", required=True, help="Source map id, name, filename stem, or JSON path")
+    cpm.add_argument("--map-id", type=int, required=True, help="New numeric map id")
+    cpm.add_argument("--name", required=True, help="New map display name")
+    cpm.set_defaults(func=cmd_clone_procedural_map)
+
+    apm = sub.add_parser("add-procedural-map", help="Add or replace a complete procedural map JSON definition")
+    spec_args(apm)
+    apm.add_argument("--from-json", required=True, help="Path to a procedural map JSON file")
+    apm.set_defaults(func=cmd_add_procedural_map)
+
+    lcv = sub.add_parser("list-conversations", help="List conversation nodes and family replies in this spec")
+    spec_args(lcv)
+    lcv.add_argument("--search", default="", help="Filter by id, type, text, option, or family reply")
+    lcv.add_argument("--json", action="store_true")
+    lcv.set_defaults(func=cmd_list_conversations)
+
+    scv = sub.add_parser("set-conversation", help="Add or replace one full conversation/family JSON row")
+    spec_args(scv)
+    scv.add_argument("--from-json", required=True, help="JSON object or path to a conversation row JSON file")
+    scv.add_argument("--family", action="store_true", help="Write to family_conversations (identity is race)")
+    scv.add_argument("--row-index", type=int, help="Select a specific row when ids/races have intentional variants")
+    scv.set_defaults(func=cmd_set_conversation)
+
+    rcv = sub.add_parser("remove-conversation", help="Remove one conversation node or family row")
+    spec_args(rcv)
+    rcv.add_argument("--conversation-id", help="Conversation id (omit with --family)")
+    rcv.add_argument("--family", action="store_true", help="Remove a family_conversations row")
+    rcv.add_argument("--race", help="Race id for --family removal")
+    rcv.add_argument("--row-index", type=int, help="Select a specific row when ids/races have variants")
+    rcv.set_defaults(func=cmd_remove_conversation)
+
+    lb = sub.add_parser("list-buildings", help="Search vanilla, installed-mod, and Workshop buildings, or list this spec")
     spec_args(lb)
     lb.add_argument("--search", default="")
     lb.add_argument("--limit", type=int, default=40)
     lb.add_argument("--json", action="store_true")
     lb.set_defaults(func=cmd_list_buildings)
 
-    db = sub.add_parser("dump-building", help="Print vanilla/workshop building JSON (does not retarget)")
+    bg = sub.add_parser("building-guide", help="Show the building contract and local game/mod references")
+    bg.add_argument("--search", default="", help="Find installed building examples")
+    bg.add_argument("--limit", type=int, default=8)
+    bg.add_argument("--json", action="store_true")
+    bg.set_defaults(func=cmd_building_guide)
+
+    db = sub.add_parser("dump-building", help="Print vanilla/installed-mod/Workshop building JSON (does not retarget)")
     spec_args(db)
     db.add_argument("building_id")
     db.set_defaults(func=cmd_dump_building)
 
-    cb = sub.add_parser("clone-building", help="Clone a vanilla/workshop building into this spec")
+    cb = sub.add_parser("clone-building", help="Clone a vanilla, installed-mod, or Workshop building into this spec")
     spec_args(cb)
     cb.add_argument("--source", required=True, help="Building id, e.g. 389 Collegium Magicae")
     cb.add_argument("--name")
@@ -2765,12 +3615,133 @@ def build_parser() -> argparse.ArgumentParser:
     cbm.add_argument("--name", help="Destination filename")
     cbm.set_defaults(func=cmd_copy_building_map)
 
+    chm = sub.add_parser(
+        "check-building-maps",
+        help="Check .smap headers link to real buildings and use unique map ids (default: every installed mod with maps)",
+    )
+    chm.add_argument("mods", nargs="*", help="Mod folder name under data/mods, or a path")
+    chm.add_argument("--verbose", action="store_true", help="Also show filename-convention notes")
+    chm.set_defaults(func=cmd_check_building_maps)
+
+    rlm = sub.add_parser(
+        "relink-building-maps",
+        help="Give each .smap a unique map id, the right building id, and the vanilla <mapid>_<building>.smap name",
+    )
+    rlm.add_argument("mods", nargs="+", help="Mod folder name under data/mods, or a path")
+    rlm.add_argument("--only", help="Just this .smap filename")
+    rlm.add_argument("--apply", action="store_true", help="Write changes (default is a dry run); backs up originals")
+    rlm.set_defaults(func=cmd_relink_building_maps)
+
+    lbm = sub.add_parser("link-building-map", help="Point an existing .smap at a building id and place it in a mod")
+    lbm.add_argument("--mod", required=True, help="Mod folder name under data/mods, or a path")
+    lbm.add_argument("--map", required=True, help="Existing .smap (any mod, core_2, or the in-game editor export)")
+    lbm.add_argument("--building", required=True, help="buildings/*.json id to link to")
+    lbm.add_argument("--map-id", help="Unique map id (default <building>_1, bumped if taken)")
+    lbm.add_argument("--name", help="Map display name (default: the building name)")
+    lbm.add_argument("--apply", action="store_true", help="Write (default is a dry run)")
+    lbm.set_defaults(func=cmd_link_building_map)
+
+    am = sub.add_parser(
+        "audit-mods",
+        help="Check enabled mods together: duplicate ids, broken references, wrong file shapes (read-only)",
+    )
+    am.add_argument("mods", nargs="*", help="Mod folder names/paths (default: mods enabled in user_settings.json)")
+    am.add_argument("--installed", action="store_true", help="Every mod folder under data/mods instead of the enabled list")
+    am.add_argument("--verbose", action="store_true", help="Also list core_2 rows a mod replaces")
+    am.add_argument("--json", action="store_true")
+    am.set_defaults(func=cmd_audit_mods)
+
+    gl = sub.add_parser("game-log", help="Summarise logs/errors.log by load pass; hides the core_2-only boot pass noise")
+    gl.add_argument("--file", help="Another errors.log")
+    gl.add_argument("--all", action="store_true", help="Show boot-pass 'Unable to find building' lines too")
+    gl.add_argument("--mods", action="store_true", help="List the mods each pass loaded")
+    gl.set_defaults(func=cmd_game_log)
+
+    ca = sub.add_parser("check-assets", help="Check assets.json sheets (files, PNG grid) and every image/glyph index against the sheet it really uses")
+    ca.add_argument("mods", nargs="*", help="Mod names/paths or core_2 (default: enabled mods)")
+    ca.add_argument("--installed", action="store_true")
+    ca.add_argument("--verbose", action="store_true", help="Also show sheets that replace a bigger core_2 sheet")
+    ca.add_argument("--limit", type=int, default=40, help="Max issues printed per mod")
+    ca.set_defaults(func=cmd_check_assets)
+
+    ls = sub.add_parser("list-sheets", help="Tilesheets a mod's content draws from (its own, else core_2) with cell counts")
+    ls.add_argument("--mod", help="Mod name/path (default core_2)")
+    ls.add_argument("--own", action="store_true", help="Only sheets the mod defines")
+    ls.add_argument("--search")
+    ls.set_defaults(func=cmd_list_sheets)
+
+    sc = sub.add_parser("show-cells", help="Render tilesheet cells to a labelled PNG (index 0 = bottom-left)")
+    sc.add_argument("--mod", help="Mod name/path (default core_2)")
+    sc.add_argument("--sheet", required=True, help="abilities, glyph32, items, passive_skills, ...")
+    sc.add_argument("--index", required=True, help="e.g. 12 or 0-15 or 3,7,40")
+    sc.add_argument("--scale", type=int, default=4)
+    sc.add_argument("--out", help="PNG path (default Output/Soulash2/_asset_preview/)")
+    sc.set_defaults(func=cmd_show_cells)
+
+    lsd = sub.add_parser("list-sounds", help="Search combat sounds (core_2 / installed / Workshop), or list a spec's custom sounds")
+    spec_args(lsd)
+    lsd.add_argument("--search")
+    lsd.add_argument("--limit", type=int, default=60)
+    lsd.set_defaults(func=cmd_list_sounds)
+
+    asd = sub.add_parser("add-sound", help="Add an .ogg as a custom combat sound (assets.json sounds.combat), optionally bind to an animation")
+    spec_args(asd)
+    asd.add_argument("--file", required=True, help="Ogg Vorbis (.ogg) file; copied to assets/sfx/ in the mod")
+    asd.add_argument("--name", required=True)
+    asd.add_argument("--sound-id", help="Default <skill_id>_<name>")
+    asd.add_argument("--bind-animation", help="Animation id in this spec that should play it")
+    asd.add_argument("--volume", type=int, default=100)
+    asd.set_defaults(func=cmd_add_sound)
+
+    lw = sub.add_parser("list-weather", help="Search weather.json in core_2/installed/workshop, or list a spec's weather (+checks)")
+    spec_args(lw)
+    lw.add_argument("--search", help="Text in id/name/animation/biome/source ('' lists all)")
+    lw.add_argument("--limit", type=int, default=60)
+    lw.add_argument("--json", action="store_true")
+    lw.set_defaults(func=cmd_list_weather)
+
+    dw = sub.add_parser("dump-weather", help="Print one weather entry (vanilla, installed or workshop) by id or name")
+    dw.add_argument("weather_id")
+    dw.set_defaults(func=cmd_dump_weather)
+
+    aw = sub.add_parser("add-weather", help="Create/replace a weather event in the spec (write emits weather.json)")
+    spec_args(aw)
+    aw.add_argument("--name", required=True)
+    aw.add_argument("--weather-id", help="Default <skill_id>_<name>; vanilla ids 1-17 replace vanilla weather")
+    aw.add_argument("--clone", help="Start from an existing weather id/name (e.g. 7 or 'Heavy rain')")
+    aw.add_argument("--animation", help="Animation id: vanilla (113 rain, 182 snow, core_2_Heavy_Rain) or this mod's")
+    aw.add_argument("--message", help="trigger_message shown when it starts")
+    aw.add_argument("--ability", action="append", help="Ability applied while it lasts (repeatable; vanilla Wet = 88, 89)")
+    aw.add_argument("--biome", action="append", help="Biome where it can roll (repeatable): grasslands, forest, swamps, tundra, ...")
+    aw.add_argument("--no-biomes", action="store_true", help="biomes [] : only starts from summon_weather or the console")
+    aw.add_argument("--duration", type=float)
+    aw.add_argument("--trigger-every", type=float)
+    aw.add_argument("--chance", type=float, help="trigger_chance 0-1")
+    aw.add_argument("--animation-tick", type=float)
+    aw.add_argument("--ability-trigger-time", type=float)
+    roof = aw.add_mutually_exclusive_group()
+    roof.add_argument("--roof", action="store_true", help="disabled_under_roof true (default for rain)")
+    roof.add_argument("--ignore-roof", action="store_true", help="disabled_under_roof false: hits under roofs too (Blood Moon, Heatwave)")
+    aw.add_argument("--change", action="append", help="change_entities_on_start from=to[,to2] (repeatable), e.g. core_2_Dried_Mud=974")
+    aw.add_argument("--force-night", action="store_true", help="Night while active (Blood Moon)")
+    aw.add_argument("--thirst-multiplier", type=float, help="Thirst rate multiplier (Heatwave 4.0)")
+    aw.add_argument("--stop-on-map-exit", action="store_true", help="exe-only field, untested in vanilla")
+    aw.add_argument("--summon-ability", help="Set effects_keys.summon_weather on this spec ability")
+    aw.set_defaults(func=cmd_add_weather)
+
+    rw = sub.add_parser("remove-weather", help="Delete a weather event (and clear summon_weather links to it)")
+    spec_args(rw)
+    rw.add_argument("--weather", required=True)
+    rw.set_defaults(func=cmd_remove_weather)
+
     fb = sub.add_parser(
         "fix-buildings",
-        help="Upgrade 0.9.x player buildings to the 0.10 API (Officers!, Battlemages, Silkworm Farm)",
+        help="Scan or upgrade Soulash 2 buildings for the current player-building API",
     )
     spec_args(fb)
     fb.add_argument("mods", nargs="*", help="officers / battlemages / silkworm, steam id, or folder")
+    fb.add_argument("--installed", action="store_true", help="Scan every mod under the game's data/mods folder")
+    fb.add_argument("--mod-root", help="Use this mods folder with --installed (defaults to the detected game install)")
     fb.add_argument("--scan", action="store_true", help="Print issues only")
     fb.add_argument("--apply", action="store_true", help="Write a fixed copy under Output/Soulash2/<name>/")
     fb.add_argument("--in-place", action="store_true", help="Also patch the workshop/source folder")

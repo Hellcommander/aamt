@@ -126,9 +126,9 @@
     },
     {
       "kind": "skill_field",
-      "id": "level_start",
+      "id": "start_level",
       "confidence": "patch",
-      "description": "Optional skills.json starting level for this skill.",
+      "description": "Optional skills.json level the skill starts at (core_2 crafting skills and Economy use 1; default 10). Older SkillCreator builds wrote level_start, which the game ignores.",
       "docs_value": "int"
     },
     {

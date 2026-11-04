@@ -20,9 +20,12 @@ requests>=2.25.0
 # openai-whisper>=20230314
 
 # Optional for the shared asset-aware audio pipeline (audio_pipeline.py)
-# sentence-transformers>=2.2.0   # tag embeddings (all-MiniLM-L6-v2)
+sentence-transformers>=6.0      # tag embeddings (all-MiniLM-L6-v2); the index records
+                                 #   its tag_model — after changing the embedder run
+                                 #   `audio_pipeline.py rebuild-tags`
 # transformers>=4.20.0           # CLAP laion/clap-htsat-unfused
-# librosa>=0.9.0                 # mp3 inside zips + resample
+av>=14.0                         # mp3/ogg/m4a decode inside zips (bundles FFmpeg)
+# torchcodec                     # optional 2nd decoder; needs FFmpeg "full-shared" DLLs on PATH
 # faiss-cpu                      # optional; numpy cosine is the default
 
 # Stable Audio Open (text-to-audio) — prefer Setup-StableAudio.ps1

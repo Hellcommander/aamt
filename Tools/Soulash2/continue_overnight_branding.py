@@ -11,9 +11,11 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-TOOLS = Path(r"D:\games\Steam\steamapps\common\Transcendence\Tools\Soulash2")
+from s2_game_paths import mods_dir
+
+TOOLS = Path(__file__).resolve().parent
 GEN = TOOLS / "generate_mod_branding_assets.py"
-MODS = Path(r"E:\SteamLibrary\steamapps\common\Soulash 2\data\mods")
+MODS = mods_dir()
 PING = "http://127.0.0.1:1338/ping"
 LOCK = Path(__import__("os").environ.get("TEMP", ".")) / "soulash_sd_branding.lock"
 
