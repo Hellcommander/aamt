@@ -5,6 +5,9 @@
 #include <glm/gtx/transform.hpp>
 #include <vector>
 #include <cmath>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 #include <random>
 
 namespace MagiTech {
@@ -57,7 +60,7 @@ namespace {
             mesh.vertices.push_back(vertex);
         }
 
-        Log::info("Created icosphere with {} vertices, radius: {}", mesh.vertices.size(), radius);
+        Log::info("BlackholeProjectile", "Created icosphere with {} vertices, radius: {}", mesh.vertices.size(), radius);
         return mesh;
     }
 
@@ -105,7 +108,7 @@ namespace {
             }
         }
 
-        Log::info("Created torus with {} vertices, {} indices, inner: {}, outer: {}", 
+        Log::info("BlackholeProjectile", "Created torus with {} vertices, {} indices, inner: {}, outer: {}", 
                  mesh.vertices.size(), mesh.indices.size(), innerRadius, outerRadius);
         return mesh;
     }
@@ -146,7 +149,7 @@ namespace {
             mesh.indices.push_back(base + 2);
         }
 
-        Log::info("Created ribbon with {} vertices, length: {}, width: {}", 
+        Log::info("BlackholeProjectile", "Created ribbon with {} vertices, length: {}, width: {}", 
                  mesh.vertices.size(), length, width);
         return mesh;
     }
@@ -154,7 +157,7 @@ namespace {
 
 namespace MeshGen {
     MeshHandle buildEventHorizon(const BlackholeProjectileParams& p) {
-        Log::info("Building event horizon for: {}", p.id);
+        Log::info("BlackholeProjectile", "Building event horizon for: {}", p.id);
         
         // Create inverted sphere (normals pointing inward)
         auto mesh = createIcoSphere(p.coreRadius, 4);
@@ -164,12 +167,12 @@ namespace MeshGen {
             vertex.normal = -vertex.normal;
         }
         
-        Log::info("Event horizon mesh created with handle: {}", mesh.handle);
+        Log::info("BlackholeProjectile", "Event horizon mesh created with handle: {}", mesh.handle);
         return mesh.handle;
     }
     
     MeshHandle buildAccretionDisk(const BlackholeProjectileParams& p) {
-        Log::info("Building accretion disk for: {}", p.id);
+        Log::info("BlackholeProjectile", "Building accretion disk for: {}", p.id);
         
         // Create torus with specified radii
         auto mesh = createTorus(p.diskInnerRadius, p.diskOuterRadius, 64, 32);
@@ -185,25 +188,25 @@ namespace MeshGen {
             vertex.normal = glm::normalize(glm::vec3(normal));
         }
         
-        Log::info("Accretion disk mesh created with handle: {}", mesh.handle);
+        Log::info("BlackholeProjectile", "Accretion disk mesh created with handle: {}", mesh.handle);
         return mesh.handle;
     }
     
     MeshHandle buildWarpTrail(const BlackholeProjectileParams& p) {
-        Log::info("Building warp trail for: {}", p.id);
+        Log::info("BlackholeProjectile", "Building warp trail for: {}", p.id);
         
         // Create ribbon along velocity direction
         float width = p.diskInnerRadius * 1.2f;
         auto mesh = createRibbon(p.trailLength, width, 32);
         
-        Log::info("Warp trail mesh created with handle: {}", mesh.handle);
+        Log::info("BlackholeProjectile", "Warp trail mesh created with handle: {}", mesh.handle);
         return mesh.handle;
     }
 }
 
 namespace ShaderGen {
     ShaderHandle buildWarpShader(const BlackholeProjectileParams& p) {
-        Log::info("Building warp shader for: {}", p.id);
+        Log::info("BlackholeProjectile", "Building warp shader for: {}", p.id);
         
         // Generate shader source with parameters
         std::string vertexShader = R"(
@@ -281,14 +284,14 @@ void main() {
 }
 )";
 
-        Log::info("Warp shader created with handle: {}", nextShaderHandle);
+        Log::info("BlackholeProjectile", "Warp shader created with handle: {}", nextShaderHandle);
         return nextShaderHandle++;
     }
 }
 
 namespace TextureGen {
     TextureHandle buildDiskTexture(const BlackholeProjectileParams& p) {
-        Log::info("Building disk texture for: {}", p.id);
+        Log::info("BlackholeProjectile", "Building disk texture for: {}", p.id);
         
         // Generate procedural noise texture
         const int width = 256;
@@ -332,7 +335,7 @@ namespace TextureGen {
             }
         }
         
-        Log::info("Disk texture created with handle: {}, size: {}x{}", 
+        Log::info("BlackholeProjectile", "Disk texture created with handle: {}, size: {}x{}", 
                  nextTextureHandle, width, height);
         return nextTextureHandle++;
     }
@@ -340,7 +343,7 @@ namespace TextureGen {
 
 namespace ParticleGen {
     ParticleHandle buildVortex(const BlackholeProjectileParams& p) {
-        Log::info("Building particle vortex for: {}", p.id);
+        Log::info("BlackholeProjectile", "Building particle vortex for: {}", p.id);
         
         // Create particle system configuration
         struct ParticleSystem {
@@ -365,7 +368,7 @@ namespace ParticleGen {
         ps.endColor = {0.0f, 0.0f, 0.0f, 0.0f};
         ps.suckRadius = p.starSuckRadius;
         
-        Log::info("Particle vortex created with handle: {}, rate: {}, lifetime: {}", 
+        Log::info("BlackholeProjectile", "Particle vortex created with handle: {}, rate: {}, lifetime: {}", 
                  nextParticleHandle, ps.rate, ps.lifetime);
         return nextParticleHandle++;
     }
@@ -373,7 +376,7 @@ namespace ParticleGen {
 
 namespace AudioGen {
     AudioHandle buildRumble(const BlackholeProjectileParams& p) {
-        Log::info("Building audio rumble for: {}", p.id);
+        Log::info("BlackholeProjectile", "Building audio rumble for: {}", p.id);
         
         // Generate deep space rumble with sucking crescendo
         struct AudioConfig {
@@ -421,7 +424,7 @@ namespace AudioGen {
             samples[i] = rumble;
         }
         
-        Log::info("Audio rumble created with handle: {}, duration: {}, samples: {}", 
+        Log::info("BlackholeProjectile", "Audio rumble created with handle: {}, duration: {}, samples: {}", 
                  nextAudioHandle, config.duration, numSamples);
         return nextAudioHandle++;
     }

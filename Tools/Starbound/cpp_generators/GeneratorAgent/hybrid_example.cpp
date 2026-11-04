@@ -1,3 +1,4 @@
+#include "MechFamilyExamples.hpp"
 #include "MechFactory.hpp"
 #include "MechGenerators.hpp"
 #include "MechLuaBindings.hpp"
@@ -11,6 +12,12 @@
 // Example: Hybrid C++23/26 + Lua In-Game Multi-Form Mech Generator
 // This demonstrates the enhanced pipeline with procedural generation,
 // multi-form support, and comprehensive Lua integration.
+
+namespace MagiTech {
+namespace Mechs {
+namespace Examples {
+
+namespace {
 
 class HybridMechGameSystem {
 private:
@@ -440,18 +447,24 @@ private:
     }
 };
 
-// Main function to run the demonstration
-int main() {
+} // namespace
+
+// Entry point of the demonstration (was main() when this was a standalone program)
+int runHybridMechExample() {
     try {
         HybridMechGameSystem gameSystem;
         gameSystem.runFullDemonstration();
-        
+
         std::cout << "\nHybrid mech generator demonstration completed successfully!" << std::endl;
-        
+
     } catch (const std::exception& e) {
-        std::cerr << "Exception in main: " << e.what() << std::endl;
+        std::cerr << "Exception in hybrid mech example: " << e.what() << std::endl;
         return 1;
     }
-    
+
     return 0;
-} 
+}
+
+} // namespace Examples
+} // namespace Mechs
+} // namespace MagiTech

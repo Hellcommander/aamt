@@ -1,12 +1,40 @@
 #include "AcidLiquidProjectileLuaBindings.hpp"
 #include "AcidLiquidProjectileFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include <vector>
 
 namespace MagiTech {
 namespace AcidLiquidProjectiles {
 
 static std::vector<std::pair<std::future<LiquidAssetBundle>, std::string>> pendingProjectiles;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<AcidLiquidProjectileFactory>& factorySlot() {
+    static std::shared_ptr<AcidLiquidProjectileFactory> f;
+    return f;
+}
+} // namespace
+
+void AcidLiquidProjectileLuaBindings::setFactory(std::shared_ptr<AcidLiquidProjectileFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<AcidLiquidProjectileFactory> AcidLiquidProjectileLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<AcidLiquidProjectileFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 void AcidLiquidProjectileLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<LiquidProjectileParams>("LiquidProjectileParams",
@@ -41,15 +69,15 @@ void AcidLiquidProjectileLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_liquid_projectile",
-        [&](const LiquidProjectileParams& p) {
-            auto factory = MainPlugin::instance().getAcidLiquidProjectileFactory();
+        [](const LiquidProjectileParams& p) {
+            auto factory = AcidLiquidProjectileLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("spawn_liquid_projectile_async",
-        [&](const LiquidProjectileParams& p) {
-            auto factory = MainPlugin::instance().getAcidLiquidProjectileFactory();
+        [](const LiquidProjectileParams& p) {
+            auto factory = AcidLiquidProjectileLuaBindings::factory();
             pendingProjectiles.emplace_back(factory->generateAsync(p), p.id);
         }
     );

@@ -7,7 +7,9 @@
     - .frames files with frameList format (pixel coordinates)
     - .material files for tile properties
     - .matmod files for material modifiers
-    - Placeholder PNG spritesheets
+    - Tile PNG spritesheets painted by the local Stable Diffusion 3.5 server (:1338),
+      downsized and palette-quantized to the tile cell size. SD or throw: procedural
+      System.Drawing art only runs with -AllowProcedural (or AAMT_SD_STRICT=0) after SD fails.
 
 # Load shared asset generation settings
 $settingsPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "..\\AssetGenerationSettings.ps1"
@@ -96,7 +98,23 @@ param(
     [switch]$Multicolored,  # Has color variants
 
     [Parameter(Mandatory=$false)]
-    [switch]$GeneratePlaceholderImage
+    [switch]$GeneratePlaceholderImage,  # Kept for compatibility: the PNG is always written (via Stable Diffusion)
+
+    [Parameter(Mandatory=$false)]
+    [switch]$AllowProcedural,  # Permit the old System.Drawing art, only as fallback after SD failure (or AAMT_SD_STRICT=0)
+
+    # Ollama / art direction
+    [Parameter(Mandatory=$false)]
+    [string]$Description = "",
+
+    [Parameter(Mandatory=$false)]
+    [switch]$UseOllama,
+
+    [Parameter(Mandatory=$false)]
+    [string]$OllamaModel = "codellama:7b-instruct",
+
+    [Parameter(Mandatory=$false)]
+    [string]$VisualModel = "wizardlm-uncensored"
 )
 
 # Import shared Ollama integration module if available
@@ -110,6 +128,9 @@ if (Test-Path $sharedModulePath) {
         }
     }
 }
+
+# Stable Diffusion art helper (SD3.5 server :1338). No procedural art unless -AllowProcedural.
+Import-Module (Join-Path $PSScriptRoot "StarboundSdArt.psm1") -Force
 
 # ============================================================================
 # PRESET DEFINITIONS
@@ -223,7 +244,30 @@ $TilePresets = @{
 # HELPER FUNCTIONS
 # ============================================================================
 
-function New-PlaceholderTileImage {
+function Get-TileColorWord {
+    # Coarse RGB -> colour word so Ollama palettes can steer the SD prompt.
+    param([int]$R, [int]$G, [int]$B)
+    $max = [Math]::Max($R, [Math]::Max($G, $B)); $min = [Math]::Min($R, [Math]::Min($G, $B))
+    if ($max -lt 50) { return "black" }
+    if (($max - $min) -lt 28) { if ($max -gt 205) { return "white" } elseif ($max -gt 120) { return "grey" } else { return "dark grey" } }
+    $d = [double]($max - $min)
+    $h = if ($max -eq $R) { 60.0 * ((($G - $B) / $d) % 6) } elseif ($max -eq $G) { 60.0 * ((($B - $R) / $d) + 2) } else { 60.0 * ((($R - $G) / $d) + 4) }
+    if ($h -lt 0) { $h += 360 }
+    $tone = if ($max -lt 110) { "dark " } elseif ($max -gt 215 -and ($max - $min) -lt 120) { "pale " } else { "" }
+    $name = if ($h -lt 15 -or $h -ge 345) { "red" } elseif ($h -lt 40) { "orange" } elseif ($h -lt 70) { "yellow" } elseif ($h -lt 160) { "green" } elseif ($h -lt 200) { "teal" } elseif ($h -lt 255) { "blue" } elseif ($h -lt 300) { "purple" } else { "magenta" }
+    return "$tone$name"
+}
+
+function Get-StableSeed {
+    param([string]$Text)
+    $h = 17
+    foreach ($ch in $Text.ToCharArray()) { $h = (($h * 31) + [int]$ch) % 900000 }
+    return [int]($h + 1)
+}
+
+function New-ProceduralTileFallbackImage {
+    # LEGACY FALLBACK ONLY: coloured rectangles/checkerboards. Runs solely when
+    # -AllowProcedural (or AAMT_SD_STRICT=0) is set and Stable Diffusion failed.
     param(
         [string]$OutputPath,
         [int]$TileSize,
@@ -491,32 +535,98 @@ Return ONLY the JSON object."
 }
 
 # ============================================================================
-# Generate placeholder or intelligent image (optional)
+# Generate the tile spritesheet PNG with Stable Diffusion (SD3.5 :1338)
 # ============================================================================
 
-# Always write a real tile PNG (procedural art fills the role; Ollama may refine colors/style above)
+# Always write a real tile PNG. Pixels come from SD; Ollama refines the prompt above.
 if ($true) {
     $pngFile = Join-Path $outputPath "$TileName.png"
-    
-    # Use AI design if available
-    $style = if ($script:tileDesign -and $script:tileDesign.PatternStyle) {
-        $script:tileDesign.PatternStyle.ToLower()
-    } else {
-        switch ($Preset) {
-            "Brick" { "checker" }
-            "Glass" { "solid" }
-            default { "border" }
+
+    # Per-preset subject + per-cell variant wording (cycled across the sheet).
+    $presetArt = switch ($Preset) {
+        "Basic"      { @{ Subject = "plain solid stone block";                           Variants = @() } }
+        "Protection" { @{ Subject = "reinforced protective barrier block, riveted armour plating"; Variants = @("intact and pristine", "light scratches", "cracked", "heavily damaged", "glowing energy fractures") } }
+        "Platform"   { @{ Subject = "thin horizontal metal walkway platform, one strip across the middle of the frame"; Variants = @("left end cap", "middle section", "right end cap", "single isolated piece") } }
+        "Ore"        { @{ Subject = "rough rock with embedded glowing ore crystal veins"; Variants = @() } }
+        "Brick"      { @{ Subject = "masonry brick wall";                                Variants = @("plain bricks", "cracked bricks", "mossy bricks", "darker worn bricks", "lighter clean bricks", "chipped bricks") } }
+        "Natural"    { @{ Subject = "natural soil and earth ground with pebbles and tufts of grass"; Variants = @("grassy", "rocky", "dense packed soil", "tangled roots") } }
+        "Metal"      { @{ Subject = "scratched steel metal plate with rivets and panel seams"; Variants = @() } }
+        "Glass"      { @{ Subject = "clear glass pane with bright light reflections, pale blue tint"; Variants = @() } }
+        "Organic"    { @{ Subject = "alien organic flesh tissue with veins and slime";   Variants = @("pulsing veins", "slimy surface", "fibrous muscle", "spore pods") } }
+        "Tech"       { @{ Subject = "futuristic sci-fi tech wall panel";                 Variants = @("glowing circuit lines", "vent grille", "glowing energy core", "hazard stripes", "screen panel", "wiring conduit", "plain armoured plate", "blinking status lights") } }
+        default      { @{ Subject = "game block material";                               Variants = @() } }
+    }
+
+    $readableName = ($TileName -creplace '([a-z])([A-Z])', '$1 $2') -replace '[_\-]+', ' '
+    $parts = New-Object System.Collections.Generic.List[string]
+    $parts.Add("$readableName tile, $($presetArt.Subject)")
+    if (-not [string]::IsNullOrWhiteSpace($Description)) { $parts.Add($Description.Trim()) }
+    if ($script:tileDesign) {
+        if ($script:tileDesign.VisualDescription) { $parts.Add([string]$script:tileDesign.VisualDescription) }
+        if ($script:tileDesign.PatternStyle)      { $parts.Add("$($script:tileDesign.PatternStyle) pattern") }
+        if ($script:tileDesign.ColorPalette) {
+            $words = @()
+            foreach ($rgb in @($script:tileDesign.ColorPalette)) {
+                try { if (@($rgb).Count -ge 3) { $words += (Get-TileColorWord -R ([int]$rgb[0]) -G ([int]$rgb[1]) -B ([int]$rgb[2])) } } catch { }
+            }
+            $words = $words | Select-Object -Unique
+            if ($words) { $parts.Add("color palette: " + ($words -join ", ")) }
         }
     }
-    
-    $success = New-PlaceholderTileImage -OutputPath $pngFile `
-        -TileSize $finalTileSize -TileCount $finalTileCount `
-        -Columns $finalColumns -Style $style
-    
+    if ($Multicolored) { $parts.Add("neutral colouring that takes tinting well") }
+    $parts.Add("flat front-on view of a 2D platformer terrain material texture, seamless tileable, fills the entire frame edge to edge, Starbound sci-fantasy pixel art")
+    $tilePromptText = $parts -join ", "
+
+    $cellVariants = @()
+    if ($FrameNames -and $FrameNames.Count -gt 0 -and $finalTileCount -gt 1) {
+        $cellVariants = @($FrameNames | ForEach-Object { "variant: $_" })
+    } elseif ($finalTileCount -gt 1) {
+        $cellVariants = @($presetArt.Variants)
+    }
+
+    $sdArgs = @{
+        Kind      = "sheet"
+        Prompt    = $tilePromptText
+        OutputPath = $pngFile
+        Width     = [int]$finalTileSize
+        Height    = [int]$finalTileSize
+        Count     = [int]$finalTileCount
+        Columns   = [int]$finalColumns
+        SdKind    = "texture"
+        Pixel     = $true
+        Colors    = 16
+        Seed      = (Get-StableSeed -Text "$TileName|$Preset")
+        AllowProcedural = $AllowProcedural
+    }
+    if ($cellVariants.Count -gt 0) { $sdArgs.Variants = [string[]]$cellVariants }
+
+    Write-Host "[SD] Painting $finalTileCount tile cell(s) at ${finalTileSize}x${finalTileSize} with Stable Diffusion..." -ForegroundColor Yellow
+    # Throws when SD fails and procedural art is not allowed; returns $false only when it is allowed.
+    $success = New-StarboundSdArt @sdArgs
+
+    if (-not $success) {
+        Write-Host "[Fallback] Drawing procedural tile art (explicitly allowed)" -ForegroundColor Yellow
+        $style = if ($script:tileDesign -and $script:tileDesign.PatternStyle) {
+            ([string]$script:tileDesign.PatternStyle).ToLower()
+        } else {
+            switch ($Preset) {
+                "Brick" { "checker" }
+                "Glass" { "solid" }
+                default { "border" }
+            }
+        }
+        $success = New-ProceduralTileFallbackImage -OutputPath $pngFile `
+            -TileSize $finalTileSize -TileCount $finalTileCount `
+            -Columns $finalColumns -Style $style
+        $tileArtSource = "procedural fallback"
+    } else {
+        $tileArtSource = "Stable Diffusion"
+    }
+
     if ($success) {
-        Write-Host "[Created] $pngFile" -ForegroundColor Green
+        Write-Host "[Created] $pngFile ($tileArtSource)" -ForegroundColor Green
         if ($script:tileDesign) {
-            Write-Host "  AI-designed tile pattern" -ForegroundColor Gray
+            Write-Host "  AI-designed tile prompt" -ForegroundColor Gray
         }
     }
 }
@@ -549,7 +659,8 @@ if ($GenerateMatmod) {
     Write-Host "  - $TileName.matmod" -ForegroundColor White
 }
 if (Test-Path (Join-Path $outputPath "$TileName.png")) {
-    Write-Host "  - $TileName.png (procedural)" -ForegroundColor White
+    $pngLabel = if ($tileArtSource) { $tileArtSource } else { "existing file" }
+    Write-Host "  - $TileName.png ($pngLabel)" -ForegroundColor White
 }
 
 Write-Host ""

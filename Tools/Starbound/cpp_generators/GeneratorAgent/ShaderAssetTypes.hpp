@@ -10,13 +10,14 @@ namespace ShaderAssets {
 using ShaderHandle = uint32_t;
 using PipelineStateHandle = uint32_t;
 
-// Forward declarations for complex descriptor types
-struct ReflectionData;
-struct DescriptorSetLayoutDesc;
-struct VertexAttribDesc;
-struct RasterStateDesc;
-struct BlendStateDesc;
-struct DepthStateDesc;
+// --- Descriptor structs (placeholders until shader reflection is implemented).
+// Defined before use: std::optional / std::vector members need complete types.
+struct ReflectionData {};
+struct DescriptorSetLayoutDesc {};
+struct VertexAttribDesc {};
+struct RasterStateDesc {};
+struct BlendStateDesc {};
+struct DepthStateDesc {};
 
 enum class ShaderStage   { Vertex, Fragment, Compute, TessControl, TessEval, Geometry };
 enum class ShaderLang    { GLSL, HLSL, MSL, ESSL };
@@ -46,18 +47,10 @@ struct PipelineParams {
 };
 
 struct ShaderAssetBundle {
-    ShaderHandle shader;
+    ShaderHandle shader = 0;
     std::optional<ReflectionData> reflection;
-    PipelineStateHandle pipelineState;
+    PipelineStateHandle pipelineState = 0;
 };
-
-// --- Placeholder Descriptor Structs ---
-struct ReflectionData {};
-struct DescriptorSetLayoutDesc {};
-struct VertexAttribDesc {};
-struct RasterStateDesc {};
-struct BlendStateDesc {};
-struct DepthStateDesc {};
 
 } // namespace ShaderAssets
 } // namespace MagiTech

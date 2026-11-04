@@ -1,7 +1,7 @@
 #pragma once
 
 #include "SpaceObjectTypes.hpp"
-#include "core/modules/cosmic_generator/CosmicFactory.hpp"
+#include "CosmicFactory.hpp"
 
 namespace MagiTech {
 namespace Cosmic {

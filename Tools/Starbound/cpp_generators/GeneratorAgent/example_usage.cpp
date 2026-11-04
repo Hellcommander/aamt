@@ -3,6 +3,15 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <vector>
+#include <string>
+
+// Examples live in their own namespace and expose runMechAssetExamples() instead of
+// main(), because this file is compiled into the backend library (several example
+// files would otherwise each define main()).
+namespace MagiTech {
+namespace MechAssets {
+namespace Examples {
 
 // Example: FormShiftMechGen Pipeline Integration
 // This demonstrates how to use the FormShiftMechGen pipeline for creating
@@ -125,7 +134,7 @@ public:
 // Example: Lua Integration
 void setupLuaIntegration(lua_State* L) {
     // Register the mech asset Lua bindings
-    MagiTech::MechAssets::registerMechAssetLuaBindings(L);
+    registerMechAssetLuaBindings(L);
     
     std::cout << "Lua integration: Registered mt_mech table" << std::endl;
 }
@@ -248,7 +257,7 @@ void demonstratePerformanceTesting() {
     std::cout << "Performance test completed in " << duration.count() << "ms" << std::endl;
 }
 
-int main() {
+int runMechAssetExamples() {
     try {
         std::cout << "FormShiftMechGen Pipeline Examples" << std::endl;
         std::cout << "===================================" << std::endl;
@@ -265,7 +274,7 @@ int main() {
         std::cout << "\nAll demonstrations completed successfully!" << std::endl;
         
     } catch (const std::exception& e) {
-        std::cerr << "Exception in main: " << e.what() << std::endl;
+        std::cerr << "Exception in runMechAssetExamples: " << e.what() << std::endl;
         return 1;
     }
     
@@ -331,10 +340,14 @@ void runLuaScript(lua_State* L) {
     setupLuaIntegration(L);
     
     // Run the script
-    if (luaL_dostring(L, luaMechScript) != LUA_OK) {
+    if (luaL_dostring(L, luaMechScript) != 0) {
         std::cerr << "Lua script error: " << lua_tostring(L, -1) << std::endl;
         lua_pop(L, 1);
     } else {
         std::cout << "Lua script executed successfully!" << std::endl;
     }
-} 
+}
+
+} // namespace Examples
+} // namespace MechAssets
+} // namespace MagiTech

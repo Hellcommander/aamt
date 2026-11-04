@@ -41,13 +41,20 @@ except ImportError:
 from elin_procedural import render_rich_icon, render_rich_texture
 from elin_quality import validate_icon, validate_texture, finalize_rgba, finalize_texture
 
-# Optional local Stable Diffusion backend (procedural fallback if unavailable).
+from sd_policy import SdUnavailable, procedural_fallback
+
+# Local Stable Diffusion backend. Procedural art is only produced when explicitly
+# requested (--sd off), or allowed (--allow-procedural / AAMT_SD_STRICT=0).
 try:
     import elin_sd
     ELIN_SD_MODULE = True
 except Exception as _sd_exc:
     ELIN_SD_MODULE = False
-    print(f"  [Info] elin_sd unavailable ({_sd_exc}); procedural only", file=sys.stderr)
+    print(f"  [Info] elin_sd unavailable ({_sd_exc})", file=sys.stderr)
+
+ALLOW_PROCEDURAL = False   # set from --allow-procedural in main()
+SD_ATTEMPTS = 3            # SD render + QA attempts (new seed each) before giving up
+SD_SEED_STEP = 1009
 
 # Shared Unity .meta writer (preferred); fall back to local generate_unity_meta_file.
 try:
@@ -140,36 +147,51 @@ def generate_spell_asset(size, spec, seed=0):
 
 
 def _try_sd(asset_type, size, spec):
-    """Attempt an SD render (validated by the same QA gate). None -> procedural."""
-    if not (ELIN_SD_MODULE and elin_sd.sd_enabled()):
+    """SD render validated by the same QA gate, with bounded new-seed retries.
+
+    Returns an image, or None only when procedural art is explicitly wanted
+    (--sd off) or explicitly allowed (--allow-procedural / AAMT_SD_STRICT=0).
+    Otherwise raises SdUnavailable - no silent procedural placeholder.
+    """
+    if (os.environ.get("ELIN_SD", "auto") or "auto").strip().lower() == "off":
+        return None  # explicit procedural request
+    if not ELIN_SD_MODULE:
+        procedural_fallback("elin_sd module could not be imported", allow=ALLOW_PROCEDURAL)
         return None
-    seed = int(spec.get("seed", 0))
-    try:
-        if asset_type == "texture":
-            img = elin_sd.generate_texture_sd(size, spec, seed=seed)
-            if img is None:
-                return None
-            img = make_tileable(img)
-            ok, reason = validate_texture(img)
-        else:
-            img = elin_sd.generate_icon_sd(size, spec, asset_type=asset_type, seed=seed)
-            if img is None:
-                return None
-            ok, reason = validate_icon(img)
+    base_seed = int(spec.get("seed", 0))
+    last_reason = "unknown"
+    for attempt in range(SD_ATTEMPTS):
+        seed = base_seed + attempt * SD_SEED_STEP
+        try:
+            if asset_type == "texture":
+                img = elin_sd.generate_texture_sd(size, spec, seed=seed)
+                if img is None:
+                    return None  # SD explicitly off
+                img = make_tileable(img)
+                ok, reason = validate_texture(img)
+            else:
+                img = elin_sd.generate_icon_sd(size, spec, asset_type=asset_type, seed=seed)
+                if img is None:
+                    return None  # SD explicitly off
+                ok, reason = validate_icon(img)
+                if ok:
+                    img = finalize_rgba(img)
             if ok:
-                img = finalize_rgba(img)
-        if ok:
-            print("  [SD] used local Stable Diffusion", file=sys.stderr)
-            return img
-        print(f"  [SD] failed QA ({reason}); procedural fallback", file=sys.stderr)
-    except Exception as exc:
-        print(f"  [SD] error ({exc}); procedural fallback", file=sys.stderr)
+                print("  [SD] used local Stable Diffusion", file=sys.stderr)
+                return img
+            last_reason = f"failed QA ({reason})"
+        except elin_sd.SdServerUnreachable as exc:
+            last_reason = str(exc)
+            break  # server down: a new seed will not help
+        except Exception as exc:
+            last_reason = str(exc)
+        print(f"  [SD] attempt {attempt + 1}/{SD_ATTEMPTS} {last_reason}", file=sys.stderr)
+    procedural_fallback(f"SD {asset_type} render failed: {last_reason}", allow=ALLOW_PROCEDURAL)
     return None
 
 
 def _generate_with_quality(asset_type, size, spec):
-    """Prefer local SD (if a server is up), else procedural with QA + seed retries."""
-    # High-fidelity path first; transparently falls through on any problem.
+    """Local SD (required unless procedural is explicitly off/allowed), else procedural with QA + seed retries."""
     sd_img = _try_sd(asset_type, size, spec)
     if sd_img is not None:
         return sd_img
@@ -226,12 +248,19 @@ Error Codes:
     parser.add_argument('--size', type=int, help='Override size in pixels')
     parser.add_argument('--seed', type=int, default=None, help='Optional render seed')
     parser.add_argument('--sd', choices=['auto', 'on', 'off'], default=None,
-                        help='Local Stable Diffusion: auto=use if server up, on=require, off=procedural')
+                        help='Local Stable Diffusion: auto/on=SD required (fails if SD is down or QA fails), '
+                             'off=explicit procedural art')
+    parser.add_argument('--allow-procedural', action='store_true',
+                        help='If SD is unavailable or fails QA, accept a procedural placeholder '
+                             'instead of aborting (same as AAMT_SD_STRICT=0)')
     parser.add_argument('--sd-quality', choices=['draft', 'standard', 'high', 'ultra'], default=None,
                         help='SD sampling budget (default standard)')
     parser.add_argument('--api-url', default=None, help='Explicit SD API URL (else auto-detect)')
 
     args = parser.parse_args()
+
+    global ALLOW_PROCEDURAL
+    ALLOW_PROCEDURAL = bool(args.allow_procedural)
 
     # CLI overrides for the env-driven SD backend (elin_sd reads these).
     if args.sd:
@@ -304,6 +333,10 @@ Error Codes:
         else:
             print(f"WARNING: Unknown asset type '{asset_type}', using icon generator", file=sys.stderr)
             img = _generate_with_quality('icon', size, spec)
+    except SdUnavailable as e:
+        print(f"ERROR: SD art required for {asset_type} asset but unavailable", file=sys.stderr)
+        print(f"  {e}", file=sys.stderr)
+        sys.exit(3)
     except Exception as e:
         print(f"ERROR: Failed to generate {asset_type} asset", file=sys.stderr)
         print(f"  Size: {size}x{size}", file=sys.stderr)

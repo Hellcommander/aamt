@@ -2,6 +2,7 @@
 #include <future>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "IngredientTypes.hpp"
 
 namespace MagiTech {
@@ -46,7 +47,7 @@ public:
         if (auto hit = m_cache.find(key)) {
             return std::async(std::launch::deferred, [=] { return *hit; });
         }
-        return m_pool.enqueue([=]() {
+        return m_pool.enqueue([=, this]() {
             IngredientAssetBundle b;
             // Dispatch to the correct generator set based on type
             switch (p.type) {
@@ -76,7 +77,7 @@ public:
 
 private:
     ConcurrentLRUCache<uint64_t, IngredientAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
 };
 

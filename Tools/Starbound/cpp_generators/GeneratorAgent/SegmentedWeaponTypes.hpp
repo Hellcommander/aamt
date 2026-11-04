@@ -190,10 +190,10 @@ struct PhysicsParams {
 };
 
 struct AssetBundle {
-    MeshHandle      mesh;
-    TextureHandle   texture;
-    SkeletonHandle  skeleton;
-    PhysicsHandle   physics;
+    MeshHandle      mesh = 0;
+    TextureHandle   texture = 0;
+    SkeletonHandle  skeleton = 0;
+    PhysicsHandle   physics = 0;
 };
 
 // Utility functions for parameter conversion
@@ -217,7 +217,7 @@ namespace ParamUtils {
     SegmentedWeaponParams fromJson(const nlohmann::json& json);
     
     nlohmann::json toJson(const PhysicsParams& params);
-    PhysicsParams fromJson(const nlohmann::json& json);
+    PhysicsParams physicsFromJson(const nlohmann::json& json);
 }
 
 } // namespace SegmentedWeapons

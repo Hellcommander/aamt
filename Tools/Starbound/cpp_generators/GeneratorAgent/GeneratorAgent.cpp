@@ -4,6 +4,11 @@
 #include "core/utils/SafeCall.hpp"
 #include "core/utils/EventPatternMatcher.hpp"
 #include "core/plugins/AdaptiveBusPlugin.hpp"
+#include "core/Log.hpp"
+#include <cctype>
+#include <cmath>
+#include <numbers>
+#include <sstream>
 #include <chrono>
 #include <thread>
 #include <filesystem>
@@ -67,11 +72,14 @@ void GeneratorAgent::shutdown() {
 void GeneratorAgent::registerBindings(sol::state& lua) {
     // Register enums
     lua.new_enum("SynthesisGoalType",
-        "Power", "Style", "Hybrid"
+        "Power", 0,
+        "Style", 1,
+        "Hybrid", 2
     );
 
     // Register structs
     lua.new_usertype<SynthesisGoal>("SynthesisGoal",
+        sol::constructors<SynthesisGoal()>(),
         "targetPower", &SynthesisGoal::targetPower,
         "styleTags", &SynthesisGoal::styleTags
     );
@@ -114,114 +122,163 @@ void GeneratorAgent::registerBindings(sol::state& lua) {
         "reset", &AgentStats::reset
     );
 
+    lua.new_usertype<SpellDefinition>("SpellDefinition",
+        sol::constructors<SpellDefinition()>(),
+        "id", &SpellDefinition::id,
+        "type", &SpellDefinition::type,
+        "params", &SpellDefinition::params,
+        "displayName", &SpellDefinition::displayName,
+        "description", &SpellDefinition::description,
+        "tags", &SpellDefinition::tags
+    );
+
+    using SpellResult = std::tuple<std::optional<SpellInstance>, std::string>;
+    auto toLuaResult = [](std::expected<SpellInstance, std::string> r) -> SpellResult {
+        if (r) return {std::move(*r), std::string()};
+        return {std::nullopt, r.error()};
+    };
+
     // Register GeneratorAgent class
-    lua.new_usertype<GeneratorAgent>("GeneratorAgent",
+    // (C++-only factory registration - registerCppFactory/registerPatternFactory take
+    //  C++ ISpell factories - is not exposed; Lua registers registerLuaFactory/registerLuaPattern.)
+    auto agentType = lua.new_usertype<GeneratorAgent>("GeneratorAgent",
         // Constructor
         sol::constructors<GeneratorAgent()>(),
-        
+
         // IMagiTechModule methods
         "init", &GeneratorAgent::init,
         "shutdown", &GeneratorAgent::shutdown,
         "registerBindings", &GeneratorAgent::registerBindings,
-        
+
         // Configuration
         "setConfig", &GeneratorAgent::setConfig,
-        "getConfig", &GeneratorAgent::getConfig,
-        
-        // Core generation
-        "generateSpell", &GeneratorAgent::generateSpell,
-        "generateSpellFromDefinition", &GeneratorAgent::generateSpellFromDefinition,
+        "getConfig", sol::resolve<AgentConfig&()>(&GeneratorAgent::getConfig),
+
+        // Core generation (returns instance-or-nil, error message)
+        "generateSpell", [toLuaResult](GeneratorAgent& self, const std::string& id) {
+            return toLuaResult(self.generateSpell(id));
+        },
+        "generateSpellFromDefinition", [toLuaResult](GeneratorAgent& self, const SpellDefinition& def) {
+            return toLuaResult(self.generateSpellFromDefinition(def));
+        },
         "getAvailableSpellIds", &GeneratorAgent::getAvailableSpellIds,
         "hasSpell", &GeneratorAgent::hasSpell,
-        
+
         // Factory registration
-        "registerCppFactory", &GeneratorAgent::registerCppFactory,
-        "registerLuaFactory", &GeneratorAgent::registerLuaFactory,
-        "registerPatternFactory", &GeneratorAgent::registerPatternFactory,
+        "registerLuaFactory", [](GeneratorAgent& self, const std::string& type, sol::function factory) {
+            self.registerLuaFactory(type, std::move(factory));
+        },
         "registerLuaPattern", &GeneratorAgent::registerLuaPattern,
-        
-        // Manifest management
-        "loadManifest", &GeneratorAgent::loadManifest,
+
+        // Manifest management (returns ok, errors)
+        "loadManifest", [](GeneratorAgent& self, const std::string& path)
+                -> std::tuple<bool, std::vector<BlazeJsonHelper::JsonErrorInfo>> {
+            auto result = self.loadManifest(path);
+            if (result) return {true, {}};
+            return {false, result.error()};
+        },
         "reloadManifest", &GeneratorAgent::reloadManifest,
-        "getManifestPath", &GeneratorAgent::getManifestPath,
+        "getManifestPath", [](const GeneratorAgent& self) { return self.getManifestPath().string(); },
         "isManifestLoaded", &GeneratorAgent::isManifestLoaded,
-        
+
         // Synthesis
         "synthesizeSpell", &GeneratorAgent::synthesizeSpell,
         "synthesizeSpellBatch", &GeneratorAgent::synthesizeSpellBatch,
         "setSynthesisGoal", &GeneratorAgent::setSynthesisGoal,
         "getSynthesisGoal", &GeneratorAgent::getSynthesisGoal,
-        
+
         // Genetic evolution
         "evolveSpellPopulation", &GeneratorAgent::evolveSpellPopulation,
         "createInitialPopulation", &GeneratorAgent::createInitialPopulation,
-        "setEvolutionParameters", &GeneratorAgent::setEvolutionParameters,
-        
+        "setEvolutionParameters", sol::overload(
+            sol::resolve<void(int, int, float)>(&GeneratorAgent::setEvolutionParameters),
+            sol::resolve<void(float, float)>(&GeneratorAgent::setEvolutionParameters)),
+
         // Grammar engine
         "expandGrammar", &GeneratorAgent::expandGrammar,
         "loadGrammarRules", &GeneratorAgent::loadGrammarRules,
         "addGrammarRule", &GeneratorAgent::addGrammarRule,
         "getGrammarRules", &GeneratorAgent::getGrammarRules,
-        
+
         // Pattern matching
         "matchesPattern", &GeneratorAgent::matchesPattern,
         "findMatchingSpells", &GeneratorAgent::findMatchingSpells,
         "addPatternMatcher", &GeneratorAgent::addPatternMatcher,
-        
+
         // Hot-reload
         "enableHotReload", &GeneratorAgent::enableHotReload,
-        "setWatchInterval", &GeneratorAgent::setWatchInterval,
+        "setWatchInterval", [](GeneratorAgent& self, int milliseconds) {
+            self.setWatchInterval(std::chrono::milliseconds(milliseconds));
+        },
         "startWatching", &GeneratorAgent::startWatching,
         "stopWatching", &GeneratorAgent::stopWatching,
         "isWatching", &GeneratorAgent::isWatching,
-        
+
         // Caching
         "enableCaching", &GeneratorAgent::enableCaching,
         "clearCache", &GeneratorAgent::clearCache,
         "setCacheSize", &GeneratorAgent::setCacheSize,
         "getCacheSize", &GeneratorAgent::getCacheSize,
         "getCacheHitRate", &GeneratorAgent::getCacheHitRate,
-        
+
         // Performance monitoring
-        "getStats", &GeneratorAgent::getStats,
+        "getStats", sol::resolve<AgentStats&()>(&GeneratorAgent::getStats),
         "resetStats", &GeneratorAgent::resetStats,
         "logPerformanceMetrics", &GeneratorAgent::logPerformanceMetrics,
-        
-        // Batch operations
-        "generateSpellBatch", &GeneratorAgent::generateSpellBatch,
+
+        // Batch operations (returns generated instances, error messages)
+        "generateSpellBatch", [](GeneratorAgent& self, const std::vector<std::string>& ids) {
+            std::vector<SpellInstance> spells;
+            std::vector<std::string> errors;
+            for (auto& r : self.generateSpellBatch(ids)) {
+                if (r) spells.push_back(std::move(*r));
+                else errors.push_back(r.error());
+            }
+            return std::make_tuple(std::move(spells), std::move(errors));
+        },
         "preloadSpells", &GeneratorAgent::preloadSpells,
         "warmupCache", &GeneratorAgent::warmupCache,
-        
+
         // Utility methods
         "generateSpellId", &GeneratorAgent::generateSpellId,
         "validateSpellDefinition", &GeneratorAgent::validateSpellDefinition,
         "getSpellTags", &GeneratorAgent::getSpellTags,
         "addSpellTag", &GeneratorAgent::addSpellTag,
         "removeSpellTag", &GeneratorAgent::removeSpellTag,
-        
+
         // Advanced features
         "enableAIEnhancement", &GeneratorAgent::enableAIEnhancement,
         "setAIParameters", &GeneratorAgent::setAIParameters,
         "generateAISpell", &GeneratorAgent::generateAISpell,
         "trainOnSpellData", &GeneratorAgent::trainOnSpellData,
-        
+
+        // SpellStone generation
+        "generateSpellStoneSeed", &GeneratorAgent::generateSpellStoneSeed,
+        "generateSpellStoneFromIngredients", &GeneratorAgent::generateSpellStoneFromIngredients,
+        "getSpellStoneRecipes", &GeneratorAgent::getSpellStoneRecipes,
+        "hasSpellStoneRecipe", &GeneratorAgent::hasSpellStoneRecipe,
+        "registerSpellStoneRecipe", &GeneratorAgent::registerSpellStoneRecipe,
+        "removeSpellStoneRecipe", &GeneratorAgent::removeSpellStoneRecipe,
+
         // Event system
         "onSpellGenerated", &GeneratorAgent::onSpellGenerated,
         "onSynthesisComplete", &GeneratorAgent::onSynthesisComplete,
         "onEvolutionProgress", &GeneratorAgent::onEvolutionProgress,
         "onError", &GeneratorAgent::onError,
-        
-        // Import/Export
-        "exportSpellDefinitions", &GeneratorAgent::exportSpellDefinitions,
-        "importSpellDefinitions", &GeneratorAgent::importSpellDefinitions,
+
+        // Import/Export (JSON as text on the Lua side)
+        "exportSpellDefinitions", [](const GeneratorAgent& self) { return self.exportSpellDefinitions().dump(); },
+        "importSpellDefinitions", [](GeneratorAgent& self, const std::string& jsonText) {
+            self.importSpellDefinitions(nlohmann::json::parse(jsonText));
+        },
         "exportToFile", &GeneratorAgent::exportToFile,
         "importFromFile", &GeneratorAgent::importFromFile,
-        
+
         // Validation
-        "validateSpell", &GeneratorAgent::validateSpell,
+        "validateSpell", sol::resolve<bool(const std::string&) const>(&GeneratorAgent::validateSpell),
         "validateAllSpells", &GeneratorAgent::validateAllSpells,
         "runSpellTests", &GeneratorAgent::runSpellTests,
-        
+
         // Performance optimization
         "enableParallelProcessing", &GeneratorAgent::enableParallelProcessing,
         "setThreadPoolSize", &GeneratorAgent::setThreadPoolSize,
@@ -229,9 +286,8 @@ void GeneratorAgent::registerBindings(sol::state& lua) {
         "setMemoryPoolSize", &GeneratorAgent::setMemoryPoolSize
     );
 
-    // Create global instance
-    lua["GeneratorAgent"] = lua.create_named_table("GeneratorAgent");
-    lua["GeneratorAgent"]["instance"] = [this]() -> GeneratorAgent* {
+    // Access to this agent instance: GeneratorAgent.instance()
+    agentType["instance"] = [this]() -> GeneratorAgent* {
         return this;
     };
 }
@@ -294,7 +350,7 @@ std::expected<SpellInstance, std::string> GeneratorAgent::generateSpell(const st
                 if (m_spellCache.size() >= m_maxCacheSize) {
                     cleanupCache();
                 }
-                m_spellCache[spellId] = *result;
+                m_spellCache.insert_or_assign(spellId, *result);
                 m_stats.cacheSize = m_spellCache.size();
             }
             
@@ -328,7 +384,7 @@ std::expected<SpellInstance, std::string> GeneratorAgent::generateSpellFromDefin
 
     try {
         // Create spell instance directly from definition
-        auto result = m_spellGenerator->create(def.id);
+        auto result = m_spellGenerator->createFromDefinition(def);
         
         if (result) {
             m_stats.successfulGenerations++;
@@ -354,9 +410,9 @@ std::vector<std::string> GeneratorAgent::getAvailableSpellIds() const {
         return {};
     }
 
-    // This would need to be implemented in SpellGenerator
-    // For now, return empty vector
-    return {};
+    auto ids = m_spellGenerator->definitionIds();
+    std::sort(ids.begin(), ids.end());
+    return ids;
 }
 
 bool GeneratorAgent::hasSpell(const std::string& spellId) const {
@@ -372,9 +428,7 @@ bool GeneratorAgent::hasSpell(const std::string& spellId) const {
         }
     }
 
-    // This would need to be implemented in SpellGenerator
-    // For now, return false
-    return false;
+    return m_spellGenerator->hasDefinition(spellId);
 }
 
 // Synthesis system methods
@@ -439,15 +493,17 @@ std::vector<std::string> GeneratorAgent::synthesizeSpellBatch(const std::vector<
 }
 
 void GeneratorAgent::setSynthesisGoal(const std::string& spellId, const SynthesisGoal& goal) {
-    // This would need to be implemented to store synthesis goals
-    // For now, just emit an event
+    {
+        std::lock_guard<std::mutex> lock(m_registryMutex);
+        m_synthesisGoals[spellId] = goal;
+    }
     emitSynthesisCompleteEvent(spellId, goal);
 }
 
 SynthesisGoal GeneratorAgent::getSynthesisGoal(const std::string& spellId) const {
-    // This would need to be implemented to retrieve synthesis goals
-    // For now, return default goal
-    return SynthesisGoal{};
+    std::lock_guard<std::mutex> lock(m_registryMutex);
+    auto it = m_synthesisGoals.find(spellId);
+    return it != m_synthesisGoals.end() ? it->second : SynthesisGoal{};
 }
 
 // Genetic evolution methods
@@ -479,9 +535,11 @@ void GeneratorAgent::evolveSpellPopulation(std::vector<std::shared_ptr<SpellNode
             m_evolutionTimes.erase(m_evolutionTimes.begin());
         }
         
-        // Emit progress events for each generation
+        // Report the best fitness reached (population is sorted best-first)
+        const double bestFitness = population.empty() || !population.front()
+            ? 0.0 : synthesis_detail::fitness(*population.front(), goal);
         for (int i = 0; i < generations; ++i) {
-            emitEvolutionProgressEvent(i, 0.0); // Fitness would need to be calculated
+            emitEvolutionProgressEvent(i, bestFitness);
         }
     } catch (const std::exception& e) {
         std::string error = "Exception during genetic evolution: " + std::string(e.what());
@@ -504,10 +562,17 @@ std::vector<std::shared_ptr<SpellNode>> GeneratorAgent::createInitialPopulation(
     population.reserve(size);
 
     try {
+        // Random goals over the grammar's vocabulary give a diverse starting population
+        static const std::vector<std::string> vocabulary = {
+            "beam", "aoe", "heal", "frost", "lightning", "poison", "chain", "bounce", "repeat", "explosive"};
+        std::uniform_int_distribution<size_t> pickTag(0, vocabulary.size() - 1);
+        std::uniform_int_distribution<int> tagCount(0, 3);
+        std::uniform_real_distribution<float> power(5.0f, 100.0f);
         for (int i = 0; i < size; ++i) {
-            // Create random spell nodes
-            // This would need to be implemented based on SpellNode structure
-            population.push_back(std::make_shared<SpellNode>());
+            SynthesisGoal goal;
+            goal.targetPower = power(m_shapeRng);
+            for (int t = tagCount(m_shapeRng); t > 0; --t) goal.styleTags.push_back(vocabulary[pickTag(m_shapeRng)]);
+            population.push_back(m_grammarEngine->expand(goal));
         }
     } catch (const std::exception& e) {
         std::string error = "Exception during population creation: " + std::string(e.what());
@@ -525,9 +590,9 @@ void GeneratorAgent::setEvolutionParameters(int populationSize, int generations,
 
     m_config.geneticPopulationSize = populationSize;
     m_config.geneticGenerations = generations;
-    
-    // mutationRate would need to be stored in the genetic evolver
-    // For now, just update config
+    m_mutationRate = mutationRate;
+    m_geneticEvolver->setMutationRate(mutationRate);
+    m_synthesisManager->setEvolutionParameters(static_cast<size_t>(std::max(populationSize, 2)), generations, mutationRate);
 }
 
 // Grammar engine methods
@@ -563,9 +628,31 @@ void GeneratorAgent::loadGrammarRules(const std::string& rulesPath) {
     }
 
     try {
-        // This would need to be implemented in GrammarEngine
-        // For now, just log the attempt
-        logError("Loading grammar rules from: " + rulesPath);
+        // Accepts {"rules": [{"pattern": "...", "expansion": "..."}]} or {"pattern": "expansion", ...}
+        std::ifstream file(rulesPath);
+        if (!file) {
+            emitErrorEvent("Cannot open grammar rules file: " + rulesPath);
+            return;
+        }
+        nlohmann::json data = nlohmann::json::parse(file);
+        size_t loaded = 0;
+        if (data.contains("rules") && data["rules"].is_array()) {
+            for (const auto& rule : data["rules"]) {
+                if (rule.contains("pattern") && rule.contains("expansion") &&
+                    rule["pattern"].is_string() && rule["expansion"].is_string()) {
+                    addGrammarRule(rule["pattern"].get<std::string>(), rule["expansion"].get<std::string>());
+                    ++loaded;
+                }
+            }
+        } else if (data.is_object()) {
+            for (const auto& [pattern, expansion] : data.items()) {
+                if (expansion.is_string()) {
+                    addGrammarRule(pattern, expansion.get<std::string>());
+                    ++loaded;
+                }
+            }
+        }
+        Log::info("GeneratorAgent", "Loaded {} grammar rules from {}", loaded, rulesPath);
     } catch (const std::exception& e) {
         std::string error = "Exception during grammar rules loading: " + std::string(e.what());
         emitErrorEvent(error);
@@ -584,9 +671,10 @@ void GeneratorAgent::addGrammarRule(const std::string& pattern, const std::strin
     }
 
     try {
-        // This would need to be implemented in GrammarEngine
-        // For now, just log the attempt
-        logError("Adding grammar rule: " + pattern + " -> " + expansion);
+        m_grammarEngine->addRule(pattern, expansion);
+        m_synthesisManager->addGrammarRule(pattern, expansion);
+        std::lock_guard<std::mutex> lock(m_registryMutex);
+        m_grammarRules.emplace_back(pattern, expansion);
     } catch (const std::exception& e) {
         std::string error = "Exception during grammar rule addition: " + std::string(e.what());
         emitErrorEvent(error);
@@ -602,9 +690,13 @@ std::vector<std::string> GeneratorAgent::getGrammarRules() const {
         return {};
     }
 
-    // This would need to be implemented in GrammarEngine
-    // For now, return empty vector
-    return {};
+    std::lock_guard<std::mutex> lock(m_registryMutex);
+    std::vector<std::string> rules;
+    rules.reserve(m_grammarRules.size());
+    for (const auto& [pattern, expansion] : m_grammarRules) {
+        rules.push_back(pattern + " -> " + expansion);
+    }
+    return rules;
 }
 
 // Pattern matching methods
@@ -618,6 +710,13 @@ bool GeneratorAgent::matchesPattern(const std::string& spellType, const std::str
     }
 
     try {
+        // A custom matcher registered for this pattern takes precedence
+        std::function<bool(const std::string&)> custom;
+        {
+            std::lock_guard<std::mutex> lock(m_registryMutex);
+            if (auto it = m_patternMatchers.find(pattern); it != m_patternMatchers.end()) custom = it->second;
+        }
+        if (custom) return custom(spellType);
         return EventPatternMatcher::matches(pattern, spellType);
     } catch (const std::exception& e) {
         std::string error = "Exception during pattern matching: " + std::string(e.what());
@@ -638,8 +737,13 @@ std::vector<std::string> GeneratorAgent::findMatchingSpells(const std::string& p
     std::vector<std::string> matches;
     
     try {
-        // This would need to be implemented to search through available spells
-        // For now, return empty vector
+        // Match against spell types (and ids) of all known definitions
+        for (const auto& def : m_spellGenerator->definitions()) {
+            if (matchesPattern(def.type, pattern) || matchesPattern(def.id, pattern)) {
+                matches.push_back(def.id);
+            }
+        }
+        std::sort(matches.begin(), matches.end());
     } catch (const std::exception& e) {
         std::string error = "Exception during spell pattern search: " + std::string(e.what());
         const_cast<GeneratorAgent*>(this)->emitErrorEvent(error);
@@ -660,9 +764,8 @@ void GeneratorAgent::addPatternMatcher(const std::string& pattern, std::function
     }
 
     try {
-        // This would need to be implemented to store custom pattern matchers
-        // For now, just log the attempt
-        logError("Adding pattern matcher for: " + pattern);
+        std::lock_guard<std::mutex> lock(m_registryMutex);
+        m_patternMatchers[pattern] = std::move(matcher);
     } catch (const std::exception& e) {
         std::string error = "Exception during pattern matcher addition: " + std::string(e.what());
         emitErrorEvent(error);
@@ -763,7 +866,7 @@ auto GeneratorAgent::loadManifest(std::filesystem::path const& path)
         if (!result) {
             m_stats.syntaxErrors += result.error().size();
             for (const auto& error : result.error()) {
-                emitErrorEvent("Manifest error: " + error.msg);
+                emitErrorEvent("Manifest error: " + error.message);
             }
         } else {
             // Clear cache when manifest is reloaded
@@ -802,21 +905,18 @@ std::filesystem::path GeneratorAgent::getManifestPath() const {
     if (!m_spellGenerator) {
         return {};
     }
-    
-    // This would need to be implemented in SpellGenerator
-    // For now, return default path
-    return m_config.defaultManifestPath;
+
+    // The path of the last successfully loaded manifest, else the configured default
+    auto path = m_spellGenerator->manifestPath();
+    return path.empty() ? std::filesystem::path(m_config.defaultManifestPath) : path;
 }
 
 bool GeneratorAgent::isManifestLoaded() const {
     if (!m_spellGenerator) {
         return false;
     }
-    
-    // This would need to be implemented in SpellGenerator
-    // For now, return false
-    return false;
-} 
+    return m_spellGenerator->isManifestLoaded();
+}
 
 // Hot-reload system methods
 void GeneratorAgent::enableHotReload(bool enable) {
@@ -999,21 +1099,25 @@ bool GeneratorAgent::validateSpellDefinition(const SpellDefinition& def) const {
 }
 
 std::vector<std::string> GeneratorAgent::getSpellTags(const std::string& spellId) const {
-    // This would need to be implemented to retrieve spell tags
-    // For now, return empty vector
-    return {};
+    if (!m_spellGenerator) return {};
+    auto def = m_spellGenerator->findDefinition(spellId);
+    return def ? def->tags : std::vector<std::string>{};
 }
 
 void GeneratorAgent::addSpellTag(const std::string& spellId, const std::string& tag) {
-    // This would need to be implemented to add spell tags
-    // For now, just log the attempt
-    logError("Adding tag '" + tag + "' to spell '" + spellId + "'");
+    if (!m_spellGenerator) return;
+    const bool found = m_spellGenerator->updateDefinition(spellId, [&](SpellDefinition& def) {
+        if (std::find(def.tags.begin(), def.tags.end(), tag) == def.tags.end()) def.tags.push_back(tag);
+    });
+    if (!found) emitErrorEvent("Cannot tag unknown spell '" + spellId + "'");
 }
 
 void GeneratorAgent::removeSpellTag(const std::string& spellId, const std::string& tag) {
-    // This would need to be implemented to remove spell tags
-    // For now, just log the attempt
-    logError("Removing tag '" + tag + "' from spell '" + spellId + "'");
+    if (!m_spellGenerator) return;
+    const bool found = m_spellGenerator->updateDefinition(spellId, [&](SpellDefinition& def) {
+        def.tags.erase(std::remove(def.tags.begin(), def.tags.end(), tag), def.tags.end());
+    });
+    if (!found) emitErrorEvent("Cannot untag unknown spell '" + spellId + "'");
 }
 
 // Advanced features
@@ -1031,9 +1135,40 @@ std::string GeneratorAgent::generateAISpell(const std::string& prompt) {
         return "";
     }
 
-    // This would need to be implemented with actual AI integration
-    // For now, return a placeholder
-    return "ai_generated_spell_" + generateUniqueId();
+    // Turn the prompt into a synthesis goal: words become style tags, numbers set the power.
+    SynthesisGoal goal;
+    goal.targetPower = m_aiParams.value("defaultPower", 25.0f);
+    std::string word;
+    auto flush = [&]() {
+        if (word.empty()) return;
+        if (std::all_of(word.begin(), word.end(), [](unsigned char c) { return std::isdigit(c) != 0; })) {
+            goal.targetPower = std::stof(word);
+        } else {
+            goal.styleTags.push_back(word);
+        }
+        word.clear();
+    };
+    for (unsigned char c : prompt) {
+        if (std::isalnum(c)) word.push_back(static_cast<char>(std::tolower(c)));
+        else flush();
+    }
+    flush();
+
+    // Bias towards tags seen in the training data
+    for (const auto& def : m_trainingData) {
+        for (const auto& tag : def.tags) {
+            if (std::find(goal.styleTags.begin(), goal.styleTags.end(), def.type) != goal.styleTags.end() &&
+                std::find(goal.styleTags.begin(), goal.styleTags.end(), tag) == goal.styleTags.end()) {
+                goal.styleTags.push_back(tag);
+            }
+        }
+    }
+
+    const std::string spellJson = synthesizeSpell(goal);
+    if (spellJson.empty()) return "";
+    const std::string id = "ai_generated_spell_" + generateUniqueId();
+    setSynthesisGoal(id, goal);
+    return spellJson;
 }
 
 void GeneratorAgent::trainOnSpellData(const std::vector<SpellDefinition>& trainingData) {
@@ -1065,15 +1200,51 @@ void GeneratorAgent::onError(std::function<void(const std::string&)> callback) {
 
 // Import/Export
 nlohmann::json GeneratorAgent::exportSpellDefinitions() const {
-    // This would need to be implemented to export spell definitions
-    // For now, return empty JSON
-    return nlohmann::json::object();
+    // Same layout as the manifest: {"spells": [...]}
+    nlohmann::json spells = nlohmann::json::array();
+    if (m_spellGenerator) {
+        for (const auto& def : m_spellGenerator->definitions()) {
+            spells.push_back({
+                {"id", def.id},
+                {"type", def.type},
+                {"params", def.params},
+                {"displayName", def.displayName},
+                {"description", def.description},
+                {"tags", def.tags}
+            });
+        }
+    }
+    return nlohmann::json{{"spells", std::move(spells)}};
 }
 
 void GeneratorAgent::importSpellDefinitions(const nlohmann::json& data) {
-    // This would need to be implemented to import spell definitions
-    // For now, just log the attempt
-    logError("Importing spell definitions from JSON");
+    if (!m_spellGenerator) {
+        emitErrorEvent("Cannot import spell definitions: GeneratorAgent not initialized");
+        return;
+    }
+    const nlohmann::json& spells = data.is_array() ? data : data.value("spells", nlohmann::json::array());
+    size_t imported = 0;
+    for (const auto& sj : spells) {
+        if (!sj.is_object()) continue;
+        SpellDefinition def;
+        def.id = sj.value("id", std::string());
+        def.type = sj.value("type", std::string());
+        def.params = sj.value("params", nlohmann::json::object());
+        def.displayName = sj.value("displayName", def.id);
+        def.description = sj.value("description", std::string());
+        if (sj.contains("tags") && sj["tags"].is_array()) {
+            for (const auto& t : sj["tags"]) if (t.is_string()) def.tags.push_back(t.get<std::string>());
+        }
+        if (!validateSpellDefinition(def)) {
+            m_stats.semanticErrors++;
+            emitErrorEvent("Skipping invalid imported spell definition '" + def.id + "'");
+            continue;
+        }
+        m_spellGenerator->upsertDefinition(std::move(def));
+        ++imported;
+    }
+    clearCache();
+    Log::info("GeneratorAgent", "Imported {} spell definitions", imported);
 }
 
 void GeneratorAgent::exportToFile(const std::string& filePath) const {
@@ -1101,21 +1272,35 @@ void GeneratorAgent::importFromFile(const std::string& filePath) {
 
 // Validation
 bool GeneratorAgent::validateSpell(const std::string& spellId) const {
-    // This would need to be implemented to validate spells
-    // For now, return true
-    return true;
+    if (!m_spellGenerator) return false;
+    auto def = m_spellGenerator->findDefinition(spellId);
+    // Valid = well-formed definition that some registered factory can build
+    return def && validateSpellDefinition(*def) && m_spellGenerator->hasFactoryFor(def->type);
 }
 
 std::vector<std::string> GeneratorAgent::validateAllSpells() const {
-    // This would need to be implemented to validate all spells
-    // For now, return empty vector
-    return {};
+    // Returns the ids of spells that fail validation
+    std::vector<std::string> invalid;
+    if (!m_spellGenerator) return invalid;
+    for (const auto& id : m_spellGenerator->definitionIds()) {
+        if (!validateSpell(id)) invalid.push_back(id);
+    }
+    std::sort(invalid.begin(), invalid.end());
+    return invalid;
 }
 
 void GeneratorAgent::runSpellTests(const std::string& spellId) {
-    // This would need to be implemented to run spell tests
-    // For now, just log the attempt
-    logError("Running tests for spell: " + spellId);
+    // Instantiation test: validation, then a real factory build (without casting).
+    if (!validateSpell(spellId)) {
+        emitErrorEvent("Spell test failed for '" + spellId + "': definition invalid or no factory");
+        return;
+    }
+    auto result = m_spellGenerator->create(spellId);
+    if (!result) {
+        emitErrorEvent("Spell test failed for '" + spellId + "': " + result.error());
+        return;
+    }
+    Log::info("GeneratorAgent", "Spell test passed for '{}'", spellId);
 }
 
 // Performance optimization
@@ -1238,8 +1423,7 @@ void GeneratorAgent::emitErrorEvent(const std::string& error) {
 }
 
 void GeneratorAgent::logError(const std::string& error) {
-    // This would typically log to a proper logging system
-    // For now, just emit as error event
+    Log::info("GeneratorAgent", "{}", error);
     emitErrorEvent(error);
 }
 
@@ -1307,6 +1491,312 @@ void GeneratorAgent::cleanupAdvancedFeatures() {
     // Cleanup advanced features
     m_aiParams.clear();
     m_trainingData.clear();
+}
+
+// ============================================================================
+// SpellStone generation
+// ============================================================================
+
+uint64_t GeneratorAgent::generateSpellStoneSeed(int entityId, const std::vector<std::string>& ingredients,
+                                                uint64_t userSeed, uint64_t worldSeed) {
+    return SpellStoneAPI::generateSeed(entityId, ingredients, userSeed, worldSeed);
+}
+
+std::string GeneratorAgent::generateSpellStoneFromIngredients(const std::vector<std::string>& ingredients,
+                                                              int entityId, uint64_t userSeed, uint64_t worldSeed) {
+    if (ingredients.empty()) {
+        emitErrorEvent("Cannot generate a spellstone without ingredients");
+        return "";
+    }
+
+    const uint64_t seed = generateSpellStoneSeed(entityId, ingredients, userSeed, worldSeed);
+
+    // A registered recipe with the same ingredient multiset names the stone
+    std::vector<std::string> sorted = ingredients;
+    std::sort(sorted.begin(), sorted.end());
+    std::string recipeId;
+    {
+        std::lock_guard<std::mutex> lock(m_spellStoneRecipesMutex);
+        for (const auto& [id, recipe] : m_spellStoneRecipes) {
+            std::vector<std::string> r = recipe;
+            std::sort(r.begin(), r.end());
+            if (r == sorted) { recipeId = id; break; }
+        }
+    }
+
+    // The ingredients drive the spell's style; the seed fixes its power deterministically
+    SynthesisGoal goal;
+    goal.styleTags = sorted;
+    goal.targetPower = 10.0f + static_cast<float>(seed % 9001) / 100.0f;   // 10 .. 100
+
+    nlohmann::json stone;
+    stone["seed"] = seed;
+    stone["recipe"] = recipeId;
+    stone["ingredients"] = sorted;
+    stone["targetPower"] = goal.targetPower;
+    const std::string spell = synthesizeSpell(goal);
+    stone["spell"] = spell.empty() ? nlohmann::json() : nlohmann::json::parse(spell);
+    return stone.dump();
+}
+
+std::vector<std::string> GeneratorAgent::getSpellStoneRecipes() const {
+    std::lock_guard<std::mutex> lock(m_spellStoneRecipesMutex);
+    std::vector<std::string> ids;
+    ids.reserve(m_spellStoneRecipes.size());
+    for (const auto& [id, recipe] : m_spellStoneRecipes) ids.push_back(id);
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+
+bool GeneratorAgent::hasSpellStoneRecipe(const std::string& recipeId) const {
+    std::lock_guard<std::mutex> lock(m_spellStoneRecipesMutex);
+    return m_spellStoneRecipes.count(recipeId) != 0;
+}
+
+void GeneratorAgent::registerSpellStoneRecipe(const std::string& recipeId, const std::vector<std::string>& ingredients) {
+    if (recipeId.empty() || ingredients.empty()) {
+        emitErrorEvent("Spellstone recipe needs an id and at least one ingredient");
+        return;
+    }
+    std::lock_guard<std::mutex> lock(m_spellStoneRecipesMutex);
+    m_spellStoneRecipes[recipeId] = ingredients;
+}
+
+void GeneratorAgent::removeSpellStoneRecipe(const std::string& recipeId) {
+    std::lock_guard<std::mutex> lock(m_spellStoneRecipesMutex);
+    m_spellStoneRecipes.erase(recipeId);
+}
+
+// ============================================================================
+// Balanced spell shapes (ShapeDef from core/ShapeTypes.hpp)
+//
+// power = covered area of the shape; cost = power * per-shape multiplier.
+// Shapes built for a budget have cost == budget. A spell is balanced when its
+// cost stays within m_costThreshold * kMaxBudget and its efficiency
+// (power per cost) does not exceed m_powerThreshold * kMaxEfficiency.
+// ============================================================================
+
+namespace {
+    constexpr float kMaxBudget = 10.0f;
+    constexpr float kMaxEfficiency = 1.25f;
+    constexpr float kLineWidth = 0.1f;
+
+    const char* shapeTypeName(::ShapeType type) {
+        switch (type) {
+            case ::ShapeType::Circle: return "Circle";
+            case ::ShapeType::Square: return "Square";
+            case ::ShapeType::Line: return "Line";
+            case ::ShapeType::Cone: return "Cone";
+        }
+        return "Circle";
+    }
+
+    std::optional<::ShapeType> shapeTypeFromName(const std::string& name) {
+        std::string lower;
+        for (unsigned char c : name) lower.push_back(static_cast<char>(std::tolower(c)));
+        if (lower == "circle") return ::ShapeType::Circle;
+        if (lower == "square") return ::ShapeType::Square;
+        if (lower == "line") return ::ShapeType::Line;
+        if (lower == "cone") return ::ShapeType::Cone;
+        return std::nullopt;
+    }
+
+    float costMultiplier(::ShapeType type) {
+        switch (type) {
+            case ::ShapeType::Circle: return 1.0f;
+            case ::ShapeType::Square: return 1.1f;
+            case ::ShapeType::Line: return 0.8f;
+            case ::ShapeType::Cone: return 0.9f;
+        }
+        return 1.0f;
+    }
+
+    float shapeArea(const ShapeDef& s) {
+        constexpr float pi = std::numbers::pi_v<float>;
+        switch (s.shape) {
+            case ::ShapeType::Circle: return pi * s.radius * s.radius;
+            case ::ShapeType::Square: return (2.0f * s.radius) * (2.0f * s.radius);
+            case ::ShapeType::Line: return s.radius * s.width;
+            case ::ShapeType::Cone: return (s.angle / 360.0f) * pi * s.radius * s.radius;
+        }
+        return 0.0f;
+    }
+
+    // Radius giving the requested area for the shape (width/angle fixed)
+    float radiusForArea(const ShapeDef& s, float area) {
+        constexpr float pi = std::numbers::pi_v<float>;
+        area = std::max(area, 1e-4f);
+        switch (s.shape) {
+            case ::ShapeType::Circle: return std::sqrt(area / pi);
+            case ::ShapeType::Square: return std::sqrt(area) * 0.5f;
+            case ::ShapeType::Line: return area / std::max(s.width, 1e-4f);
+            case ::ShapeType::Cone: return std::sqrt(area / ((std::max(s.angle, 1.0f) / 360.0f) * pi));
+        }
+        return 1.0f;
+    }
+}
+
+::ShapeType GeneratorAgent::pickShapeType(const std::vector<::ShapeType>& candidates) const {
+    std::vector<float> weights;
+    weights.reserve(candidates.size());
+    for (auto type : candidates) {
+        auto it = m_shapePreferences.find(shapeTypeName(type));
+        weights.push_back(it != m_shapePreferences.end() ? std::max(it->second, 0.0f) : 1.0f);
+    }
+    if (std::all_of(weights.begin(), weights.end(), [](float w) { return w <= 0.0f; })) {
+        std::fill(weights.begin(), weights.end(), 1.0f);
+    }
+    std::discrete_distribution<size_t> pick(weights.begin(), weights.end());
+    return candidates[pick(m_shapeRng)];
+}
+
+ShapeDef GeneratorAgent::buildShape(::ShapeType type, float budget) const {
+    ShapeDef s;
+    s.shape = type;
+    s.typeStr = shapeTypeName(type);
+    s.width = kLineWidth;
+    if (type == ::ShapeType::Cone) {
+        s.angle = std::uniform_real_distribution<float>(20.0f, 90.0f)(m_shapeRng);
+    }
+    // Choose the size so that cost == budget
+    s.radius = radiusForArea(s, std::max(budget, 0.01f) / costMultiplier(type));
+    s.params = {s.radius, s.width, s.angle};
+    s.id = std::string("shape_") + s.typeStr + "_" + generateUniqueId().substr(6);
+    return s;
+}
+
+ShapeDef GeneratorAgent::makeSpellShape() {
+    return makeSpellShapeWithBudget(1.0f);
+}
+
+ShapeDef GeneratorAgent::makeSpellShapeWithBudget(float budget) {
+    return makeSpellShapeWithConstraints({}, {}, budget);
+}
+
+ShapeDef GeneratorAgent::makeSpellShapeWithConstraints(const std::vector<std::string>& requiredShapes,
+                                                       const std::vector<std::string>& forbiddenShapes,
+                                                       float budget) {
+    std::vector<::ShapeType> candidates;
+    if (!requiredShapes.empty()) {
+        for (const auto& name : requiredShapes) {
+            if (auto type = shapeTypeFromName(name)) candidates.push_back(*type);
+        }
+    } else {
+        candidates = {::ShapeType::Circle, ::ShapeType::Square, ::ShapeType::Line, ::ShapeType::Cone};
+    }
+    candidates.erase(std::remove_if(candidates.begin(), candidates.end(), [&](::ShapeType type) {
+        return std::any_of(forbiddenShapes.begin(), forbiddenShapes.end(), [&](const std::string& name) {
+            auto forbidden = shapeTypeFromName(name);
+            return forbidden && *forbidden == type;
+        });
+    }), candidates.end());
+
+    if (candidates.empty()) {
+        emitErrorEvent("No spell shape satisfies the given constraints; using Circle");
+        candidates.push_back(::ShapeType::Circle);
+    }
+    return buildShape(pickShapeType(candidates), budget);
+}
+
+std::vector<ShapeDef> GeneratorAgent::generateSpellVariations(int count, float budget) {
+    std::vector<ShapeDef> variations;
+    variations.reserve(static_cast<size_t>(std::max(count, 0)));
+    std::uniform_real_distribution<float> jitter(0.8f, 1.2f);
+    for (int i = 0; i < count; ++i) {
+        variations.push_back(makeSpellShapeWithBudget(budget * jitter(m_shapeRng)));
+    }
+    return variations;
+}
+
+ShapeDef GeneratorAgent::combineShapes(const std::vector<ShapeDef>& shapes) {
+    if (shapes.empty()) return ShapeDef{};
+    // The most powerful shape decides the primitive; areas add up.
+    const auto strongest = std::max_element(shapes.begin(), shapes.end(), [&](const ShapeDef& a, const ShapeDef& b) {
+        return calculateSpellPower(a) < calculateSpellPower(b);
+    });
+    ShapeDef combined;
+    combined.shape = strongest->shape;
+    combined.typeStr = shapeTypeName(combined.shape);
+    combined.width = 0.0f;
+    combined.angle = 0.0f;
+    float totalArea = 0.0f;
+    std::string id = "combo";
+    for (const auto& s : shapes) {
+        totalArea += shapeArea(s);
+        combined.width += s.width;
+        combined.angle = std::max(combined.angle, s.angle);
+        combined.points.insert(combined.points.end(), s.points.begin(), s.points.end());
+        id += "_" + (s.id.empty() ? std::string(shapeTypeName(s.shape)) : s.id);
+    }
+    combined.width /= static_cast<float>(shapes.size());
+    combined.radius = radiusForArea(combined, totalArea);
+    combined.params = {combined.radius, combined.width, combined.angle};
+    combined.id = id;
+    return combined;
+}
+
+ShapeDef GeneratorAgent::evolveSpell(const ShapeDef& baseSpell, float evolutionFactor) {
+    ShapeDef evolved = baseSpell;
+    const float sigma = std::max(0.0f, evolutionFactor) * std::max(m_mutationRate, 0.01f);
+    std::normal_distribution<float> scale(1.0f, sigma);
+    std::uniform_real_distribution<float> unit(0.0f, 1.0f);
+
+    evolved.radius = std::max(0.05f, evolved.radius * scale(m_shapeRng));
+    if (evolved.shape == ::ShapeType::Line) evolved.width = std::max(0.01f, evolved.width * scale(m_shapeRng));
+    if (evolved.shape == ::ShapeType::Cone) evolved.angle = std::clamp(evolved.angle * scale(m_shapeRng), 5.0f, 360.0f);
+
+    // Crossover towards a preferred primitive, keeping the area
+    if (unit(m_shapeRng) < m_crossoverRate * std::min(evolutionFactor, 1.0f)) {
+        const float area = shapeArea(evolved);
+        evolved.shape = pickShapeType({::ShapeType::Circle, ::ShapeType::Square, ::ShapeType::Line, ::ShapeType::Cone});
+        evolved.typeStr = shapeTypeName(evolved.shape);
+        if (evolved.shape == ::ShapeType::Line && evolved.width <= 0.0f) evolved.width = kLineWidth;
+        if (evolved.shape == ::ShapeType::Cone && evolved.angle <= 0.0f) evolved.angle = 45.0f;
+        evolved.radius = radiusForArea(evolved, area);
+    }
+    evolved.params = {evolved.radius, evolved.width, evolved.angle};
+    evolved.id = baseSpell.id + "_evo";
+    return evolved;
+}
+
+bool GeneratorAgent::isSpellBalanced(const ShapeDef& spell) const {
+    if (!validateSpell(spell)) return false;
+    const float cost = calculateSpellCost(spell);
+    if (cost <= 0.0f) return false;
+    const float efficiency = calculateSpellPower(spell) / cost;
+    return cost <= m_costThreshold * kMaxBudget && efficiency <= m_powerThreshold * kMaxEfficiency;
+}
+
+float GeneratorAgent::calculateSpellPower(const ShapeDef& spell) const {
+    return shapeArea(spell);
+}
+
+float GeneratorAgent::calculateSpellCost(const ShapeDef& spell) const {
+    return calculateSpellPower(spell) * costMultiplier(spell.shape);
+}
+
+bool GeneratorAgent::validateSpell(const ShapeDef& spell) const {
+    if (!(spell.radius > 0.0f) || !std::isfinite(spell.radius)) return false;
+    switch (spell.shape) {
+        case ::ShapeType::Line: return spell.width > 0.0f;
+        case ::ShapeType::Cone: return spell.angle > 0.0f && spell.angle <= 360.0f;
+        default: return true;
+    }
+}
+
+void GeneratorAgent::setBalanceParameters(float powerThreshold, float costThreshold) {
+    m_powerThreshold = std::max(powerThreshold, 0.0f);
+    m_costThreshold = std::max(costThreshold, 0.0f);
+}
+
+void GeneratorAgent::setShapePreferences(const std::unordered_map<std::string, float>& preferences) {
+    m_shapePreferences = preferences;
+}
+
+void GeneratorAgent::setEvolutionParameters(float mutationRate, float crossoverRate) {
+    m_mutationRate = std::clamp(mutationRate, 0.0f, 1.0f);
+    m_crossoverRate = std::clamp(crossoverRate, 0.0f, 1.0f);
+    if (m_geneticEvolver) m_geneticEvolver->setMutationRate(m_mutationRate);
 }
 
 } // namespace MagiTech::GeneratorAgent 

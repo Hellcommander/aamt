@@ -2,6 +2,7 @@
 #include <future>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "SnakeMechTypes.hpp"
 
 namespace MagiTech {
@@ -51,7 +52,7 @@ public:
         if (auto hit = m_cache.find(key)) {
             return std::async(std::launch::deferred, [=] { return *hit; });
         }
-        return m_pool.enqueue([=]() {
+        return m_pool.enqueue([=, this]() {
             SnakeMechAssetBundle b;
             b.segmentMesh = MeshGen::buildMech(p);
             b.skeleton = RigGen::buildSkeleton(p);
@@ -66,7 +67,7 @@ public:
 
 private:
     ConcurrentLRUCache<uint64_t, SnakeMechAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
 };
 

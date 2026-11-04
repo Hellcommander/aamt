@@ -1,12 +1,40 @@
 #include "BarbedExplosiveProjectileLuaBindings.hpp"
 #include "BarbedExplosiveProjectileFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include <vector>
 
 namespace MagiTech {
 namespace BarbedExplosiveProjectiles {
 
 static std::vector<std::pair<std::future<BarbedExplosiveProjectileBundle>, std::string>> pendingProjectiles;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<BarbedExplosiveProjectileFactory>& factorySlot() {
+    static std::shared_ptr<BarbedExplosiveProjectileFactory> f;
+    return f;
+}
+} // namespace
+
+void BarbedExplosiveProjectileLuaBindings::setFactory(std::shared_ptr<BarbedExplosiveProjectileFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<BarbedExplosiveProjectileFactory> BarbedExplosiveProjectileLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<BarbedExplosiveProjectileFactory>();
+        slot->initialize(4);
+    }
+    return slot;
+}
 
 void BarbedExplosiveProjectileLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<GeometryParams>("GeometryParams", sol::constructors<GeometryParams()>(),
@@ -28,8 +56,8 @@ void BarbedExplosiveProjectileLuaBindings::bind(sol::state& lua) {
         "explosionEffect", &BarbedExplosiveProjectileBundle::explosionEffect);
 
     lua.set_function("generateBarbProj",
-        [&](const GeometryParams& gp, const ExplosionParams& ep, const VisualParams& vp) {
-            auto factory = MainPlugin::instance().getBarbedExplosiveProjectileFactory();
+        [](const GeometryParams& gp, const ExplosionParams& ep, const VisualParams& vp) {
+            auto factory = BarbedExplosiveProjectileLuaBindings::factory();
             auto id = std::to_string(gp.hashKey() ^ ep.hashKey() ^ vp.hashKey());
             pendingProjectiles.emplace_back(factory->generateAsync(gp, ep, vp), id);
         }

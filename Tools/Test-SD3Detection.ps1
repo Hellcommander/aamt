@@ -38,7 +38,7 @@ if ($detected) {
     Write-Host "`nPlease start one of the following:" -ForegroundColor Gray
     Write-Host "  - AUTOMATIC1111 WebUI (most common, port 7860)" -ForegroundColor Gray
     Write-Host "  - ComfyUI (port 8188)" -ForegroundColor Gray
-    Write-Host "  - Stable Diffusion API Server (port 1337 or 8000)" -ForegroundColor Gray
+    Write-Host "  - AAMT SD3.5 server (port 1338): .\Start-StableDiffusionServer.ps1" -ForegroundColor Gray
     Write-Host "  - InvokeAI (port 9090)" -ForegroundColor Gray
 }
 

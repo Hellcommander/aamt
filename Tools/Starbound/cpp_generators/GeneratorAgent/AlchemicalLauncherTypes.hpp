@@ -167,8 +167,7 @@ struct AlchemicalLauncherParams {
     float distortionStrength;
     bool enableRefraction;
     float refractionStrength;
-    bool enableReflection;
-    float reflectionStrength;
+    bool enableReflection;   // strength: reflectionStrength (shared with the visual properties above)
     bool enableEmission;
     float emissionStrength;
     
@@ -284,7 +283,6 @@ struct AlchemicalLauncherParams {
         XXH64_update(&hash_state, &enableRefraction, sizeof(enableRefraction));
         XXH64_update(&hash_state, &refractionStrength, sizeof(refractionStrength));
         XXH64_update(&hash_state, &enableReflection, sizeof(enableReflection));
-        XXH64_update(&hash_state, &reflectionStrength, sizeof(reflectionStrength));
         XXH64_update(&hash_state, &enableEmission, sizeof(enableEmission));
         XXH64_update(&hash_state, &emissionStrength, sizeof(emissionStrength));
         XXH64_update(&hash_state, &enablePhysics, sizeof(enablePhysics));
@@ -446,7 +444,7 @@ namespace ParamUtils {
     nlohmann::json toJson(const AlchemicalLauncherParams& params);
     AlchemicalLauncherParams fromJson(const nlohmann::json& json);
     nlohmann::json toJson(const UIParams& params);
-    UIParams fromJson(const nlohmann::json& json);
+    UIParams uiParamsFromJson(const nlohmann::json& json);
 }
 
 } // namespace AlchemicalLaunchers

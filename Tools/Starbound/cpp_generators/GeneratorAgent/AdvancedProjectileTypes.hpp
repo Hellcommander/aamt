@@ -1,10 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <optional>
 #include <glm/glm.hpp>
-#include "vendor/xxhash/xxhash.h"
 
 namespace MagiTech {
 namespace AdvancedProjectiles {
@@ -38,7 +38,7 @@ struct PropulsionParams {
 struct TargetParams {
     std::string targetTag;             // actor identifier
     float homingRadius = 50.0f;       // search sphere radius
-    glm::vec3 targetPosition;         // current target position
+    glm::vec3 targetPosition{0.0f};   // current target position
     uint64_t hashKey() const;
 };
 

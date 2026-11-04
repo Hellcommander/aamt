@@ -10,7 +10,7 @@
 namespace MagiTech {
 namespace GasGrenades {
 
-#define LOG_GEN(Asset, Id) Log::info("Building Gas Grenade {}: {}", #Asset, Id)
+#define LOG_GEN(Asset, Id) Log::info("GasGrenade", "Building Gas Grenade {}: {}", #Asset, Id)
 
 namespace MeshGen {
     MeshHandle buildGasGrenadeBody(const GasGrenadeParams& p) {

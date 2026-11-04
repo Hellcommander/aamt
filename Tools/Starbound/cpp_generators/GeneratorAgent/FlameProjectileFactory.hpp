@@ -1,9 +1,10 @@
 #pragma once
+#include <fstream>
 #include <future>
+#include <stdexcept>
 #include <vector>
 #include <string>
-#include "core/ConcurrentLRU.hpp"
-#include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "FlameProjectileTypes.hpp"
 
 namespace MagiTech {
@@ -20,6 +21,7 @@ namespace MeshGen {
 namespace ShaderGen {
     ShaderHandle buildFlame(const FlameProjectileParams& p);
     ShaderHandle buildHeatDistortion(const FlameProjectileParams& p);
+    std::string generateFlameShaderCode(const FlameProjectileParams& p);
 }
 
 namespace TextureGen {
@@ -216,7 +218,7 @@ public:
     }
 
     double getCacheHitRate() const {
-        return m_cache.hit_rate();
+        return m_cache.getHitRate();
     }
 
     void setCacheCapacity(size_t capacity) {
@@ -255,10 +257,23 @@ public:
 
 private:
     FlameProjectileParams loadParamsFromJson(const std::string& jsonPath) {
-        // Implementation would load JSON file and parse parameters
-        // For now, return default parameters
+        std::ifstream file(jsonPath);
+        if (!file.is_open()) {
+            throw std::runtime_error("FlameProjectileFactory: cannot open params file " + jsonPath);
+        }
+        nlohmann::json json = nlohmann::json::parse(file);  // throws on malformed JSON
+        FlameProjectileParams params = ParamUtils::fromJson(json);
+        if (params.id.empty()) {
+            params.id = jsonPath;
+        }
+        return params;
+    }
+
+public:
+    /** Built-in fireball preset (fully initialized; a bare FlameProjectileParams() leaves fields unset). */
+    static FlameProjectileParams defaultParams() {
         FlameProjectileParams params;
-        params.id = "loaded_from_json";
+        params.id = "default_flame";
         params.flameType = FlameType::FIREBALL;
         params.flameShape = FlameShape::CONE;
         params.blendMode = BlendMode::ADDITIVE;
@@ -308,15 +323,16 @@ private:
         params.enableHotReload = true;
         params.enableParallelProcessing = true;
         params.lodLevel = 0;
-        params.description = "Loaded from JSON";
-        params.tags = {"flame", "projectile", "json"};
-        params.metadata = {{"source", "json_file"}};
-        
+        params.description = "Default flame projectile";
+        params.tags = {"flame", "projectile", "default"};
+        params.metadata = {{"source", "builtin_default"}};
+
         return params;
     }
 
+private:
     ConcurrentLRUCache<uint64_t, FlameAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
     mutable PerformanceMetrics m_performanceMetrics;
 };

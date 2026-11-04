@@ -293,7 +293,7 @@ nlohmann::json toJson(const PhysicsParams& params) {
     return j;
 }
 
-PhysicsParams fromJson(const nlohmann::json& json) {
+PhysicsParams physicsFromJson(const nlohmann::json& json) {
     PhysicsParams params;
     
     // Helper functions (same as above)

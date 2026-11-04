@@ -30,7 +30,7 @@ std::future<ProjectileBundle> ProjectileFactory::generateAsync(const ProjectileP
         return std::async(std::launch::deferred, [existing]{ return *existing; });
     }
 
-    return m_pool.enqueue([p, this] {
+    return m_pool.enqueue([p, key, this] {
         ProjectileBundle b;
         b.mesh         = MeshGen::buildMesh(p);
         b.texture      = TextureGen::buildTexture(p);

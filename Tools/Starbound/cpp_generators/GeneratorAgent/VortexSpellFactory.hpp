@@ -2,6 +2,7 @@
 #include <future>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "VortexSpellTypes.hpp"
 
 namespace MagiTech {
@@ -61,7 +62,7 @@ public:
 
 private:
     ConcurrentLRUCache<uint64_t, VortexSpellAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
 };
 

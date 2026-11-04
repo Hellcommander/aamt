@@ -3,6 +3,7 @@
 #include <optional>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "IconAssetTypes.hpp"
 
 namespace MagiTech {
@@ -44,7 +45,7 @@ uint64_t hashVector(const std::vector<T>& vec) {
 class IconAssetFactory {
     ConcurrentLRUCache<uint64_t, IconAsset> m_cache;
     ConcurrentLRUCache<uint64_t, IconAtlas> m_atlasCache;
-    std::unique_ptr<MultithreadBusPlugin> m_pool;
+    std::unique_ptr<GeneratorTaskPool> m_pool;
     bool m_initialized = false;
 
 public:

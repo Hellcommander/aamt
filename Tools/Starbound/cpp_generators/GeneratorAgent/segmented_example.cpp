@@ -1,3 +1,4 @@
+#include "MechFamilyExamples.hpp"
 #include "MechFactory.hpp"
 #include "MechGenerators.hpp"
 #include "MechLuaBindings.hpp"
@@ -11,6 +12,12 @@
 // Example: Segmented Mech Asset Generation Pipeline
 // This demonstrates the integration of snake and worm mech capabilities
 // with the existing hybrid C++23/26 + Lua mech generator system.
+
+namespace MagiTech {
+namespace Mechs {
+namespace Examples {
+
+namespace {
 
 class SegmentedMechGameSystem {
 private:
@@ -149,7 +156,7 @@ public:
         wormParams.taperProfile = "linear";
         wormParams.segmentShape = "cylinder";
         wormParams.jointFlexibility = 0.7f;
-        wormParams.armorPlating = true;
+        wormParams.enablePlating = true;
         wormParams.platingDetailLevel = 2;
         wormParams.colorPrimary = glm::vec3(0.2f, 0.3f, 0.35f);
         wormParams.colorSecondary = glm::vec3(0.8f, 0.6f, 0.4f);
@@ -581,18 +588,24 @@ public:
     }
 };
 
-// Main function to run the demonstration
-int main() {
+} // namespace
+
+// Entry point of the demonstration (was main() when this was a standalone program)
+int runSegmentedMechExample() {
     try {
         SegmentedMechGameSystem gameSystem;
         gameSystem.runFullDemonstration();
-        
+
         std::cout << "\nSegmented mech generator demonstration completed successfully!" << std::endl;
-        
+
     } catch (const std::exception& e) {
-        std::cerr << "Exception in main: " << e.what() << std::endl;
+        std::cerr << "Exception in segmented mech example: " << e.what() << std::endl;
         return 1;
     }
-    
+
     return 0;
-} 
+}
+
+} // namespace Examples
+} // namespace Mechs
+} // namespace MagiTech

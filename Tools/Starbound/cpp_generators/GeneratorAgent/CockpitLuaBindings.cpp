@@ -1,12 +1,41 @@
 #include "CockpitLuaBindings.hpp"
 #include "CockpitFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <vector>
 
 namespace MagiTech {
 namespace Cockpits {
 
 static std::vector<std::pair<std::future<CockpitAssetBundle>, std::string>> pendingCockpits;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<CockpitFactory>& factorySlot() {
+    static std::shared_ptr<CockpitFactory> f;
+    return f;
+}
+} // namespace
+
+void CockpitLuaBindings::setFactory(std::shared_ptr<CockpitFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<CockpitFactory> CockpitLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<CockpitFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 void CockpitLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<CockpitParams>("CockpitParams",
@@ -65,14 +94,14 @@ void CockpitLuaBindings::bind(sol::state& lua) {
 
     lua.set_function("attach_cockpit",
         [&](const CockpitParams& p) {
-            auto factory = MainPlugin::instance().getCockpitFactory();
+            auto factory = CockpitLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("attach_cockpit_async",
         [&](const CockpitParams& p) {
-            auto factory = MainPlugin::instance().getCockpitFactory();
+            auto factory = CockpitLuaBindings::factory();
             pendingCockpits.emplace_back(factory->generateAsync(p), p.id);
         }
     );
@@ -82,10 +111,10 @@ void CockpitLuaBindings::poll_assets(sol::state& lua) {
     for (auto it = pendingCockpits.begin(); it != pendingCockpits.end();) {
         if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
             try {
-                auto b = it->first.get();
+                it->first.get();
                 lua["print"]("Cockpit module ready: " + it->second);
             } catch (const std::exception& e) {
-                // log error
+                Log::error("Cockpits", "Cockpit module {} failed: {}", it->second, e.what());
             }
             it = pendingCockpits.erase(it);
         } else {

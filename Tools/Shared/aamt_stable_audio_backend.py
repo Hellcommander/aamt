@@ -45,7 +45,7 @@ _HF_HUB.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("HUGGINGFACE_HUB_CACHE", str(_HF_HUB))
 os.environ.setdefault("HF_HUB_CACHE", str(_HF_HUB))
 
-# Auto-select media download token (SD3.5 Token) when available
+# Confirm the existing Hugging Face login when available
 try:
     _shared_dir = Path(__file__).resolve().parent
     if str(_shared_dir) not in sys.path:

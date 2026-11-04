@@ -1,6 +1,7 @@
 #pragma once
 #include <future>
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "core/ConcurrentLRU.hpp"
 #include "GrappleHookTypes.hpp"
 
@@ -28,8 +29,8 @@ namespace ShaderGen {
 }
 
 class GrappleAssetFactory {
-    ConcurrentLRU<uint64_t, GrappleBundle> m_cache;
-    ThreadPool m_pool;
+    ConcurrentLRUCache<uint64_t, GrappleBundle> m_cache;
+    GeneratorTaskPool m_pool;
     bool m_initialized = false;
 
 public:

@@ -1,6 +1,9 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <map>
+#include <utility>
+#include <cstdint>
 #include <unordered_map>
 #include <any>
 #include <chrono>
@@ -64,23 +67,60 @@ enum class LODLevel {
     HIGH, MEDIUM, LOW, ULTRA_LOW
 };
 
-// Audio Buffer Type
+// Audio Buffer Type (interleaved float samples)
 using AudioBuffer = std::vector<float>;
+
+// ---------------------------------------------------------------------------
+// Shared generator settings (used by SampleGen, SynthGen and SampleGenPipeline)
+// ---------------------------------------------------------------------------
+
+// Time stretching settings. Union of the SampleGen (targetBPM based) and
+// SynthGen (overlap-add window based) variants.
+struct TimeStretchSettings {
+    bool enabled = false;
+    float targetBPM = 120.0f;
+    float stretchFactor = 1.0f;
+    size_t windowSize = 1024;
+    float overlap = 0.5f;
+    std::map<std::string, float> parameters;
+};
+
+// Random variation applied to generated audio.
+struct RandomizationSettings {
+    bool enabled = false;
+    float amount = 0.1f;
+    std::map<std::string, float> ranges;
+};
+
+// Variation settings shared by the sample and synth pipelines.
+struct VariationSettings {
+    std::pair<int, int> pitchRange = {-12, 12}; // semitones
+    TimeStretchSettings timeStretch;
+    RandomizationSettings randomization;
+    bool enableVariations = true;          // master switch (sample pipeline)
+    bool enablePitchVariations = true;
+    bool enableTimeVariations = false;
+    bool enableRandomVariations = false;
+    std::map<std::string, float> parameters;
+};
 
 // Parameter Structs with Enhanced Features
 struct SoundParams {
     std::string id;
-    float duration;
-    bool loop;
+    float duration = 0.0f;
+    bool loop = false;
     uint64_t hashKey() const;
 };
 
 struct SampleParams {
     std::string filePath;
-    glm::vec2 trimRange;
-    float pitchShift;
-    float gain;
-    
+    glm::vec2 trimRange = glm::vec2(0.0f, 0.0f);
+    float pitchShift = 0.0f;
+    float gain = 1.0f;
+
+    // Optional JSON sample-pack definition (SampleGen::loadSampleDefinition)
+    std::string sampleDefinitionPath;
+
     // Enhanced parameters from new implementation
     SampleRate sampleRate = SampleRate::SR_44100;
     BitDepth bitDepth = BitDepth::BD_16;
@@ -95,11 +135,16 @@ struct SampleParams {
 
 struct SynthParams {
     std::string waveType;
-    float frequency;
-    glm::vec2 freqEnvelope;
-    glm::vec2 ampEnvelope;
-    bool polyphonic;
-    
+    float frequency = 440.0f;
+    glm::vec2 freqEnvelope = glm::vec2(0.0f, 0.0f);
+    glm::vec2 ampEnvelope = glm::vec2(0.0f, 0.0f);
+    bool polyphonic = false;
+
+    // Rendered note length in seconds
+    float duration = 1.0f;
+    // Optional JSON instrument definition (SynthGen::loadInstrumentDefinition)
+    std::string instrumentDefinitionPath;
+
     // Enhanced parameters from new implementation
     WaveformType waveformType = WaveformType::SINE;
     float amplitude = 1.0f;
@@ -122,6 +167,9 @@ struct EffectParams {
     
     // Enhanced parameters from new implementation
     std::vector<EffectType> effectTypes;
+    // Audio to process. When empty, EffectGen renders the chain's impulse response.
+    AudioBuffer inputBuffer;
+    uint32_t sampleRate = 44100;
     float processingQuality = 1.0f;
     int oversamplingFactor = 2;
     bool enableAntiAliasing = true;
@@ -163,8 +211,8 @@ struct EffectParams {
 };
 
 struct MixerParams {
-    int channels;
-    float masterGain;
+    int channels = 2;
+    float masterGain = 1.0f;
     std::vector<float> trackGains;
     
     // Enhanced parameters from new implementation
@@ -180,9 +228,15 @@ struct MixerParams {
 
 struct ExportParams {
     std::string format;
-    int sampleRate;
-    int bitDepth;
-    
+    int sampleRate = 44100;
+    int bitDepth = 16;
+
+    // Optional JSON export definition (ExportGen::loadExportDefinition)
+    std::string exportDefinitionPath;
+    // Audio to export (interleaved, exportChannels). When empty the export
+    // definition's source files are decoded instead.
+    AudioBuffer sourceBuffer;
+
     // Enhanced parameters from new implementation
     AudioFormat audioFormat = AudioFormat::WAV;
     SampleRate exportSampleRate = SampleRate::SR_44100;
@@ -208,7 +262,12 @@ struct LODParams {
     std::vector<ChannelLayout> lodChannels = {ChannelLayout::STEREO, ChannelLayout::STEREO, ChannelLayout::MONO};
     bool enableGPUAcceleration = false;
     int optimizationLevel = 2;
-    
+
+    // Master audio the LOD chain is derived from (interleaved stereo at
+    // sourceSampleRate). When empty LODGen derives the chain from a reference signal.
+    AudioBuffer sourceBuffer;
+    uint32_t sourceSampleRate = 44100;
+
     uint64_t hashKey() const;
 };
 
@@ -222,7 +281,23 @@ struct AudioPerformanceMetrics {
     std::atomic<uint64_t> peakMemoryUsage{0};
     std::atomic<uint64_t> gpuMemoryUsage{0};
     std::atomic<uint64_t> gpuUtilization{0};
-    
+
+    AudioPerformanceMetrics() = default;
+    AudioPerformanceMetrics(const AudioPerformanceMetrics& other) { *this = other; }
+    AudioPerformanceMetrics& operator=(const AudioPerformanceMetrics& other) {
+        if (this != &other) {
+            cacheHits = other.cacheHits.load();
+            cacheMisses = other.cacheMisses.load();
+            totalGenerations = other.totalGenerations.load();
+            gpuGenerations = other.gpuGenerations.load();
+            totalProcessingTime = other.totalProcessingTime.load();
+            peakMemoryUsage = other.peakMemoryUsage.load();
+            gpuMemoryUsage = other.gpuMemoryUsage.load();
+            gpuUtilization = other.gpuUtilization.load();
+        }
+        return *this;
+    }
+
     void reset() {
         cacheHits = 0;
         cacheMisses = 0;
@@ -262,22 +337,37 @@ struct AudioQualityMetrics {
     }
 };
 
-// Enhanced Audio Bundle
+// Audio metadata: bundle identity plus the tag fields embedded on export
+// (merged with the former ExportGen.hpp definition).
 struct AudioMetadata {
     std::string id;
-    float duration;
-    bool loop;
-    
+    float duration = 0.0f;
+    bool loop = false;
+
     // Enhanced metadata
     std::string artist;
     std::string title;
     std::string album;
     std::string genre;
-    int year;
+    int year = 0;
     std::string comment;
     AudioQualityMetrics quality;
     std::chrono::system_clock::time_point creationTime;
-    
+
+    // Export / tagging metadata
+    std::string copyright;
+    std::string composer;
+    std::string producer;
+    std::string engineer;
+    std::string publisher;
+    std::string isrc;
+    std::string upc;
+    std::string catalog;
+    std::string bpm;
+    std::string key;
+    std::string mood;
+    std::string tags;
+
     uint64_t hashKey() const;
 };
 

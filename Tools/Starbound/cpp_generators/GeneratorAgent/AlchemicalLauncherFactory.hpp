@@ -1,7 +1,11 @@
 #pragma once
 #include <future>
+#include <algorithm>
+#include <chrono>
+#include <optional>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "AlchemicalLauncherTypes.hpp"
 
 namespace MagiTech {
@@ -10,6 +14,24 @@ namespace AlchemicalLaunchers {
 // Forward declarations of generator functions
 namespace MeshGen {
     MeshHandle buildLauncherBody(const AlchemicalLauncherParams& p);
+
+    // PBR surface properties recorded per generated mesh handle (the generic
+    // MagiTech::Mesh carries geometry only).
+    struct LauncherSurfaceMaterial {
+        float metallic = 0.0f;
+        float roughness = 0.5f;
+        float emissivePower = 0.0f;
+    };
+    void setMeshMaterial(MeshHandle mesh, const LauncherSurfaceMaterial& material);
+    std::optional<LauncherSurfaceMaterial> getMeshMaterial(MeshHandle mesh);
+
+    // Geometry statistics recorded per generated mesh handle.
+    struct LauncherMeshStats {
+        size_t vertexCount = 0;
+        size_t triangleCount = 0;
+    };
+    void recordMeshStats(MeshHandle mesh, size_t vertexCount, size_t triangleCount);
+    std::optional<LauncherMeshStats> getMeshStats(MeshHandle mesh);
 }
 namespace TextureGen {
     TextureHandle buildLauncherTexture(const AlchemicalLauncherParams& p);
@@ -60,8 +82,9 @@ public:
         if (auto hit = m_cache.find(key)) {
             return std::async(std::launch::deferred, [=] { return *hit; });
         }
-        return m_pool.enqueue([=]() {
-            LauncherAssetBundle b;
+        return m_pool.enqueue([this, p, u, key]() {
+            const auto start = std::chrono::steady_clock::now();
+            LauncherAssetBundle b{};
             
             // Main launcher assets
             b.meshBody = MeshGen::buildLauncherBody(p);
@@ -100,11 +123,12 @@ public:
             b.icon = IconGen::buildLauncherIcon(p, u);
             
             // Performance metrics
-            b.generationTime = getGenerationTime();
-            b.vertexCount = getVertexCount(b.meshBody);
-            b.triangleCount = getTriangleCount(b.meshBody);
-            b.particleCount = getParticleCount(b);
-            b.gpuAccelerated = isGPUAccelerated();
+            const auto stats = MeshGen::getMeshStats(b.meshBody);
+            b.vertexCount = stats ? stats->vertexCount : 0;
+            b.triangleCount = stats ? stats->triangleCount : 0;
+            b.particleCount = getParticleCount(p, b);
+            b.gpuAccelerated = false; // generated on the CPU worker pool
+            b.generationTime = std::chrono::duration<float>(std::chrono::steady_clock::now() - start).count();
             
             m_cache.insert(key, b);
             return b;
@@ -113,15 +137,18 @@ public:
 
 private:
     ConcurrentLRUCache<uint64_t, LauncherAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
     
-    // Performance measurement helpers
-    float getGenerationTime() const;
-    size_t getVertexCount(MeshHandle mesh) const;
-    size_t getTriangleCount(MeshHandle mesh) const;
-    size_t getParticleCount(const LauncherAssetBundle& bundle) const;
-    bool isGPUAccelerated() const;
+    // Particles spawned per shot by the bundle's emitters.
+    static size_t getParticleCount(const AlchemicalLauncherParams& p, const LauncherAssetBundle& b) {
+        size_t count = 0;
+        if (b.muzzleFlash) count += 1;                                              // single flash burst
+        if (b.muzzleSmoke) count += static_cast<size_t>(std::max(p.muzzleSmokeCount, 0));
+        if (b.shellEjection) count += static_cast<size_t>(std::max(p.shellEjectionCount, 0));
+        if (b.heatDistortion) count += 1;                                           // distortion volume
+        return count;
+    }
 };
 
 } // namespace AlchemicalLaunchers

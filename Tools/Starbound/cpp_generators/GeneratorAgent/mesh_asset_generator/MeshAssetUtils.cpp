@@ -1,4 +1,5 @@
 #include "MeshAssetGenerator.hpp"
+#include <cmath>
 #include <random>
 #include <sstream>
 #include <algorithm>
@@ -128,8 +129,20 @@ MeshAssetParams MeshAssetUtils::createMeshParams(const nlohmann::json& data) {
                 emissive[3].get<float>()
             );
         }
+        if (matData.contains("name")) {
+            params.materialParams.name = matData["name"].get<std::string>();
+        }
         if (matData.contains("metallic")) {
             params.materialParams.metallic = matData["metallic"].get<float>();
+        }
+        if (matData.contains("ao")) {
+            params.materialParams.ao = matData["ao"].get<float>();
+        }
+        if (matData.contains("normalScale")) {
+            params.materialParams.normalScale = matData["normalScale"].get<float>();
+        }
+        if (matData.contains("emissiveIntensity")) {
+            params.materialParams.emissiveIntensity = matData["emissiveIntensity"].get<float>();
         }
         if (matData.contains("roughness")) {
             params.materialParams.roughness = matData["roughness"].get<float>();
@@ -145,6 +158,12 @@ MeshAssetParams MeshAssetUtils::createMeshParams(const nlohmann::json& data) {
     // UV parameters
     if (data.contains("uvParams")) {
         auto uvData = data["uvParams"];
+        if (uvData.contains("unwrapMethod")) {
+            params.uvParams.unwrapMethod = static_cast<mt::UVGenParams::UnwrapMethod>(uvData["unwrapMethod"].get<int>());
+        }
+        if (uvData.contains("packingMethod")) {
+            params.uvParams.packingMethod = static_cast<mt::UVGenParams::PackingMethod>(uvData["packingMethod"].get<int>());
+        }
         if (uvData.contains("atlasSize")) {
             auto size = uvData["atlasSize"];
             params.uvParams.atlasSize = glm::vec2(
@@ -203,7 +222,7 @@ bool MeshAssetUtils::validateMeshParams(const MeshAssetParams& params) {
     return true;
 }
 
-bool MeshAssetUtils::validateLODParams(const LODParams& params) {
+bool MeshAssetUtils::validateLODParams(const mt::LODParams& params) {
     if (params.screenSizes.empty()) return false;
     if (params.targetRatios.empty()) return false;
     if (params.screenSizes.size() != params.targetRatios.size()) return false;
@@ -223,7 +242,7 @@ bool MeshAssetUtils::validateLODParams(const LODParams& params) {
     return true;
 }
 
-bool MeshAssetUtils::validateMaterialParams(const MaterialParams& params) {
+bool MeshAssetUtils::validateMaterialParams(const mt::MaterialParams& params) {
     if (params.id.empty()) return false;
     if (params.shaderType.empty()) return false;
     if (params.metallic < 0.0f || params.metallic > 1.0f) return false;
@@ -234,7 +253,7 @@ bool MeshAssetUtils::validateMaterialParams(const MaterialParams& params) {
     return true;
 }
 
-bool MeshAssetUtils::validateUVParams(const UVGenParams& params) {
+bool MeshAssetUtils::validateUVParams(const mt::UVGenParams& params) {
     if (params.atlasSize.x <= 0.0f || params.atlasSize.y <= 0.0f) return false;
     if (params.padding < 0.0f) return false;
     if (params.texelDensity <= 0.0f) return false;
@@ -289,7 +308,9 @@ nlohmann::json MeshAssetUtils::paramsToJson(const MeshAssetParams& params) {
     // Material parameters
     nlohmann::json matData;
     matData["id"] = params.materialParams.id;
+    matData["name"] = params.materialParams.name;
     matData["shaderType"] = params.materialParams.shaderType;
+    matData["emissiveIntensity"] = params.materialParams.emissiveIntensity;
     matData["albedo"] = {
         params.materialParams.albedo.x,
         params.materialParams.albedo.y,
@@ -312,6 +333,8 @@ nlohmann::json MeshAssetUtils::paramsToJson(const MeshAssetParams& params) {
     
     // UV parameters
     nlohmann::json uvData;
+    uvData["unwrapMethod"] = static_cast<int>(params.uvParams.unwrapMethod);
+    uvData["packingMethod"] = static_cast<int>(params.uvParams.packingMethod);
     uvData["atlasSize"] = {
         params.uvParams.atlasSize.x,
         params.uvParams.atlasSize.y
@@ -366,8 +389,9 @@ size_t MeshAssetUtils::estimateMemoryUsage(const MeshAssetParams& params) {
     
     // Estimate LOD memory
     if (!params.lodParams.targetRatios.empty()) {
+        const size_t baseUsage = usage; // each LOD is a fraction of the base mesh
         for (float ratio : params.lodParams.targetRatios) {
-            usage += static_cast<size_t>(usage * ratio);
+            usage += static_cast<size_t>(static_cast<double>(baseUsage) * ratio);
         }
     }
     
@@ -444,34 +468,34 @@ float MeshAssetUtils::calculateSimilarity(const MeshAssetBundle& a, const MeshAs
     if (!a.isValid || !b.isValid) return 0.0f;
     if (!a.mesh || !b.mesh) return 0.0f;
     
+    // 1 when equal, falling linearly to 0 as the relative difference grows
+    // (computed in floating point: the counts are unsigned).
+    auto ratioSimilarity = [](double x, double y) -> float {
+        const double largest = std::max(x, y);
+        if (largest <= 0.0) return 1.0f;
+        return static_cast<float>(1.0 - std::abs(x - y) / largest);
+    };
+
     float similarity = 0.0f;
     int factors = 0;
-    
+
     // Compare vertex counts
-    float vertexSimilarity = 1.0f - std::abs(static_cast<float>(a.mesh->vertexCount - b.mesh->vertexCount)) / 
-                              std::max(static_cast<float>(a.mesh->vertexCount), static_cast<float>(b.mesh->vertexCount));
-    similarity += vertexSimilarity;
+    similarity += ratioSimilarity(a.mesh->vertexCount, b.mesh->vertexCount);
     factors++;
-    
+
     // Compare index counts
-    float indexSimilarity = 1.0f - std::abs(static_cast<float>(a.mesh->indexCount - b.mesh->indexCount)) / 
-                             std::max(static_cast<float>(a.mesh->indexCount), static_cast<float>(b.mesh->indexCount));
-    similarity += indexSimilarity;
+    similarity += ratioSimilarity(a.mesh->indexCount, b.mesh->indexCount);
     factors++;
-    
+
     // Compare memory usage
-    float memorySimilarity = 1.0f - std::abs(static_cast<float>(a.memoryUsage - b.memoryUsage)) / 
-                             std::max(static_cast<float>(a.memoryUsage), static_cast<float>(b.memoryUsage));
-    similarity += memorySimilarity;
+    similarity += ratioSimilarity(static_cast<double>(a.memoryUsage), static_cast<double>(b.memoryUsage));
     factors++;
-    
+
     // Compare asset types
-    if (a.assetType == b.assetType) {
-        similarity += 1.0f;
-        factors++;
-    }
-    
-    return factors > 0 ? similarity / factors : 0.0f;
+    similarity += (a.assetType == b.assetType) ? 1.0f : 0.0f;
+    factors++;
+
+    return similarity / static_cast<float>(factors);
 }
 
 } // namespace MagiTech::GeneratorAgent 

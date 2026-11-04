@@ -2,15 +2,23 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include <unordered_map>
 #include <memory>
 #include <atomic>
 #include <chrono>
+#include <cstdint>
+#include <cstddef>
 #include <glm/glm.hpp>
 #include "vendor/xxhash/xxhash.h"
 
 namespace MagiTech {
 namespace ImageGen {
+
+// Feed a by-value 64-bit hash (e.g. the result of a nested hashKey()) into an XXH64 state.
+inline void xxhUpdateU64(XXH64_state_t* state, uint64_t value) {
+    XXH64_update(state, &value, sizeof(value));
+}
 
 // GPU Handle Types for OpenStarbound Integration
 using ImageHandle = uint32_t;
@@ -59,6 +67,27 @@ enum class PaddingStyle {
 
 // Image Buffer Type
 using ImageBuffer = std::vector<uint8_t>;
+
+// CPU-side image: a GPU handle plus the 8-bit pixel data it was created from
+// (row-major, top-left origin, `channels` interleaved bytes per pixel).
+struct ImageData {
+    ImageHandle handle = 0;
+    int width = 0;
+    int height = 0;
+    int channels = 4;
+    ImageBuffer data;
+
+    bool empty() const { return data.empty() || width <= 0 || height <= 0; }
+    size_t byteSize() const { return data.size(); }
+    size_t stride() const { return static_cast<size_t>(width) * static_cast<size_t>(channels); }
+
+    void allocate(int w, int h, int c = 4) {
+        width = w;
+        height = h;
+        channels = c;
+        data.assign(static_cast<size_t>(w > 0 ? w : 0) * static_cast<size_t>(h > 0 ? h : 0) * static_cast<size_t>(c), 0);
+    }
+};
 
 // Parameter Structs with Enhanced Features
 struct ImageParams {
@@ -153,7 +182,12 @@ struct CaptureParams {
     glm::vec3 lightColor = glm::vec3(1.0f, 1.0f, 1.0f);
     float lightIntensity = 1.0f;
     bool enableShadows = false;
-    
+
+    // Output parameters
+    int padding = 0;                 // transparent border (px) added around the captured frame
+    bool gpuAccelerated = false;     // request the GPU capture path when available
+    glm::vec4 clearColor = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+
     uint64_t hashKey() const;
 };
 
@@ -200,7 +234,12 @@ struct ImageMetadata {
     std::string license;
     std::string source;
     std::map<std::string, std::string> customFields;
-    
+    std::map<std::string, double> customData;   // numeric per-image data (e.g. animation_time)
+
+    // Animation metadata
+    float timestamp = 0.0f;   // time within the animation this image was captured at
+    int frameIndex = -1;      // frame index within its animation, -1 when not part of one
+
     // Technical metadata
     int width;
     int height;
@@ -242,43 +281,51 @@ struct AtlasMetadata {
 };
 
 struct ImageBundle {
-    ImageHandle image;
-    TextureHandle texture;
-    FramebufferHandle framebuffer;
-    
+    ImageData image;                 // handle + CPU pixel data
+    TextureHandle texture = 0;
+    FramebufferHandle framebuffer = 0;
+
     // Additional assets for enhanced pipeline
-    TextureHandle normalMap;
-    TextureHandle roughnessMap;
-    TextureHandle metallicMap;
-    TextureHandle emissiveMap;
-    
+    TextureHandle normalMap = 0;
+    TextureHandle roughnessMap = 0;
+    TextureHandle metallicMap = 0;
+    TextureHandle emissiveMap = 0;
+
     // Metadata
     ImageMetadata metadata;
     AtlasMetadata atlasMetadata;
-    
+
     // Performance data
     std::chrono::system_clock::time_point creationTime;
-    uint64_t generationTime;
-    uint64_t memoryUsage;
+    uint64_t generationTime = 0;
+    uint64_t memoryUsage = 0;
     bool gpuAccelerated = false;
-    
+
     uint64_t hashKey() const;
 };
 
 struct SpritesheetBundle {
-    ImageHandle spritesheet;
-    TextureHandle spritesheetTexture;
+    ImageHandle spritesheet = 0;
+    TextureHandle spritesheetTexture = 0;
     std::vector<ImageHandle> individualFrames;
     std::vector<TextureHandle> individualTextures;
-    
+
+    // Combined sheet pixels and the grid it was laid out on
+    ImageData combinedImage;
+    int columns = 0;
+    int rows = 0;
+    int tileWidth = 0;
+    int tileHeight = 0;
+    int padding = 0;
+
     // Atlas data
     AtlasMetadata atlasMetadata;
     std::vector<glm::vec4> frameBounds; // x, y, width, height for each frame
-    
+
     // Performance data
     std::chrono::system_clock::time_point creationTime;
-    uint64_t generationTime;
-    uint64_t memoryUsage;
+    uint64_t generationTime = 0;
+    uint64_t memoryUsage = 0;
     bool gpuAccelerated = false;
     
     uint64_t hashKey() const;
@@ -443,6 +490,9 @@ inline uint64_t CaptureParams::hashKey() const {
     XXH64_update(&hash_state, &lightColor, sizeof(lightColor));
     XXH64_update(&hash_state, &lightIntensity, sizeof(lightIntensity));
     XXH64_update(&hash_state, &enableShadows, sizeof(enableShadows));
+    XXH64_update(&hash_state, &padding, sizeof(padding));
+    XXH64_update(&hash_state, &gpuAccelerated, sizeof(gpuAccelerated));
+    XXH64_update(&hash_state, &clearColor, sizeof(clearColor));
     return XXH64_digest(&hash_state);
 }
 
@@ -487,6 +537,8 @@ inline uint64_t ImageMetadata::hashKey() const {
     XXH64_update(&hash_state, &compression, sizeof(compression));
     XXH64_update(&hash_state, &fileSize, sizeof(fileSize));
     XXH64_update(&hash_state, checksum.c_str(), checksum.length());
+    XXH64_update(&hash_state, &timestamp, sizeof(timestamp));
+    XXH64_update(&hash_state, &frameIndex, sizeof(frameIndex));
     return XXH64_digest(&hash_state);
 }
 
@@ -519,15 +571,21 @@ inline uint64_t AtlasMetadata::hashKey() const {
 inline uint64_t ImageBundle::hashKey() const {
     XXH64_state_t hash_state;
     XXH64_reset(&hash_state, 0);
-    XXH64_update(&hash_state, &image, sizeof(image));
+    XXH64_update(&hash_state, &image.handle, sizeof(image.handle));
+    XXH64_update(&hash_state, &image.width, sizeof(image.width));
+    XXH64_update(&hash_state, &image.height, sizeof(image.height));
+    XXH64_update(&hash_state, &image.channels, sizeof(image.channels));
+    if (!image.data.empty()) {
+        XXH64_update(&hash_state, image.data.data(), image.data.size());
+    }
     XXH64_update(&hash_state, &texture, sizeof(texture));
     XXH64_update(&hash_state, &framebuffer, sizeof(framebuffer));
     XXH64_update(&hash_state, &normalMap, sizeof(normalMap));
     XXH64_update(&hash_state, &roughnessMap, sizeof(roughnessMap));
     XXH64_update(&hash_state, &metallicMap, sizeof(metallicMap));
     XXH64_update(&hash_state, &emissiveMap, sizeof(emissiveMap));
-    XXH64_update(&hash_state, &metadata.hashKey(), sizeof(uint64_t));
-    XXH64_update(&hash_state, &atlasMetadata.hashKey(), sizeof(uint64_t));
+    xxhUpdateU64(&hash_state, metadata.hashKey());
+    xxhUpdateU64(&hash_state, atlasMetadata.hashKey());
     XXH64_update(&hash_state, &generationTime, sizeof(generationTime));
     XXH64_update(&hash_state, &memoryUsage, sizeof(memoryUsage));
     XXH64_update(&hash_state, &gpuAccelerated, sizeof(gpuAccelerated));
@@ -545,7 +603,17 @@ inline uint64_t SpritesheetBundle::hashKey() const {
     for (const auto& tex : individualTextures) {
         XXH64_update(&hash_state, &tex, sizeof(tex));
     }
-    XXH64_update(&hash_state, &atlasMetadata.hashKey(), sizeof(uint64_t));
+    XXH64_update(&hash_state, &combinedImage.width, sizeof(combinedImage.width));
+    XXH64_update(&hash_state, &combinedImage.height, sizeof(combinedImage.height));
+    if (!combinedImage.data.empty()) {
+        XXH64_update(&hash_state, combinedImage.data.data(), combinedImage.data.size());
+    }
+    XXH64_update(&hash_state, &columns, sizeof(columns));
+    XXH64_update(&hash_state, &rows, sizeof(rows));
+    XXH64_update(&hash_state, &tileWidth, sizeof(tileWidth));
+    XXH64_update(&hash_state, &tileHeight, sizeof(tileHeight));
+    XXH64_update(&hash_state, &padding, sizeof(padding));
+    xxhUpdateU64(&hash_state, atlasMetadata.hashKey());
     for (const auto& bounds : frameBounds) {
         XXH64_update(&hash_state, &bounds, sizeof(bounds));
     }
@@ -559,12 +627,12 @@ inline uint64_t ImageGeneratorState::hashKey() const {
     XXH64_state_t hash_state;
     XXH64_reset(&hash_state, 0);
     XXH64_update(&hash_state, id.c_str(), id.length());
-    XXH64_update(&hash_state, &imageParams.hashKey(), sizeof(uint64_t));
-    XXH64_update(&hash_state, &spritesheetParams.hashKey(), sizeof(uint64_t));
-    XXH64_update(&hash_state, &captureParams.hashKey(), sizeof(uint64_t));
-    XXH64_update(&hash_state, &uiParams.hashKey(), sizeof(uint64_t));
-    XXH64_update(&hash_state, &currentImage.hashKey(), sizeof(uint64_t));
-    XXH64_update(&hash_state, &currentSpritesheet.hashKey(), sizeof(uint64_t));
+    xxhUpdateU64(&hash_state, imageParams.hashKey());
+    xxhUpdateU64(&hash_state, spritesheetParams.hashKey());
+    xxhUpdateU64(&hash_state, captureParams.hashKey());
+    xxhUpdateU64(&hash_state, uiParams.hashKey());
+    xxhUpdateU64(&hash_state, currentImage.hashKey());
+    xxhUpdateU64(&hash_state, currentSpritesheet.hashKey());
     XXH64_update(&hash_state, &isGenerating, sizeof(isGenerating));
     XXH64_update(&hash_state, &isCapturing, sizeof(isCapturing));
     XXH64_update(&hash_state, &generationProgress, sizeof(generationProgress));

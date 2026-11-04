@@ -30,7 +30,7 @@ std::future<RoomBundle> RoomFactory::generateAsync(const RoomParams& p) {
         return std::async(std::launch::deferred, [existing]{ return *existing; });
     }
 
-    return m_pool.enqueue([p, this] {
+    return m_pool.enqueue([p, key, this] {
         RoomBundle b;
         b.geometry = MeshGen::buildRoomMesh(p);
         b.tileset  = TextureGen::buildTileset(p);

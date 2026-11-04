@@ -1,10 +1,34 @@
 #pragma once
 #include <string>
+#include <type_traits>
 #include <glm/glm.hpp>
 #include "vendor/xxhash/xxhash.h"
 
 namespace MagiTech {
 namespace BeamNets {
+
+namespace detail {
+    // Field-wise hashing: hashing raw struct bytes would include padding and
+    // std::string heap pointers, which makes cache keys non-deterministic.
+    inline void hashField(XXH64_state_t& s, const std::string& v) noexcept {
+        const uint64_t len = v.size();
+        XXH64_update(&s, &len, sizeof(len));
+        XXH64_update(&s, v.data(), v.size());
+    }
+    template <typename T>
+    inline void hashField(XXH64_state_t& s, const T& v) noexcept {
+        static_assert(std::is_trivially_copyable_v<T>, "hash members field by field");
+        XXH64_update(&s, &v, sizeof(T));
+    }
+    template <typename... Ts>
+    inline uint64_t hashFields(const Ts&... fields) noexcept {
+        XXH64_state_t s;
+        XXH64_reset(&s, 0);
+        (hashField(s, fields), ...);
+        return XXH64_digest(&s);
+    }
+} // namespace detail
+
 
 using MeshHandle = uint32_t;
 using ShaderHandle = uint32_t;
@@ -41,18 +65,15 @@ struct BeamNetParams {
     float sparkLifetime = 0.3f;
 
     uint64_t hashKey() const noexcept {
-        XXH64_state_t hash_state;
-        XXH64_reset(&hash_state, 0);
-        XXH64_update(&hash_state, this, sizeof(BeamNetParams));
-        return XXH64_digest(&hash_state);
+        return detail::hashFields(id, rows, columns, cellWidth, cellHeight, beamThickness, beamColor, glowIntensity, flickerFrequency, weaveAmplitude, weaveSpeed, deploymentDelay, activeDuration, retractOnExpire, enableSparks, sparkRate, sparkLifetime);
     }
 };
 
 struct BeamNetAssetBundle {
-    MeshHandle netMesh;
-    ShaderHandle beamShader;
-    ParticleHandle sparkParticles;
-    DecalHandle scorchDecal;
+    MeshHandle netMesh = 0;
+    ShaderHandle beamShader = 0;
+    ParticleHandle sparkParticles = 0;
+    DecalHandle scorchDecal = 0;
 };
 
 } // namespace BeamNets

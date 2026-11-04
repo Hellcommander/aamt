@@ -1,8 +1,7 @@
 #pragma once
 #include <future>
 #include <optional>
-#include "core/ConcurrentLRU.hpp"
-#include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "SpellProjectileTypes.hpp"
 
 namespace MagiTech {
@@ -38,7 +37,7 @@ inline uint64_t hashCombine(uint64_t h1, uint64_t h2) {
 
 class SpellAssetFactory {
     ConcurrentLRUCache<uint64_t, SpellAssetBundle> m_cache;
-    std::unique_ptr<MultithreadBusPlugin> m_pool;
+    GeneratorTaskPool m_pool;   // runs tasks inline until initialize() starts workers
     bool m_initialized = false;
 
 public:

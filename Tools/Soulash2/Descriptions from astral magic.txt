@@ -1,0 +1,164 @@
+ E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Air_Burst_Charge.json (1 hit)
+	Line  9: 	"description": "Channels a compressed burst of charged air toward a distant target, striking it with chained lightning impacts",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Air_Cyclone_Burst.json (1 hit)
+	Line  9: 	"description": "Deal ::damage ::damage_type damage Unleashes a compressed mini cyclone that strikes the target with rapid, low-intensity lightning impacts.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\arendeth_astral_magic_shatterfrost_surge_trigger.json (1 hit)
+	Line 18: 	"description": "Calls Shatterfrost Surge.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Astral_Collapse.json (1 hit)
+	Line  9: 	"description": "You unleash a devastating astral frost blast in a wide cone up to 8 tiles away, dealing ::damage ::damage_type damage with powerful astral force.\nThe surge pierces all targets, inflicts frostbite, burns 35 stamina, knocks enemies back, and immobilizes those caught in the blast.\nEach cast builds Astral Fatigue stacks, increasing this spell’s damage by 3 per stack, but overuse triggers severe astral backlash.\nThis spell ignores party members and cannot be dodged.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Astral_Discharge.json (1 hit)
+	Line  9: 	"description": "You collapse the unstable astral influence building within you, clearing all Astral Fatigue in a controlled release. The disruption chills your body and shifts your position as astral space momentarily destabilizes.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Astral_Frostline.json (1 hit)
+	Line  9: 	"description": "You release a narrow astral frost cone that reaches up to 6 tiles, dealing ::damage ::damage_type damage and piercing through all enemies caught in its side‑shaped area.\nThe chilling impact inflicts frostbite and generates astral frost stacks.\nIf too many stacks accumulate, the backlash applies debuffs to you.\nThis spell ignores party members.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Astral_Frost_Aura.json (1 hit)
+	Line  9: 	"description": "You emit a cold astral field that chills nearby enemies and sustains your astral construct.\nThe aura inflicts frostbite while maintaining a single Astral Wisp, healing it slightly each pulse.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Astral_Frost_Charge.json (1 hit)
+	Line 10:     "description": "Hurl a frosty astrally charged projectile by consuming a targeted Astral Wisp on the battlefield. The projectile originates from the wisp’s tile, then chains to up to six nearby enemies, propelling you toward each struck target. Each hit displaces the target 4 tiles to the left or right, and after the final strike you roll back 1 tile. Each hit deals ::damage ::damage_type damage that scales with weapon and magic power and converts its damage into Frosty Trigger pulses, feeding Frostburn stacks.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Astral_Mantle.json (1 hit)
+	Line  9: 	"description": "You wrap yourself in a dense mantle of astral force, sharpening your defensive instincts while applying a frost aura that applies frostbite and spawns a single astral wisp each time you move to a limit of 1. \nThe mantle time reduces the time takes for your attacks and movements by .15/25  by while greatly increasing your parry chance.\n It increases your magic power by 1 for each Astral Wisps within the zone\nSustaining the mantle builds Astral Fatigue, risking Overdrawn backlash if maintained too long.\nThis empowerment affects only you and cannot be shared.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Astral_Overdrawn.json (1 hit)
+	Line  9: 	"description": "You suffer astral backlash as your mind overextends beyond safe limits.\nThe strain increases your cooldowns, burns stamina, slows your movement and attacks, reduces resistances and willpower, lowers hit chance, and leaves you vulnerable.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Astral_Recrystallization.json (1 hit)
+	Line 11: 	"description": "You focus astral light through a crystalized wisp, reigniting its dormant essence and restoring it to form. The ritual binds the construct to you for an extended time, granting a reliable astral companion shaped from crystallized frost and pure illumination.\n\nRequires a crystalized astral wisp and a light source. Summons one astral wisp for a long duration, without accepting Amplifiers.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Astral_Riftchain.json (1 hit)
+	Line  9: 	"description": "You lash out with a spectral chain that disarms the target(s) and deals ::damage ::damage_type damage along a straight line.\nThe strike pierces through all enemies in its path, forcing each one to sidestep.\nThis spell ignores party members.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Astral_Soul_Rend.json (1 hit)
+	Line  9: 	"description": "You tear open an astral conduit and lash the minds of up to five enemies in a chain.\nEach target is corrupted, becoming your thrall for a short duration, while their cooldowns are wiped clean, making them immediately dangerous once the control ends.\nThe astral shock leaves them frostbitten and vulnerable, and the surge of stolen astral force briefly accelerates their movement.\nThis spell ignores allies and cannot affect your party.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Astral_Windstorm_Barrier.json (1 hit)
+	Line  9: 	"description": "You surround yourself with an astral windstorm that deflects incoming attacks while slowing your strikes.\nThe barrier emits a chilling aura that applies frostbite, and each time you cast this you add stacks of astral fatigue stacks to you.\nIf your stacks grow too high, the astral surge backfires, inflicting Astral Overdrawn’s debuffs on you.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Astral_Wisp_Ambush.json (1 hit)
+	Line  9: 	"description": "A rare burst of courage from a timid wisp. When a vulnerable enemy is exposed, the wisp darts forward in a quick frost‑charged rush, delivering a light disruptive strike before instantly retreating to safety. The attack deals minor frost damage, inflicts frostbite and silence, and triggers a brief revenge pulse, but the wisp avoids staying in danger by backstepping the full distance of its charge.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Backlash_Surge.json (1 hit)
+	Line  9: 	"description": "When instability reaches its limit, the target releases a brief corruption shockwave, striking all nearby foes while sparing its own allies.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Corruption_Burst.json (1 hit)
+	Line  9: 	"description": "On failed control, the target releases a brief corruption shockwave, striking all creatures in a one‑tile square around it except its own allies. The burst lasts 1 turn and leaves nearby foes disoriented while the target’s party remains unharmed.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Create_Crystalized_Astral_Wisp.json (1 hit)
+	Line 11: 	"description": "You channel astral force through a summoned wisp and a nearby light source, crystallizing its essence into a temporary construct.\nThe Crystalized Astral Wisp radiates a chilling aura that terrifies enemies, inflicts frostbite and poison, and lashes out with both astral and physical force.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Frosty_Trigger.json (1 hit)
+	Line  9: 	"description": "A brief astral pulse of frost that lashes out at anything in reach, converting its chill into frostburn stacks that deepen the target’s astral cold.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\MiniCyclone.json (1 hit)
+	Line  9: 	"description": "Deal ::damage ::damage_type damage to target and everyone adjacent to the target.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Rupture_Spark_Chain.json (1 hit)
+	Line  9: 	"description": "A Shatterfrost Spark launches itself toward a distant target in a violent astral rush, chaining between nearby foes as unstable frost energy erupts on impact. Each strike deals light frost damage, can critically hit, and applies Frosty Trigger stacks that scale into frostburn through party ignoring astral rupture. The spark rebounds instantly after the burst, burning away as its unstable energy collapses.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Rupture_Spark_Trigger.json (1 hit)
+	Line 25: 	"description": "A frost pulse that deals ::damage ::damage_type damage, scaling with weapon and Magic Power. The damage is converted into stacks that feed the Shatterfrost Surge.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Shatterfrost_Collapse.json (1 hit)
+	Line  9: 	"description": "The Shatterfrost Spark unleashes a volatile frost burst that chains between up to five targets, ignoring party alignment and piercing through each foe. Every hit applies Frosty Trigger, dealing ::damage damage scaled by .4 magic power and 0.4 weapon damage. The impact knocks targets back 2 tiles, dealing collision damage, then pulls them 2 tile toward the spark as unstable astral frost collapses inward.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Shatterfrost_Surge.json (1 hit)
+	Line 15: 	"description": "Tears frost sparks out of the astral: summons up to 150 Rupture Sparks for 2 turns.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Stamina_Burning_Light_Trigger.json (1 hit)
+	Line  9: 	"description": "Triggered when damage becomes Burning Light stacks: burns 12 stamina from the target and sets it alight with burning light. Ignores party members.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Summon_Astral_Wisp_Swarm.json (1 hit)
+	Line  9: 	"description": "You release a burst of burning light that deals ::damage ::damage_type damage in a small circular area.\nThe flash forces each affected enemy to sidestep and converts the damage dealt into stacks for Burning Light Trigger(12 burn stamina, burning light).\nThe surge summons Astral Wisps that echo your magic, up to a maximum of twelve.\nThis spell ignores party members.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\abilities\Wisp_Powered_Swap.json (1 hit)
+	Line 10: 	"description": "Your Astral Wisp panics and mind‑phases you into the target’s position, forcing the target into yours.\nThe sudden displacement terrifies the target and causes the Wisp to split into small astral fragments within a  small square area.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\ability_amplifiers.json (18 hits)
+	Line  13: 		"description": "Each Astral Fatigue stack triggers a brief astral displacement, pulling you backward. The disturbance may collapse your fatigue entirely or intensify it if the astral shift destabilizes."
+	Line  37: 		"description": "A dangerous astral flare that sharpens frostbite and draws enemy focus. Astral Fatigue erupts into repeated frost pulses, rapidly compounding frostburn as long as the surge holds. This can not fully be implemented yet"
+	Line  61: 		"description": "A dangerous astral flare that sharpens frostbite and draws enemy focus. Astral Fatigue erupts into repeated frost pulses, rapidly compounding frostburn as long as the surge holds. This can not fully be implemented yet"
+	Line  75: 		"description": "Channels astral force to charge one tile toward the target."
+	Line  89: 		"description": "Charges forward up to five tiles toward the target using astral displacement."
+	Line 103: 		"description": "Shifts position using astral displacement."
+	Line 117: 		"description": "Shifts position two tiles using astral displacement."
+	Line 131: 		"description": "Shifts position three tiles using astral displacement."
+	Line 145: 		"description": "Shifts position four tiles using astral displacement."
+	Line 163: 		"description": "Creates a small astral light on targets and adds a burning light effect to skills."
+	Line 177: 		"description": "Burns 5 stamina through astral strain."
+	Line 191: 		"description": "adds a 20% chance to repeat the ability with your second weapon"
+	Line 214: 		"description": "Astral frost converges into a volatile surge, expanding your spell’s area while converting a portion of damage into frostbite stacks. Frostbite intensifies, amplifying astral chill interactions.",
+	Line 259: 		"description": "Converts damage into frostbite and frostburn stacks, then detonates them for bonus damage. Expands the spell’s area and intensifies frostbite. Allies are unaffected."
+	Line 276: 		"description": "You distort astral geometry, expanding the area of your next spell while shortening its casting reach. The widened impact zone overwhelms nearby foes but forces you to channel the spell from closer range.",
+	Line 306: 		"description": "You fracture astral flow to accelerate your casting rhythm, unleashing your next spell with greatly reduced cast time and cooldown. The surge restores a random ability’s cooldown, converts a portion of your damage into life, and empowers distant attacks through astral resonance.",
+	Line 338: 		"description": "You force unstable astral power through your channels, causing your next spell to strike twice and inflicting heavy Overdrawn strain on yourself. Any effects applied by that spell collapse instantly when you cast another ability, and the surge sharply increases the spell’s cooldown before burning out.",
+	Line 365: 		"description": "You fracture astral flow to accelerate your casting rhythm, nearly instantaneously unleashing your next spell while sharply reducing its cooldown and extending its duration. The surge restores two random ability cooldowns, making this Amplifier ideal for regaining tempo in critical moments.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\ability_stackers.json (5 hits)
+	Line 17: 		"description": "Overuse of astral channels slows your attacks by 0.01 turn per stack, up to 15. At 15 stacks it erupts as Astral Overdrawn. Lasts 10 turns if not refreshed."
+	Line 41: 		"description": "The cold of the astral gets harsher the more it stacks up"
+	Line 51: 		"description": "Each stack summons one Rupture Spark, up to 30."
+	Line 70: 		"description": "A volatile astral chill that marks the target with a trace of frost, causing each pulse of astral damage to deepen the frostburn within them."
+	Line 87: 		"description": "Corruption builds up over time, weakening the target."
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\character.json (1 hit)
+	Line  6:             "description": "Use your willpower to attempt taming a magical creature. This action requires an empty companion slot and takes 2 turns.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Astral_Adapt.json (1 hit)
+	Line  49: 	"description": "Astral Adepts study the quiet geometry of astral flow, shaping it into practical techniques rather than destructive magic. Every Adept learns three foundational manipulations: Astral Frostline to mark and chill distant targets, Astral Wisp Swarm to summon guiding wisps that illuminate the battlefield, and Wisp Powered Swap to reposition themselves or allies through astral displacement. Adepts rely on precision rather than force, using controlled movement, subtle light, and spatial shifts to support companions. Their discipline is stable, predictable, and intentionally restrained — ideal for teaching initiates or accompanying adventurers without endangering settlements.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Astral_Adapt_Rogue.json (1 hit)
+	Line  47: 	"description": "Veilrunners are Adepts who’ve adapted astral techniques for infiltration and sudden strikes. They wield Astral Frostline as a marking tool to track prey, unleash Astral Wisp Swarm to confuse and illuminate targets from unexpected angles, and use Wisp Powered Swap to slip through spatial seams mid‑combat. Their movements are sharp and evasive, weaving between enemies with multi‑step sidesteps and bursting forward with astral charges. Unlike scholarly Adepts, Veilrunners weaponize astral geometry — turning illumination into misdirection, displacement into ambush, and frostline marks into kill‑paths. They appear in dynamic encounters as unpredictable, mobile astral skirmishers..",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Astral_Wisp.json (1 hit)
+	Line  43: 	"description": "A timid astral mote that follows you while keeping itself alive. Astral Wisps avoid danger, take cover from ranged threats, and use simple astral tricks to recover, evade, and stay out of harm’s way.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Book_of_Astral_Magic.json (1 hit)
+	Line  4: 	"description": "Book of Astral Magic",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Civilized_Air_Elemental.json (1 hit)
+	Line  72: 	"description": "Humanoid in shape mass of swirling winds.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Civilized_Animated_Armor.json (1 hit)
+	Line  70: 	"description": "This armor moves of its own accord!",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Civilized_Earth_Elemental.json (1 hit)
+	Line  58: 	"description": "Walking hill made from a jagged stone.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Civilized_Fire_Elemental.json (1 hit)
+	Line  53: 	"description": "Humanoid in shape mass of fire.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Civilized_Pixie.json (1 hit)
+	Line  62: 	"description": "A tiny humanoid creature is flapping colorful butterfly-like wings to stay in the air.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Civilized_Storm_Elemental.json (1 hit)
+	Line  48: 	"description": "A powerful creature born from the chaos, embodying the raw energy of a thunderstorm.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Civil_Animated_Mannequin.json (1 hit)
+	Line  57: 	"description": "This mannequin of a little girl wears a pink dress and a blonde wig. It's covered in dust and cobwebs.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Crystalized_Astral_Wisp.json (1 hit)
+	Line 15: 	"description": "Spirit of empowered by astral magic. Crystalized into a component for upgrading it",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Omega_Astral_Wisp.json (1 hit)
+	Line  87: 	"description": "A perfected astral construct formed from condensed mind light and frost charged ether.\nThe Omega Astral Wisp possesses heightened perception, reinforced astral stamina, and a disciplined mind core capable of leadership grade behaviors.\nIts presence strengthens party coordination, maintains distance when threatened, and executes ambush or guard routines with uncanny precision.\nThough not built for direct combat, its empowered intellect, expanded pockets, and soulbound ability slots allow it to support its creator with advanced astral techniques.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Shatterfrost_Spark.json (1 hit)
+	Line  55: 	"description": "A volatile shard of ruptured astral frost. Shatterfrost Sparks hunt enemies with reckless aggression, bursting into brief frost impacts before burning away. Their unstable nature makes them fast, short lived combat motes that embody the violent energy released when astral frost fractures.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Undead_Astral_Adapt.json (1 hit)
+	Line  48: 	"description": "Boneweavers are skeletal mages bound by astral flow instead of necromancy. Their bones carry faint astral etchings, marking them as stable astral constructs accepted by both Elves and Undead. They wield Astral Frostline to mark foes, Astral Wisp Swarm to illuminate and harass targets, and Wisp Powered Swap to slip through astral seams. Precise, quiet, and unnervingly fluid, Boneweavers act as mobile astral controllers who support allies with controlled movement and battlefield manipulation.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\entities\Wild_Friendly_Astral_Wisp.json (1 hit)
+	Line  46: 	"description": "A timid astral mote that follows you while keeping itself alive. Astral Wisps avoid danger, take cover from ranged threats, and use simple astral tricks to recover, evade, and stay out of harm’s way.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\mod.json (1 hit)
+	Line  8:     "description": "A complete astral‑themed magic focused on constructs, chain corruption, frost manipulation, and astral crafting.",
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\passives.json (20 hits)
+	Line  16: 		"description": "Study foes with astral sight, analysing their attack speed and their weaknesses."
+	Line  29: 		"description": "Converts 10% of damage to frostbite."
+	Line  50: 		"description": "The Party will regenerate an extra 1 stamina a turn, have a extra 40 max stamina, and regain 10% of the stamina costs of abilities in health"
+	Line 106: 		"description": "Casting Frost Charge, Frostline, Riftchain or Astral Collapse can trigger Shatterfrost Surge, tearing a swarm of frost sparks out of the astral (100%, 50%, 100% and 100% chance respectively)."
+	Line 120: 		"description": "When a being dies while suffering frostbite, you and your party regain 6 stamina."
+	Line 133: 		"description": "Moving costs 0.5 less stamina for you and your party."
+	Line 146: 		"description": "You and your party move 0.1 turn quicker."
+	Line 171: 		"description": "8% chance to repeat the ability you cast, and 8% chance to consume 1 stack of Astral Fatigue."
+	Line 203: 		"description": "You can see stamina, frostbite is 15% stronger, enemies resist frost 20% less, casting can trigger Spectral Chain, and you can command an extra companion."
+	Line 228: 		"description": "Your astral authority strengthens, granting command over an additional companion while expanding your sight and spell range. A 30% of of health is restored based on stamina cost."
+	Line 266: 		"description": "Your astral senses can feel nearby magic."
+	Line 280: 		"description": "Learn to craft a Storm Elemental persona for your settlement."
+	Line 293: 		"description": "Learn to craft an Animated Mannequin persona for your settlement."
+	Line 306: 		"description": "Learn to craft an Air Elemental persona for your settlement."
+	Line 319: 		"description": "Learn to craft an Animated Armor persona for your settlement."
+	Line 332: 		"description": "Learn to craft a Fire Elemental persona for your settlement."
+	Line 345: 		"description": "Learn to craft an Earth Elemental persona for your settlement."
+	Line 358: 		"description": "Learn to craft a Friendly Astral Wisp persona from a Crystalized Astral Wisp."
+	Line 371: 		"description": "Learn to craft a Pixie persona for your settlement."
+	Line 404: 		"description": "+10% to all attributes. Stacks with other combat-branch masteries."
+  E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic\skills.json (1 hit)
+	Line  6: 		"description": "Astral Magic bends the boundary between mind and matter, weaving frost‑laden force into constructs, chains, and corruptive tethers.",
+
+where no description are 
+Passives
+		"id": "arendeth_astral_magic_astral_resonance",
+		"name": "Astral Resonance",
+		"apply_mode": "party_only",
+		"image": 0,
+		"effects": [
+			{
+				"effect": "parry_chance",
+				"value": 0.05
+			},
+			{
+				"effect": "parry",
+				"value": 1
+			},
+			{
+                "effect": "dodge",
+                "value": 0.05
+			},
+			{
+				"effect": "attack_on_parry",
+				"value": 0.05
+			}
+		]
+	},

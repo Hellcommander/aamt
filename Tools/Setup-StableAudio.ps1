@@ -74,23 +74,24 @@ $env:HUGGINGFACE_HUB_CACHE = $hfHub
 $env:HF_HUB_CACHE = $hfHub
 Remove-Item Env:HF_HOME -ErrorAction SilentlyContinue
 Write-Host "  HF model cache: $hfHub (token stays in user profile)" -ForegroundColor Gray
-# Optional: mirror token into install dir for tools that set HF_HOME locally
-$userToken = Join-Path $env:USERPROFILE ".cache\huggingface\token"
-$localHfHome = Join-Path $InstallPath "hf-home"
-New-Item -ItemType Directory -Path $localHfHome -Force | Out-Null
-if (Test-Path $userToken) {
-    Copy-Item $userToken (Join-Path $localHfHome "token") -Force -ErrorAction SilentlyContinue
-}
-
-# Auto-switch to media download token by name (SD3.5 Token)
+# Confirm the existing Hugging Face login (hf auth login). The token is never copied anywhere.
+$hfLoginOk = $false
 $tokenSwitch = Join-Path $ToolsRoot "Shared\HfTokenSwitch.psm1"
 if (Test-Path $tokenSwitch) {
     Import-Module $tokenSwitch -Force
     try {
-        Use-AamtHfMediaToken | Out-Null
+        Use-AamtHfMediaToken -Quiet | Out-Null
+        $hfLoginOk = $true
+        Write-Host "  [OK] Hugging Face login found" -ForegroundColor Green
     } catch {
-        Write-Host "  [WARN] Could not auto-switch HF token: $_" -ForegroundColor Yellow
+        Write-Host "  [WARN] No Hugging Face login found. Run: hf auth login" -ForegroundColor Yellow
     }
+}
+if (-not $SkipModelDownload -and -not $hfLoginOk) {
+    Write-Host "  [ERROR] The model is gated; log in first (hf auth login), accept the license at" -ForegroundColor Red
+    Write-Host "          https://huggingface.co/stabilityai/stable-audio-3-$Model, then re-run" -ForegroundColor Red
+    Write-Host "          (or pass -SkipModelDownload)." -ForegroundColor Gray
+    exit 1
 }
 
 Write-Host ""
@@ -122,7 +123,8 @@ if (-not $SkipDeps) {
     $depHelper = Join-Path $ToolsRoot "Shared\sa3_install_deps.py"
     Copy-Item $depHelper (Join-Path $RepoPath "sa3_install_deps.py") -Force
     & $pythonCmd (Join-Path $RepoPath "sa3_install_deps.py")
-    & $pythonCmd -m pip install -U soundfile einops huggingface_hub safetensors transformers tqdm scipy numpy
+    & $pythonCmd -m pip install -U soundfile einops huggingface_hub safetensors transformers tqdm scipy
+    # numpy is intentionally not upgraded here: torch/torchaudio wheels pin what they need.
     Pop-Location
     Write-Host "  [OK] Package install attempted" -ForegroundColor Green
 } else {
@@ -157,7 +159,7 @@ if (-not $SkipModelDownload) {
     Write-Host "  Accept license first:" -ForegroundColor Yellow
     Write-Host "    https://huggingface.co/stabilityai/stable-audio-3-$Model" -ForegroundColor Cyan
 
-    # Prefetch: token from user profile, weights into E: hub cache
+    # Prefetch: existing HF login (read by huggingface_hub), weights into the E: hub cache
     $prefetchPath = Join-Path $env:TEMP "sa3_prefetch.py"
     @"
 import os, sys

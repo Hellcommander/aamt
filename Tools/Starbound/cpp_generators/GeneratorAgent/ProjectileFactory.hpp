@@ -1,8 +1,7 @@
 #pragma once
 
 #include "ProjectileTypes.hpp"
-#include "core/ConcurrentLRU.hpp"
-#include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include <future>
 #include <string>
 
@@ -21,7 +20,7 @@ public:
 
 private:
     ConcurrentLRUCache<uint64_t, ProjectileBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized = false;
 };
 

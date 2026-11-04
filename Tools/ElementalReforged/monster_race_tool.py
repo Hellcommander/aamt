@@ -49,6 +49,11 @@ import re
 
 ROOT = Path(__file__).resolve().parent
 
+_SHARED = ROOT.parent / "Shared"
+if str(_SHARED) not in sys.path:
+    sys.path.insert(0, str(_SHARED))
+from sd_policy import SdUnavailable, procedural_fallback  # noqa: E402
+
 
 def _log(msg: str) -> None:
     print(msg, flush=True)
@@ -433,10 +438,15 @@ def apply_ai_pass(
     steps: int,
     ai_kinds: list[str],
     force: bool,
+    allow_procedural: bool = False,
 ) -> None:
     """
     Optional AI polish. With assetPolicy=originals, skip inventing new art unless --force-ai.
     Prefer keeping original medallion icons + original HKB textures referenced in XML.
+
+    AI was requested (mode ai/both): if SD is down or an icon fails after retries, raise
+    SdUnavailable instead of silently keeping the original/procedural icon, unless
+    allow_procedural (--allow-procedural / AAMT_SD_STRICT=0).
     """
     policy = (cfg.get("assetPolicy") or "originals").lower()
     if policy == "originals" and not force:
@@ -447,7 +457,10 @@ def apply_ai_pass(
     from er_ai_pipeline import ai_assets_for_item, postprocess_icon
 
     if not tools.get("sd"):
-        _log("[AI] SD not available — keeping original/procedural icons")
+        procedural_fallback(
+            "AI icon pass requested but SD is not available", allow=allow_procedural
+        )
+        _log("[AI] SD not available — keeping original/procedural icons (explicitly allowed)")
         return
 
     _log(f"[AI] Ollama enhance={'ON' if enhance and tools.get('ollama') else 'OFF'} | SD={tools.get('sd_url')}")
@@ -462,21 +475,30 @@ def apply_ai_pass(
                 continue
             pack = race[it["kind"]]
             # Only polish icons from original base — never replace game texture refs in XML
-            result = ai_assets_for_item(
-                cfg=cfg,
-                race=race,
-                kind=it["kind"],
-                pack=pack,
-                icon_path=Path(it["icon"]),
-                texture_path=Path(it["texture"]),
-                source_dir=source,
-                tools=tools,
-                enhance=enhance and bool(tools.get("ollama")),
-                force=force,
-                steps=steps,
-                gen_icon=True,
-                gen_texture=False,  # XML uses original Texture_*; do not invent
-            )
+            result = {"icon": False}
+            for attempt in range(3):  # bounded retry for transient SD failures
+                result = ai_assets_for_item(
+                    cfg=cfg,
+                    race=race,
+                    kind=it["kind"],
+                    pack=pack,
+                    icon_path=Path(it["icon"]),
+                    texture_path=Path(it["texture"]),
+                    source_dir=source,
+                    tools=tools,
+                    enhance=enhance and bool(tools.get("ollama")),
+                    force=force,
+                    steps=steps,
+                    gen_icon=True,
+                    gen_texture=False,  # XML uses original Texture_*; do not invent
+                )
+                if result["icon"]:
+                    break
+                _log(f"  [SD] {it['internal']}: attempt {attempt + 1}/3 failed")
+            if not result["icon"]:
+                procedural_fallback(
+                    f"SD icon generation failed for {it['internal']}", allow=allow_procedural
+                )
             it["ai"] = {"icon": result["icon"], "texture": False}
             _log(f"  {it['internal']}: {'AI icon' if result['icon'] else 'kept original'}")
             postprocess_icon(Path(it["icon"]), size=128)
@@ -512,7 +534,7 @@ def cmd_generate(cfg: dict[str, Any], args: argparse.Namespace) -> int:
             f"Magick={'OK' if tools.get('magick') else 'no'}"
         )
         if mode == "ai" and not tools.get("sd"):
-            _log("ERROR: --mode ai requires Stable Diffusion. Use --start-sd or Mode Both/Tools.")
+            _log("ERROR: --mode ai requires Stable Diffusion. Use --start-sd or --mode tools.")
             return 1
 
     t0 = time.perf_counter()
@@ -553,15 +575,20 @@ def cmd_generate(cfg: dict[str, Any], args: argparse.Namespace) -> int:
 
     if want_ai:
         ai_kinds = [k.strip() for k in (args.ai_kinds or "clothes,armor,weapon").split(",") if k.strip()]
-        apply_ai_pass(
-            cfg,
-            manifest,
-            tools=tools,
-            enhance=not args.no_enhance,
-            steps=args.sd_steps,
-            ai_kinds=ai_kinds,
-            force=args.force_ai,
-        )
+        try:
+            apply_ai_pass(
+                cfg,
+                manifest,
+                tools=tools,
+                enhance=not args.no_enhance,
+                steps=args.sd_steps,
+                ai_kinds=ai_kinds,
+                force=args.force_ai,
+                allow_procedural=bool(getattr(args, "allow_procedural", False)),
+            )
+        except SdUnavailable as exc:
+            _log(f"ERROR: {exc}")
+            return 1
 
     # Combined XML — use already-resolved per-item fragments (includes Alt + fallbacks)
     chunks: list[str] = []
@@ -717,18 +744,24 @@ def cmd_banner(cfg: dict[str, Any], args: argparse.Namespace) -> int:
     out_root.mkdir(parents=True, exist_ok=True)
     banner_path = out_root / pkg["bannerFile"]
 
-    result = generate_banner(
-        cfg,
-        output=banner_path,
-        prompt=args.prompt or None,
-        enhance=not args.no_enhance,
-        force=bool(args.force),
-        steps=int(args.sd_steps),
-        guidance=float(args.guidance),
-        allow_procedural=not args.require_sd,
-        start_sd=bool(args.start_sd),
-        sd_wait=float(args.sd_wait),
-    )
+    try:
+        result = generate_banner(
+            cfg,
+            output=banner_path,
+            prompt=args.prompt or None,
+            enhance=not args.no_enhance,
+            force=bool(args.force),
+            steps=int(args.sd_steps),
+            guidance=float(args.guidance),
+            # SD is required by default; procedural only on explicit --allow-procedural
+            # (or AAMT_SD_STRICT=0, handled by sd_policy). --require-sd is a legacy no-op.
+            allow_procedural=bool(args.allow_procedural) and not args.require_sd,
+            start_sd=bool(args.start_sd),
+            sd_wait=float(args.sd_wait),
+        )
+    except SdUnavailable as exc:
+        _log(f"ERROR: {exc}")
+        return 1
     write_banner_meta(cfg, result, out_root)
 
     if not result.get("ok"):
@@ -857,6 +890,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_gen.add_argument("--ai-kinds", default="clothes,armor,weapon", help="Which packs get AI art")
     p_gen.add_argument("--no-enhance", action="store_true", help="Skip Ollama prompt enhancement")
     p_gen.add_argument("--force-ai", action="store_true", help="Overwrite even if AI files exist")
+    p_gen.add_argument(
+        "--allow-procedural",
+        action="store_true",
+        help="With --mode ai/both: keep original/procedural icons instead of failing when SD is down/fails",
+    )
     p_gen.set_defaults(func=cmd_generate)
 
     p_ins = sub.add_parser("install", help="Install existing Output/ into mod")
@@ -866,7 +904,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_ban = sub.add_parser(
         "banner",
-        help="Generate Mod Manager banner via local SD/Ollama (procedural fallback)",
+        help="Generate Mod Manager banner via local SD/Ollama (fails if SD is down unless --allow-procedural)",
     )
     p_ban.add_argument("--output", default="", help="Output folder (default: Output/)")
     p_ban.add_argument("--install", action="store_true", help="Copy banner into mod root")
@@ -890,7 +928,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_ban.add_argument(
         "--require-sd",
         action="store_true",
-        help="Fail if SD is down (no procedural fallback)",
+        help="Fail if SD is down (now the default; kept for compatibility)",
+    )
+    p_ban.add_argument(
+        "--allow-procedural",
+        action="store_true",
+        help="Explicit opt-in: draw a procedural banner if SD is down/fails",
     )
     p_ban.set_defaults(func=cmd_banner)
 

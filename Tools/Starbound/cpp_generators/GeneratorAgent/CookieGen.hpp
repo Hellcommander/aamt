@@ -1,45 +1,54 @@
 #pragma once
 
 #include "LightTypes.hpp"
+#include "LightGen.hpp"
 #include "GPUDeviceInterface.hpp"
-#include <unordered_map>
-#include <mutex>
+#include "core/Log.hpp"
 #include <string>
 
 namespace mt::light {
 
-struct CookieConfig { uint32_t tex{}; uint32_t sampler{}; };
+struct CookieConfig {
+    bool       enabled{false};
+    GpuTexture tex{};
+    GpuSampler sampler{};
+    Vec2       uvScale{1.0f, 1.0f};
+    Vec2       uvOffset{0.0f, 0.0f};
+};
 
-// Very small texture cache that hands out incremental handles.
-// Replace with actual renderer texture manager later.
+// Loads light cookie (projected mask) textures. Textures are shared and reference counted by
+// GPUDeviceInterface, so the same cookie file is decoded only once.
 class CookieGen {
 public:
-    static CookieConfig apply(LightHandle /*handle*/, const CookieParams& cp) {
+    static CookieConfig apply(LightHandle handle, const CookieParams& cp) {
         CookieConfig cfg{};
-        if (!cp.useCookie || cp.texturePath.empty()) return cfg;
+        if (!cp.useCookie || cp.texturePath.empty()) {
+            LightGen::setFlag(handle, LightFlags::Cookie, false);
+            return cfg;
+        }
 
-        uint32_t texHandle = getOrLoad(cp.texturePath);
-        cfg.tex = texHandle;
-        cfg.sampler = g_gpuDevice.createSampler(true, true); // Linear filtering, clamp to edge
+        auto& device = GPUDeviceInterface::getInstance();
+        cfg.tex = device.createTexture2D(cp.texturePath, true);
+        if (cfg.tex == 0) {
+            MagiTech::Log::warn("LightCookie", "cookie texture '{}' unavailable; light {} renders without cookie",
+                                cp.texturePath, handle);
+            LightGen::setFlag(handle, LightFlags::Cookie, false);
+            return CookieConfig{};
+        }
+        cfg.sampler = device.createSampler(true, true); // linear filtering, clamp to edge
+        cfg.uvScale = cp.uvScale;
+        cfg.uvOffset = cp.uvOffset;
+        cfg.enabled = true;
+        LightGen::setFlag(handle, LightFlags::Cookie, true);
         return cfg;
     }
-private:
-    static uint32_t getOrLoad(const std::string& path) {
-        std::lock_guard<std::mutex> lock(m_mtx);
-        auto it = m_cache.find(path);
-        if (it != m_cache.end()) return it->second;
-        
-        // Use real GPU device interface
-        uint32_t newHandle = g_gpuDevice.createTexture2D(path, true);
-        if (newHandle != 0) {
-            m_cache[path] = newHandle;
-        }
-        return newHandle;
-    }
 
-    static inline std::unordered_map<std::string, uint32_t> m_cache;
-    static inline std::mutex m_mtx;
-    static inline uint32_t m_nextId = 1000;
+    static void release(CookieConfig& cfg) {
+        auto& device = GPUDeviceInterface::getInstance();
+        if (cfg.tex) device.destroyTexture(cfg.tex);
+        if (cfg.sampler) device.destroySampler(cfg.sampler);
+        cfg = CookieConfig{};
+    }
 };
 
 } // namespace mt::light

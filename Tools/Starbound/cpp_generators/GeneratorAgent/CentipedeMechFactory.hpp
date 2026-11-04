@@ -2,6 +2,7 @@
 #include <future>
 #include <optional>
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "CentipedeMechTypes.hpp"
 #include "core/Log.hpp"
 
@@ -41,7 +42,7 @@ namespace CollisionGen {
 }
 
 class CentipedeMechFactory {
-    std::unique_ptr<MultithreadBusPlugin> m_pool;
+    std::unique_ptr<GeneratorTaskPool> m_pool;
     bool m_initialized = false;
 
 public:
@@ -50,6 +51,7 @@ public:
 
     void initialize(size_t num_threads);
     void shutdown();
+    bool isInitialized() const { return m_initialized; }
 
     std::future<MechBundle> generateAsync(
         const MechParams& m,

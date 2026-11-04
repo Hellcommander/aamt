@@ -4,7 +4,7 @@
 namespace MagiTech {
 namespace Geometry {
 
-#define LOG_GEO_GEN(Action, Id) Log::info("GeometryGen - {}: {}", #Action, Id)
+#define LOG_GEO_GEN(Action, Id) Log::info("Geometry", "GeometryGen - {}: {}", #Action, Id)
 
 // Hash function implementations
 uint64_t PrimitiveParams::hashKey() const {

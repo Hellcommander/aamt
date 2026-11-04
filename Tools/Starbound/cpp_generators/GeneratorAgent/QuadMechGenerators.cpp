@@ -1,18 +1,231 @@
 #include "QuadMechFactory.hpp"
+#include "QuadMechYaml.hpp"
 #include "core/Log.hpp"
-#include "vendor/yaml-cpp/yaml.h"
+#include <nlohmann/json.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
+#include <atomic>
+#include <cctype>
 #include <fstream>
 #include <filesystem>
 #include <algorithm>
+#include <optional>
 #include <random>
+#include <stdexcept>
 
 namespace MagiTech {
 namespace QuadMechGen {
 
-#define LOG_QUAD_MECH(Action, Id) Log::info("QuadMechGen - {}: {}", #Action, Id)
+using namespace ::MagiTech::QuadMech;
+
+#define LOG_QUAD_MECH(Action, Id) Log::info("QuadMechGen", "{}: {}", #Action, Id)
+
+namespace {
+
+constexpr const char* kLogCategory = "QuadMechGen";
+using ojson = nlohmann::ordered_json;
+
+// ----------------------------------------------------------------------------
+// Enum <-> string helpers (shared by the parser and the serializer)
+// ----------------------------------------------------------------------------
+
+std::string toLower(std::string s) {
+    std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return s;
+}
+
+struct ModuleTypeName { ModuleType type; const char* name; };
+constexpr ModuleTypeName kModuleTypeNames[] = {
+    {ModuleType::CHASSIS, "chassis"},
+    {ModuleType::LEG_FRONT_LEFT, "leg_front_left"},
+    {ModuleType::LEG_FRONT_RIGHT, "leg_front_right"},
+    {ModuleType::LEG_BACK_LEFT, "leg_back_left"},
+    {ModuleType::LEG_BACK_RIGHT, "leg_back_right"},
+    {ModuleType::HEAD, "head"},
+    {ModuleType::COCKPIT, "cockpit"},
+    {ModuleType::WEAPON_LEFT, "weapon_left"},
+    {ModuleType::WEAPON_RIGHT, "weapon_right"},
+    {ModuleType::ENERGY_CORE, "energy_core"},
+};
+
+struct AnimationTypeName { AnimationType type; const char* name; };
+constexpr AnimationTypeName kAnimationTypeNames[] = {
+    {AnimationType::WALK, "walk"},
+    {AnimationType::TROT, "trot"},
+    {AnimationType::GALLOP, "gallop"},
+    {AnimationType::COCKPIT_OPEN, "cockpit_open"},
+    {AnimationType::COCKPIT_CLOSE, "cockpit_close"},
+    {AnimationType::PILOT_ENTRY, "pilot_entry"},
+    {AnimationType::PILOT_EXIT, "pilot_exit"},
+    {AnimationType::IDLE, "idle"},
+    {AnimationType::ATTACK, "attack"},
+    {AnimationType::DEFEND, "defend"},
+};
+
+struct LODQualityName { LODQuality quality; const char* name; };
+constexpr LODQualityName kLODQualityNames[] = {
+    {LODQuality::HIGH, "high"},
+    {LODQuality::MEDIUM, "medium"},
+    {LODQuality::LOW, "low"},
+    {LODQuality::ULTRA_LOW, "ultra_low"},
+};
+
+std::optional<ModuleType> moduleTypeFromString(const std::string& s) {
+    const std::string key = toLower(s);
+    for (const auto& e : kModuleTypeNames) if (key == e.name) return e.type;
+    return std::nullopt;
+}
+
+std::optional<AnimationType> animationTypeFromString(const std::string& s) {
+    const std::string key = toLower(s);
+    for (const auto& e : kAnimationTypeNames) if (key == e.name) return e.type;
+    return std::nullopt;
+}
+
+std::optional<LODQuality> lodQualityFromString(const std::string& s) {
+    const std::string key = toLower(s);
+    for (const auto& e : kLODQualityNames) if (key == e.name) return e.quality;
+    return std::nullopt;
+}
+
+const char* toString(ModuleType t) {
+    for (const auto& e : kModuleTypeNames) if (e.type == t) return e.name;
+    return "chassis";
+}
+
+const char* toString(AnimationType t) {
+    for (const auto& e : kAnimationTypeNames) if (e.type == t) return e.name;
+    return "idle";
+}
+
+const char* toString(LODQuality q) {
+    for (const auto& e : kLODQualityNames) if (e.quality == q) return e.name;
+    return "high";
+}
+
+// ----------------------------------------------------------------------------
+// Typed field readers. Missing (or null) keys keep the struct default; a key
+// with the wrong type is an error, as it was with yaml-cpp's as<T>().
+// ----------------------------------------------------------------------------
+
+[[noreturn]] void fieldError(const std::string& path, const char* expected) {
+    throw std::runtime_error("QuadMech definition: '" + path + "' must be " + expected);
+}
+
+const ojson* child(const ojson& node, const char* key) {
+    if (!node.is_object()) return nullptr;
+    auto it = node.find(key);
+    if (it == node.end() || it->is_null()) return nullptr;
+    return &*it;
+}
+
+void readFloat(const ojson& node, const char* key, float& out, const std::string& ctx) {
+    if (const ojson* v = child(node, key)) {
+        if (!v->is_number()) fieldError(ctx + "." + key, "a number");
+        out = v->get<float>();
+    }
+}
+
+void readInt(const ojson& node, const char* key, int& out, const std::string& ctx) {
+    if (const ojson* v = child(node, key)) {
+        if (!v->is_number()) fieldError(ctx + "." + key, "an integer");
+        out = v->is_number_integer() ? v->get<int>() : static_cast<int>(v->get<double>());
+    }
+}
+
+void readBool(const ojson& node, const char* key, bool& out, const std::string& ctx) {
+    if (const ojson* v = child(node, key)) {
+        if (!v->is_boolean()) fieldError(ctx + "." + key, "true or false");
+        out = v->get<bool>();
+    }
+}
+
+std::string scalarToString(const ojson& v, const std::string& path) {
+    if (v.is_string()) return v.get<std::string>();
+    if (v.is_number() || v.is_boolean()) return v.dump(); // YAML scalars convert to strings
+    fieldError(path, "a scalar");
+}
+
+void readString(const ojson& node, const char* key, std::string& out, const std::string& ctx) {
+    if (const ojson* v = child(node, key)) out = scalarToString(*v, ctx + "." + key);
+}
+
+template<int N>
+void parseVec(const ojson& v, glm::vec<N, float, glm::defaultp>& out, const std::string& path) {
+    if (!v.is_array() || v.size() < static_cast<size_t>(N)) {
+        fieldError(path, N == 2 ? "a list of 2 numbers" : N == 3 ? "a list of 3 numbers" : "a list of 4 numbers");
+    }
+    for (int i = 0; i < N; ++i) {
+        const ojson& c = v[static_cast<size_t>(i)];
+        if (!c.is_number()) fieldError(path, "a list of numbers");
+        out[i] = c.get<float>();
+    }
+}
+
+template<int N>
+void readVec(const ojson& node, const char* key, glm::vec<N, float, glm::defaultp>& out, const std::string& ctx) {
+    if (const ojson* v = child(node, key)) parseVec<N>(*v, out, ctx + "." + key);
+}
+
+// Reads a [min, max] pair given either as a list or as {min: , max: }.
+void readRange(const ojson& node, const char* key, glm::vec2& out, const std::string& ctx) {
+    const ojson* v = child(node, key);
+    if (!v) return;
+    if (v->is_object()) {
+        readFloat(*v, "min", out.x, ctx + "." + key);
+        readFloat(*v, "max", out.y, ctx + "." + key);
+    } else {
+        readVec<2>(node, key, out, ctx);
+    }
+}
+
+// Reads the RGBA canopy tint; an RGB list keeps the current alpha.
+void readTint(const ojson& node, const char* key, glm::vec4& out, const std::string& ctx) {
+    const ojson* v = child(node, key);
+    if (!v) return;
+    if (v->is_array() && v->size() == 3) {
+        glm::vec3 rgb(out);
+        readVec<3>(node, key, rgb, ctx);
+        out = glm::vec4(rgb, out.a);
+    } else {
+        readVec<4>(node, key, out, ctx);
+    }
+}
+
+ModuleDefinition parseModule(const std::string& id, const ojson& m) {
+    const std::string ctx = "modules." + id;
+    if (!m.is_object()) fieldError(ctx, "a mapping");
+
+    ModuleDefinition module;
+    module.id = id;
+    if (const ojson* t = child(m, "type")) {
+        const std::string typeStr = scalarToString(*t, ctx + ".type");
+        auto type = moduleTypeFromString(typeStr);
+        if (!type) throw std::runtime_error("QuadMech definition: unknown module type '" + typeStr + "' in " + ctx);
+        module.type = *type;
+    } else if (auto type = moduleTypeFromString(id)) {
+        module.type = *type; // standard module ids double as their type
+    } else {
+        Log::warn(kLogCategory, "Module '{}' has no type and a non-standard id; assuming chassis", id);
+    }
+
+    readString(m, "mesh", module.meshPath, ctx);
+    readString(m, "attachBone", module.attachBone, ctx);
+    readVec<3>(m, "offset", module.offset, ctx);
+    readVec<3>(m, "scale", module.scale, ctx);
+    readVec<3>(m, "rotation", module.rotation, ctx);
+    readFloat(m, "mass", module.mass, ctx);
+    readVec<3>(m, "inertia", module.inertia, ctx);
+    readString(m, "materialOverride", module.materialOverride, ctx);
+    return module;
+}
+
+ojson vecToJson(const glm::vec2& v) { return ojson::array({v.x, v.y}); }
+ojson vecToJson(const glm::vec3& v) { return ojson::array({v.x, v.y, v.z}); }
+ojson vecToJson(const glm::vec4& v) { return ojson::array({v.x, v.y, v.z, v.w}); }
+
+} // namespace
 
 // ============================================================================
 // DEFINITION PARSER
@@ -22,240 +235,339 @@ namespace DefinitionParser {
 
 QuadMechDefinition parseFromYAML(const std::string& yamlContent) {
     LOG_QUAD_MECH(ParsingDefinition, "YAML");
-    
-    YAML::Node node = YAML::Load(yamlContent);
+
+    const ojson node = parseQuadMechYaml(yamlContent);
+    if (!node.is_object()) {
+        throw std::runtime_error("QuadMech definition: document root must be a mapping");
+    }
     QuadMechDefinition def;
-    
+
     // Parse basic info
-    def.name = node["name"].as<std::string>();
-    def.version = node["version"].as<std::string>();
-    def.author = node["author"].as<std::string>();
-    def.description = node["description"].as<std::string>();
-    
-    // Parse modules
-    if (node["modules"]) {
-        for (const auto& moduleNode : node["modules"]) {
-            ModuleDefinition module;
-            module.id = moduleNode.first.as<std::string>();
-            module.meshPath = moduleNode.second["mesh"].as<std::string>();
-            module.attachBone = moduleNode.second["attachBone"].as<std::string>();
-            
-            if (moduleNode.second["offset"]) {
-                auto offset = moduleNode.second["offset"];
-                module.offset = {offset[0].as<float>(), offset[1].as<float>(), offset[2].as<float>()};
+    const ojson* name = child(node, "name");
+    if (!name) throw std::runtime_error("QuadMech definition: missing required key 'name'");
+    def.name = scalarToString(*name, "name");
+    readString(node, "version", def.version, "");
+    readString(node, "author", def.author, "");
+    readString(node, "description", def.description, "");
+
+    // Parse modules: either a mapping of id -> module, or a list of modules with an "id" key
+    if (const ojson* modules = child(node, "modules")) {
+        if (modules->is_object()) {
+            for (auto it = modules->begin(); it != modules->end(); ++it) {
+                def.modules.push_back(parseModule(it.key(), it.value()));
             }
-            
-            if (moduleNode.second["scale"]) {
-                auto scale = moduleNode.second["scale"];
-                module.scale = {scale[0].as<float>(), scale[1].as<float>(), scale[2].as<float>()};
+        } else if (modules->is_array()) {
+            for (size_t i = 0; i < modules->size(); ++i) {
+                const ojson& m = (*modules)[i];
+                const ojson* id = child(m, "id");
+                if (!id) throw std::runtime_error("QuadMech definition: modules[" + std::to_string(i) + "] needs an 'id'");
+                def.modules.push_back(parseModule(scalarToString(*id, "modules.id"), m));
             }
-            
-            if (moduleNode.second["mass"]) {
-                module.mass = moduleNode.second["mass"].as<float>();
-            }
-            
-            def.modules.push_back(module);
+        } else {
+            fieldError("modules", "a mapping or a list");
         }
     }
-    
+
     // Parse cockpit
-    if (node["cockpit"]) {
-        auto cockpitNode = node["cockpit"];
-        if (cockpitNode["seatPosition"]) {
-            auto pos = cockpitNode["seatPosition"];
-            def.cockpit.seatPosition = {pos[0].as<float>(), pos[1].as<float>(), pos[2].as<float>()};
-        }
-        if (cockpitNode["canopyMaterial"]) {
-            def.cockpit.canopyMaterial = cockpitNode["canopyMaterial"].as<std::string>();
+    if (const ojson* cockpit = child(node, "cockpit")) {
+        readVec<3>(*cockpit, "seatPosition", def.cockpit.seatPosition, "cockpit");
+        readTint(*cockpit, "canopyTint", def.cockpit.canopyTint, "cockpit");
+        readString(*cockpit, "canopyMaterial", def.cockpit.canopyMaterial, "cockpit");
+        readFloat(*cockpit, "transparency", def.cockpit.transparency, "cockpit");
+        readBool(*cockpit, "enableHologram", def.cockpit.enableHologram, "cockpit");
+        if (const ojson* anchors = child(*cockpit, "hudAnchorPoints")) {
+            if (!anchors->is_array()) fieldError("cockpit.hudAnchorPoints", "a list");
+            for (size_t i = 0; i < anchors->size(); ++i) {
+                glm::vec3 p(0.0f);
+                parseVec<3>((*anchors)[i], p, "cockpit.hudAnchorPoints[" + std::to_string(i) + "]");
+                def.cockpit.hudAnchorPoints.push_back(p);
+            }
         }
     }
-    
+
     // Parse Magitech materials
-    if (node["magitechMaterials"]) {
-        auto matNode = node["magitechMaterials"];
-        
-        // Energy runes
-        if (matNode["energyRunes"]) {
-            auto runesNode = matNode["energyRunes"];
-            if (runesNode["emissiveColor"]) {
-                auto color = runesNode["emissiveColor"];
-                def.magitechMaterials.energyRunes.emissiveColor = {color[0].as<float>(), color[1].as<float>(), color[2].as<float>()};
-            }
-            if (runesNode["glowIntensity"]) {
-                auto intensity = runesNode["glowIntensity"];
-                def.magitechMaterials.energyRunes.glowIntensity = {intensity["min"].as<float>(), intensity["max"].as<float>()};
-            }
-            if (runesNode["animationRate"]) {
-                def.magitechMaterials.energyRunes.animationRate = runesNode["animationRate"].as<float>();
-            }
+    if (const ojson* mat = child(node, "magitechMaterials")) {
+        auto& runes = def.magitechMaterials.energyRunes;
+        if (const ojson* r = child(*mat, "energyRunes")) {
+            const std::string ctx = "magitechMaterials.energyRunes";
+            readVec<3>(*r, "emissiveColor", runes.emissiveColor, ctx);
+            readRange(*r, "glowIntensity", runes.glowIntensity, ctx);
+            readFloat(*r, "animationRate", runes.animationRate, ctx);
+            readFloat(*r, "pulseFrequency", runes.pulseFrequency, ctx);
+            readBool(*r, "enableFlicker", runes.enableFlicker, ctx);
+            readFloat(*r, "flickerIntensity", runes.flickerIntensity, ctx);
         }
-        
-        // Energy core
-        if (matNode["energyCore"]) {
-            auto coreNode = matNode["energyCore"];
-            if (coreNode["coreColor"]) {
-                auto color = coreNode["coreColor"];
-                def.magitechMaterials.energyCore.coreColor = {color[0].as<float>(), color[1].as<float>(), color[2].as<float>()};
-            }
-            if (coreNode["energyLevel"]) {
-                def.magitechMaterials.energyCore.energyLevel = coreNode["energyLevel"].as<float>();
-            }
-            if (coreNode["pulseRate"]) {
-                def.magitechMaterials.energyCore.pulseRate = coreNode["pulseRate"].as<float>();
-            }
+
+        auto& core = def.magitechMaterials.energyCore;
+        if (const ojson* c = child(*mat, "energyCore")) {
+            const std::string ctx = "magitechMaterials.energyCore";
+            readVec<3>(*c, "coreColor", core.coreColor, ctx);
+            readFloat(*c, "energyLevel", core.energyLevel, ctx);
+            readFloat(*c, "pulseRate", core.pulseRate, ctx);
+            readBool(*c, "enableArcs", core.enableArcs, ctx);
+            readFloat(*c, "arcIntensity", core.arcIntensity, ctx);
+            readInt(*c, "arcCount", core.arcCount, ctx);
         }
-        
-        // Canopy material
-        if (matNode["canopy"]) {
-            auto canopyNode = matNode["canopy"];
-            if (canopyNode["tint"]) {
-                auto tint = canopyNode["tint"];
-                def.magitechMaterials.canopy.tint = {tint[0].as<float>(), tint[1].as<float>(), tint[2].as<float>(), tint[3].as<float>()};
-            }
-            if (canopyNode["transparency"]) {
-                def.magitechMaterials.canopy.transparency = canopyNode["transparency"].as<float>();
-            }
+
+        auto& canopy = def.magitechMaterials.canopy;
+        if (const ojson* c = child(*mat, "canopy")) {
+            const std::string ctx = "magitechMaterials.canopy";
+            readTint(*c, "tint", canopy.tint, ctx);
+            readFloat(*c, "transparency", canopy.transparency, ctx);
+            readFloat(*c, "reflectivity", canopy.reflectivity, ctx);
+            readBool(*c, "enableScratches", canopy.enableScratches, ctx);
+            readFloat(*c, "scratchDensity", canopy.scratchDensity, ctx);
         }
     }
-    
+
     // Parse animations
-    if (node["animations"]) {
-        for (const auto& animNode : node["animations"]) {
+    if (const ojson* anims = child(node, "animations")) {
+        if (!anims->is_array()) fieldError("animations", "a list");
+        for (size_t i = 0; i < anims->size(); ++i) {
+            const ojson& a = (*anims)[i];
+            const std::string ctx = "animations[" + std::to_string(i) + "]";
+            if (!a.is_object()) fieldError(ctx, "a mapping");
             AnimationDefinition anim;
-            anim.id = animNode["id"].as<std::string>();
-            anim.path = animNode["path"].as<std::string>();
-            anim.speed = animNode["speed"].as<float>();
-            anim.loop = animNode["loop"].as<bool>();
-            
-            // Parse animation type
-            std::string typeStr = animNode["type"].as<std::string>();
-            if (typeStr == "walk") anim.type = AnimationType::WALK;
-            else if (typeStr == "trot") anim.type = AnimationType::TROT;
-            else if (typeStr == "gallop") anim.type = AnimationType::GALLOP;
-            else if (typeStr == "cockpit_open") anim.type = AnimationType::COCKPIT_OPEN;
-            else if (typeStr == "cockpit_close") anim.type = AnimationType::COCKPIT_CLOSE;
-            else if (typeStr == "pilot_entry") anim.type = AnimationType::PILOT_ENTRY;
-            else if (typeStr == "pilot_exit") anim.type = AnimationType::PILOT_EXIT;
-            else if (typeStr == "idle") anim.type = AnimationType::IDLE;
-            else if (typeStr == "attack") anim.type = AnimationType::ATTACK;
-            else if (typeStr == "defend") anim.type = AnimationType::DEFEND;
-            
+            readString(a, "id", anim.id, ctx);
+            readString(a, "path", anim.path, ctx);
+            readFloat(a, "speed", anim.speed, ctx);
+            readBool(a, "loop", anim.loop, ctx);
+            readFloat(a, "blendTime", anim.blendTime, ctx);
+            readFloat(a, "gaitPhase", anim.gaitPhase, ctx);
+            readFloat(a, "strideLength", anim.strideLength, ctx);
+            readFloat(a, "legLift", anim.legLift, ctx);
+
+            std::string typeStr = anim.id;
+            readString(a, "type", typeStr, ctx);
+            if (auto type = animationTypeFromString(typeStr)) {
+                anim.type = *type;
+            } else {
+                Log::warn(kLogCategory, "Animation '{}' has unknown type '{}'; using idle", anim.id, typeStr);
+            }
+
             def.animations.push_back(anim);
         }
     }
-    
+
     // Parse physics
-    if (node["physics"]) {
-        auto physicsNode = node["physics"];
-        def.physics.totalMass = physicsNode["totalMass"].as<float>();
-        
-        if (physicsNode["moduleMass"]) {
-            for (const auto& massNode : physicsNode["moduleMass"]) {
-                std::string moduleId = massNode.first.as<std::string>();
-                float mass = massNode.second.as<float>();
-                def.physics.moduleMass[moduleId] = mass;
+    if (const ojson* physics = child(node, "physics")) {
+        readFloat(*physics, "totalMass", def.physics.totalMass, "physics");
+        readBool(*physics, "enableCCD", def.physics.enableCCD, "physics");
+        readFloat(*physics, "collisionMargin", def.physics.collisionMargin, "physics");
+
+        if (const ojson* masses = child(*physics, "moduleMass")) {
+            if (!masses->is_object()) fieldError("physics.moduleMass", "a mapping");
+            for (auto it = masses->begin(); it != masses->end(); ++it) {
+                if (!it.value().is_number()) fieldError("physics.moduleMass." + it.key(), "a number");
+                def.physics.moduleMass[it.key()] = it.value().get<float>();
             }
         }
-        
-        if (physicsNode["jointLimits"]) {
-            for (const auto& jointNode : physicsNode["jointLimits"]) {
-                std::string jointName = jointNode.first.as<std::string>();
+
+        if (const ojson* joints = child(*physics, "jointLimits")) {
+            if (!joints->is_object()) fieldError("physics.jointLimits", "a mapping");
+            for (auto it = joints->begin(); it != joints->end(); ++it) {
+                const std::string ctx = "physics.jointLimits." + it.key();
                 JointLimit limit;
-                
-                if (jointNode.second["swing"]) {
-                    auto swing = jointNode.second["swing"];
-                    limit.swing = {swing[0].as<float>(), swing[1].as<float>()};
-                }
-                if (jointNode.second["twist"]) {
-                    auto twist = jointNode.second["twist"];
-                    limit.twist = {twist[0].as<float>(), twist[1].as<float>()};
-                }
-                
-                def.physics.jointLimits[jointName] = limit;
+                readVec<2>(it.value(), "swing", limit.swing, ctx);
+                readVec<2>(it.value(), "twist", limit.twist, ctx);
+                readFloat(it.value(), "damping", limit.damping, ctx);
+                readFloat(it.value(), "friction", limit.friction, ctx);
+                def.physics.jointLimits[it.key()] = limit;
             }
         }
     }
-    
+
     // Parse LODs
-    if (node["lods"]) {
-        for (const auto& lodNode : node["lods"]) {
+    if (const ojson* lods = child(node, "lods")) {
+        if (!lods->is_array()) fieldError("lods", "a list");
+        for (size_t i = 0; i < lods->size(); ++i) {
+            const ojson& l = (*lods)[i];
+            const std::string ctx = "lods[" + std::to_string(i) + "]";
             LODDefinition lod;
-            std::string qualityStr = lodNode["quality"].as<std::string>();
-            if (qualityStr == "high") lod.quality = LODQuality::HIGH;
-            else if (qualityStr == "medium") lod.quality = LODQuality::MEDIUM;
-            else if (qualityStr == "low") lod.quality = LODQuality::LOW;
-            else if (qualityStr == "ultra_low") lod.quality = LODQuality::ULTRA_LOW;
-            
-            lod.meshDecimate = lodNode["meshDecimate"].as<float>();
-            lod.materialDetail = lodNode["materialDetail"].as<float>();
-            lod.maxBones = lodNode["maxBones"].as<int>();
-            lod.enableMorphTargets = lodNode["enableMorphTargets"].as<bool>();
-            
+            std::string qualityStr = "high";
+            readString(l, "quality", qualityStr, ctx);
+            if (auto quality = lodQualityFromString(qualityStr)) {
+                lod.quality = *quality;
+            } else {
+                throw std::runtime_error("QuadMech definition: unknown LOD quality '" + qualityStr + "' in " + ctx);
+            }
+
+            readFloat(l, "meshDecimate", lod.meshDecimate, ctx);
+            readFloat(l, "materialDetail", lod.materialDetail, ctx);
+            readInt(l, "maxBones", lod.maxBones, ctx);
+            readBool(l, "enableMorphTargets", lod.enableMorphTargets, ctx);
+
             def.lods.push_back(lod);
         }
     }
-    
+
+    // Tags
+    if (const ojson* tags = child(node, "tags")) {
+        if (!tags->is_array()) fieldError("tags", "a list");
+        for (size_t i = 0; i < tags->size(); ++i) {
+            def.tags.push_back(scalarToString((*tags)[i], "tags[" + std::to_string(i) + "]"));
+        }
+    }
+
     return def;
+}
+
+std::string serializeDefinition(const QuadMechDefinition& def) {
+    ojson root = ojson::object();
+    root["name"] = def.name;
+    root["version"] = def.version;
+    root["author"] = def.author;
+    root["description"] = def.description;
+
+    ojson modules = ojson::object();
+    for (const auto& m : def.modules) {
+        ojson j = ojson::object();
+        j["type"] = toString(m.type);
+        j["mesh"] = m.meshPath;
+        j["attachBone"] = m.attachBone;
+        j["offset"] = vecToJson(m.offset);
+        j["scale"] = vecToJson(m.scale);
+        j["rotation"] = vecToJson(m.rotation);
+        j["mass"] = m.mass;
+        j["inertia"] = vecToJson(m.inertia);
+        if (!m.materialOverride.empty()) j["materialOverride"] = m.materialOverride;
+        modules[m.id] = std::move(j);
+    }
+    root["modules"] = std::move(modules);
+
+    ojson cockpit = ojson::object();
+    cockpit["seatPosition"] = vecToJson(def.cockpit.seatPosition);
+    cockpit["canopyTint"] = vecToJson(def.cockpit.canopyTint);
+    cockpit["canopyMaterial"] = def.cockpit.canopyMaterial;
+    cockpit["transparency"] = def.cockpit.transparency;
+    cockpit["enableHologram"] = def.cockpit.enableHologram;
+    ojson anchors = ojson::array();
+    for (const auto& p : def.cockpit.hudAnchorPoints) anchors.push_back(vecToJson(p));
+    cockpit["hudAnchorPoints"] = std::move(anchors);
+    root["cockpit"] = std::move(cockpit);
+
+    const auto& runes = def.magitechMaterials.energyRunes;
+    const auto& core = def.magitechMaterials.energyCore;
+    const auto& canopy = def.magitechMaterials.canopy;
+    root["magitechMaterials"] = {
+        {"energyRunes", {
+            {"emissiveColor", vecToJson(runes.emissiveColor)},
+            {"glowIntensity", {{"min", runes.glowIntensity.x}, {"max", runes.glowIntensity.y}}},
+            {"animationRate", runes.animationRate},
+            {"pulseFrequency", runes.pulseFrequency},
+            {"enableFlicker", runes.enableFlicker},
+            {"flickerIntensity", runes.flickerIntensity}}},
+        {"energyCore", {
+            {"coreColor", vecToJson(core.coreColor)},
+            {"energyLevel", core.energyLevel},
+            {"pulseRate", core.pulseRate},
+            {"enableArcs", core.enableArcs},
+            {"arcIntensity", core.arcIntensity},
+            {"arcCount", core.arcCount}}},
+        {"canopy", {
+            {"tint", vecToJson(canopy.tint)},
+            {"transparency", canopy.transparency},
+            {"reflectivity", canopy.reflectivity},
+            {"enableScratches", canopy.enableScratches},
+            {"scratchDensity", canopy.scratchDensity}}}
+    };
+
+    ojson anims = ojson::array();
+    for (const auto& a : def.animations) {
+        anims.push_back({
+            {"id", a.id}, {"type", toString(a.type)}, {"path", a.path},
+            {"speed", a.speed}, {"loop", a.loop}, {"blendTime", a.blendTime},
+            {"gaitPhase", a.gaitPhase}, {"strideLength", a.strideLength}, {"legLift", a.legLift}});
+    }
+    root["animations"] = std::move(anims);
+
+    ojson physics = ojson::object();
+    physics["totalMass"] = def.physics.totalMass;
+    ojson masses = ojson::object();
+    for (const auto& k : sortedKeys(def.physics.moduleMass)) masses[k] = def.physics.moduleMass.at(k);
+    physics["moduleMass"] = std::move(masses);
+    ojson joints = ojson::object();
+    for (const auto& k : sortedKeys(def.physics.jointLimits)) {
+        const JointLimit& l = def.physics.jointLimits.at(k);
+        joints[k] = {{"swing", vecToJson(l.swing)}, {"twist", vecToJson(l.twist)},
+                     {"damping", l.damping}, {"friction", l.friction}};
+    }
+    physics["jointLimits"] = std::move(joints);
+    physics["enableCCD"] = def.physics.enableCCD;
+    physics["collisionMargin"] = def.physics.collisionMargin;
+    root["physics"] = std::move(physics);
+
+    ojson lods = ojson::array();
+    for (const auto& l : def.lods) {
+        lods.push_back({
+            {"quality", toString(l.quality)}, {"meshDecimate", l.meshDecimate},
+            {"materialDetail", l.materialDetail}, {"maxBones", l.maxBones},
+            {"enableMorphTargets", l.enableMorphTargets}});
+    }
+    root["lods"] = std::move(lods);
+    root["tags"] = def.tags;
+
+    return root.dump(2);
 }
 
 bool validateDefinition(const QuadMechDefinition& def) {
     LOG_QUAD_MECH(ValidatingDefinition, def.name);
-    
+
     // Check basic requirements
     if (def.name.empty()) {
         Log::error("QuadMech definition must have a name");
         return false;
     }
-    
+
     if (def.modules.empty()) {
         Log::error("QuadMech definition must have at least one module");
         return false;
     }
-    
+
     // Check for required modules
     bool hasChassis = false;
     bool hasLegs = false;
-    
+
     for (const auto& module : def.modules) {
         if (module.id == "chassis") hasChassis = true;
         if (module.id.find("leg") != std::string::npos) hasLegs = true;
-        
+
         if (module.meshPath.empty()) {
-            Log::error("Module {} must have a mesh path", module.id);
+            Log::error(kLogCategory, "Module {} must have a mesh path", module.id);
             return false;
         }
-        
+
         if (module.attachBone.empty()) {
-            Log::error("Module {} must have an attach bone", module.id);
+            Log::error(kLogCategory, "Module {} must have an attach bone", module.id);
             return false;
         }
     }
-    
+
     if (!hasChassis) {
         Log::error("QuadMech must have a chassis module");
         return false;
     }
-    
+
     if (!hasLegs) {
         Log::error("QuadMech must have leg modules");
         return false;
     }
-    
+
     // Validate physics
     if (def.physics.totalMass <= 0) {
         Log::error("Total mass must be positive");
         return false;
     }
-    
+
     // Validate animations
     for (const auto& anim : def.animations) {
         if (anim.path.empty()) {
-            Log::error("Animation {} must have a path", anim.id);
+            Log::error(kLogCategory, "Animation {} must have a path", anim.id);
             return false;
         }
     }
-    
-    Log::info("QuadMech definition validation passed for: {}", def.name);
+
+    Log::info(kLogCategory, "QuadMech definition validation passed for: {}", def.name);
     return true;
 }
 
@@ -281,16 +593,16 @@ std::vector<ModuleEntry> assembleModules(const QuadMechDefinition& def, LODQuali
             
             // In real implementation, this would load the actual mesh
             // For now, we create placeholder handles
-            static uint32_t nextMeshHandle = 1000;
+            static std::atomic<uint32_t> nextMeshHandle{1000};
             entry.lodMeshes[i] = nextMeshHandle++;
             
             // Load material for this LOD
-            static uint32_t nextMaterialHandle = 2000;
+            static std::atomic<uint32_t> nextMaterialHandle{2000};
             entry.lodMaterials[i] = nextMaterialHandle++;
         }
         
         // Create physics body
-        static uint32_t nextPhysicsHandle = 3000;
+        static std::atomic<uint32_t> nextPhysicsHandle{3000};
         entry.physicsBody = nextPhysicsHandle++;
         
         // Calculate transform from module definition
@@ -319,7 +631,7 @@ SkeletonHandle buildSkeleton(const QuadMechDefinition& def) {
     // Root -> Spine -> Hip_BL -> Thigh_BL -> Shin_BL -> Foot_BL
     // Root -> Spine -> Hip_BR -> Thigh_BR -> Shin_BR -> Foot_BR
     
-    static uint32_t nextSkeletonHandle = 4000;
+    static std::atomic<uint32_t> nextSkeletonHandle{4000};
     SkeletonHandle skeleton = nextSkeletonHandle++;
     
     // In real implementation, this would create the actual bone hierarchy
@@ -345,7 +657,7 @@ MaterialHandle createEnergyRunesMaterial(const EnergyRunes& runes) {
     // - Noise-based flicker effect
     // - Animated glow patterns
     
-    static uint32_t nextMaterialHandle = 5000;
+    static std::atomic<uint32_t> nextMaterialHandle{5000};
     MaterialHandle material = nextMaterialHandle++;
     
     return material;
@@ -360,7 +672,7 @@ MaterialHandle createEnergyCoreMaterial(const EnergyCore& core) {
     // - Energy arc effects
     // - Dynamic intensity based on energy level
     
-    static uint32_t nextMaterialHandle = 6000;
+    static std::atomic<uint32_t> nextMaterialHandle{6000};
     MaterialHandle material = nextMaterialHandle++;
     
     return material;
@@ -375,7 +687,7 @@ MaterialHandle createCanopyMaterial(const CanopyMaterial& canopy) {
     // - Reflectivity
     // - Optional scratch effects
     
-    static uint32_t nextMaterialHandle = 7000;
+    static std::atomic<uint32_t> nextMaterialHandle{7000};
     MaterialHandle material = nextMaterialHandle++;
     
     return material;
@@ -391,7 +703,7 @@ std::vector<MaterialHandle> generateLODMaterials(const MagitechMaterials& materi
         LODQuality lodQuality = static_cast<LODQuality>(i);
         
         // Create simplified versions for lower LODs
-        static uint32_t nextLODMaterialHandle = 8000;
+        static std::atomic<uint32_t> nextLODMaterialHandle{8000};
         MaterialHandle lodMaterial = nextLODMaterialHandle++;
         
         lodMaterials.push_back(lodMaterial);
@@ -418,7 +730,7 @@ AnimationHandle retargetAnimation(const std::string& path, const SkeletonHandle&
     // - Adjust timing for quadraped locomotion
     // - Apply gait-specific modifications
     
-    static uint32_t nextAnimationHandle = 9000;
+    static std::atomic<uint32_t> nextAnimationHandle{9000};
     AnimationHandle animation = nextAnimationHandle++;
     
     return animation;
@@ -454,7 +766,7 @@ PhysicsBodyHandle createModulePhysics(const ModuleDefinition& module, float mass
     // - Set mass and inertia
     // - Configure physics properties
     
-    static uint32_t nextPhysicsHandle = 10000;
+    static std::atomic<uint32_t> nextPhysicsHandle{10000};
     PhysicsBodyHandle body = nextPhysicsHandle++;
     
     return body;
@@ -508,7 +820,7 @@ MeshHandle generateLODMesh(const MeshHandle& original, LODQuality quality, float
     // - Preserve important features
     // - Optimize for rendering performance
     
-    static uint32_t nextLODMeshHandle = 11000;
+    static std::atomic<uint32_t> nextLODMeshHandle{11000};
     MeshHandle lodMesh = nextLODMeshHandle++;
     
     return lodMesh;
@@ -523,7 +835,7 @@ MaterialHandle generateLODMaterial(const MaterialHandle& original, LODQuality qu
     // - Simplify shader complexity
     // - Remove expensive effects for lower LODs
     
-    static uint32_t nextLODMaterialHandle = 12000;
+    static std::atomic<uint32_t> nextLODMaterialHandle{12000};
     MaterialHandle lodMaterial = nextLODMaterialHandle++;
     
     return lodMaterial;
@@ -550,76 +862,114 @@ std::array<MeshHandle, 4> generateAllLODs(const MeshHandle& original, const std:
 
 namespace PackageWriter {
 
+namespace {
+
+bool writeBinary(const std::filesystem::path& path, const void* data, size_t size) {
+    std::filesystem::create_directories(path.parent_path());
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out.is_open()) {
+        Log::error(kLogCategory, "Failed to write package file: {}", path.string());
+        return false;
+    }
+    out.write(static_cast<const char*>(data), static_cast<std::streamsize>(size));
+    return static_cast<bool>(out);
+}
+
+template<typename T>
+bool writeValue(const std::filesystem::path& path, const T& value) {
+    static_assert(std::is_trivially_copyable_v<T>);
+    return writeBinary(path, &value, sizeof(T));
+}
+
+// Mesh payload: the module's mesh handle for this LOD followed by its transform.
+struct MeshRecord {
+    MeshHandle mesh = 0;
+    glm::mat4 transform = glm::mat4(1.0f);
+};
+
+} // namespace
+
 bool writeMechPackage(const QuadMechAsset& asset, const std::string& outputPath) {
     LOG_QUAD_MECH(WritingMechPackage, outputPath);
-    
-    // Write mech package to disk
-    // This would:
-    // - Serialize all meshes, materials, animations
-    // - Write physics data
-    // - Create package structure
-    // - Compress and optimize
-    
-    // Create package directory structure
-    std::filesystem::create_directories(outputPath);
-    
-    // Write metadata
-    std::ofstream metadataFile(outputPath + "/metadata.json");
-    if (metadataFile.is_open()) {
-        metadataFile << "{\n";
-        metadataFile << "  \"name\": \"" << asset.definition.name << "\",\n";
-        metadataFile << "  \"version\": \"" << asset.definition.version << "\",\n";
-        metadataFile << "  \"hashKey\": " << asset.hashKey << "\n";
-        metadataFile << "}\n";
-        metadataFile.close();
+
+    // Package layout (see createPackageStructure):
+    //   metadata.json, definition.yaml, skeleton/, meshes/<lod>/, materials/<lod>/,
+    //   animations/, physics/
+    std::error_code ec;
+    std::filesystem::create_directories(outputPath, ec);
+    if (ec) {
+        Log::error(kLogCategory, "Cannot create package directory {}: {}", outputPath, ec.message());
+        return false;
     }
-    
-    // Write LOD-specific data
-    for (const auto& modulePair : asset.modules) {
-        const std::string& moduleId = modulePair.first;
-        const ModuleEntry& module = modulePair.second;
-        
-        for (int i = 0; i < 4; ++i) {
-            LODQuality quality = static_cast<LODQuality>(i);
-            std::string qualityStr;
-            switch (quality) {
-                case LODQuality::HIGH: qualityStr = "high"; break;
-                case LODQuality::MEDIUM: qualityStr = "medium"; break;
-                case LODQuality::LOW: qualityStr = "low"; break;
-                case LODQuality::ULTRA_LOW: qualityStr = "ultra_low"; break;
-            }
-            
-            // Write mesh data
-            std::string meshPath = outputPath + "/meshes/" + qualityStr + "/" + moduleId + ".bin";
-            std::filesystem::create_directories(std::filesystem::path(meshPath).parent_path());
-            
-            // Write material data
-            std::string materialPath = outputPath + "/materials/" + qualityStr + "/" + moduleId + ".mat";
-            std::filesystem::create_directories(std::filesystem::path(materialPath).parent_path());
+    const MechPackage layout = createPackageStructure(asset.definition.name, outputPath);
+    bool ok = true;
+
+    // Write metadata
+    {
+        ojson metadata = ojson::object();
+        metadata["name"] = asset.definition.name;
+        metadata["version"] = asset.definition.version;
+        metadata["hashKey"] = asset.hashKey();
+        ojson moduleIds = ojson::array();
+        for (const auto& m : asset.definition.modules) moduleIds.push_back(m.id);
+        metadata["modules"] = std::move(moduleIds);
+        ojson animIds = ojson::array();
+        for (const auto& [id, handle] : asset.animations) animIds.push_back(id);
+        metadata["animations"] = std::move(animIds);
+
+        std::ofstream metadataFile(layout.metadataPath, std::ios::trunc);
+        if (metadataFile.is_open()) {
+            metadataFile << metadata.dump(2) << "\n";
+        } else {
+            Log::error(kLogCategory, "Failed to write metadata: {}", layout.metadataPath);
+            ok = false;
         }
     }
-    
-    // Write skeleton
-    std::string skeletonPath = outputPath + "/skeleton/skeleton.bin";
-    std::filesystem::create_directories(std::filesystem::path(skeletonPath).parent_path());
-    
-    // Write animations
-    for (const auto& animPair : asset.animations) {
-        std::string animPath = outputPath + "/animations/" + animPair.first + ".anim";
-        std::filesystem::create_directories(std::filesystem::path(animPath).parent_path());
+
+    // Write the source definition so the package can be regenerated / reloaded
+    {
+        std::ofstream definitionFile(layout.definitionPath, std::ios::trunc);
+        if (definitionFile.is_open()) {
+            definitionFile << DefinitionParser::serializeDefinition(asset.definition) << "\n";
+        } else {
+            Log::error(kLogCategory, "Failed to write definition: {}", layout.definitionPath);
+            ok = false;
+        }
     }
-    
+
+    // Write LOD-specific data
+    for (const auto& [moduleId, module] : asset.modules) {
+        for (int i = 0; i < 4; ++i) {
+            const LODQuality quality = static_cast<LODQuality>(i);
+
+            MeshRecord record;
+            record.mesh = module.lodMeshes[i];
+            record.transform = module.transform;
+            ok &= writeValue(layout.meshPaths.at(quality) + moduleId + ".bin", record);
+            ok &= writeValue(layout.materialPaths.at(quality) + moduleId + ".mat", module.lodMaterials[i]);
+        }
+    }
+
+    // Write skeleton
+    ok &= writeValue(layout.skeletonPath, asset.skeleton);
+
+    // Write animations
+    for (const auto& [animId, handle] : asset.animations) {
+        ok &= writeValue(std::filesystem::path(outputPath) / "animations" / (animId + ".anim"), handle);
+    }
+
     // Write physics data
-    std::string physicsPath = outputPath + "/physics/rig.bin";
-    std::filesystem::create_directories(std::filesystem::path(physicsPath).parent_path());
-    
-    Log::info("Mech package written successfully to: {}", outputPath);
-    return true;
+    ok &= writeValue(layout.physicsPath, asset.rootBody);
+
+    if (ok) {
+        Log::info(kLogCategory, "Mech package written successfully to: {}", outputPath);
+    }
+    return ok;
 }
 
 MechPackage createPackageStructure(const std::string& mechName, const std::string& outputDir) {
     LOG_QUAD_MECH(CreatingPackageStructure, mechName);
-    
+
     MechPackage package;
     package.name = mechName;
     package.version = "1.0.0";
@@ -627,17 +977,16 @@ MechPackage createPackageStructure(const std::string& mechName, const std::strin
     package.skeletonPath = outputDir + "/skeleton/skeleton.bin";
     package.physicsPath = outputDir + "/physics/rig.bin";
     package.metadataPath = outputDir + "/metadata.json";
-    
+
     // Setup LOD paths
-    std::vector<std::string> qualityStrs = {"high", "medium", "low", "ultra_low"};
     for (int i = 0; i < 4; ++i) {
-        LODQuality quality = static_cast<LODQuality>(i);
-        std::string qualityStr = qualityStrs[i];
-        
+        const LODQuality quality = static_cast<LODQuality>(i);
+        const std::string qualityStr = toString(quality);
+
         package.meshPaths[quality] = outputDir + "/meshes/" + qualityStr + "/";
         package.materialPaths[quality] = outputDir + "/materials/" + qualityStr + "/";
     }
-    
+
     return package;
 }
 
@@ -649,87 +998,123 @@ MechPackage createPackageStructure(const std::string& mechName, const std::strin
 
 namespace PackageReader {
 
+namespace {
+
+ojson readJsonFile(const std::string& path) {
+    std::ifstream in(path);
+    if (!in.is_open()) return ojson();
+    ojson j = ojson::parse(in, nullptr, false);
+    return j.is_discarded() ? ojson() : j;
+}
+
+} // namespace
+
 QuadMechAsset readMechPackage(const std::string& packagePath) {
     LOG_QUAD_MECH(ReadingMechPackage, packagePath);
-    
+
     QuadMechAsset asset;
-    
-    // Read metadata
-    std::string metadataPath = packagePath + "/metadata.json";
-    std::ifstream metadataFile(metadataPath);
-    if (metadataFile.is_open()) {
-        // Parse metadata JSON
-        // In real implementation, this would use a JSON parser
+    const MechPackage package = readPackageMetadata(packagePath);
+    std::error_code ec;
+
+    // Restore the definition the package was generated from
+    if (std::filesystem::exists(package.definitionPath, ec)) {
+        std::ifstream definitionFile(package.definitionPath, std::ios::binary);
+        std::string content((std::istreambuf_iterator<char>(definitionFile)), std::istreambuf_iterator<char>());
+        try {
+            asset.definition = DefinitionParser::parseFromYAML(content);
+        } catch (const std::exception& e) {
+            Log::warn(kLogCategory, "Package {} has an unreadable definition: {}", packagePath, e.what());
+        }
     }
-    
+    if (asset.definition.name.empty()) asset.definition.name = package.name;
+    if (!package.version.empty()) asset.definition.version = package.version;
+
     // Read skeleton
-    std::string skeletonPath = packagePath + "/skeleton/skeleton.bin";
-    static uint32_t nextSkeletonHandle = 13000;
+    static std::atomic<uint32_t> nextSkeletonHandle{13000};
     asset.skeleton = nextSkeletonHandle++;
-    
+
     // Read modules for all LODs
-    std::vector<std::string> qualityStrs = {"high", "medium", "low", "ultra_low"};
+    static std::atomic<uint32_t> nextMeshHandle{14000};
+    static std::atomic<uint32_t> nextMaterialHandle{15000};
     for (int i = 0; i < 4; ++i) {
-        LODQuality quality = static_cast<LODQuality>(i);
-        std::string qualityStr = qualityStrs[i];
-        
-        std::string meshDir = packagePath + "/meshes/" + qualityStr + "/";
-        std::string materialDir = packagePath + "/materials/" + qualityStr + "/";
-        
+        const LODQuality quality = static_cast<LODQuality>(i);
+        const std::string& meshDir = package.meshPaths.at(quality);
+        if (!std::filesystem::is_directory(meshDir, ec)) continue;
+
         // Read all module files in this LOD directory
-        for (const auto& entry : std::filesystem::directory_iterator(meshDir)) {
+        for (const auto& entry : std::filesystem::directory_iterator(meshDir, ec)) {
             if (entry.is_regular_file() && entry.path().extension() == ".bin") {
-                std::string moduleId = entry.path().stem().string();
-                
-                ModuleEntry moduleEntry;
-                static uint32_t nextMeshHandle = 14000;
-                static uint32_t nextMaterialHandle = 15000;
-                
+                const std::string moduleId = entry.path().stem().string();
+                ModuleEntry& moduleEntry = asset.modules[moduleId]; // accumulate all LODs per module
+
                 moduleEntry.lodMeshes[i] = nextMeshHandle++;
                 moduleEntry.lodMaterials[i] = nextMaterialHandle++;
-                
-                asset.modules[moduleId] = moduleEntry;
+
+                // Restore the module transform stored after the mesh handle
+                std::ifstream meshFile(entry.path(), std::ios::binary);
+                MeshHandle storedMesh = 0;
+                glm::mat4 transform(1.0f);
+                if (meshFile.read(reinterpret_cast<char*>(&storedMesh), sizeof(storedMesh)) &&
+                    meshFile.read(reinterpret_cast<char*>(&transform), sizeof(transform))) {
+                    moduleEntry.transform = transform;
+                }
             }
         }
     }
-    
+
     // Read animations
-    std::string animDir = packagePath + "/animations/";
-    for (const auto& entry : std::filesystem::directory_iterator(animDir)) {
-        if (entry.is_regular_file() && entry.path().extension() == ".anim") {
-            std::string animId = entry.path().stem().string();
-            static uint32_t nextAnimationHandle = 16000;
-            asset.animations[animId] = nextAnimationHandle++;
+    const std::string animDir = packagePath + "/animations/";
+    static std::atomic<uint32_t> nextAnimationHandle{16000};
+    if (std::filesystem::is_directory(animDir, ec)) {
+        for (const auto& entry : std::filesystem::directory_iterator(animDir, ec)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".anim") {
+                asset.animations[entry.path().stem().string()] = nextAnimationHandle++;
+            }
         }
     }
-    
+
     // Read physics data
-    std::string physicsPath = packagePath + "/physics/rig.bin";
-    static uint32_t nextPhysicsHandle = 17000;
-    asset.rootBody = nextPhysicsHandle++;
-    
+    static std::atomic<uint32_t> nextPhysicsHandle{17000};
+    if (std::filesystem::exists(package.physicsPath, ec)) {
+        asset.rootBody = nextPhysicsHandle++;
+    }
+
     // Create Magitech materials
-    static uint32_t nextMaterialHandle = 18000;
-    asset.energyRunesMaterial = nextMaterialHandle++;
-    asset.energyCoreMaterial = nextMaterialHandle++;
-    asset.canopyMaterial = nextMaterialHandle++;
-    
+    asset.energyRunesMaterial = MaterialSynthesizer::createEnergyRunesMaterial(asset.definition.magitechMaterials.energyRunes);
+    asset.energyCoreMaterial = MaterialSynthesizer::createEnergyCoreMaterial(asset.definition.magitechMaterials.energyCore);
+    asset.canopyMaterial = MaterialSynthesizer::createCanopyMaterial(asset.definition.magitechMaterials.canopy);
+
     return asset;
 }
 
 MechPackage readPackageMetadata(const std::string& packagePath) {
     LOG_QUAD_MECH(ReadingPackageMetadata, packagePath);
-    
-    MechPackage package;
-    
+
+    // Default layout, derived from the package directory name
+    std::string mechName = std::filesystem::path(packagePath).stem().string();
+    MechPackage package = PackageWriter::createPackageStructure(mechName, packagePath);
+    package.version.clear();
+
     // Read metadata from JSON
-    std::string metadataPath = packagePath + "/metadata.json";
-    std::ifstream metadataFile(metadataPath);
-    if (metadataFile.is_open()) {
-        // Parse metadata
-        // In real implementation, this would use a JSON parser
+    const ojson metadata = readJsonFile(package.metadataPath);
+    if (metadata.is_object()) {
+        if (auto it = metadata.find("name"); it != metadata.end() && it->is_string()) package.name = it->get<std::string>();
+        if (auto it = metadata.find("version"); it != metadata.end() && it->is_string()) package.version = it->get<std::string>();
+    } else {
+        Log::warn(kLogCategory, "Package {} has no readable metadata.json", packagePath);
     }
-    
+
+    // Animation files present in the package
+    std::error_code ec;
+    const std::string animDir = packagePath + "/animations/";
+    if (std::filesystem::is_directory(animDir, ec)) {
+        for (const auto& entry : std::filesystem::directory_iterator(animDir, ec)) {
+            if (entry.is_regular_file() && entry.path().extension() == ".anim") {
+                package.animationPaths[entry.path().stem().string()] = entry.path().string();
+            }
+        }
+    }
+
     return package;
 }
 

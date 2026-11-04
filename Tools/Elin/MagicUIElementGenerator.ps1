@@ -41,10 +41,25 @@ param(
     
     [switch]$UseAI,
     
-    [string]$OllamaModel = ""  # Auto-selects based on content (llama3.1:8b for regular, wizardlm-uncensored for taboo)
+    [string]$OllamaModel = "",  # Auto-selects based on content (llama3.1:8b for regular, wizardlm-uncensored for taboo)
+
+    # Accept procedural (PIL) placeholder art when local Stable Diffusion is down or fails.
+    # Default: abort. (AAMT_SD_STRICT=0 in the environment does the same.)
+    [switch]$AllowProcedural
 )
 
 $ErrorActionPreference = "Stop"
+
+# SD policy: procedural placeholder art is never a silent fallback.
+$sdStrict = (-not $AllowProcedural) -and ($env:AAMT_SD_STRICT -ne '0')
+if (-not $sdStrict) { $PSDefaultParameterValues['Invoke-ElinAssetImage:AllowProcedural'] = $true }
+function Assert-ProceduralAllowed {
+    param([Parameter(Mandatory)][string]$What)
+    if ($sdStrict) {
+        throw "$What. Refusing procedural placeholder art - start the SD server (:1338) and retry, or pass -AllowProcedural / set AAMT_SD_STRICT=0."
+    }
+    Write-Host "  [Warn] $What; using procedural placeholder (explicitly allowed)" -ForegroundColor Yellow
+}
 
 # Load shared asset generation settings
 $settingsPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "..\\AssetGenerationSettings.ps1"
@@ -477,7 +492,9 @@ function Generate-UIButton {
             Write-Host "  [OK] UI buttons via local AI pipeline ($SystemName)" -ForegroundColor Green
             return $true
         }
-        Write-Host "  [Info] Local AI buttons incomplete; falling back to procedural PIL..." -ForegroundColor Gray
+        Assert-ProceduralAllowed "Local SD art for UI buttons incomplete"
+    } else {
+        Assert-ProceduralAllowed "Invoke-ElinAssetImage unavailable (ElinAssetRender.psm1 not loaded)"
     }
     
     $pythonScript = @"
@@ -602,7 +619,9 @@ function Generate-UIPanel {
             Write-Host "  [OK] UI panels via local AI pipeline ($SystemName)" -ForegroundColor Green
             return $true
         }
-        Write-Host "  [Info] Local AI panels incomplete; falling back to procedural PIL..." -ForegroundColor Gray
+        Assert-ProceduralAllowed "Local SD art for UI panels incomplete"
+    } else {
+        Assert-ProceduralAllowed "Invoke-ElinAssetImage unavailable (ElinAssetRender.psm1 not loaded)"
     }
     
     $pythonScript = @"
@@ -721,7 +740,9 @@ function Generate-UIFrame {
             Write-Host "  [OK] UI frames via local AI pipeline ($SystemName)" -ForegroundColor Green
             return $true
         }
-        Write-Host "  [Info] Local AI frames incomplete; falling back to procedural PIL..." -ForegroundColor Gray
+        Assert-ProceduralAllowed "Local SD art for UI frames incomplete"
+    } else {
+        Assert-ProceduralAllowed "Invoke-ElinAssetImage unavailable (ElinAssetRender.psm1 not loaded)"
     }
     
     $pythonScript = @"
@@ -838,7 +859,9 @@ function Generate-ProgressBar {
             Write-Host "  [OK] Progress bars via local AI pipeline ($SystemName)" -ForegroundColor Green
             return $true
         }
-        Write-Host "  [Info] Local AI progress bars incomplete; falling back to procedural PIL..." -ForegroundColor Gray
+        Assert-ProceduralAllowed "Local SD art for UI progress bars incomplete"
+    } else {
+        Assert-ProceduralAllowed "Invoke-ElinAssetImage unavailable (ElinAssetRender.psm1 not loaded)"
     }
 
     $config = $script:UIElementConfigs["progressbar"]
@@ -934,7 +957,9 @@ function Generate-UIIcon {
             Write-Host "  [OK] UI icons via local AI pipeline ($SystemName)" -ForegroundColor Green
             return $true
         }
-        Write-Host "  [Info] Local AI icons incomplete; falling back to procedural PIL..." -ForegroundColor Gray
+        Assert-ProceduralAllowed "Local SD art for UI icons incomplete"
+    } else {
+        Assert-ProceduralAllowed "Invoke-ElinAssetImage unavailable (ElinAssetRender.psm1 not loaded)"
     }
     
     $pythonScript = @"
@@ -1029,7 +1054,9 @@ function Generate-UIBadge {
             Write-Host "  [OK] UI badges via local AI pipeline ($SystemName)" -ForegroundColor Green
             return $true
         }
-        Write-Host "  [Info] Local AI badges incomplete; falling back to procedural PIL..." -ForegroundColor Gray
+        Assert-ProceduralAllowed "Local SD art for UI badges incomplete"
+    } else {
+        Assert-ProceduralAllowed "Invoke-ElinAssetImage unavailable (ElinAssetRender.psm1 not loaded)"
     }
     
     $pythonScript = @"

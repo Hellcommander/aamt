@@ -1,78 +1,97 @@
 #include "CentipedeMechFactory.hpp"
 #include "core/Log.hpp"
-#include "agents/GeneratorAgent/AudioAssetTypes.hpp"
+#include "AudioAssetTypes.hpp"
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <cmath>
 #include <random>
 #include <algorithm>
+#include <atomic>
+#include <numbers>
 
 namespace MagiTech {
 namespace CentipedeMechs {
 
-#define LOG_MECH_GEN(Action, Id) Log::info("CentipedeMechGen - {}: {}", #Action, Id)
+#define LOG_MECH_GEN(Action, Id) Log::info("CentipedeMechGen", "{}: {}", #Action, Id)
 
-// Hash function implementations
+// Hash function implementations. Fields are hashed one by one (never the raw
+// struct bytes, which would include padding and std::string internals).
+namespace {
+    template <typename T>
+    void hashValue(XXH64_state_t& s, const T& v) { XXH64_update(&s, &v, sizeof(T)); }
+    void hashValue(XXH64_state_t& s, const std::string& v) {
+        const uint64_t len = v.size();
+        XXH64_update(&s, &len, sizeof(len));
+        XXH64_update(&s, v.data(), v.size());
+    }
+    template <typename... Ts>
+    uint64_t hashFields(const Ts&... fields) {
+        XXH64_state_t s;
+        XXH64_reset(&s, 0);
+        (hashValue(s, fields), ...);
+        return XXH64_digest(&s);
+    }
+}
+
 uint64_t MechParams::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(MechParams) - sizeof(std::string));
-    XXH64_update(&s, id.c_str(), id.length());
-    return XXH64_digest(&s);
+    return hashFields(id, segmentCount, segmentLength, segmentRadius,
+                      baseColor.r, baseColor.g, baseColor.b, baseColor.a, seamlessJoints);
 }
 uint64_t LegParams::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(LegParams) - sizeof(std::string));
-    XXH64_update(&s, footType.c_str(), footType.length());
-    return XXH64_digest(&s);
+    return hashFields(legsPerSegment, upperLegLength, lowerLegLength, jointRadius, armorPlates, footType);
 }
 uint64_t CockpitParams::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(CockpitParams) - 2 * sizeof(std::string));
-    XXH64_update(&s, seatMaterial.c_str(), seatMaterial.length());
-    XXH64_update(&s, controlStyle.c_str(), controlStyle.length());
-    return XXH64_digest(&s);
+    return hashFields(hasCockpit, cockpitPosition.x, cockpitPosition.y, cockpitPosition.z,
+                      width, height, depth, enableDisplays, displayCount, seatMaterial, controlStyle);
 }
-uint64_t HardpointParams::hashKey() const { return XXH64(this, sizeof(HardpointParams), 0); }
+uint64_t HardpointParams::hashKey() const {
+    return hashFields(missileTubes, autocannonSlots, enableTurret, enableRadarArray, radarRange);
+}
+
+// ============================================================================
+// PRIMITIVE MESH UTILITIES - shared by every generator stage below
+// ============================================================================
+
+// Primitive mesh generation utilities. Generator stages run concurrently, so
+// the handle counters are atomic.
+struct Primitive {
+    static MeshHandle cylinder(float radius, float length, int segments = 16) {
+        LOG_MECH_GEN(CreatingCylinder, radius);
+        static std::atomic<uint32_t> nextHandle{1000};
+        return nextHandle++;
+    }
+
+    static MeshHandle sphere(float radius, int segments = 16) {
+        LOG_MECH_GEN(CreatingSphere, radius);
+        static std::atomic<uint32_t> nextHandle{2000};
+        return nextHandle++;
+    }
+
+    static MeshHandle capsule(float radius, float length) {
+        LOG_MECH_GEN(CreatingCapsule, radius);
+        static std::atomic<uint32_t> nextHandle{3000};
+        return nextHandle++;
+    }
+
+    static MeshHandle box(float width, float height, float depth) {
+        LOG_MECH_GEN(CreatingBox, width);
+        static std::atomic<uint32_t> nextHandle{4000};
+        return nextHandle++;
+    }
+
+    static MeshHandle plane(float width, float height) {
+        LOG_MECH_GEN(CreatingPlane, width);
+        static std::atomic<uint32_t> nextHandle{5000};
+        return nextHandle++;
+    }
+};
 
 // ============================================================================
 // SEGMENT GENERATION - Multi-segment body with seamless joints
 // ============================================================================
 
 namespace SegmentGen {
-    // Primitive mesh generation utilities
-    struct Primitive {
-        static MeshHandle cylinder(float radius, float length, int segments = 16) {
-            LOG_MECH_GEN(CreatingCylinder, radius);
-            static uint32_t nextHandle = 1000;
-            return nextHandle++;
-        }
-        
-        static MeshHandle sphere(float radius, int segments = 16) {
-            LOG_MECH_GEN(CreatingSphere, radius);
-            static uint32_t nextHandle = 2000;
-            return nextHandle++;
-        }
-        
-        static MeshHandle capsule(float radius, float length) {
-            LOG_MECH_GEN(CreatingCapsule, radius);
-            static uint32_t nextHandle = 3000;
-            return nextHandle++;
-        }
-        
-        static MeshHandle box(float width, float height, float depth) {
-            LOG_MECH_GEN(CreatingBox, width);
-            static uint32_t nextHandle = 4000;
-            return nextHandle++;
-        }
-        
-        static MeshHandle plane(float width, float height) {
-            LOG_MECH_GEN(CreatingPlane, width);
-            static uint32_t nextHandle = 5000;
-            return nextHandle++;
-        }
-    };
-    
     std::vector<MeshHandle> buildSegments(const MechParams& m, const LegParams& l) {
         LOG_MECH_GEN(BuildingSegments, m.id);
         std::vector<MeshHandle> segs;
@@ -91,7 +110,7 @@ namespace SegmentGen {
             
             // Add leg attachment points
             for(int leg = 0; leg < l.legsPerSegment; ++leg) {
-                float angle = (2.0f * M_PI * leg) / l.legsPerSegment;
+                float angle = (2.0f * std::numbers::pi_v<float> * leg) / l.legsPerSegment;
                 float x = m.segmentRadius * std::cos(angle);
                 float z = m.segmentRadius * std::sin(angle);
                 
@@ -169,7 +188,7 @@ namespace LegGen {
             foot = Primitive::sphere(p.jointRadius);
         }
         
-        static uint32_t nextHandle = 6000;
+        static std::atomic<uint32_t> nextHandle{6000};
         return nextHandle++;
     }
     
@@ -226,7 +245,7 @@ namespace CockpitGen {
             controls = Primitive::box(0.2f, 0.1f, 0.1f);
         }
         
-        static uint32_t nextHandle = 7000;
+        static std::atomic<uint32_t> nextHandle{7000};
         return nextHandle++;
     }
 }
@@ -257,7 +276,7 @@ namespace WeaponGen {
             auto turretBarrel = Primitive::cylinder(0.05f, 1.5f);
         }
         
-        static uint32_t nextHandle = 8000;
+        static std::atomic<uint32_t> nextHandle{8000};
         return nextHandle++;
     }
 }
@@ -281,7 +300,7 @@ namespace SensorGen {
         // Create range indicator (visual representation)
         auto rangeIndicator = Primitive::sphere(range * 0.01f); // Scaled for visualization
         
-        static uint32_t nextHandle = 9000;
+        static std::atomic<uint32_t> nextHandle{9000};
         return nextHandle++;
     }
 }
@@ -315,7 +334,7 @@ namespace MaterialGen {
         auto weaponMaterial = base * 0.5f;
         weaponMaterial.a = 1.0f;
         
-        static uint32_t nextHandle = 10000;
+        static std::atomic<uint32_t> nextHandle{10000};
         return nextHandle++;
     }
 }
@@ -345,7 +364,7 @@ namespace VFXGen {
         // Create explosion effects
         auto explosionEffect = Primitive::sphere(1.0f);
         
-        static uint32_t nextHandle = 11000;
+        static std::atomic<uint32_t> nextHandle{11000};
         return nextHandle++;
     }
 }
@@ -383,7 +402,7 @@ namespace AudioGen {
         // - Armor damage
         // - System failure alarms
         
-        static uint32_t nextHandle = 12000;
+        static std::atomic<uint32_t> nextHandle{12000};
         return nextHandle++;
     }
 }
@@ -422,7 +441,7 @@ namespace CollisionGen {
         // Enable continuous collision detection for fast-moving parts
         bool enableCCD = true;
         
-        static uint32_t nextHandle = 13000;
+        static std::atomic<uint32_t> nextHandle{13000};
         return nextHandle++;
     }
 }

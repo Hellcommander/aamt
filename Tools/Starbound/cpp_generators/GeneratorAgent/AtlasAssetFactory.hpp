@@ -2,6 +2,7 @@
 #include <future>
 #include <vector>
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "core/ConcurrentLRU.hpp"
 #include "AtlasAssetTypes.hpp"
 
@@ -29,8 +30,8 @@ namespace LODGen {
 }
 
 class AtlasAssetFactory {
-    ConcurrentLRU<uint64_t, AtlasBundle> m_cache;
-    ThreadPool m_pool;
+    ConcurrentLRUCache<uint64_t, AtlasBundle> m_cache;
+    GeneratorTaskPool m_pool;
     bool m_initialized = false;
 
 public:

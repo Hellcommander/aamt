@@ -1,6 +1,7 @@
 #pragma once
 #include <future>
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "SnakeSpellTypes.hpp"
 
 namespace MagiTech {
@@ -27,7 +28,7 @@ namespace CollisionGen {
 }
 
 class SnakeSpellFactory {
-    std::unique_ptr<MultithreadBusPlugin> m_pool;
+    std::unique_ptr<GeneratorTaskPool> m_pool;
     bool m_initialized = false;
 
 public:

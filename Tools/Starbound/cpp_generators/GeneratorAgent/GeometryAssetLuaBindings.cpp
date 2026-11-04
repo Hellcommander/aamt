@@ -1,10 +1,39 @@
 #include "GeometryAssetLuaBindings.hpp"
 #include "GeometryAssetFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <vector>
 
 namespace MagiTech {
 namespace Geometry {
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<GeometryAssetFactory>& factorySlot() {
+    static std::shared_ptr<GeometryAssetFactory> f;
+    return f;
+}
+} // namespace
+
+void GeometryAssetLuaBindings::setFactory(std::shared_ptr<GeometryAssetFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<GeometryAssetFactory> GeometryAssetLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<GeometryAssetFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 static std::vector<std::pair<std::future<GeometryBundle>, std::string>> pendingGeometry;
 
@@ -28,14 +57,14 @@ void GeometryAssetLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<BooleanParams>("BooleanParams", sol::constructors<BooleanParams()>(),
         "type", &BooleanParams::type, "op", &BooleanParams::op, "meshA", &BooleanParams::meshA, "meshB", &BooleanParams::meshB);
 
-    lua.new_usertype<LODParams>("LODParams", sol::constructors<LODParams()>(),
+    lua.new_usertype<LODParams>("GeometryLODParams", sol::constructors<LODParams()>(),
         "screenSizes", &LODParams::screenSizes, "simplificationFactors", &LODParams::simplificationFactors);
 
     lua.new_usertype<GeometryBundle>("GeometryBundle", sol::no_constructor,
         "meshes", &GeometryBundle::meshes, "lod", &GeometryBundle::lod);
 
     lua.set_function("spawn_geometry_asset",
-        [&](sol::table requests_table, const LODParams& lp) {
+        [](sol::table requests_table, const LODParams& lp) {
             std::vector<GeometryRequest> requests;
             for (const auto& kv : requests_table) {
                 sol::table req = kv.second.as<sol::table>();
@@ -46,7 +75,7 @@ void GeometryAssetLuaBindings::bind(sol::state& lua) {
                 else if (type == GeometryType::Surface) requests.push_back(req.as<SurfaceParams>());
                 else if (type == GeometryType::Boolean) requests.push_back(req.as<BooleanParams>());
             }
-            auto factory = MainPlugin::instance().getGeometryAssetFactory();
+            auto factory = GeometryAssetLuaBindings::factory();
             pendingGeometry.emplace_back(factory->generateAsync(requests, lp), "GeometryAsset");
         }
     );
@@ -58,7 +87,7 @@ void GeometryAssetLuaBindings::poll_assets(sol::state& lua) {
             try {
                 auto b = it->first.get();
                 lua["print"]("Geometry asset ready: " + it->second);
-            } catch (const std::exception& e) { /* log error */ }
+            } catch (const std::exception& e) { Log::error("Geometry", "Asset generation failed for {}: {}", it->second, e.what()); }
             it = pendingGeometry.erase(it);
         } else { ++it; }
     }

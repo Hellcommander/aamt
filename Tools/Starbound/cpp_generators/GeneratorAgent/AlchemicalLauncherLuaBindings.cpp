@@ -1,6 +1,7 @@
 #include "AlchemicalLauncherLuaBindings.hpp"
 #include "AlchemicalLauncherFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include "AlchemicalLauncherTypes.hpp"
 #include "ColorPickerSystem.hpp"
 #include <vector>
@@ -10,7 +11,49 @@ namespace MagiTech {
 namespace AlchemicalLaunchers {
 
 static std::vector<std::pair<std::future<LauncherAssetBundle>, std::string>> pendingLaunchers;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<AlchemicalLauncherFactory>& factorySlot() {
+    static std::shared_ptr<AlchemicalLauncherFactory> f;
+    return f;
+}
+} // namespace
+
+void AlchemicalLauncherLuaBindings::setFactory(std::shared_ptr<AlchemicalLauncherFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<AlchemicalLauncherFactory> AlchemicalLauncherLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No instance injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<AlchemicalLauncherFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 static std::chrono::high_resolution_clock::time_point generationStartTime;
+
+// std::map members are exposed as plain Lua tables (copy in / copy out): sol2's
+// associative container usertype does not compile with the vendored sol2
+// (usertype_container.hpp next_associative calls iter::end()).
+template <typename T>
+static auto metadataProperty() {
+    return sol::property(
+        [](const T& p) { return sol::as_table(p.metadata); },
+        [](T& p, const sol::table& t) {
+            p.metadata.clear();
+            for (const auto& [k, v] : t) {
+                p.metadata[k.as<std::string>()] = v.as<std::string>();
+            }
+        });
+}
 
 void AlchemicalLauncherLuaBindings::bind(sol::state& lua) {
     // Bind enums
@@ -126,9 +169,9 @@ void AlchemicalLauncherLuaBindings::bind(sol::state& lua) {
         sol::no_constructor,
         "instance", &ColorPicker::ColorPickerSystem::instance,
         "drawColorPicker", &ColorPicker::ColorPickerSystem::drawColorPicker,
-        "drawPaletteSelector", &ColorPicker::ColorPickerSystem::drawPaletteSelector,
+        "drawPaletteSelector", &ColorPicker::ColorPickerSystem::drawAdvancedPaletteSelector,
         "drawPaletteEditor", &ColorPicker::ColorPickerSystem::drawPaletteEditor,
-        "drawThemeSelector", &ColorPicker::ColorPickerSystem::drawThemeSelector,
+        "drawThemeSelector", &ColorPicker::ColorPickerSystem::drawAdvancedThemeSelector,
         "addPalette", &ColorPicker::ColorPickerSystem::addPalette,
         "removePalette", &ColorPicker::ColorPickerSystem::removePalette,
         "getPalette", &ColorPicker::ColorPickerSystem::getPalette,
@@ -240,7 +283,6 @@ void AlchemicalLauncherLuaBindings::bind(sol::state& lua) {
         "enableRefraction", &AlchemicalLauncherParams::enableRefraction,
         "refractionStrength", &AlchemicalLauncherParams::refractionStrength,
         "enableReflection", &AlchemicalLauncherParams::enableReflection,
-        "reflectionStrength", &AlchemicalLauncherParams::reflectionStrength,
         "enableEmission", &AlchemicalLauncherParams::enableEmission,
         "emissionStrength", &AlchemicalLauncherParams::emissionStrength,
         
@@ -278,7 +320,7 @@ void AlchemicalLauncherLuaBindings::bind(sol::state& lua) {
         // Metadata
         "description", &AlchemicalLauncherParams::description,
         "tags", &AlchemicalLauncherParams::tags,
-        "metadata", &AlchemicalLauncherParams::metadata,
+        "metadata", metadataProperty<AlchemicalLauncherParams>(),
         
         // Utility methods
         "hashKey", &AlchemicalLauncherParams::hashKey
@@ -326,7 +368,7 @@ void AlchemicalLauncherLuaBindings::bind(sol::state& lua) {
         // Metadata
         "description", &UIParams::description,
         "tags", &UIParams::tags,
-        "metadata", &UIParams::metadata,
+        "metadata", metadataProperty<UIParams>(),
         
         // Utility methods
         "hashKey", &UIParams::hashKey
@@ -381,10 +423,10 @@ void AlchemicalLauncherLuaBindings::bind(sol::state& lua) {
     lua.set_function("backgroundShapeToString", ParamUtils::backgroundShapeToString);
 
     // Bind JSON serialization utilities
-    lua.set_function("launcherParamsToJson", ParamUtils::toJson);
-    lua.set_function("launcherParamsFromJson", ParamUtils::fromJson);
+    lua.set_function("launcherParamsToJson", [](const AlchemicalLauncherParams& p) { return ParamUtils::toJson(p); });
+    lua.set_function("launcherParamsFromJson", [](const nlohmann::json& j) { return ParamUtils::fromJson(j); });
     lua.set_function("uiParamsToJson", [](const UIParams& p) { return ParamUtils::toJson(p); });
-    lua.set_function("uiParamsFromJson", [](const nlohmann::json& j) { return ParamUtils::fromJson(j); });
+    lua.set_function("uiParamsFromJson", [](const nlohmann::json& j) { return ParamUtils::uiParamsFromJson(j); });
 
     // Bind color picker utilities
     lua.set_function("openColorPicker", [](const std::string& name, ColorPicker::Color& color) {
@@ -442,14 +484,14 @@ void AlchemicalLauncherLuaBindings::bind(sol::state& lua) {
     lua.set_function("spawn_launcher",
         [&](const AlchemicalLauncherParams& p, const UIParams& u) {
             generationStartTime = std::chrono::high_resolution_clock::now();
-            auto factory = MainPlugin::instance().getAlchemicalLauncherFactory();
+            auto factory = AlchemicalLauncherLuaBindings::factory();
             return factory->generateAsync(p, u).get();
         }
     );
 
     lua.set_function("spawn_launcher_async",
         [&](const AlchemicalLauncherParams& p, const UIParams& u) {
-            auto factory = MainPlugin::instance().getAlchemicalLauncherFactory();
+            auto factory = AlchemicalLauncherLuaBindings::factory();
             pendingLaunchers.emplace_back(factory->generateAsync(p, u), p.id);
         }
     );

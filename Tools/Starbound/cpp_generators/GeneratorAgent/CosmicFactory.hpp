@@ -1,8 +1,7 @@
 #pragma once
 
 #include "CosmicAssetBundle.hpp"
-#include "core/ConcurrentLRU.hpp"
-#include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include <future>
 #include <string>
 
@@ -57,7 +56,7 @@ public:
             return std::async(std::launch::deferred, [existing]{ return *existing; });
         }
 
-        return m_pool.enqueue([p, this]() {
+        return m_pool.enqueue([p, key, this]() {
             AssetBundle b;
             b.mesh    = MeshGen<P>::build(p);
             b.texture = TextureGen<P>::build(p);
@@ -70,7 +69,7 @@ public:
 
 private:
     ConcurrentLRUCache<uint64_t, AssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
 };
 

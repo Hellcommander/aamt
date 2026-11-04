@@ -1,4 +1,5 @@
 #include "SnakeSpellFactory.hpp"
+#include "GeneratorConcurrency.hpp"
 #include <stdexcept>
 
 namespace MagiTech {
@@ -6,7 +7,7 @@ namespace SnakeSpells {
 
 void SnakeSpellFactory::initialize(size_t num_threads) {
     if (m_initialized) return;
-    m_pool = std::make_unique<MultithreadBusPlugin>(num_threads);
+    m_pool = std::make_unique<GeneratorTaskPool>(num_threads);
     m_initialized = true;
 }
 

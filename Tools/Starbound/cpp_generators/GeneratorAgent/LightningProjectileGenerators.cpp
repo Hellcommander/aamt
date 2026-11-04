@@ -1,13 +1,10 @@
 #include "LightningProjectileFactory.hpp"
 #include "LightningProjectileTypes.hpp"
-#include "LightningProjectileParams.cpp"
+#include "LightningProjectileAssets.hpp"
 #include "core/Log.hpp"
-#include "core/utils/NoiseGenerator.hpp"
-#include "core/utils/MeshBuilder.hpp"
+#include <FastNoiseLite.h>
 #include "core/utils/ShaderBuilder.hpp"
-#include "core/utils/TextureBuilder.hpp"
-#include "core/utils/ParticleBuilder.hpp"
-#include "core/utils/AudioBuilder.hpp"
+#include <glm/gtc/matrix_transform.hpp>
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -21,9 +18,30 @@ namespace LightningProjectiles {
 // Global factory instance
 LightningProjectileFactory g_lightningFactory;
 
+using ParamUtils::lightningTypeToString;
+using ParamUtils::trailTypeToString;
+using ParamUtils::noiseTypeToString;
+using ParamUtils::blendModeToString;
+using ParamUtils::audioTypeToString;
+
+namespace {
+// Perlin noise (header-only FastNoiseLite) sampled at caller-scaled coordinates (frequency 1).
+void configurePerlin(FastNoiseLite& noise) {
+    noise.SetNoiseType(FastNoiseLite::NoiseType_Perlin);
+    noise.SetFrequency(1.0f);
+}
+
+// Three decorrelated Perlin channels at the same position.
+glm::vec3 perlinVec3(const FastNoiseLite& noise, const glm::vec3& p) {
+    return glm::vec3(noise.GetNoise(p.x, p.y, p.z),
+                     noise.GetNoise(p.x + 31.416f, p.y, p.z),
+                     noise.GetNoise(p.x, p.y + 47.853f, p.z));
+}
+} // namespace
+
 namespace MeshGen {
     MeshHandle buildLightning(const LightningProjectileParams& p) {
-        Log::info("Building lightning mesh for: {} (type: {}, length: {}, thickness: {})", 
+        Log::info("LightningProjectile", "Building lightning mesh for: {} (type: {}, length: {}, thickness: {})", 
                   p.id, lightningTypeToString(p.lightningType), p.length, p.thickness);
         
         // Generate main arc points
@@ -59,25 +77,25 @@ namespace MeshGen {
         MeshHandle finalMesh = mergeMeshes(meshes);
         
         Log::info("Lightning mesh parameters:");
-        Log::info("  - Lightning type: {}", lightningTypeToString(p.lightningType));
-        Log::info("  - Length: {}", p.length);
-        Log::info("  - Thickness: {}", p.thickness);
-        Log::info("  - Arc segments: {}", segments);
-        Log::info("  - Noise intensity: {}", p.noiseIntensity);
-        Log::info("  - Noise scale: {}", p.noiseScale);
-        Log::info("  - Enable jitter: {}", p.enableJitter);
-        Log::info("  - Jitter amplitude: {}", p.jitterAmplitude);
-        Log::info("  - Jitter frequency: {}", p.jitterFrequency);
-        Log::info("  - Arc width variation: {}", p.arcWidthVariation);
-        Log::info("  - Enable branching: {}", p.enableBranching);
-        Log::info("  - Branch count: {}", p.branchCount);
-        Log::info("  - Trail type: {}", trailTypeToString(p.trailType));
+        Log::info("LightningProjectile", "  - Lightning type: {}", lightningTypeToString(p.lightningType));
+        Log::info("LightningProjectile", "  - Length: {}", p.length);
+        Log::info("LightningProjectile", "  - Thickness: {}", p.thickness);
+        Log::info("LightningProjectile", "  - Arc segments: {}", segments);
+        Log::info("LightningProjectile", "  - Noise intensity: {}", p.noiseIntensity);
+        Log::info("LightningProjectile", "  - Noise scale: {}", p.noiseScale);
+        Log::info("LightningProjectile", "  - Enable jitter: {}", p.enableJitter);
+        Log::info("LightningProjectile", "  - Jitter amplitude: {}", p.jitterAmplitude);
+        Log::info("LightningProjectile", "  - Jitter frequency: {}", p.jitterFrequency);
+        Log::info("LightningProjectile", "  - Arc width variation: {}", p.arcWidthVariation);
+        Log::info("LightningProjectile", "  - Enable branching: {}", p.enableBranching);
+        Log::info("LightningProjectile", "  - Branch count: {}", p.branchCount);
+        Log::info("LightningProjectile", "  - Trail type: {}", trailTypeToString(p.trailType));
         
         return finalMesh;
     }
     
     MeshHandle buildLightningArc(const LightningProjectileParams& p) {
-        Log::info("Building lightning arc for: {}", p.id);
+        Log::info("LightningProjectile", "Building lightning arc for: {}", p.id);
         
         // Generate arc points with appropriate segments
         int segments = static_cast<int>(p.arcSegments);
@@ -97,7 +115,7 @@ namespace MeshGen {
             return 0; // No branches
         }
         
-        Log::info("Building lightning branches for: {} (count: {}, length factor: {})", 
+        Log::info("LightningProjectile", "Building lightning branches for: {} (count: {}, length factor: {})", 
                   p.id, p.branchCount, p.branchLengthFactor);
         
         // Generate main arc points for branch attachment
@@ -110,28 +128,30 @@ namespace MeshGen {
         std::uniform_real_distribution<float> angleDist(-p.branchAngle, p.branchAngle);
         std::uniform_real_distribution<float> lengthDist(0.3f, 1.0f);
         
+        if (mainArcPoints.size() < 3) {
+            return 0; // Need an interior point to attach branches to
+        }
+
         for (int i = 0; i < p.branchCount; ++i) {
-            // Select random point on main arc for branch attachment
-            int attachmentPoint = std::uniform_int_distribution<int>(1, mainArcPoints.size() - 2)(gen);
+            // Select random interior point on main arc for branch attachment
+            int attachmentPoint = std::uniform_int_distribution<int>(1, static_cast<int>(mainArcPoints.size()) - 2)(gen);
             glm::vec3 attachmentPos = mainArcPoints[attachmentPoint];
-            
+
             // Generate branch direction
             float branchAngle = angleDist(gen);
             float branchLength = p.length * p.branchLengthFactor * lengthDist(gen);
-            
-            // Generate branch points
-            auto branchPoints = generateArcPoints(branchLength, segments / 2, p.noiseScale * 1.5f, p.noiseIntensity * 0.8f);
-            
-            // Transform branch points to attach to main arc
+
+            // Generate branch points (along +Z in branch-local space)
+            auto branchPoints = generateArcPoints(branchLength, std::max(2, segments / 2), p.noiseScale * 1.5f, p.noiseIntensity * 0.8f);
+
+            // Orient the branch along the local arc tangent, then fan it out by branchAngle
             glm::vec3 direction = glm::normalize(mainArcPoints[attachmentPoint + 1] - mainArcPoints[attachmentPoint - 1]);
             glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-            glm::vec3 right = glm::normalize(glm::cross(direction, up));
-            
+            float tangentYaw = std::atan2(direction.x, direction.z);
+            glm::mat4 transform = glm::translate(glm::mat4(1.0f), attachmentPos) *
+                                  glm::rotate(glm::mat4(1.0f), tangentYaw + branchAngle, up);
+
             for (auto& point : branchPoints) {
-                // Rotate and translate branch point
-                glm::mat4 transform = glm::translate(glm::mat4(1.0f), attachmentPos) *
-                                    glm::rotate(glm::mat4(1.0f), branchAngle, up) *
-                                    glm::translate(glm::mat4(1.0f), point);
                 point = glm::vec3(transform * glm::vec4(point, 1.0f));
             }
             
@@ -155,7 +175,7 @@ namespace MeshGen {
             return 0; // No trail
         }
         
-        Log::info("Building lightning trail for: {} (type: {}, length: {})", 
+        Log::info("LightningProjectile", "Building lightning trail for: {} (type: {}, length: {})", 
                   p.id, trailTypeToString(p.trailType), p.trailLength);
         
         // Generate trail points based on main arc
@@ -175,16 +195,18 @@ namespace MeshGen {
         std::vector<glm::vec3> points;
         points.reserve(segments + 1);
         
-        NoiseGenerator noise;
-        
+        segments = std::max(1, segments);
+        FastNoiseLite noise;
+        configurePerlin(noise);
+
         for (int i = 0; i <= segments; ++i) {
             float t = static_cast<float>(i) / segments;
             float z = t * length;
-            
+
             // Generate noise-based displacement
             glm::vec3 noisePos = glm::vec3(t * noiseScale, 0.0f, z * noiseScale);
-            float noiseX = noise.perlin3D(noisePos).x * noiseIntensity;
-            float noiseY = noise.perlin3D(noisePos + glm::vec3(100.0f)).y * noiseIntensity;
+            float noiseX = perlinVec3(noise, noisePos).x * noiseIntensity;
+            float noiseY = perlinVec3(noise, noisePos + glm::vec3(100.0f)).y * noiseIntensity;
             
             // Create arc point with noise displacement
             glm::vec3 point = glm::vec3(noiseX, noiseY, z);
@@ -195,12 +217,13 @@ namespace MeshGen {
     }
     
     void applyJitter(std::vector<glm::vec3>& points, float amplitude, float frequency) {
-        NoiseGenerator noise;
-        
+        FastNoiseLite noise;
+        configurePerlin(noise);
+
         for (auto& point : points) {
             // Apply temporal jitter based on position
             glm::vec3 jitterPos = point * frequency;
-            glm::vec3 jitter = noise.perlin3D(jitterPos) * amplitude;
+            glm::vec3 jitter = perlinVec3(noise, jitterPos) * amplitude;
             point += jitter;
         }
     }
@@ -210,7 +233,7 @@ namespace MeshGen {
             return 0; // Need at least 2 points
         }
         
-        Log::info("Building polyline ribbon: {} points, thickness: {}, width variation: {}", 
+        Log::info("LightningProjectile", "Building polyline ribbon: {} points, thickness: {}, width variation: {}", 
                   points.size(), thickness, widthVariation);
         
         std::vector<glm::vec3> vertices;
@@ -218,22 +241,23 @@ namespace MeshGen {
         std::vector<glm::vec2> uvs;
         std::vector<uint32_t> indices;
         
-        NoiseGenerator noise;
-        
+        FastNoiseLite noise;
+        configurePerlin(noise);
+
         for (size_t i = 0; i < points.size(); ++i) {
             glm::vec3 current = points[i];
             glm::vec3 next = (i + 1 < points.size()) ? points[i + 1] : current;
             glm::vec3 prev = (i > 0) ? points[i - 1] : current;
-            
+
             // Calculate direction
             glm::vec3 direction = glm::normalize(next - prev);
             glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
             glm::vec3 right = glm::normalize(glm::cross(direction, up));
-            
+
             // Calculate width variation
             float width = thickness;
             if (widthVariation > 0.0f) {
-                float variation = noise.perlin1D(static_cast<float>(i) * 0.5f) * widthVariation;
+                float variation = noise.GetNoise(static_cast<float>(i) * 0.5f, 0.0f) * widthVariation;
                 width += variation;
             }
             
@@ -272,7 +296,7 @@ namespace MeshGen {
         MeshHandle handle = createMeshHandle();
         uploadMeshData(handle, vertices, normals, uvs, indices);
         
-        Log::info("Created polyline ribbon with {} vertices, {} triangles", vertices.size(), indices.size() / 3);
+        Log::info("LightningProjectile", "Created polyline ribbon with {} vertices, {} triangles", vertices.size(), indices.size() / 3);
         
         return handle;
     }
@@ -282,7 +306,7 @@ namespace MeshGen {
             return 0; // Need at least 2 points
         }
         
-        Log::info("Building trail ribbon: {} points, trail length: {}, thickness: {}", 
+        Log::info("LightningProjectile", "Building trail ribbon: {} points, trail length: {}, thickness: {}", 
                   points.size(), trailLength, thickness);
         
         std::vector<glm::vec3> vertices;
@@ -340,7 +364,7 @@ namespace MeshGen {
         MeshHandle handle = createMeshHandle();
         uploadMeshData(handle, vertices, normals, uvs, indices);
         
-        Log::info("Created trail ribbon with {} vertices, {} triangles", vertices.size(), indices.size() / 3);
+        Log::info("LightningProjectile", "Created trail ribbon with {} vertices, {} triangles", vertices.size(), indices.size() / 3);
         
         return handle;
     }
@@ -354,17 +378,42 @@ namespace MeshGen {
             return meshes[0];
         }
         
-        Log::info("Merging {} lightning meshes", meshes.size());
-        
-        // In a real implementation, this would combine multiple meshes
-        // For now, return the first mesh as a placeholder
-        return meshes[0];
+        Log::info("LightningProjectile", "Merging {} lightning meshes", meshes.size());
+
+        // Concatenate the stored geometry of every part into one mesh
+        LightningMeshData merged;
+        size_t mergedParts = 0;
+        for (MeshHandle part : meshes) {
+            auto data = getMeshData(part);
+            if (!data) {
+                continue;
+            }
+            const uint32_t base = static_cast<uint32_t>(merged.vertices.size());
+            merged.vertices.insert(merged.vertices.end(), data->vertices.begin(), data->vertices.end());
+            merged.normals.insert(merged.normals.end(), data->normals.begin(), data->normals.end());
+            merged.uvs.insert(merged.uvs.end(), data->uvs.begin(), data->uvs.end());
+            for (uint32_t index : data->indices) {
+                merged.indices.push_back(base + index);
+            }
+            ++mergedParts;
+        }
+
+        if (mergedParts == 0) {
+            Log::warn("LightningProjectile", "No geometry stored for the {} meshes to merge; keeping the first", meshes.size());
+            return meshes[0];
+        }
+
+        MeshHandle handle = createMeshHandle();
+        uploadMeshData(handle, merged.vertices, merged.normals, merged.uvs, merged.indices);
+        Log::info("LightningProjectile", "Merged {} meshes into {} vertices, {} triangles",
+                  mergedParts, merged.vertices.size(), merged.indices.size() / 3);
+        return handle;
     }
 }
 
 namespace ShaderGen {
     ShaderHandle buildLightning(const LightningProjectileParams& p) {
-        Log::info("Building lightning shader for: {} (blend: {}, noise: {})", 
+        Log::info("LightningProjectile", "Building lightning shader for: {} (blend: {}, noise: {})", 
                   p.id, blendModeToString(p.blendMode), noiseTypeToString(p.noiseType));
         
         // Create shader based on parameters
@@ -372,7 +421,7 @@ namespace ShaderGen {
         
         // Compile shader with parameters
         ShaderBuilder builder;
-        builder.setVertexShader(buildLightningVertexShader(p));
+        builder.setVertexShader(generateLightningVertexShaderCode(p));
         builder.setFragmentShader(shaderCode);
         builder.addUniform("uMainColor", p.mainColor);
         builder.addUniform("uGlowColor", p.glowColor);
@@ -427,26 +476,35 @@ namespace ShaderGen {
         ShaderHandle handle = builder.compile();
         
         Log::info("Compiling lightning shader with parameters:");
-        Log::info("  - Shader type: {}", p.shaderType);
-        Log::info("  - Shader intensity: {}", p.shaderIntensity);
-        Log::info("  - Glow intensity: {}", p.glowIntensity);
-        Log::info("  - Emissive power: {}", p.emissivePower);
-        Log::info("  - Core opacity: {}", p.coreOpacity);
-        Log::info("  - Trail opacity: {}", p.trailOpacity);
-        Log::info("  - Enable core glow: {}", p.enableCoreGlow);
-        Log::info("  - Enable trail glow: {}", p.enableTrailGlow);
-        Log::info("  - Enable distortion: {}", p.enableDistortion);
-        Log::info("  - Distortion strength: {}", p.distortionStrength);
-        Log::info("  - Enable blur: {}", p.enableBlur);
-        Log::info("  - Blur strength: {}", p.blurStrength);
-        Log::info("  - Enable heat distortion: {}", p.enableHeatDistortion);
-        Log::info("  - Heat distortion strength: {}", p.heatDistortionStrength);
+        Log::info("LightningProjectile", "  - Shader type: {}", p.shaderType);
+        Log::info("LightningProjectile", "  - Shader intensity: {}", p.shaderIntensity);
+        Log::info("LightningProjectile", "  - Glow intensity: {}", p.glowIntensity);
+        Log::info("LightningProjectile", "  - Emissive power: {}", p.emissivePower);
+        Log::info("LightningProjectile", "  - Core opacity: {}", p.coreOpacity);
+        Log::info("LightningProjectile", "  - Trail opacity: {}", p.trailOpacity);
+        Log::info("LightningProjectile", "  - Enable core glow: {}", p.enableCoreGlow);
+        Log::info("LightningProjectile", "  - Enable trail glow: {}", p.enableTrailGlow);
+        Log::info("LightningProjectile", "  - Enable distortion: {}", p.enableDistortion);
+        Log::info("LightningProjectile", "  - Distortion strength: {}", p.distortionStrength);
+        Log::info("LightningProjectile", "  - Enable blur: {}", p.enableBlur);
+        Log::info("LightningProjectile", "  - Blur strength: {}", p.blurStrength);
+        Log::info("LightningProjectile", "  - Enable heat distortion: {}", p.enableHeatDistortion);
+        Log::info("LightningProjectile", "  - Heat distortion strength: {}", p.heatDistortionStrength);
         
         return handle;
     }
     
     ShaderHandle buildLightningVertexShader(const LightningProjectileParams& p) {
+        return ShaderBuilder().setVertexShader(generateLightningVertexShaderCode(p)).compile();
+    }
+
+    ShaderHandle buildLightningFragmentShader(const LightningProjectileParams& p) {
+        return ShaderBuilder().setFragmentShader(generateLightningShaderCode(p)).compile();
+    }
+
+    std::string generateLightningVertexShaderCode(const LightningProjectileParams& p) {
         std::stringstream ss;
+        ss << "// Lightning vertex shader for: " << p.id << "\n";
         ss << "#version 450\n";
         ss << "layout(location = 0) in vec3 aPosition;\n";
         ss << "layout(location = 1) in vec3 aNormal;\n";
@@ -468,7 +526,7 @@ namespace ShaderGen {
         ss << "    gl_Position = uModelViewProjection * vec4(aPosition, 1.0);\n";
         ss << "}\n";
         
-        return ShaderBuilder().setVertexShader(ss.str()).compile();
+        return ss.str();
     }
     
     std::string generateLightningShaderCode(const LightningProjectileParams& p) {
@@ -594,7 +652,7 @@ namespace ShaderGen {
 
 namespace TextureGen {
     TextureHandle buildLightning(const LightningProjectileParams& p) {
-        Log::info("Building lightning texture for: {} (noise: {}, main: ({},{},{}), glow: ({},{},{}))", 
+        Log::info("LightningProjectile", "Building lightning texture for: {} (noise: {}, main: ({},{},{}), glow: ({},{},{}))", 
                   p.id, noiseTypeToString(p.noiseType),
                   p.mainColor.x, p.mainColor.y, p.mainColor.z,
                   p.glowColor.x, p.glowColor.y, p.glowColor.z);
@@ -610,7 +668,7 @@ namespace TextureGen {
     }
     
     TextureHandle buildLightningGradient(const glm::vec3& mainColor, const glm::vec3& glowColor) {
-        Log::info("Building lightning gradient: main=({},{},{}), glow=({},{},{})", 
+        Log::info("LightningProjectile", "Building lightning gradient: main=({},{},{}), glow=({},{},{})", 
                   mainColor.x, mainColor.y, mainColor.z,
                   glowColor.x, glowColor.y, glowColor.z);
         
@@ -644,22 +702,25 @@ namespace TextureGen {
     }
     
     TextureHandle buildLightningNoise(float noiseScale, float flickerSpeed) {
-        Log::info("Building lightning noise: scale={}, flicker={}", noiseScale, flickerSpeed);
+        Log::info("LightningProjectile", "Building lightning noise: scale={}, flicker={}", noiseScale, flickerSpeed);
         
         const int width = 256;
         const int height = 256;
         std::vector<uint8_t> data(width * height * 4);
         
-        NoiseGenerator noise;
-        
+        FastNoiseLite noise;
+        configurePerlin(noise);
+        // Flicker speed decorrelates the pattern between differently flickering bolts
+        noise.SetSeed(static_cast<int>(flickerSpeed * 1000.0f));
+
         for (int y = 0; y < height; ++y) {
             for (int x = 0; x < width; ++x) {
                 float nx = static_cast<float>(x) / width;
                 float ny = static_cast<float>(y) / height;
-                
+
                 // Generate 2D noise for lightning texture
                 glm::vec2 pos(nx * noiseScale, ny * noiseScale);
-                float noiseValue = noise.perlin2D(pos);
+                float noiseValue = noise.GetNoise(pos.x, pos.y);
                 
                 // Create lightning-like pattern
                 float lightningValue = (noiseValue + 1.0f) * 0.5f;
@@ -680,25 +741,46 @@ namespace TextureGen {
     }
     
     TextureHandle mergeLightningTextures(const TextureHandle& gradient, const TextureHandle& noise) {
-        Log::info("Merging lightning gradient and noise textures");
-        
-        // In a real implementation, this would blend the textures
-        // For now, return the gradient texture as the merged result
-        return gradient;
+        Log::info("LightningProjectile", "Merging lightning gradient {} and noise {} textures", gradient, noise);
+
+        auto gradientData = getTextureData(gradient);
+        auto noiseData = getTextureData(noise);
+        if (!gradientData || !noiseData ||
+            gradientData->width != noiseData->width || gradientData->height != noiseData->height ||
+            gradientData->rgba.size() != noiseData->rgba.size()) {
+            Log::warn("LightningProjectile", "Cannot blend textures {} and {} (missing or size mismatch); using gradient", gradient, noise);
+            return gradient;
+        }
+
+        // Modulate the colour gradient by the noise luminance (50% floor so the core never vanishes)
+        std::vector<uint8_t> blended(gradientData->rgba.size());
+        for (size_t i = 0; i + 3 < blended.size(); i += 4) {
+            const float n = noiseData->rgba[i] / 255.0f;
+            const float factor = 0.5f + 0.5f * n;
+            for (size_t c = 0; c < 3; ++c) {
+                blended[i + c] = static_cast<uint8_t>(std::clamp(gradientData->rgba[i + c] * factor, 0.0f, 255.0f));
+            }
+            blended[i + 3] = gradientData->rgba[i + 3];
+        }
+
+        TextureHandle handle = createTextureHandle();
+        uploadTextureData(handle, gradientData->width, gradientData->height, blended.data(),
+                          gradientData->generateMipmaps || noiseData->generateMipmaps);
+        return handle;
     }
 }
 
 namespace ParticleGen {
     ParticleHandle buildSparks(const LightningProjectileParams& p) {
-        Log::info("Building spark particles for: {} (count: {}, lifetime: {}, size: {})", 
+        Log::info("LightningProjectile", "Building spark particles for: {} (count: {}, lifetime: {}, size: {})", 
                   p.id, p.sparkCount, p.sparkLifetime, p.sparkSize);
         
         // Create particle emitter description
         ParticleEmitterDesc desc;
-        desc.type = ParticleType::POINT;
-        desc.rate = p.sparkCount;
+        desc.type = ParticleType::EMBER; // point-like spark (Starbound "ember" particle)
+        desc.rate = static_cast<float>(p.sparkCount);
         desc.lifetime = p.sparkLifetime;
-        desc.startColor = p.sparkColor;
+        desc.startColor = glm::vec4(p.sparkColor, 1.0f);
         desc.endColor = glm::vec4(p.sparkColor.x, p.sparkColor.y, p.sparkColor.z, 0.0f);
         desc.startSize = p.sparkSize;
         desc.endSize = p.sparkSize * 0.5f;
@@ -713,29 +795,29 @@ namespace ParticleGen {
         ParticleHandle handle = createParticleEmitter(desc);
         
         Log::info("Spark particle parameters:");
-        Log::info("  - Count: {}", p.sparkCount);
-        Log::info("  - Lifetime: {}", p.sparkLifetime);
-        Log::info("  - Size: {}", p.sparkSize);
-        Log::info("  - Speed: {}", p.sparkSpeed);
-        Log::info("  - Color: ({},{},{},{})", 
-                  p.sparkColor.x, p.sparkColor.y, p.sparkColor.z, p.sparkColor.w);
-        Log::info("  - Enable fade: {}", p.enableSparkFade);
-        Log::info("  - Fade speed: {}", p.sparkFadeSpeed);
-        Log::info("  - Enable physics: {}", p.enableSparkPhysics);
-        Log::info("  - Gravity: {}", p.sparkGravity);
+        Log::info("LightningProjectile", "  - Count: {}", p.sparkCount);
+        Log::info("LightningProjectile", "  - Lifetime: {}", p.sparkLifetime);
+        Log::info("LightningProjectile", "  - Size: {}", p.sparkSize);
+        Log::info("LightningProjectile", "  - Speed: {}", p.sparkSpeed);
+        Log::info("LightningProjectile", "  - Color: ({},{},{})",
+                  p.sparkColor.x, p.sparkColor.y, p.sparkColor.z);
+        Log::info("LightningProjectile", "  - Enable fade: {}", p.enableSparkFade);
+        Log::info("LightningProjectile", "  - Fade speed: {}", p.sparkFadeSpeed);
+        Log::info("LightningProjectile", "  - Enable physics: {}", p.enableSparkPhysics);
+        Log::info("LightningProjectile", "  - Gravity: {}", p.sparkGravity);
         
         return handle;
     }
     
     ParticleHandle buildLightningParticles(const LightningProjectileParams& p) {
-        Log::info("Building lightning particles for: {}", p.id);
+        Log::info("LightningProjectile", "Building lightning particles for: {}", p.id);
         
         // Create specialized lightning particle emitter
         ParticleEmitterDesc desc;
         desc.type = ParticleType::BILLBOARD;
         desc.rate = p.sparkCount * 2; // More particles for lightning effect
         desc.lifetime = p.sparkLifetime * 0.5f; // Shorter lifetime for lightning
-        desc.startColor = p.mainColor;
+        desc.startColor = glm::vec4(p.mainColor, 1.0f);
         desc.endColor = glm::vec4(p.glowColor.x, p.glowColor.y, p.glowColor.z, 0.0f);
         desc.startSize = p.sparkSize * 2.0f;
         desc.endSize = p.sparkSize * 0.1f;
@@ -754,7 +836,7 @@ namespace ParticleGen {
             return 0; // No electric trail
         }
         
-        Log::info("Building electric trail particles for: {}", p.id);
+        Log::info("LightningProjectile", "Building electric trail particles for: {}", p.id);
         
         // Create electric trail particle emitter
         ParticleEmitterDesc desc;
@@ -778,7 +860,7 @@ namespace ParticleGen {
 
 namespace AudioGen {
     AudioHandle buildCrackle(const LightningProjectileParams& p) {
-        Log::info("Building crackle audio for: {} (pitch: {}, volume: {}, duration: {})", 
+        Log::info("LightningProjectile", "Building crackle audio for: {} (pitch: {}, volume: {}, duration: {})", 
                   p.id, p.soundPitch, p.soundVolume, p.soundDuration);
         
         // Create procedural audio description
@@ -795,19 +877,19 @@ namespace AudioGen {
         AudioHandle handle = createProceduralAudio(desc);
         
         Log::info("Crackle audio parameters:");
-        Log::info("  - Audio type: {}", audioTypeToString(p.audioType));
-        Log::info("  - Pitch: {}", p.soundPitch);
-        Log::info("  - Volume: {}", p.soundVolume);
-        Log::info("  - Duration: {}", p.soundDuration);
-        Log::info("  - Enable audio: {}", p.enableAudio);
-        Log::info("  - Enable spatial audio: {}", p.enableSpatialAudio);
-        Log::info("  - Audio distance: {}", p.audioDistance);
+        Log::info("LightningProjectile", "  - Audio type: {}", audioTypeToString(p.audioType));
+        Log::info("LightningProjectile", "  - Pitch: {}", p.soundPitch);
+        Log::info("LightningProjectile", "  - Volume: {}", p.soundVolume);
+        Log::info("LightningProjectile", "  - Duration: {}", p.soundDuration);
+        Log::info("LightningProjectile", "  - Enable audio: {}", p.enableAudio);
+        Log::info("LightningProjectile", "  - Enable spatial audio: {}", p.enableSpatialAudio);
+        Log::info("LightningProjectile", "  - Audio distance: {}", p.audioDistance);
         
         return handle;
     }
     
     AudioHandle buildLightningAudio(const LightningProjectileParams& p) {
-        Log::info("Building lightning audio for: {}", p.id);
+        Log::info("LightningProjectile", "Building lightning audio for: {}", p.id);
         
         // Create specialized lightning audio
         ProceduralAudioDesc desc;
@@ -823,7 +905,7 @@ namespace AudioGen {
     }
     
     AudioHandle buildElectricSound(const LightningProjectileParams& p) {
-        Log::info("Building electric sound for: {}", p.id);
+        Log::info("LightningProjectile", "Building electric sound for: {}", p.id);
         
         // Create electric sound effect
         ProceduralAudioDesc desc;

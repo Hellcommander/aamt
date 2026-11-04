@@ -1,12 +1,100 @@
 #include "ParticleAssetLuaBindings.hpp"
 #include "ParticleAssetFactory.hpp"
 #include "ParticleAssetTypes.hpp"
+#include "core/Log.hpp"
 #include <sol/sol.hpp>
+#include <chrono>
 #include <memory>
 #include <future>
+#include <mutex>
+#include <vector>
 
 namespace MagiTech {
 namespace Particles {
+
+static std::vector<std::pair<std::future<ParticleEffectResult>, std::string>> pendingEffects;
+static std::mutex pendingEffectsMutex;
+
+static std::mutex factoryMutex;
+static std::shared_ptr<ParticleAssetFactory> sharedFactory;
+
+void ParticleAssetLuaBindings::setFactory(std::shared_ptr<ParticleAssetFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex);
+    sharedFactory = std::move(factory);
+}
+
+std::shared_ptr<ParticleAssetFactory> ParticleAssetLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex);
+    if (!sharedFactory) {
+        sharedFactory = std::make_shared<ParticleAssetFactory>();
+        sharedFactory->initialize(256, 4);
+    }
+    return sharedFactory;
+}
+
+static std::shared_ptr<ParticleAssetFactory> factory() {
+    return ParticleAssetLuaBindings::factory();
+}
+
+void ParticleAssetLuaBindings::bind(sol::state& lua) {
+    bindParticleAssetToLua(lua);
+}
+
+void ParticleAssetLuaBindings::poll_assets(sol::state& lua) {
+    // Take finished futures out under the lock; run Lua callbacks without it.
+    std::vector<std::pair<std::future<ParticleEffectResult>, std::string>> ready;
+    {
+        std::lock_guard<std::mutex> lock(pendingEffectsMutex);
+        for (auto it = pendingEffects.begin(); it != pendingEffects.end();) {
+            if (it->first.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+                ready.push_back(std::move(*it));
+                it = pendingEffects.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
+
+    for (auto& [future, effectName] : ready) {
+        try {
+            ParticleEffectResult result = future.get();
+            if (!result.success) {
+                Log::error("ParticleAsset", "Particle effect {} failed: {}", effectName, result.errorMessage);
+            }
+            sol::protected_function callback = lua["on_particle_effect_ready"];
+            if (callback.valid()) {
+                auto call = callback(effectName, result);
+                if (!call.valid()) {
+                    sol::error err = call;
+                    Log::error("ParticleAsset", "on_particle_effect_ready failed for {}: {}", effectName, err.what());
+                }
+            } else {
+                lua["print"]("Particle effect ready: " + effectName);
+            }
+        } catch (const std::exception& e) {
+            Log::error("ParticleAsset", "Particle effect generation failed for {}: {}", effectName, e.what());
+        }
+    }
+}
+
+// std::map members are exposed as plain Lua tables (copied on read, replaced on
+// write). Pushing the maps as sol container userdata is avoided on purpose: the
+// vendored sol2 associative-container iterator does not compile with MSVC
+// (usertype_container.hpp calls iter::end() instead of iter::sen()).
+template <typename Owner, typename V>
+static auto mapProperty(std::map<std::string, V> Owner::*member) {
+    return sol::property(
+        [member](const Owner& owner) { return sol::as_table(owner.*member); },
+        [member](Owner& owner, sol::table table) {
+            std::map<std::string, V> values;
+            for (const auto& [key, value] : table) {
+                if (key.template is<std::string>() && value.template is<V>()) {
+                    values[key.template as<std::string>()] = value.template as<V>();
+                }
+            }
+            owner.*member = std::move(values);
+        });
+}
 
 void bindParticleAssetToLua(sol::state& lua) {
     // Bind parameter structures
@@ -23,10 +111,10 @@ void bindParticleAssetToLua(sol::state& lua) {
         "burstCount", &EmitterParams::burstCount,
         "burstInterval", &EmitterParams::burstInterval,
         "gpuDriven", &EmitterParams::gpuDriven,
-        "customParameters", &EmitterParams::customParameters
+        "customParameters", mapProperty(&EmitterParams::customParameters)
     );
 
-    lua.new_usertype<BehaviorParams>("BehaviorParams",
+    lua.new_usertype<BehaviorParams>("ParticleBehaviorParams",
         sol::constructors<BehaviorParams()>(),
         "initialVelocity", &BehaviorParams::initialVelocity,
         "velocityVariance", &BehaviorParams::velocityVariance,
@@ -41,7 +129,7 @@ void bindParticleAssetToLua(sol::state& lua) {
         "attractorPosition", &BehaviorParams::attractorPosition,
         "attractorStrength", &BehaviorParams::attractorStrength,
         "attractorRadius", &BehaviorParams::attractorRadius,
-        "customParameters", &BehaviorParams::customParameters
+        "customParameters", mapProperty(&BehaviorParams::customParameters)
     );
 
     lua.new_usertype<ShapeParams>("ShapeParams",
@@ -54,7 +142,7 @@ void bindParticleAssetToLua(sol::state& lua) {
         "meshPath", &ShapeParams::meshPath,
         "randomRotation", &ShapeParams::randomRotation,
         "alignToVelocity", &ShapeParams::alignToVelocity,
-        "customParameters", &ShapeParams::customParameters
+        "customParameters", mapProperty(&ShapeParams::customParameters)
     );
 
     lua.new_usertype<LifetimeParams>("LifetimeParams",
@@ -73,7 +161,7 @@ void bindParticleAssetToLua(sol::state& lua) {
         "velocityOverLife", &LifetimeParams::velocityOverLife,
         "velocityStart", &LifetimeParams::velocityStart,
         "velocityEnd", &LifetimeParams::velocityEnd,
-        "customParameters", &LifetimeParams::customParameters
+        "customParameters", mapProperty(&LifetimeParams::customParameters)
     );
 
     lua.new_usertype<RenderParams>("RenderParams",
@@ -94,17 +182,17 @@ void bindParticleAssetToLua(sol::state& lua) {
         "glowIntensity", &RenderParams::glowIntensity,
         "normalMapPath", &RenderParams::normalMapPath,
         "emissionMapPath", &RenderParams::emissionMapPath,
-        "customParameters", &RenderParams::customParameters
+        "customParameters", mapProperty(&RenderParams::customParameters)
     );
 
-    lua.new_usertype<LODParams>("LODParams",
+    lua.new_usertype<LODParams>("ParticleLODParams",
         sol::constructors<LODParams()>(),
         "screenSizes", &LODParams::screenSizes,
         "rateScales", &LODParams::rateScales,
         "qualityScales", &LODParams::qualityScales,
         "adaptiveLOD", &LODParams::adaptiveLOD,
         "adaptiveThreshold", &LODParams::adaptiveThreshold,
-        "customParameters", &LODParams::customParameters
+        "customParameters", mapProperty(&LODParams::customParameters)
     );
 
     lua.new_usertype<ParticleEffectDefinition>("ParticleEffectDefinition",
@@ -119,7 +207,7 @@ void bindParticleAssetToLua(sol::state& lua) {
         "render", &ParticleEffectDefinition::render,
         "lod", &ParticleEffectDefinition::lod,
         "tags", &ParticleEffectDefinition::tags,
-        "metadata", &ParticleEffectDefinition::metadata,
+        "metadata", mapProperty(&ParticleEffectDefinition::metadata),
         "enableHotReload", &ParticleEffectDefinition::enableHotReload,
         "enableCaching", &ParticleEffectDefinition::enableCaching
     );
@@ -132,7 +220,7 @@ void bindParticleAssetToLua(sol::state& lua) {
         "success", &ParticleEffectResult::success,
         "errorMessage", &ParticleEffectResult::errorMessage,
         "warnings", &ParticleEffectResult::warnings,
-        "metadata", &ParticleEffectResult::metadata
+        "metadata", mapProperty(&ParticleEffectResult::metadata)
     );
 
     lua.new_usertype<ParticleBundle>("ParticleBundle",
@@ -142,7 +230,7 @@ void bindParticleAssetToLua(sol::state& lua) {
         "texture", &ParticleBundle::texture,
         "shader", &ParticleBundle::shader,
         "computeShader", &ParticleBundle::computeShader,
-        "metadata", &ParticleBundle::metadata,
+        "metadata", mapProperty(&ParticleBundle::metadata),
         "creationTime", &ParticleBundle::creationTime,
         "memoryUsage", &ParticleBundle::memoryUsage,
         "gpuAccelerated", &ParticleBundle::gpuAccelerated
@@ -166,6 +254,7 @@ void bindParticleAssetToLua(sol::state& lua) {
     lua.new_usertype<ParticleForceField>("ParticleForceField",
         sol::constructors<ParticleForceField()>(),
         "type", &ParticleForceField::type,
+        "id", &ParticleForceField::id,
         "position", &ParticleForceField::position,
         "direction", &ParticleForceField::direction,
         "strength", &ParticleForceField::strength,
@@ -177,12 +266,14 @@ void bindParticleAssetToLua(sol::state& lua) {
     lua.new_usertype<ParticleCollision>("ParticleCollision",
         sol::constructors<ParticleCollision()>(),
         "type", &ParticleCollision::type,
+        "id", &ParticleCollision::id,
         "position", &ParticleCollision::position,
         "dimensions", &ParticleCollision::dimensions,
         "normal", &ParticleCollision::normal,
         "restitution", &ParticleCollision::restitution,
         "friction", &ParticleCollision::friction,
-        "active", &ParticleCollision::active
+        "active", &ParticleCollision::active,
+        "meshPath", &ParticleCollision::meshPath
     );
 
     lua.new_usertype<ParticleTrail>("ParticleTrail",
@@ -219,7 +310,7 @@ void bindParticleAssetToLua(sol::state& lua) {
         "cullDistance", &AdvancedParticleParams::cullDistance,
         "enableOcclusion", &AdvancedParticleParams::enableOcclusion,
         "enableDepthPrePass", &AdvancedParticleParams::enableDepthPrePass,
-        "customParameters", &AdvancedParticleParams::customParameters
+        "customParameters", mapProperty(&AdvancedParticleParams::customParameters)
     );
 
     lua.new_usertype<ParticleEffectTemplate>("ParticleEffectTemplate",
@@ -233,11 +324,12 @@ void bindParticleAssetToLua(sol::state& lua) {
         "collisions", &ParticleEffectTemplate::collisions,
         "trail", &ParticleEffectTemplate::trail,
         "advanced", &ParticleEffectTemplate::advanced,
-        "metadata", &ParticleEffectTemplate::metadata
+        "metadata", mapProperty(&ParticleEffectTemplate::metadata)
     );
 
     lua.new_usertype<ParticleEffectInstance>("ParticleEffectInstance",
         sol::constructors<ParticleEffectInstance()>(),
+        "id", &ParticleEffectInstance::id,
         "templateName", &ParticleEffectInstance::templateName,
         "definition", &ParticleEffectInstance::definition,
         "position", &ParticleEffectInstance::position,
@@ -247,7 +339,7 @@ void bindParticleAssetToLua(sol::state& lua) {
         "startTime", &ParticleEffectInstance::startTime,
         "duration", &ParticleEffectInstance::duration,
         "loopCount", &ParticleEffectInstance::loopCount,
-        "parameters", &ParticleEffectInstance::parameters,
+        "parameters", mapProperty(&ParticleEffectInstance::parameters),
         "state", &ParticleEffectInstance::state
     );
 
@@ -318,198 +410,206 @@ void bindParticleAssetToLua(sol::state& lua) {
 
     // Bind factory functions
     lua.set_function("create_particle_effect", 
-        [&](const ParticleEffectDefinition& definition) {
-            return particleFactory.generateAsync(definition).get();
+        [](const ParticleEffectDefinition& definition) {
+            return factory()->generateAsync(definition).get();
         });
 
     lua.set_function("create_particle_effect_sync", 
-        [&](const ParticleEffectDefinition& definition) {
-            return particleFactory.generate(definition);
+        [](const ParticleEffectDefinition& definition) {
+            return factory()->generate(definition);
         });
 
-    lua.set_function("create_particle_instance", 
-        [&](const std::string& templateName, 
+    // Queues generation; the result is delivered by poll_assets (on_particle_effect_ready)
+    lua.set_function("create_particle_effect_async",
+        [](const ParticleEffectDefinition& definition) {
+            auto future = factory()->generateAsync(definition);
+            std::lock_guard<std::mutex> lock(pendingEffectsMutex);
+            pendingEffects.emplace_back(std::move(future), definition.name);
+        });
+
+    lua.set_function("create_particle_instance",
+        [](const std::string& templateName, 
             const glm::vec3& position,
             const glm::vec3& rotation,
             const glm::vec3& scale) {
-            return particleFactory.createInstance(templateName, position, rotation, scale);
+            return factory()->createInstance(templateName, position, rotation, scale);
         });
 
     lua.set_function("destroy_particle_instance", 
-        [&](const std::string& instanceId) {
-            particleFactory.destroyInstance(instanceId);
+        [](const std::string& instanceId) {
+            factory()->destroyInstance(instanceId);
         });
 
     lua.set_function("update_particle_instance", 
-        [&](const std::string& instanceId, float deltaTime) {
-            particleFactory.updateInstance(instanceId, deltaTime);
+        [](const std::string& instanceId, float deltaTime) {
+            factory()->updateInstance(instanceId, deltaTime);
         });
 
     // Bind factory management functions
     lua.set_function("register_particle_template", 
-        [&](const ParticleEffectTemplate& template) {
-            particleFactory.registerTemplate(template);
+        [](const ParticleEffectTemplate& effectTemplate) {
+            factory()->registerTemplate(effectTemplate);
         });
 
     lua.set_function("unregister_particle_template", 
-        [&](const std::string& templateName) {
-            particleFactory.unregisterTemplate(templateName);
+        [](const std::string& templateName) {
+            factory()->unregisterTemplate(templateName);
         });
 
     lua.set_function("get_particle_template", 
-        [&](const std::string& templateName) {
-            return particleFactory.getTemplate(templateName);
+        [](const std::string& templateName) {
+            return factory()->getTemplate(templateName);
         });
 
     // Bind force field management
     lua.set_function("add_global_force_field", 
-        [&](const ParticleForceField& forceField) {
-            particleFactory.addGlobalForceField(forceField);
+        [](const ParticleForceField& forceField) {
+            factory()->addGlobalForceField(forceField);
         });
 
     lua.set_function("remove_global_force_field", 
-        [&](const std::string& forceFieldId) {
-            particleFactory.removeGlobalForceField(forceFieldId);
+        [](const std::string& forceFieldId) {
+            factory()->removeGlobalForceField(forceFieldId);
         });
 
     lua.set_function("update_global_force_fields", 
-        [&](float deltaTime) {
-            particleFactory.updateGlobalForceFields(deltaTime);
+        [](float deltaTime) {
+            factory()->updateGlobalForceFields(deltaTime);
         });
 
     // Bind collision management
     lua.set_function("add_global_collision", 
-        [&](const ParticleCollision& collision) {
-            particleFactory.addGlobalCollision(collision);
+        [](const ParticleCollision& collision) {
+            factory()->addGlobalCollision(collision);
         });
 
     lua.set_function("remove_global_collision", 
-        [&](const std::string& collisionId) {
-            particleFactory.removeGlobalCollision(collisionId);
+        [](const std::string& collisionId) {
+            factory()->removeGlobalCollision(collisionId);
         });
 
     lua.set_function("update_global_collisions", 
-        [&](float deltaTime) {
-            particleFactory.updateGlobalCollisions(deltaTime);
+        [](float deltaTime) {
+            factory()->updateGlobalCollisions(deltaTime);
         });
 
     // Bind cache management
     lua.set_function("clear_particle_cache", 
-        [&]() {
-            particleFactory.clearCache();
+        []() {
+            factory()->clearCache();
         });
 
     lua.set_function("set_particle_cache_size", 
-        [&](size_t maxEntries) {
-            particleFactory.setCacheSize(maxEntries);
+        [](size_t maxEntries) {
+            factory()->setCacheSize(maxEntries);
         });
 
     lua.set_function("get_particle_cache_size", 
-        [&]() {
-            return particleFactory.getCacheSize();
+        []() {
+            return factory()->getCacheSize();
         });
 
     lua.set_function("get_particle_cache_hits", 
-        [&]() {
-            return particleFactory.getCacheHits();
+        []() {
+            return factory()->getCacheHits();
         });
 
     lua.set_function("get_particle_cache_misses", 
-        [&]() {
-            return particleFactory.getCacheMisses();
+        []() {
+            return factory()->getCacheMisses();
         });
 
     // Bind thread pool management
     lua.set_function("set_particle_max_threads", 
-        [&](int threads) {
-            particleFactory.setMaxThreads(threads);
+        [](int threads) {
+            factory()->setMaxThreads(threads);
         });
 
     lua.set_function("get_particle_max_threads", 
-        [&]() {
-            return particleFactory.getMaxThreads();
+        []() {
+            return factory()->getMaxThreads();
         });
 
     // Bind GPU acceleration
     lua.set_function("enable_particle_gpu_acceleration", 
-        [&](bool enable) {
-            particleFactory.enableGPUAcceleration(enable);
+        [](bool enable) {
+            factory()->enableGPUAcceleration(enable);
         });
 
     lua.set_function("is_particle_gpu_acceleration_enabled", 
-        [&]() {
-            return particleFactory.isGPUAccelerationEnabled();
+        []() {
+            return factory()->isGPUAccelerationEnabled();
         });
 
     // Bind quality settings
     lua.set_function("set_particle_quality", 
-        [&](ParticleQuality quality) {
-            particleFactory.setParticleQuality(quality);
+        [](ParticleQuality quality) {
+            factory()->setParticleQuality(quality);
         });
 
     lua.set_function("get_particle_quality", 
-        [&]() {
-            return particleFactory.getParticleQuality();
+        []() {
+            return factory()->getParticleQuality();
         });
 
     // Bind performance monitoring
     lua.set_function("get_particle_performance_metrics", 
-        [&]() {
-            return particleFactory.getPerformanceMetrics();
+        []() {
+            return factory()->getPerformanceMetrics();
         });
 
     lua.set_function("reset_particle_performance_metrics", 
-        [&]() {
-            particleFactory.resetPerformanceMetrics();
+        []() {
+            factory()->resetPerformanceMetrics();
         });
 
     // Bind error handling
     lua.set_function("get_particle_last_error", 
-        [&]() {
-            return particleFactory.getLastError();
+        []() {
+            return factory()->getLastError();
         });
 
     lua.set_function("clear_particle_last_error", 
-        [&]() {
-            particleFactory.clearLastError();
+        []() {
+            factory()->clearLastError();
         });
 
     // Bind generation status
     lua.set_function("is_particle_generating", 
-        [&]() {
-            return particleFactory.isGenerating();
+        []() {
+            return factory()->isGenerating();
         });
 
     lua.set_function("get_particle_generation_progress", 
-        [&]() {
-            return particleFactory.getGenerationProgress();
+        []() {
+            return factory()->getGenerationProgress();
         });
 
     // Bind memory management
     lua.set_function("get_particle_total_memory_usage", 
-        [&]() {
-            return particleFactory.getTotalMemoryUsage();
+        []() {
+            return factory()->getTotalMemoryUsage();
         });
 
     lua.set_function("set_particle_max_memory_usage", 
-        [&](size_t maxBytes) {
-            particleFactory.setMaxMemoryUsage(maxBytes);
+        [](size_t maxBytes) {
+            factory()->setMaxMemoryUsage(maxBytes);
         });
 
     lua.set_function("get_particle_max_memory_usage", 
-        [&]() {
-            return particleFactory.getMaxMemoryUsage();
+        []() {
+            return factory()->getMaxMemoryUsage();
         });
 
     // Bind utility functions
     lua.set_function("validate_particle_definition", 
-        [&](const ParticleEffectDefinition& definition) {
-            return particleFactory.validateDefinition(definition);
+        [](const ParticleEffectDefinition& definition) {
+            return factory()->validateDefinition(definition);
         });
 
     // Bind helper functions for creating common effects
     lua.set_function("create_explosion_effect", 
-        [&](const glm::vec3& position, float intensity) {
+        [](const glm::vec3& position, float intensity) {
             ParticleEffectDefinition def;
             def.name = "explosion";
             def.category = "combat";
@@ -543,11 +643,11 @@ void bindParticleAssetToLua(sol::state& lua) {
             def.render.glow = true;
             def.render.glowIntensity = 0.8f * intensity;
             
-            return particleFactory.generate(def);
+            return factory()->generate(def);
         });
 
     lua.set_function("create_fire_effect", 
-        [&](const glm::vec3& position, float intensity) {
+        [](const glm::vec3& position, float intensity) {
             ParticleEffectDefinition def;
             def.name = "fire";
             def.category = "environment";
@@ -582,11 +682,11 @@ void bindParticleAssetToLua(sol::state& lua) {
             def.render.glow = true;
             def.render.glowIntensity = 0.6f * intensity;
             
-            return particleFactory.generate(def);
+            return factory()->generate(def);
         });
 
     lua.set_function("create_magic_sparkle_effect", 
-        [&](const glm::vec3& position, float intensity) {
+        [](const glm::vec3& position, float intensity) {
             ParticleEffectDefinition def;
             def.name = "magic_sparkle";
             def.category = "magic";
@@ -618,7 +718,7 @@ void bindParticleAssetToLua(sol::state& lua) {
             def.render.glow = true;
             def.render.glowIntensity = 0.9f * intensity;
             
-            return particleFactory.generate(def);
+            return factory()->generate(def);
         });
 }
 

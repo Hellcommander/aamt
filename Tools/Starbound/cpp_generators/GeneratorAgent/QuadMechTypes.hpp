@@ -4,9 +4,14 @@
 #include <unordered_map>
 #include <optional>
 #include <array>
+#include <algorithm>
+#include <chrono>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <type_traits>
 #include <glm/glm.hpp>
 #include "vendor/xxhash/xxhash.h"
-#include "vendor/yaml-cpp/yaml.h"
 
 namespace MagiTech {
 namespace QuadMech {
@@ -69,7 +74,7 @@ enum class JointType {
 
 struct ModuleDefinition {
     std::string id;
-    ModuleType type;
+    ModuleType type = ModuleType::CHASSIS;
     std::string meshPath;
     std::string attachBone;
     glm::vec3 offset = {0, 0, 0};
@@ -88,7 +93,7 @@ struct ModuleDefinition {
 
 struct CockpitDefinition {
     glm::vec3 seatPosition = {0, 0.8f, 0};
-    glm::vec3 canopyTint = {0.2f, 0.6f, 1.0f, 0.3f};
+    glm::vec4 canopyTint = {0.2f, 0.6f, 1.0f, 0.3f}; // RGBA
     std::string canopyMaterial = "canopy_mat";
     std::vector<glm::vec3> hudAnchorPoints;
     float transparency = 0.3f;
@@ -147,7 +152,7 @@ struct MagitechMaterials {
 
 struct AnimationDefinition {
     std::string id;
-    AnimationType type;
+    AnimationType type = AnimationType::IDLE;
     std::string path;
     float speed = 1.0f;
     bool loop = true;
@@ -189,7 +194,7 @@ struct PhysicsDefinition {
 // ============================================================================
 
 struct LODDefinition {
-    LODQuality quality;
+    LODQuality quality = LODQuality::HIGH;
     float meshDecimate = 0.0f; // 0.0 = no decimation, 1.0 = max decimation
     float materialDetail = 1.0f; // 0.0 = simplified, 1.0 = full detail
     int maxBones = 100;
@@ -252,15 +257,16 @@ struct QuadMechAsset {
     MaterialHandle energyCoreMaterial = 0;
     MaterialHandle canopyMaterial = 0;
     
-    // Metadata
+    // Metadata (the asset's cache/identity hash is definition.hashKey())
     QuadMechDefinition definition;
-    uint64_t hashKey;
     
     uint64_t hashKey() const;
 };
 
 struct QuadMechInstance {
-    QuadMechAsset* asset = nullptr;
+    std::string id; // assigned by QuadMechLoader (empty for unmanaged instances)
+    // Shared with the factory cache so the instance stays valid after eviction.
+    std::shared_ptr<const QuadMechAsset> asset;
     glm::mat4 transform = glm::mat4(1.0f);
     float currentAnimationTime = 0.0f;
     std::string currentAnimation = "idle";
@@ -274,6 +280,9 @@ struct QuadMechInstance {
     
     // Physics state
     std::vector<PhysicsBodyHandle> physicsBodies;
+    // Force/torque accumulated since the physics step last consumed them (world space).
+    glm::vec3 accumulatedForce = {0, 0, 0};
+    glm::vec3 accumulatedTorque = {0, 0, 0};
     
     uint64_t hashKey() const;
 };
@@ -328,7 +337,7 @@ struct EditorState {
 struct CacheEntry {
     QuadMechAsset asset;
     std::chrono::system_clock::time_point lastModified;
-    uint64_t fileHash;
+    uint64_t fileHash = 0;
     bool isValid = true;
     
     uint64_t hashKey() const;
@@ -340,122 +349,179 @@ struct CacheEntry {
 
 template<typename T>
 uint64_t hashCombine(uint64_t seed, const T& value) {
-    return seed ^ (std::hash<T>{}(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2));
+    return seed ^ (std::hash<T>{}(value) + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2));
+}
+
+// Field-by-field XXH64 accumulator. Hashing whole structs as raw memory would
+// pick up padding bytes and the heap pointers inside std::string / containers,
+// so every hashKey() below feeds its fields individually.
+class QuadMechHasher {
+public:
+    QuadMechHasher() { XXH64_reset(&m_state, 0); }
+
+    template<typename T>
+    QuadMechHasher& add(const T& value) {
+        static_assert(std::is_trivially_copyable_v<T>, "add() needs a trivially copyable type");
+        if constexpr (std::is_same_v<T, bool>) {
+            const uint8_t b = value ? 1 : 0;
+            XXH64_update(&m_state, &b, sizeof(b));
+        } else {
+            XXH64_update(&m_state, &value, sizeof(T));
+        }
+        return *this;
+    }
+
+    QuadMechHasher& add(const std::string& s) {
+        const uint64_t len = s.size();
+        XXH64_update(&m_state, &len, sizeof(len)); // length prefix keeps "ab"+"c" != "a"+"bc"
+        XXH64_update(&m_state, s.data(), s.size());
+        return *this;
+    }
+
+    uint64_t digest() const { return XXH64_digest(&m_state); }
+
+private:
+    XXH64_state_t m_state;
+};
+
+// Sorted keys of an unordered map, for order-independent hashing.
+template<typename Map>
+std::vector<typename Map::key_type> sortedKeys(const Map& m) {
+    std::vector<typename Map::key_type> keys;
+    keys.reserve(m.size());
+    for (const auto& [k, v] : m) keys.push_back(k);
+    std::sort(keys.begin(), keys.end());
+    return keys;
 }
 
 // Hash function implementations
-uint64_t ModuleDefinition::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(ModuleDefinition) - sizeof(std::string) * 4);
-    XXH64_update(&s, id.c_str(), id.length());
-    XXH64_update(&s, meshPath.c_str(), meshPath.length());
-    XXH64_update(&s, attachBone.c_str(), attachBone.length());
-    XXH64_update(&s, materialOverride.c_str(), materialOverride.length());
-    return XXH64_digest(&s);
+inline uint64_t ModuleDefinition::hashKey() const {
+    QuadMechHasher h;
+    h.add(id).add(type).add(meshPath).add(attachBone)
+     .add(offset).add(scale).add(rotation)
+     .add(mass).add(inertia).add(materialOverride);
+    return h.digest();
 }
 
-uint64_t CockpitDefinition::hashKey() const {
-    return XXH64(this, sizeof(CockpitDefinition), 0);
+inline uint64_t CockpitDefinition::hashKey() const {
+    QuadMechHasher h;
+    h.add(seatPosition).add(canopyTint).add(canopyMaterial);
+    h.add(static_cast<uint64_t>(hudAnchorPoints.size()));
+    for (const auto& p : hudAnchorPoints) h.add(p);
+    h.add(transparency).add(enableHologram);
+    return h.digest();
 }
 
-uint64_t EnergyRunes::hashKey() const {
-    return XXH64(this, sizeof(EnergyRunes), 0);
+inline uint64_t EnergyRunes::hashKey() const {
+    QuadMechHasher h;
+    h.add(emissiveColor).add(glowIntensity).add(animationRate)
+     .add(pulseFrequency).add(enableFlicker).add(flickerIntensity);
+    return h.digest();
 }
 
-uint64_t EnergyCore::hashKey() const {
-    return XXH64(this, sizeof(EnergyCore), 0);
+inline uint64_t EnergyCore::hashKey() const {
+    QuadMechHasher h;
+    h.add(coreColor).add(energyLevel).add(pulseRate)
+     .add(enableArcs).add(arcIntensity).add(arcCount);
+    return h.digest();
 }
 
-uint64_t CanopyMaterial::hashKey() const {
-    return XXH64(this, sizeof(CanopyMaterial), 0);
+inline uint64_t CanopyMaterial::hashKey() const {
+    QuadMechHasher h;
+    h.add(tint).add(transparency).add(reflectivity)
+     .add(enableScratches).add(scratchDensity);
+    return h.digest();
 }
 
-uint64_t MagitechMaterials::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
+inline uint64_t MagitechMaterials::hashKey() const {
     uint64_t hash = energyRunes.hashKey();
     hash = hashCombine(hash, energyCore.hashKey());
     hash = hashCombine(hash, canopy.hashKey());
     return hash;
 }
 
-uint64_t AnimationDefinition::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(AnimationDefinition) - sizeof(std::string) * 2);
-    XXH64_update(&s, id.c_str(), id.length());
-    XXH64_update(&s, path.c_str(), path.length());
-    return XXH64_digest(&s);
+inline uint64_t AnimationDefinition::hashKey() const {
+    QuadMechHasher h;
+    h.add(id).add(type).add(path)
+     .add(speed).add(loop).add(blendTime)
+     .add(gaitPhase).add(strideLength).add(legLift);
+    return h.digest();
 }
 
-uint64_t JointLimit::hashKey() const {
-    return XXH64(this, sizeof(JointLimit), 0);
+inline uint64_t JointLimit::hashKey() const {
+    QuadMechHasher h;
+    h.add(swing).add(twist).add(damping).add(friction);
+    return h.digest();
 }
 
-uint64_t PhysicsDefinition::hashKey() const {
-    return XXH64(this, sizeof(PhysicsDefinition), 0);
+inline uint64_t PhysicsDefinition::hashKey() const {
+    QuadMechHasher h;
+    h.add(totalMass);
+    for (const auto& k : sortedKeys(moduleMass)) h.add(k).add(moduleMass.at(k));
+    for (const auto& k : sortedKeys(jointLimits)) h.add(k).add(jointLimits.at(k).hashKey());
+    h.add(enableCCD).add(collisionMargin);
+    return h.digest();
 }
 
-uint64_t LODDefinition::hashKey() const {
-    return XXH64(this, sizeof(LODDefinition), 0);
+inline uint64_t LODDefinition::hashKey() const {
+    QuadMechHasher h;
+    h.add(quality).add(meshDecimate).add(materialDetail)
+     .add(maxBones).add(enableMorphTargets);
+    return h.digest();
 }
 
-uint64_t QuadMechDefinition::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(QuadMechDefinition) - sizeof(std::vector<ModuleDefinition>) - sizeof(CockpitDefinition) - sizeof(MagitechMaterials) - sizeof(std::vector<AnimationDefinition>) - sizeof(PhysicsDefinition) - sizeof(std::vector<LODDefinition>) - sizeof(std::string) * 4);
-    XXH64_update(&s, name.c_str(), name.length());
-    XXH64_update(&s, version.c_str(), version.length());
-    XXH64_update(&s, author.c_str(), author.length());
-    XXH64_update(&s, description.c_str(), description.length());
-    
-    // Hash vectors
-    for (const auto& module : modules) {
-        XXH64_update(&s, &module.hashKey(), sizeof(uint64_t));
-    }
-    for (const auto& anim : animations) {
-        XXH64_update(&s, &anim.hashKey(), sizeof(uint64_t));
-    }
-    for (const auto& lod : lods) {
-        XXH64_update(&s, &lod.hashKey(), sizeof(uint64_t));
-    }
-    
-    // Hash complex objects
-    XXH64_update(&s, &cockpit.hashKey(), sizeof(uint64_t));
-    XXH64_update(&s, &magitechMaterials.hashKey(), sizeof(uint64_t));
-    XXH64_update(&s, &physics.hashKey(), sizeof(uint64_t));
-    
-    return XXH64_digest(&s);
+inline uint64_t QuadMechDefinition::hashKey() const {
+    QuadMechHasher h;
+    h.add(name).add(version).add(author).add(description);
+
+    h.add(static_cast<uint64_t>(modules.size()));
+    for (const auto& module : modules) h.add(module.hashKey());
+    h.add(static_cast<uint64_t>(animations.size()));
+    for (const auto& anim : animations) h.add(anim.hashKey());
+    h.add(static_cast<uint64_t>(lods.size()));
+    for (const auto& lod : lods) h.add(lod.hashKey());
+    h.add(static_cast<uint64_t>(tags.size()));
+    for (const auto& tag : tags) h.add(tag);
+
+    h.add(cockpit.hashKey());
+    h.add(magitechMaterials.hashKey());
+    h.add(physics.hashKey());
+    return h.digest();
 }
 
-uint64_t QuadMechAsset::hashKey() const {
+inline uint64_t QuadMechAsset::hashKey() const {
     return definition.hashKey();
 }
 
-uint64_t QuadMechInstance::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(QuadMechInstance) - sizeof(QuadMechAsset*) - sizeof(std::string) - sizeof(std::vector<PhysicsBodyHandle>));
-    XXH64_update(&s, currentAnimation.c_str(), currentAnimation.length());
-    return XXH64_digest(&s);
+inline uint64_t QuadMechInstance::hashKey() const {
+    QuadMechHasher h;
+    h.add(transform).add(currentAnimationTime).add(currentAnimation).add(currentLOD)
+     .add(energyLevel).add(runeGlowIntensity).add(cockpitOpen).add(pilotInside);
+    return h.digest();
 }
 
-uint64_t MechPackage::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(MechPackage) - sizeof(std::string) * 4 - sizeof(std::unordered_map<LODQuality, std::string>) * 2 - sizeof(std::unordered_map<std::string, std::string>));
-    XXH64_update(&s, name.c_str(), name.length());
-    XXH64_update(&s, version.c_str(), version.length());
-    XXH64_update(&s, definitionPath.c_str(), definitionPath.length());
-    XXH64_update(&s, skeletonPath.c_str(), skeletonPath.length());
-    return XXH64_digest(&s);
+inline uint64_t MechPackage::hashKey() const {
+    QuadMechHasher h;
+    h.add(name).add(version).add(definitionPath).add(skeletonPath)
+     .add(physicsPath).add(metadataPath);
+    for (const auto& q : sortedKeys(meshPaths)) h.add(q).add(meshPaths.at(q));
+    for (const auto& q : sortedKeys(materialPaths)) h.add(q).add(materialPaths.at(q));
+    for (const auto& k : sortedKeys(animationPaths)) h.add(k).add(animationPaths.at(k));
+    return h.digest();
 }
 
-uint64_t EditorState::hashKey() const {
-    XXH64_state_t s; XXH64_reset(&s, 0);
-    XXH64_update(&s, this, sizeof(EditorState) - sizeof(std::string) - sizeof(QuadMechDefinition));
-    XXH64_update(&s, currentMechName.c_str(), currentMechName.length());
-    return XXH64_digest(&s);
+inline uint64_t EditorState::hashKey() const {
+    QuadMechHasher h;
+    h.add(currentMechName).add(currentDefinition.hashKey())
+     .add(isDirty).add(previewTime).add(previewLOD)
+     .add(showModulePanel).add(showMaterialPanel).add(showAnimationPanel)
+     .add(showPhysicsPanel).add(showLODPanel);
+    return h.digest();
 }
 
-uint64_t CacheEntry::hashKey() const {
+inline uint64_t CacheEntry::hashKey() const {
     return asset.hashKey();
 }
 
 } // namespace QuadMech
-} // namespace MagiTech 
+} // namespace MagiTech

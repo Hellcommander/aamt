@@ -1,10 +1,39 @@
 #include "IngredientLuaBindings.hpp"
 #include "IngredientFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
+#include "core/Log.hpp"
 #include <vector>
 
 namespace MagiTech {
 namespace Ingredients {
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<IngredientFactory>& factorySlot() {
+    static std::shared_ptr<IngredientFactory> f;
+    return f;
+}
+} // namespace
+
+void IngredientLuaBindings::setFactory(std::shared_ptr<IngredientFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<IngredientFactory> IngredientLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No factory injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<IngredientFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 static std::vector<std::pair<std::future<IngredientAssetBundle>, std::string>> pendingIngredients;
 
@@ -67,15 +96,15 @@ void IngredientLuaBindings::bind(sol::state& lua) {
     );
 
     lua.set_function("spawn_ingredient",
-        [&](const IngredientParams& p) {
-            auto factory = MainPlugin::instance().getIngredientFactory();
+        [](const IngredientParams& p) {
+            auto factory = IngredientLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("spawn_ingredient_async",
-        [&](const IngredientParams& p) {
-            auto factory = MainPlugin::instance().getIngredientFactory();
+        [](const IngredientParams& p) {
+            auto factory = IngredientLuaBindings::factory();
             pendingIngredients.emplace_back(factory->generateAsync(p), p.id);
         }
     );
@@ -88,7 +117,7 @@ void IngredientLuaBindings::poll_assets(sol::state& lua) {
                 auto b = it->first.get();
                 lua["print"]("Ingredient ready: " + it->second);
             } catch (const std::exception& e) {
-                // log error
+                Log::error("Ingredients", "Asset generation failed for {}: {}", it->second, e.what());
             }
             it = pendingIngredients.erase(it);
         } else {

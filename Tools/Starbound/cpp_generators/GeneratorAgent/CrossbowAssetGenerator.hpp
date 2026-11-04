@@ -30,23 +30,23 @@ public:
         std::string description;
         std::string rarity;
         std::string category;
-        std::string level;
-        std::string damageType;
-        float damage;
-        float fireRate;
-        std::string abilityType;
+        std::string level = "1";
+        std::string damageType = "physical";
+        float damage = 10.0f;
+        float fireRate = 1.0f;          // shots per second
+        std::string abilityType = "crossbowshot";
         std::vector<std::string> projectileTypes;
-        
+
         // Integration with existing systems
-        std::string behaviorSystem;     // "lua", "cpp", "hybrid"
-        std::string effectSystem;       // "spell", "projectile", "custom"
+        std::string behaviorSystem = "lua";     // "lua", "cpp", "hybrid"
+        std::string effectSystem = "projectile"; // "spell", "projectile", "custom"
         std::vector<std::string> specialEffects; // ["explosive", "piercing", "elemental"]
-        std::string materialSystem;     // "vanilla", "magitech", "custom"
-        
+        std::string materialSystem = "vanilla"; // "vanilla", "magitech", "custom"
+
         // AI Art generation settings
-        bool useAIArt;                  // Enable AI art generation
-        std::string artStyle;           // "pixel-art", "realistic", "cartoon"
-        std::string colorPalette;       // "starbound", "neon", "earth-tone"
+        bool useAIArt = false;          // Enable AI art generation
+        std::string artStyle = "pixel-art";      // "pixel-art", "realistic", "cartoon"
+        std::string colorPalette = "starbound";  // "starbound", "neon", "earth-tone"
         std::vector<std::string> artEffects; // ["metallic", "glowing", "weathered"]
     };
 
@@ -68,6 +68,8 @@ public:
     std::string generateFramesJSON(const std::string& spriteName, int frameCount);
     std::string generateBehaviorScript(const CrossbowParams& params, const ItemConfig& config);
     std::string generateEffectConfig(const CrossbowParams& params, const ItemConfig& config);
+    std::string generateEffectConfig(const BoltParams& params, const ItemConfig& config);
+    std::string generateEffectConfig(const ArrowParams& params, const ItemConfig& config);
     
     // AI Art integration
     AIArt::ArtOutput generateCrossbowArt(const CrossbowParams& params, const ItemConfig& config);

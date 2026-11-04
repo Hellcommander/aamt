@@ -11,6 +11,10 @@
 #include <future>
 #include <mutex>
 #include <condition_variable>
+#include <any>
+#include <atomic>
+#include <chrono>
+#include <cstdint>
 
 // Forward declarations
 struct ImGuiContext;
@@ -20,12 +24,86 @@ namespace MagiTech {
 namespace ImageGen {
 
 // Forward declarations for external dependencies
-class RenderContext;
 class MechPipeline;
-class ImageAssembler;
-class ImageWriter;
-class SpritesheetAssembler;
 class AnimationAssembler;
+
+// Returns a process-unique, non-zero handle for images / textures / framebuffers.
+ImageHandle allocateImageHandle();
+
+// Offscreen CPU render target that frames are captured from.
+class RenderContext {
+public:
+    RenderContext() = default;
+
+    // Resize the colour target (contents are reset to transparent black).
+    void resize(int width, int height);
+    // Fill the colour target with an RGBA colour (components 0..1).
+    void clear(const glm::vec4& color);
+
+    int width() const { return m_color.width; }
+    int height() const { return m_color.height; }
+
+    ImageData& colorBuffer() { return m_color; }
+    const ImageData& colorBuffer() const { return m_color; }
+
+    // Copy of the current colour target with a fresh image handle.
+    ImageData readPixels() const;
+
+    ImageHandle framebufferHandle() const { return m_framebuffer; }
+
+private:
+    ImageData m_color;
+    ImageHandle m_framebuffer = allocateImageHandle();
+};
+
+// CPU image operations used to assemble frames and sheets.
+class ImageAssembler {
+public:
+    // Convert any 1-4 channel image to RGBA8.
+    ImageData toRGBA(const ImageData& src) const;
+    // Bilinear resize (output keeps the source channel count).
+    ImageData resize(const ImageData& src, int newWidth, int newHeight) const;
+    // Add a border of `padding` pixels filled with `paddingColor` (components 0..1).
+    ImageData addPadding(const ImageData& src, int padding, const glm::vec4& paddingColor) const;
+    // Copy the w*h region starting at (x, y); parts outside the source stay transparent.
+    ImageData crop(const ImageData& src, int x, int y, int w, int h) const;
+    // Copy `src` into `dst` at (x, y), converting channels; clipped to `dst`.
+    void blit(ImageData& dst, const ImageData& src, int x, int y) const;
+    // Fill every pixel with `color` (components 0..1).
+    void fill(ImageData& image, const glm::vec4& color) const;
+};
+
+// Writes / reads image files through stb_image_write / stb_image.
+class ImageWriter {
+public:
+    bool write(const ImageData& image, const std::string& path, ImageFormat format, float quality = 0.9f) const;
+    // Format chosen from the file extension (PNG when unknown).
+    bool write(const ImageData& image, const std::string& path) const;
+    bool read(const std::string& path, ImageData& out, int desiredChannels = 4) const;
+
+    static ImageFormat formatFromPath(const std::string& path);
+
+    const std::string& lastError() const { return m_lastError; }
+
+private:
+    mutable std::string m_lastError;
+};
+
+// Lays out a set of tile images on a grid and produces the combined sheet + atlas data.
+class SpritesheetAssembler {
+public:
+    SpritesheetBundle assemble(const std::vector<ImageBundle>& tiles,
+                               int cols, int rows, int tileW, int tileH, int padding,
+                               const glm::vec4& backgroundColor = glm::vec4(0.0f),
+                               float frameRate = 30.0f, bool looping = true,
+                               const std::string& animationName = "default") const;
+
+private:
+    ImageAssembler m_images;
+};
+
+// NEW: Pipeline Registration Function (registers the built-in "mech" and "character" pipelines)
+void registerDefaultPipelines();
 
 // NEW: Dynamic Pipeline System
 class IPipeline {
@@ -77,7 +155,7 @@ public:
     
 private:
     std::unordered_map<std::string, PipelineCreator> m_creators;
-    std::mutex m_mutex;
+    mutable std::mutex m_mutex;
 };
 
 // Pipeline manager for runtime pipeline switching
@@ -233,8 +311,7 @@ public:
     bool exportAtlasJSON(const SpritesheetBundle& bundle, const std::string& outputPath);
     bool exportIndividualFrames(const SpritesheetBundle& bundle, const std::string& outputDir);
     
-    // NEW: Animation export functions
-    bool exportStarboundAnimation(const AnimationParams& params, const std::string& outputPath);
+    // NEW: Animation export functions (exportStarboundAnimation is declared with the animation functions above)
     bool exportAnimationFrames(const AnimationBundle& bundle, const std::string& outputDir);
     bool exportTimelineData(const AnimationBundle& bundle, const std::string& outputPath);
     
@@ -299,7 +376,8 @@ private:
     AnimationGeneratorState m_animationState;
     ImagePerformanceMetrics m_performanceMetrics;
     AnimationPerformanceMetrics m_animationPerformanceMetrics;
-    std::string m_lastError;
+    mutable std::string m_lastError;
+    mutable std::string m_pipelineConfigPath;   // last pipeline config saved/loaded (used by hot reload)
     
     // Processing settings
     int m_processingQuality;
@@ -326,7 +404,7 @@ private:
     std::unordered_map<uint64_t, ImageBundle> m_imageCache;
     std::unordered_map<uint64_t, SpritesheetBundle> m_spritesheetCache;
     std::unordered_map<uint64_t, AnimationBundle> m_animationCache;
-    std::mutex m_cacheMutex;
+    mutable std::mutex m_cacheMutex;
     
     // External dependencies
     std::unique_ptr<RenderContext> m_renderContext;
@@ -354,7 +432,9 @@ private:
     ImageBundle processImageGeneration(const ImageParams& params);
     SpritesheetBundle processSpritesheetGeneration(const SpritesheetParams& params);
     ImageBundle processFrameCapture(const CaptureParams& params);
-    
+    ImageBundle captureWithContext(RenderContext& ctx, const CaptureParams& params);
+    void ensureProcessingObjects();
+
     // NEW: Animation processing helpers
     AnimationBundle processAnimationGeneration(const AnimationParams& params);
     std::vector<ImageBundle> processAnimationFrameCapture(const AnimationParams& params);

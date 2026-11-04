@@ -4,7 +4,20 @@
 
 namespace mt::qa {
 
+namespace {
+// The QA.system instance currently stored in Lua (scripts may replace it)
+std::shared_ptr<UnifiedQASystem> currentSystem(sol::this_state ts) {
+    sol::state_view lua(ts);
+    return lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+}
+} // namespace
+
 void UnifiedQALuaBindings::bind(sol::state& lua) {
+    // Global QA table with convenience functions. ImageScore lives in it (QA.ImageScore)
+    // because VisualQA binds a different ImageScore type.
+    sol::table qaTable = lua.create_table();
+    lua["QA"] = qaTable;
+
     // Bind result types
     lua.new_usertype<ValidationError>("ValidationError",
         "field", &ValidationError::field,
@@ -23,7 +36,7 @@ void UnifiedQALuaBindings::bind(sol::state& lua) {
         "assetType", &ValidationResult::assetType
     );
     
-    lua.new_usertype<ImageScore>("ImageScore",
+    qaTable.new_usertype<ImageScore>("ImageScore",
         "psnr", &ImageScore::psnr,
         "ssim", &ImageScore::ssim,
         "histogramCorrelation", &ImageScore::histogramCorrelation,
@@ -54,7 +67,15 @@ void UnifiedQALuaBindings::bind(sol::state& lua) {
         "enableDataValidation", &UnifiedTestConfig::enableDataValidation,
         "strictMode", &UnifiedTestConfig::strictMode,
         "requiredFields", &UnifiedTestConfig::requiredFields,
-        "fieldValidators", &UnifiedTestConfig::fieldValidators,
+        // Plain Lua table copied in/out: the vendored sol2 container usertype cannot iterate string maps
+        "fieldValidators", sol::property(
+            [](const UnifiedTestConfig& config) { return sol::as_table(config.fieldValidators); },
+            [](UnifiedTestConfig& config, sol::table table) {
+                config.fieldValidators.clear();
+                for (const auto& [key, value] : table) {
+                    config.fieldValidators[key.as<std::string>()] = value.as<std::string>();
+                }
+            }),
         "enableVisualQA", &UnifiedTestConfig::enableVisualQA,
         "baselineDirectory", &UnifiedTestConfig::baselineDirectory,
         "outputDirectory", &UnifiedTestConfig::outputDirectory,
@@ -99,70 +120,67 @@ void UnifiedQALuaBindings::bind(sol::state& lua) {
         "resetStatistics", &UnifiedQASystem::resetStatistics
     );
     
-    // Create global QA table with convenience functions
-    lua["QA"] = lua.create_table();
-    
     // Global QA instance
     lua["QA"]["system"] = std::make_shared<UnifiedQASystem>();
     
     // Convenience functions
-    lua["QA"]["testAsset"] = [](const std::string& assetPath) {
-        auto system = lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+    lua["QA"]["testAsset"] = [](sol::this_state ts, const std::string& assetPath) {
+        auto system = currentSystem(ts);
         return system->testAsset(assetPath);
     };
     
-    lua["QA"]["testDirectory"] = [](const std::string& directoryPath) {
-        auto system = lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+    lua["QA"]["testDirectory"] = [](sol::this_state ts, const std::string& directoryPath) {
+        auto system = currentSystem(ts);
         return system->testDirectory(directoryPath);
     };
     
-    lua["QA"]["testBatch"] = [](const std::vector<std::string>& assetPaths) {
-        auto system = lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+    lua["QA"]["testBatch"] = [](sol::this_state ts, const std::vector<std::string>& assetPaths) {
+        auto system = currentSystem(ts);
         return system->testBatch(assetPaths);
     };
     
-    lua["QA"]["configure"] = [](const UnifiedTestConfig& config) {
-        auto system = lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+    lua["QA"]["configure"] = [](sol::this_state ts, const UnifiedTestConfig& config) {
+        auto system = currentSystem(ts);
         system->configure(config);
     };
     
-    lua["QA"]["generateBaseline"] = [](const std::string& assetPath) {
-        auto system = lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+    lua["QA"]["generateBaseline"] = [](sol::this_state ts, const std::string& assetPath) {
+        auto system = currentSystem(ts);
         system->generateBaseline(assetPath);
     };
     
-    lua["QA"]["generateBaselines"] = [](const std::string& directoryPath) {
-        auto system = lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+    lua["QA"]["generateBaselines"] = [](sol::this_state ts, const std::string& directoryPath) {
+        auto system = currentSystem(ts);
         system->generateBaselines(directoryPath);
     };
     
-    lua["QA"]["generateReport"] = [](const std::vector<UnifiedTestResult>& results, const std::string& outputPath) {
-        auto system = lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+    lua["QA"]["generateReport"] = [](sol::this_state ts, const std::vector<UnifiedTestResult>& results, const std::string& outputPath) {
+        auto system = currentSystem(ts);
         system->generateReport(results, outputPath);
     };
     
-    lua["QA"]["generateSummary"] = [](const std::vector<UnifiedTestResult>& results) {
-        auto system = lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+    lua["QA"]["generateSummary"] = [](sol::this_state ts, const std::vector<UnifiedTestResult>& results) {
+        auto system = currentSystem(ts);
         system->generateSummary(results);
     };
     
-    lua["QA"]["getStatistics"] = []() {
-        auto system = lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+    lua["QA"]["getStatistics"] = [](sol::this_state ts) {
+        auto system = currentSystem(ts);
         return system->getStatistics();
     };
     
-    lua["QA"]["resetStatistics"] = []() {
-        auto system = lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+    lua["QA"]["resetStatistics"] = [](sol::this_state ts) {
+        auto system = currentSystem(ts);
         system->resetStatistics();
     };
     
-    lua["QA"]["getSupportedAssetTypes"] = []() {
-        auto system = lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+    lua["QA"]["getSupportedAssetTypes"] = [](sol::this_state ts) {
+        auto system = currentSystem(ts);
         return system->getSupportedAssetTypes();
     };
     
-    lua["QA"]["getRegisteredValidators"] = []() {
-        auto system = lua["QA"]["system"].get<std::shared_ptr<UnifiedQASystem>>();
+    lua["QA"]["getRegisteredValidators"] = [](sol::this_state ts) {
+        auto system = currentSystem(ts);
         return system->getRegisteredValidators();
     };
     
@@ -198,8 +216,16 @@ void UnifiedQALuaBindings::bind(sol::state& lua) {
 }
 
 void UnifiedQALuaBindings::update(sol::state& lua) {
-    // Update any dynamic bindings if needed
-    // This could be used for runtime configuration updates
+    // Scripts may clear or replace QA.system; the convenience functions need a valid instance
+    sol::object qa = lua["QA"];
+    if (!qa.is<sol::table>()) {
+        bind(lua);
+        return;
+    }
+    sol::object system = lua["QA"]["system"];
+    if (!system.is<std::shared_ptr<UnifiedQASystem>>()) {
+        lua["QA"]["system"] = std::make_shared<UnifiedQASystem>();
+    }
 }
 
 } // namespace mt::qa 

@@ -1,4 +1,5 @@
 #include "ColorPickerSystem.hpp"
+#include "core/Log.hpp"
 #include <random>
 #include <algorithm>
 #include <memory>
@@ -59,7 +60,7 @@ public:
         m_enabled = true;
         m_initialized = true;
         
-        Log::info("C++ Plugin initialized: {} v{}", m_name, m_version);
+        Log::info("ColorPickerPlugin", "C++ Plugin initialized: {} v{}", m_name, m_version);
         return true;
     }
     
@@ -69,7 +70,7 @@ public:
             m_initialized = false;
             m_palettes.clear();
             m_availablePalettes.clear();
-            Log::info("C++ Plugin shutdown: {}", m_name);
+            Log::info("ColorPickerPlugin", "C++ Plugin shutdown: {}", m_name);
         }
     }
     

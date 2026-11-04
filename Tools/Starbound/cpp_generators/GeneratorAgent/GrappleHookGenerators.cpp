@@ -4,7 +4,7 @@
 namespace MagiTech {
 namespace GrappleHooks {
 
-#define LOG_GRAPPLE_GEN(Action, Id) Log::info("GrappleHookGen - {}: {}", #Action, Id)
+#define LOG_GRAPPLE_GEN(Action, Id) Log::info("GrappleHook", "GrappleHookGen - {}: {}", #Action, Id)
 
 // Hash function implementations
 uint64_t HookParams::hashKey() const {

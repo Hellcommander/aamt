@@ -22,7 +22,7 @@ LightningType parseLightningType(const std::string& str) {
     if (lower == "magic" || lower == "magic_lightning") return LightningType::MAGIC;
     if (lower == "custom") return LightningType::CUSTOM;
     
-    Log::warn("Unknown lightning type: {}, defaulting to BOLT", str);
+    Log::warn("LightningProjectile", "Unknown lightning type: {}, defaulting to BOLT", str);
     return LightningType::BOLT;
 }
 
@@ -36,7 +36,7 @@ TrailType parseTrailType(const std::string& str) {
     if (lower == "magic_trail" || lower == "magic") return TrailType::MAGIC_TRAIL;
     if (lower == "custom") return TrailType::CUSTOM;
     
-    Log::warn("Unknown trail type: {}, defaulting to ELECTRIC_TAIL", str);
+    Log::warn("LightningProjectile", "Unknown trail type: {}, defaulting to ELECTRIC_TAIL", str);
     return TrailType::ELECTRIC_TAIL;
 }
 
@@ -50,7 +50,7 @@ NoiseType parseNoiseType(const std::string& str) {
     if (lower == "fractal") return NoiseType::FRACTAL;
     if (lower == "custom") return NoiseType::CUSTOM;
     
-    Log::warn("Unknown noise type: {}, defaulting to PERLIN", str);
+    Log::warn("LightningProjectile", "Unknown noise type: {}, defaulting to PERLIN", str);
     return NoiseType::PERLIN;
 }
 
@@ -64,7 +64,7 @@ BlendMode parseBlendMode(const std::string& str) {
     if (lower == "overlay") return BlendMode::OVERLAY;
     if (lower == "normal" || lower == "alpha") return BlendMode::NORMAL;
     
-    Log::warn("Unknown blend mode: {}, defaulting to ADDITIVE", str);
+    Log::warn("LightningProjectile", "Unknown blend mode: {}, defaulting to ADDITIVE", str);
     return BlendMode::ADDITIVE;
 }
 
@@ -78,7 +78,7 @@ AudioType parseAudioType(const std::string& str) {
     if (lower == "electric" || lower == "electric_sound") return AudioType::ELECTRIC;
     if (lower == "custom") return AudioType::CUSTOM;
     
-    Log::warn("Unknown audio type: {}, defaulting to CRACKLE", str);
+    Log::warn("LightningProjectile", "Unknown audio type: {}, defaulting to CRACKLE", str);
     return AudioType::CRACKLE;
 }
 
@@ -415,7 +415,7 @@ LightningProjectileParams fromJson(const nlohmann::json& json) {
         }
         
     } catch (const std::exception& e) {
-        Log::error("Error parsing lightning projectile JSON: {}", e.what());
+        Log::error("LightningProjectile", "Error parsing lightning projectile JSON: {}", e.what());
         // Return default parameters on error
         params.id = "error_loading";
         params.lightningType = LightningType::BOLT;

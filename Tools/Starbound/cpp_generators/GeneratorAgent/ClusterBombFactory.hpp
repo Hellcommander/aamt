@@ -3,6 +3,7 @@
 #include <vector>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "ClusterBombTypes.hpp"
 
 namespace MagiTech {
@@ -51,7 +52,7 @@ public:
         if (auto hit = m_cache.find(key)) {
             return std::async(std::launch::deferred, [=] { return *hit; });
         }
-        return m_pool.enqueue([=]() {
+        return m_pool.enqueue([=, this]() {
             BombAssetBundle b;
             b.casingMesh = MeshGen::buildBombCasing(p);
             b.casingShader = ShaderGen::buildCasingShader(p);
@@ -67,7 +68,7 @@ public:
 
 private:
     ConcurrentLRUCache<uint64_t, BombAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
 };
 

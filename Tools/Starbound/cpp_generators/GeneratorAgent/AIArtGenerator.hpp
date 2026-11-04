@@ -1,15 +1,24 @@
 #pragma once
 
-#include "CrossbowAssetGenerator.hpp"
+#include "CrossbowAssetFactory.hpp"
 #include "core/Log.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include <string>
 #include <vector>
 #include <memory>
 #include <future>
+#include <mutex>
+#include <optional>
+#include <unordered_map>
 
 namespace MagiTech {
 namespace AIArt {
+
+// Crossbow parameter schemas (CrossbowAssetFactory.hpp) used by the prompt builders
+using Crossbows::CrossbowParams;
+using Crossbows::BoltParams;
+using Crossbows::ArrowParams;
 
 // AI-Driven Art Generation Pipeline
 class AIArtGenerator {
@@ -84,8 +93,10 @@ public:
     bool isCached(const std::string& promptHash) const;
 
 private:
-    std::unique_ptr<ThreadPool> pool;
+    std::unique_ptr<GeneratorTaskPool> pool;
     std::unordered_map<std::string, ArtOutput> artCache;
+    mutable std::mutex cacheMutex;
+    std::optional<ArtOutput> findCached(const std::string& promptHash) const;
     ModelConfig currentConfig;
     bool isInitialized;
 
@@ -103,6 +114,11 @@ private:
     std::string sanitizeFilename(const std::string& name);
     bool createDirectory(const std::string& path);
 };
+
+// Namespace-level aliases for the nested pipeline types
+using ArtPrompt = AIArtGenerator::ArtPrompt;
+using ArtOutput = AIArtGenerator::ArtOutput;
+using ModelConfig = AIArtGenerator::ModelConfig;
 
 // Global AI art generator instance
 extern std::unique_ptr<AIArtGenerator> g_aiArtGenerator;

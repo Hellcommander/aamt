@@ -2,6 +2,7 @@
 #include <future>
 #include "core/ConcurrentLRU.hpp"
 #include "core/threading/ThreadPool.hpp"
+#include "GeneratorConcurrency.hpp"
 #include "FrostNovaTypes.hpp"
 
 namespace MagiTech {
@@ -47,7 +48,7 @@ public:
         if (auto hit = m_cache.find(key)) {
             return std::async(std::launch::deferred, [=] { return *hit; });
         }
-        return m_pool.enqueue([=]() {
+        return m_pool.enqueue([=, this]() {
             FrostNovaAssetBundle b;
             b.ringMesh = MeshGen::buildNovaRing(p);
             b.shardMesh = MeshGen::buildIceShard(p);
@@ -62,7 +63,7 @@ public:
 
 private:
     ConcurrentLRUCache<uint64_t, FrostNovaAssetBundle> m_cache;
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized;
 };
 

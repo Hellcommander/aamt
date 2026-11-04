@@ -20,10 +20,16 @@ std::future<TextureAssetBundle> TextureAssetFactory::generateAsync(
     if (c) key = hashCombine(key, c->hashKey());
 
     if (auto hit = m_cache.find(key)) {
-        return std::async(std::launch::deferred, [=] { return *hit; });
+        return std::async(std::launch::deferred, [b = *hit] { return b; });
     }
 
-    return m_pool.enqueue([=]() {
+    ++m_activeCount;
+    return m_pool.enqueue([this, t, n, m, p, a, c, key]() {
+        struct ActiveGuard {
+            std::atomic<size_t>& count;
+            ~ActiveGuard() { --count; }
+        } guard{m_activeCount};
+
         TextureAssetBundle b;
 
         switch (t.type) {
@@ -48,6 +54,9 @@ std::future<TextureAssetBundle> TextureAssetFactory::generateAsync(
 
         if (a) {
             b.texture = AtlasGen::pack(*a);
+            if (a->generateUDIM) {
+                b.udim = UDIMLayout{};
+            }
         }
 
         if (c && b.texture != 0) {

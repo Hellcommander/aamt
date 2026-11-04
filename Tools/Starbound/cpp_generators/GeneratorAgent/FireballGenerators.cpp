@@ -10,7 +10,7 @@
 namespace MagiTech {
 namespace Fireballs {
 
-#define LOG_GEN(Asset, Id) Log::info("Building Fireball {}: {}", #Asset, Id)
+#define LOG_GEN(Asset, Id) Log::info("Fireball", "Building Fireball {}: {}", #Asset, Id)
 
 namespace MeshGen {
     MeshHandle buildCore(const FireballParams& p) {

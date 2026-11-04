@@ -1515,7 +1515,9 @@ def generate_fighter_tiles(
         if draft:
             sources = [draft]
             method = "detail-sd"
-    if not sources and color_mode == "classic":
+    # Classic mode is procedural-by-design (use_sd defaults off). If the caller explicitly asked
+    # for SD (use_sd=True) and it produced nothing, do NOT silently stamp a silhouette.
+    if not sources and color_mode == "classic" and not use_sd:
         allow_silhouette = True
     if not sources:
         if not allow_silhouette:

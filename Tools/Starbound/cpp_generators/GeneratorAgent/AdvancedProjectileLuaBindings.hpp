@@ -3,7 +3,10 @@
 #include <sol/sol.hpp>
 #include "AdvancedProjectileTypes.hpp"
 #include "AdvancedProjectileFactories.hpp"
+#include <future>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace MagiTech {
@@ -13,17 +16,20 @@ class AdvancedProjectileLuaBindings {
 public:
     static void bind(sol::state& lua);
     static void poll_assets(sol::state& lua);
-    
+
+    // Manager used by the bindings; inject the host's instance with setManager,
+    // otherwise manager() lazily creates and initializes a default one.
+    static void setManager(std::shared_ptr<AdvancedProjectileManager> manager);
+    static std::shared_ptr<AdvancedProjectileManager> manager();
+
 private:
-    static std::unique_ptr<AdvancedProjectileManager> g_manager;
-    
     // Pending asset tracking
     static std::vector<std::pair<std::future<MissileBundle>, std::string>> pendingMissiles;
     static std::vector<std::pair<std::future<ShardBundle>, std::string>> pendingGrenades;
     static std::vector<std::pair<std::future<BeamBundle>, std::string>> pendingBeams;
     static std::vector<std::pair<std::future<BoomerangBundle>, std::string>> pendingBoomerangs;
     static std::vector<std::pair<std::future<GrapnelBundle>, std::string>> pendingGrapnels;
-    
+
     // Validation functions
     static bool validateGuidanceParams(const GuidanceParams& p);
     static bool validatePropulsionParams(const PropulsionParams& p);
@@ -35,7 +41,7 @@ private:
     static bool validateBoomerangParams(const BoomerangParams& p);
     static bool validateGrapnelParams(const GrapnelParams& p);
     static bool validateHookParams(const HookParams& p);
-    
+
     // Utility functions
     static GuidanceParams createDefaultGuidance();
     static PropulsionParams createDefaultPropulsion();
@@ -50,4 +56,4 @@ private:
 };
 
 } // namespace AdvancedProjectiles
-} // namespace MagiTech 
+} // namespace MagiTech

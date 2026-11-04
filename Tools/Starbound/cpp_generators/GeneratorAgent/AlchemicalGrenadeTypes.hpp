@@ -450,7 +450,7 @@ namespace ParamUtils {
     nlohmann::json toJson(const AlchemicalGrenadeParams& params);
     AlchemicalGrenadeParams fromJson(const nlohmann::json& json);
     nlohmann::json toJson(const UIItemParams& params);
-    UIItemParams fromJson(const nlohmann::json& json);
+    UIItemParams uiItemParamsFromJson(const nlohmann::json& json);
 }
 
 } // namespace AlchemicalGrenades

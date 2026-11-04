@@ -1,12 +1,40 @@
 #include "ExplosiveProjectileLuaBindings.hpp"
 #include "ExplosiveProjectileFactory.hpp"
-#include "core/plugins/MainPlugin.hpp"
+#include <memory>
+#include <mutex>
 #include <vector>
 
 namespace MagiTech {
 namespace ExplosiveProjectiles {
 
 static std::vector<std::pair<std::future<ExplosiveAssetBundle>, std::string>> pendingProjectiles;
+
+namespace {
+std::mutex& factoryMutex() {
+    static std::mutex m;
+    return m;
+}
+std::shared_ptr<ExplosiveProjectileFactory>& factorySlot() {
+    static std::shared_ptr<ExplosiveProjectileFactory> f;
+    return f;
+}
+} // namespace
+
+void ExplosiveProjectileLuaBindings::setFactory(std::shared_ptr<ExplosiveProjectileFactory> factory) {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    factorySlot() = std::move(factory);
+}
+
+std::shared_ptr<ExplosiveProjectileFactory> ExplosiveProjectileLuaBindings::factory() {
+    std::lock_guard<std::mutex> lock(factoryMutex());
+    auto& slot = factorySlot();
+    if (!slot) {
+        // No instance injected (e.g. by MainPlugin): create a default one.
+        slot = std::make_shared<ExplosiveProjectileFactory>();
+        slot->initialize(64, 4);
+    }
+    return slot;
+}
 
 void ExplosiveProjectileLuaBindings::bind(sol::state& lua) {
     lua.new_usertype<ExplosiveProjectileParams>("ExplosiveProjectileParams",
@@ -51,14 +79,14 @@ void ExplosiveProjectileLuaBindings::bind(sol::state& lua) {
 
     lua.set_function("spawn_explosive_projectile",
         [&](const ExplosiveProjectileParams& p) {
-            auto factory = MainPlugin::instance().getExplosiveProjectileFactory();
+            auto factory = ExplosiveProjectileLuaBindings::factory();
             return factory->generateAsync(p).get();
         }
     );
 
     lua.set_function("spawn_explosive_projectile_async",
         [&](const ExplosiveProjectileParams& p) {
-            auto factory = MainPlugin::instance().getExplosiveProjectileFactory();
+            auto factory = ExplosiveProjectileLuaBindings::factory();
             pendingProjectiles.emplace_back(factory->generateAsync(p), p.id);
         }
     );

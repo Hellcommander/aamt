@@ -9,10 +9,10 @@ void EditorUILuaBindings::bind(sol::state& lua) {
     lua.set_function("open_color_picker", [&](const std::string& name, sol::table colorTable) -> bool {
         // Unpack color from Lua table
         glm::vec4 c(
-            colorTable.get_or<float>(1, 0.0f),
-            colorTable.get_or<float>(2, 0.0f),
-            colorTable.get_or<float>(3, 0.0f),
-            colorTable.get_or<float>(4, 1.0f)
+            colorTable.get_or(1, 0.0f),
+            colorTable.get_or(2, 0.0f),
+            colorTable.get_or(3, 0.0f),
+            colorTable.get_or(4, 1.0f)
         );
 
         // This is a conceptual binding. In a real ImGui app, drawing is stateful and happens

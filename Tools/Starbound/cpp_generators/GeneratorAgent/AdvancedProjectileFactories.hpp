@@ -2,7 +2,8 @@
 
 #include <future>
 #include <memory>
-#include "core/threading/ThreadPool.hpp"
+#include <vector>
+#include "GeneratorConcurrency.hpp"
 #include "AdvancedProjectileTypes.hpp"
 
 namespace MagiTech {
@@ -13,7 +14,7 @@ namespace AdvancedProjectiles {
 // ============================================================================
 
 class GuidedMissileFactory {
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized = false;
 
 public:
@@ -30,24 +31,24 @@ public:
 
 private:
     // Generator modules
-    namespace MeshGen {
-        MeshHandle buildMissileMesh(const GuidanceParams& g, const PropulsionParams& p);
-    }
-    namespace ShaderGen {
-        ShaderHandle compileTrailShader(const PropulsionParams& p);
-    }
-    namespace ParticleGen {
-        ParticleHandle buildEngineExhaust(const PropulsionParams& p);
-    }
-    namespace AudioGen {
-        AudioHandle loadHumAudio(const PropulsionParams& p);
-    }
-    namespace GuidanceSim {
-        SimulationHandle setup(const GuidanceParams& g, const TargetParams& t);
-    }
-    namespace PropulsionSim {
-        SimulationHandle setup(const PropulsionParams& p);
-    }
+    struct MeshGen {
+        static MeshHandle buildMissileMesh(const GuidanceParams& g, const PropulsionParams& p);
+    };
+    struct ShaderGen {
+        static ShaderHandle compileTrailShader(const PropulsionParams& p);
+    };
+    struct ParticleGen {
+        static ParticleHandle buildEngineExhaust(const PropulsionParams& p);
+    };
+    struct AudioGen {
+        static AudioHandle loadHumAudio(const PropulsionParams& p);
+    };
+    struct GuidanceSim {
+        static SimulationHandle setup(const GuidanceParams& g, const TargetParams& t);
+    };
+    struct PropulsionSim {
+        static SimulationHandle setup(const PropulsionParams& p);
+    };
 };
 
 // ============================================================================
@@ -55,7 +56,7 @@ private:
 // ============================================================================
 
 class ShardGrenadeFactory {
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized = false;
 
 public:
@@ -71,22 +72,23 @@ public:
 
 private:
     // Generator modules
-    namespace MeshGen {
-        MeshHandle buildGrenadeBody(const GrenadeParams& g);
-        std::vector<MeshHandle> generateShards(const ShardParams& s, int count);
-    }
-    namespace FragmentGen {
-        std::vector<MeshHandle> generateShards(const ShardParams& s, const GrenadeParams& g);
-    }
-    namespace TimerSim {
-        SimulationHandle setup(const GrenadeParams& g);
-    }
-    namespace VFXGen {
-        ParticleHandle buildBlast(const GrenadeParams& g);
-    }
-    namespace AudioGen {
-        AudioHandle loadExplosionAudio(const GrenadeParams& g);
-    }
+    struct MeshGen {
+        static MeshHandle buildGrenadeBody(const GrenadeParams& g);
+        /** Builds `count` shard meshes, each oriented inside a cone of `spreadAngleDeg`. */
+        static std::vector<MeshHandle> generateShards(const ShardParams& s, int count, float spreadAngleDeg);
+    };
+    struct FragmentGen {
+        static std::vector<MeshHandle> generateShards(const ShardParams& s, const GrenadeParams& g);
+    };
+    struct TimerSim {
+        static SimulationHandle setup(const GrenadeParams& g);
+    };
+    struct VFXGen {
+        static ParticleHandle buildBlast(const GrenadeParams& g);
+    };
+    struct AudioGen {
+        static AudioHandle loadExplosionAudio(const GrenadeParams& g);
+    };
 };
 
 // ============================================================================
@@ -94,7 +96,7 @@ private:
 // ============================================================================
 
 class ArcBeamFactory {
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized = false;
 
 public:
@@ -110,18 +112,18 @@ public:
 
 private:
     // Generator modules
-    namespace BeamGen {
-        MeshHandle createSegments(const BeamParams& b);
-    }
-    namespace ArcSim {
-        SimulationHandle setup(const BeamParams& b);
-    }
-    namespace ShaderGen {
-        ShaderHandle compileBeamShader(const GlowParams& g);
-    }
-    namespace AudioGen {
-        AudioHandle loadCrackleAudio(const BeamParams& b);
-    }
+    struct BeamGen {
+        static MeshHandle createSegments(const BeamParams& b);
+    };
+    struct ArcSim {
+        static SimulationHandle setup(const BeamParams& b);
+    };
+    struct ShaderGen {
+        static ShaderHandle compileBeamShader(const GlowParams& g);
+    };
+    struct AudioGen {
+        static AudioHandle loadCrackleAudio(const BeamParams& b);
+    };
 };
 
 // ============================================================================
@@ -129,7 +131,7 @@ private:
 // ============================================================================
 
 class BoomerangFactory {
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized = false;
 
 public:
@@ -143,18 +145,18 @@ public:
 
 private:
     // Generator modules
-    namespace MeshGen {
-        MeshHandle buildBoomerangBlade(const BoomerangParams& b);
-    }
-    namespace BoomerangSim {
-        SimulationHandle setup(const BoomerangParams& b);
-    }
-    namespace AudioGen {
-        AudioHandle loadWhooshAudio(const BoomerangParams& b);
-    }
-    namespace VFXGen {
-        ParticleHandle buildTrailVFX(const BoomerangParams& b);
-    }
+    struct MeshGen {
+        static MeshHandle buildBoomerangBlade(const BoomerangParams& b);
+    };
+    struct BoomerangSim {
+        static SimulationHandle setup(const BoomerangParams& b);
+    };
+    struct AudioGen {
+        static AudioHandle loadWhooshAudio(const BoomerangParams& b);
+    };
+    struct VFXGen {
+        static ParticleHandle buildTrailVFX(const BoomerangParams& b);
+    };
 };
 
 // ============================================================================
@@ -162,7 +164,7 @@ private:
 // ============================================================================
 
 class GrapnelFactory {
-    ThreadPool m_pool;
+    GeneratorTaskPool m_pool;
     bool m_initialized = false;
 
 public:
@@ -178,21 +180,21 @@ public:
 
 private:
     // Generator modules
-    namespace MeshGen {
-        MeshHandle buildGrapnelHook(const HookParams& h);
-    }
-    namespace TetherGen {
-        TetherHandle createRope(const GrapnelParams& g);
-    }
-    namespace ProjectileSim {
-        SimulationHandle setupLinear(const GrapnelParams& g);
-    }
-    namespace ReelSim {
-        SimulationHandle setup(const GrapnelParams& g);
-    }
-    namespace AudioGen {
-        AudioHandle loadReelAudio(const GrapnelParams& g);
-    }
+    struct MeshGen {
+        static MeshHandle buildGrapnelHook(const HookParams& h);
+    };
+    struct TetherGen {
+        static TetherHandle createRope(const GrapnelParams& g);
+    };
+    struct ProjectileSim {
+        static SimulationHandle setupLinear(const GrapnelParams& g);
+    };
+    struct ReelSim {
+        static SimulationHandle setup(const GrapnelParams& g);
+    };
+    struct AudioGen {
+        static AudioHandle loadReelAudio(const GrapnelParams& g);
+    };
 };
 
 // ============================================================================
@@ -210,6 +212,9 @@ public:
     AdvancedProjectileManager();
     ~AdvancedProjectileManager();
 
+    AdvancedProjectileManager(const AdvancedProjectileManager&) = delete;
+    AdvancedProjectileManager& operator=(const AdvancedProjectileManager&) = delete;
+
     void initialize(size_t num_threads);
     void shutdown();
 
@@ -222,4 +227,4 @@ public:
 };
 
 } // namespace AdvancedProjectiles
-} // namespace MagiTech 
+} // namespace MagiTech
