@@ -1,0 +1,8 @@
+# React 18.3.1 UMD builds (MIT, Meta). Third-party: Build-Vsix.ps1 fetches them
+# into media\ and checks their SHA-256. See THIRD_PARTY.md.
+media/react.production.min.js
+media/react-dom.production.min.js
+
+# Build output
+*.vsix
+node_modules/
