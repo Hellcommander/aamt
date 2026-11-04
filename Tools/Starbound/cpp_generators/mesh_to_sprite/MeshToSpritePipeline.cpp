@@ -475,7 +475,11 @@ MeshToSpritePipeline::SpriteSheet MeshToSpritePipeline::pack_frames_to_sheet(con
     
     SpriteSheet sheet;
     sheet.name = sheet_name;
-    sheet.texture_filename = sanitize_filename(sheet_name) + ".png";
+    // The metadata names the file export_sprite_sheet() writes (TGA/BMP keep their own
+    // extension; WebP falls back to PNG).
+    const char* texture_ext = config_.output_format == OutputFormat::TGA ? ".tga"
+                            : config_.output_format == OutputFormat::BMP ? ".bmp" : ".png";
+    sheet.texture_filename = sanitize_filename(sheet_name) + texture_ext;
 
     const uint32_t padding = static_cast<uint32_t>(std::max(0.0f, config_.sprite_padding));
     const bool uniform = std::all_of(frames.begin(), frames.end(),
@@ -916,6 +920,7 @@ bool MeshToSpritePipeline::load_mesh_obj(const std::string& filename) {
     std::vector<glm::vec2> uvs;
 
     MeshData mesh;
+    std::string current_material;  // last usemtl; applies to the faces that follow it
     // Unique (position, uv, normal) corners -> output vertex index
     std::unordered_map<std::string, uint32_t> corner_lookup;
 
@@ -945,7 +950,8 @@ bool MeshToSpritePipeline::load_mesh_obj(const std::string& filename) {
             iss >> u >> v;
             uvs.emplace_back(u, v);
         } else if (type == "usemtl") {
-            iss >> mesh.material_name;
+            iss >> current_material;
+            if (mesh.material_name.empty()) mesh.material_name = current_material;
         } else if (type == "f") {
             std::vector<uint32_t> polygon;
             std::string corner;
@@ -984,6 +990,7 @@ bool MeshToSpritePipeline::load_mesh_obj(const std::string& filename) {
                 mesh.indices.push_back(polygon[0]);
                 mesh.indices.push_back(polygon[i]);
                 mesh.indices.push_back(polygon[i + 1]);
+                mesh.triangle_materials.push_back(current_material);
             }
         }
     }
@@ -1200,7 +1207,8 @@ void MeshToSpritePipeline::render_mesh_with_animation(const MeshData& mesh, cons
     const glm::mat4 mvp = projection_matrix_ * view_matrix_ * model;
     const glm::mat3 normal_matrix = glm::transpose(glm::inverse(glm::mat3(model)));
     const glm::vec3 eye = current_camera_.position;
-    const TextureData* texture = get_material_texture(mesh.material_name);
+    const TextureData* texture = get_material_texture(mesh.material_name);  // re-picked per triangle below
+    const std::string* texture_material = &mesh.material_name;
     const LightingConfig& L = current_lighting_;
 
     // Transform all vertices once
@@ -1212,7 +1220,9 @@ void MeshToSpritePipeline::render_mesh_with_animation(const MeshData& mesh, cons
         v.valid = clip_pos.w > 1e-6f;
         const float inv_w = v.valid ? 1.0f / clip_pos.w : 0.0f;
         const glm::vec3 ndc = glm::vec3(clip_pos) * inv_w;
-        v.screen = glm::vec3((ndc.x * 0.5f + 0.5f) * W, (1.0f - (ndc.y * 0.5f + 0.5f)) * H, ndc.z);
+        // glm's ortho/perspective give OpenGL NDC depth (-1..1); map it to the 0..1 range the
+        // depth tests below use, or near-half geometry (all of it in ortho views) is culled.
+        v.screen = glm::vec3((ndc.x * 0.5f + 0.5f) * W, (1.0f - (ndc.y * 0.5f + 0.5f)) * H, ndc.z * 0.5f + 0.5f);
         v.inv_w = inv_w;
         v.world = glm::vec3(model * glm::vec4(mesh.vertices[i], 1.0f));
         v.normal = i < mesh.normals.size() ? glm::normalize(normal_matrix * mesh.normals[i]) : glm::vec3(0, 1, 0);
@@ -1270,6 +1280,13 @@ void MeshToSpritePipeline::render_mesh_with_animation(const MeshData& mesh, cons
         const ScreenVertex& b = sv[i1];
         const ScreenVertex& c = sv[i2];
         if (!a.valid || !b.valid || !c.valid) continue;  // behind the camera
+        if (!mesh.indices.empty() && t / 3 < mesh.triangle_materials.size()) {
+            const std::string& tri_material = mesh.triangle_materials[t / 3];
+            if (tri_material != *texture_material) {
+                texture_material = &tri_material;
+                texture = get_material_texture(tri_material);
+            }
+        }
         if ((a.screen.z < 0.0f && b.screen.z < 0.0f && c.screen.z < 0.0f) ||
             (a.screen.z > 1.0f && b.screen.z > 1.0f && c.screen.z > 1.0f)) continue;  // outside depth range
 

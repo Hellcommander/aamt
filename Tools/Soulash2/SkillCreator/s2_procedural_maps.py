@@ -154,7 +154,7 @@ def search_procedural_maps(query: str = "", *, limit: int = 40) -> List[Dict[str
             "biome": row.get("biome"),
             "source": row.get("_source") or "unknown",
             "file": row.get("_file") or "",
-            "clone_key": row.get("_path") or str(row.get("id") or ""),
+            "clone_key": row.get("_path") or ("" if row.get("id") is None else str(row.get("id"))),
         })
         if len(results) >= max(1, int(limit)):
             break
@@ -171,7 +171,7 @@ def load_procedural_map(source: str | int) -> Dict[str, Any]:
         raise FileNotFoundError(f"Procedural map JSON could not be read: {direct}")
     matches = _iter_procedural_maps()
     for row in matches:
-        if str(row.get("id") or "") == key or Path(str(row.get("_file") or "")).stem.casefold() == key.casefold() or str(row.get("name") or "").casefold() == key.casefold():
+        if ("" if row.get("id") is None else str(row.get("id"))) == key or Path(str(row.get("_file") or "")).stem.casefold() == key.casefold() or str(row.get("name") or "").casefold() == key.casefold():
             return row
     raise FileNotFoundError(f"Procedural map not found: {source}")
 

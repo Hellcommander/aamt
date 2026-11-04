@@ -65,6 +65,12 @@ function pinChatSkills(skills) {
   return [...pinned, ...rest];
 }
 
+/**
+ * Writes bridged skills into <workspace>/.cortexide/skills. Folders carrying the generated marker
+ * are ours and get replaced; any other folder is the user's own native skill and is never touched,
+ * so a bridged skill with the same name is skipped (and reported) instead of overwriting it.
+ * @returns {{ written: object[], skipped: object[] }}
+ */
 function syncSkills(workspaceRoot, skills, maxSkills) {
   const destRoot = path.join(workspaceRoot, ".cortexide", "skills");
   mkdirp(destRoot);
@@ -79,8 +85,15 @@ function syncSkills(workspaceRoot, skills, maxSkills) {
   const ordered = pinChatSkills(skills);
   const cap = Math.max(1, Math.min(64, maxSkills || 64));
   const written = [];
+  const skipped = [];
   for (const skill of ordered.slice(0, cap)) {
     const dir = path.join(destRoot, skill.name);
+    if (mine.has(skill.name) || exists(dir)) {
+      // Generated folders were removed above, so anything still here is a native skill (or a
+      // second bridged skill with the same name). Leave it alone.
+      skipped.push(skill);
+      continue;
+    }
     mkdirp(dir);
     writeFile(path.join(dir, GENERATED), `${skill.file}\n`);
     writeFile(
@@ -90,7 +103,7 @@ function syncSkills(workspaceRoot, skills, maxSkills) {
     mine.add(skill.name);
     written.push(skill);
   }
-  return written;
+  return { written, skipped };
 }
 
 function agentMarkdown() {
@@ -186,7 +199,7 @@ function voidrulesSection(skillCount, canvasCount) {
 
 function syncWorkspace(workspaceRoot, skills, canvases, options) {
   const maxSkills = options && options.maxSkills != null ? options.maxSkills : 64;
-  const writtenSkills = syncSkills(workspaceRoot, skills, maxSkills);
+  const { written: writtenSkills, skipped: skippedSkills } = syncSkills(workspaceRoot, skills, maxSkills);
   writeUserImportSkill();
   for (const [dir, name] of LEGACY_FILES) fs.rmSync(path.join(workspaceRoot, ".cortexide", dir, name), { force: true });
   writeFile(path.join(workspaceRoot, ".cortexide", "agents", "local-agent.md"), agentMarkdown());
@@ -195,7 +208,7 @@ function syncWorkspace(workspaceRoot, skills, canvases, options) {
   mkdirp(path.join(workspaceRoot, "canvases"));
   const slug = cursorProjectSlug(workspaceRoot);
   mkdirp(path.join(home(), ".cursor", "projects", slug, "canvases"));
-  return { writtenSkills, slug };
+  return { writtenSkills, skippedSkills, slug };
 }
 
 module.exports = {

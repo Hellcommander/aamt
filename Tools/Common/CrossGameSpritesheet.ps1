@@ -94,11 +94,7 @@ $script:BlenderScript = Join-Path $PSScriptRoot "blender_asset_spritesheet_expor
 # ============================================================
 
 function Test-PythonAvailable {
-    $python = Get-Command "python" -ErrorAction SilentlyContinue
-    if (-not $python) {
-        $python = Get-Command "python3" -ErrorAction SilentlyContinue
-    }
-    return $null -ne $python
+    return $null -ne (Get-PythonCommand)
 }
 
 function Test-PillowInstalled {
@@ -117,6 +113,10 @@ function Test-PillowInstalled {
 }
 
 function Get-PythonCommand {
+    # Same order as the AAMT stagers: AAMT_PYTHON first, then PATH.
+    if ($env:AAMT_PYTHON -and (Test-Path -LiteralPath $env:AAMT_PYTHON)) {
+        return $env:AAMT_PYTHON
+    }
     $python = Get-Command "python" -ErrorAction SilentlyContinue
     if ($python) {
         return $python.Source

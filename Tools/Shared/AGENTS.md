@@ -74,9 +74,25 @@ is in-process and also takes that lock — do not run it while SD/TRELLIS is gen
 SFX belong on the `audio` stage. Agents retrieve from the purchased zip library,
 then generate a variant — they do not invent a new commercial pack.
 
-- Library: `audio_asset_library.py` (`ingest`, `search_text`, `search_audio`)
+- Library: `audio_asset_library.py` (`ingest`, `search_text`, `search_audio`). Packs are zips or 7z archives anywhere
+  under `D:\assets\audio` (a zip in a folder is named with it). License tiers: `own`, `direct` (Function Loops bt25,
+  Tao & Sound: ship altered, no AI), `restricted` (`Omni/`, the Ovani packs: no AI, nothing standalone, used only where
+  Noise Alchemy has no fitting sound), `reference` (Noise Alchemy, Dark Fantasy: AI references, transformed derivatives).
 - Generate: `audio_pipeline.py` / `ai_resources.make_audio`
 - Backend: `aamt_stable_audio_backend.py` (SA3 `init_audio` + GPU lock)
+- Listen: `audio_listener.py` (`Listener.pick` / `compare` / `audit`): the CLAP judge, on CPU, picks takes and
+  gates changes. Judge sound quality with it, never by ear or by running a game.
+- Decide: `audio_agent.py` (`Agent.propose`): the local audio agent picks clips, lays out layers and tuning, renders
+  seeds and lets the listener choose; `AudioBench.exe` / `AudioBench-GUI.bat` put all of this in a control-panel page.
+- Rebuild: `audio_rebuild.py` (`rebuild(name, clips, n, purpose, listener, max_corr=...)`, or folder mode over
+  .meta.json sidecars): a sound from licensed or barred-pack clips that stays far from every clip. Never ship a
+  direct- or restricted-tier clip cleaned and levelled only; run it through this.
+- Ship: `audio_seal.py`: seal a mod's sounds into one MTSA1 archive; Lua (`install-lua`) and C++ (fork
+  `SealedAssetSource`, `write-cpp-key`) readers unseal in memory. Key file never committed. Other mods: their own key
+  + `--embed-key` (sounds.key beside the archive); Chimera mods: wrapped keys via the loader's public key.
+- Shape: `audio_bench.py`: mixing, blending, texture layering and effects (pitch, formant, EQ30, saturation,
+  modulation, reverb, ...) as deterministic DSP from a recipe. An agent decides the recipe from `analyze()` and the
+  listener; the bench applies it. No model touches audio. `AUDIO_BENCH.md` has the recipe format.
 - First run: `python audio_pipeline.py ingest --fast`
 
 Do **not** skip retrieval when the index has assets. Pass `archetype` when known

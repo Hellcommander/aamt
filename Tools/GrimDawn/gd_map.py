@@ -599,7 +599,8 @@ def merge_maps(
             f"{other.path.name}: +{added} regions ({dup} duplicate GUIDs skipped), +{len(newq)} quests, "
             f"shifted by ({dx}, {dy}, {dz})"
         )
-    if len(base.minimaps) != len(base.regions):
+    # worlds without any minimaps (all inputs) carry none; only check when some input had them
+    if (base.minimaps or any(o.minimaps for o in others)) and len(base.minimaps) != len(base.regions):
         raise ValueError("minimap/region count mismatch after merge")
     if 17 in base.raw:
         base.raw[17] = encode_points(head, groups)
@@ -649,7 +650,9 @@ def pack_maps(mod_root: Path, maps: Sequence[Path], arc_name: str = "Maps.arc") 
 
     res = mod_root / "resources"
     arc = next((p for p in res.glob("*.arc") if p.name.lower() == arc_name.lower()), res / arc_name)
-    work = Path(tempfile.mkdtemp(prefix="gdmap_pack_", dir=str(Path(__file__).resolve().parent / "work")))
+    work_root = Path(__file__).resolve().parent / "work"  # gitignored: absent on a clean checkout
+    work_root.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix="gdmap_pack_", dir=str(work_root)))
     try:
         if arc.is_file():
             _unarc(arc, work)
@@ -725,6 +728,9 @@ def _cmd_roundtrip(a) -> int:
     src = Path(a.map)
     gm = read_map(src)
     out = Path(a.out) if a.out else src.with_name(src.stem + ".roundtrip.map")
+    if out.resolve() == src.resolve():
+        print("roundtrip: --out must differ from the input map (it is compared, then deleted)")
+        return 2
     write_map(gm, out)
     same = os.path.getsize(out) == os.path.getsize(src)
     if same:

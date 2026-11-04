@@ -60,7 +60,7 @@ class Progress {
   }
 
   empty() {
-    return !this.read.size && !this.edited.size && !this.commands.length && !this.searched.length && !this.notes.length;
+    return !this.read.size && !this.edited.size && !this.commands.length && !this.searched.length && !this.notes.length && !this.errors.length;
   }
 
   toText() {

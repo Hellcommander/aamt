@@ -61,7 +61,7 @@ except Exception:
 
 from s2_game_paths import mods_dir  # noqa: E402
 
-DEFAULT_MOD = mods_dir() / "arendeth_reactive_crafting"
+DEFAULT_MOD_NAME = "arendeth_reactive_crafting"  # resolved lazily: mods_dir() raises without an install
 
 # Earthy alchemical base + the four reactive-terrain accent colors.
 REACTIVE_PALETTE = ["#120d0a", "#2c2015", "#5a3d22", "#a06a2c", "#e0b25e", "#f5e6c8"]
@@ -591,7 +591,7 @@ def write_game_sheets(mod_path: Path, *, use_sd: bool = True) -> Dict[str, Any]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Generate arendeth_reactive_crafting branding assets")
-    ap.add_argument("--mod-path", type=Path, default=DEFAULT_MOD)
+    ap.add_argument("--mod-path", type=Path, default=None)
     ap.add_argument("--mode", choices=["icon", "thumbnail", "all"], default="all")
     ap.add_argument("--quality", choices=["mechanical", "full"], default="full")
     ap.add_argument("--model", default="qwen3-vl:8b", help="Ollama vision model for QA")
@@ -607,7 +607,7 @@ def main() -> int:
     except Exception:
         pass
 
-    mod_path: Path = args.mod_path
+    mod_path: Path = args.mod_path or (mods_dir() / DEFAULT_MOD_NAME)
     if not mod_path.exists():
         print(f"[FAIL] mod path not found: {mod_path}")
         return 2

@@ -215,3 +215,7 @@ Tools/Qud/QudLab/Dhf-cache/hub/models--Qwen--Qwen2.5-3B-Instruct/.no_exist
 Tools/Qud/.voidrules
 Tools/Qud/canvases/cortexide-docs-canvas.canvas.tsx
 .voidrules
+
+# sealed sound archive key: readers carry it, the repo never does
+Tools/Shared/audio_seal.key
+Tools/Shared/archive.key

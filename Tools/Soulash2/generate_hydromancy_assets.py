@@ -52,7 +52,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 from s2_game_paths import mods_dir  # noqa: E402
 
-DEFAULT_MOD = mods_dir() / "arendeth_hydromancy"
+DEFAULT_MOD_NAME = "arendeth_hydromancy"  # resolved lazily: mods_dir() raises without an install
 DRAFT_ICON_NAME = "icon_design_draft.png"
 DRAFT_THUMB_NAME = "thumbnail_design_draft.png"
 
@@ -316,7 +316,7 @@ def generate_branding(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Soulash 2 Hydromancy asset generator")
-    parser.add_argument("--mod-path", type=Path, default=DEFAULT_MOD)
+    parser.add_argument("--mod-path", type=Path, default=None)
     parser.add_argument(
         "--mode",
         choices=["references", "procedural", "ollama", "sd", "all"],
@@ -340,7 +340,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    mod_path = args.mod_path.resolve()
+    mod_path = (args.mod_path or (mods_dir() / DEFAULT_MOD_NAME)).resolve()
     branding = {}
     ref_file = mod_path / "core2_asset_references.json"
     if ref_file.exists():

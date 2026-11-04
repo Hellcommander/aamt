@@ -75,6 +75,8 @@ static func to_size(v, fallback := Vector2i.ZERO) -> Vector2i:
 		return Vector2i(v)
 	if v is Array and v.size() >= 2:
 		return Vector2i(to_int(v[0]), to_int(v[1]))
+	if v is Dictionary and v.has("x") and v.has("y"):
+		return Vector2i(to_int(v.x), to_int(v.y))
 	if v is int or v is float:
 		return Vector2i(int(v), int(v))
 	var s := str(v).strip_edges().to_lower().replace("*", "x").replace(",", "x")
@@ -792,7 +794,7 @@ static func parse_tags(v, frame_count: int, default_fps: float, default_name := 
 		t.from = clampi(t.from, 1, frame_count)
 		t.to = clampi(t.to, t.from, frame_count)
 		if t.fps <= 0:
-			t.fps = default_fps
+			t.fps = maxf(default_fps, 1.0)  # fps=0 would give zero frame durations
 	return out
 
 

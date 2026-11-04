@@ -238,6 +238,24 @@ function Get-StableSeed {
     return [int]($h + 1)
 }
 
+# The spellstone template glows blue (the System.Drawing path below recolours B>150 pixels).
+$script:TemplateGlowHue = 220.0
+
+# ImageMagick -modulate "brightness,saturation,hue": brightness from the element/strength
+# intensity, saturation from the element's glow colour, and hue rotated from the template's
+# blue to that colour (100 = unchanged, 0/200 = +-180 degrees).
+function Get-ElementModulate {
+    param([hashtable]$ElementColors, [double]$Intensity)
+    $glow = $ElementColors.coreGlow
+    $brightness = [int][Math]::Round($Intensity * 100)
+    $saturation = [int][Math]::Round([Math]::Max(0.2, $glow.GetSaturation()) * 100)
+    $shift = $glow.GetHue() - $script:TemplateGlowHue
+    if ($shift -gt 180) { $shift -= 360 }
+    if ($shift -lt -180) { $shift += 360 }
+    $hue = [int][Math]::Round(100 + ($shift * 100.0 / 180.0))
+    return "$brightness,$saturation,$hue"
+}
+
 # Legacy recolour of the template (ImageMagick / System.Drawing). Fallback only.
 function Invoke-LegacyElementVariant {
     param(
@@ -249,8 +267,8 @@ function Invoke-LegacyElementVariant {
 
     if ($imageMagickAvailable) {
         $intensity = $ElementColors.intensity * $StrengthMod.intensity
-        $pct = [int][Math]::Round($intensity * 100)
-        & $magickExe $InputPath -modulate "$pct,100,100" "PNG32:$OutputPath"
+        $modulate = Get-ElementModulate -ElementColors $ElementColors -Intensity $intensity
+        & $magickExe $InputPath -modulate $modulate "PNG32:$OutputPath"
         if ($LASTEXITCODE -eq 0) {
             return $true
         }
@@ -339,6 +357,10 @@ function Create-AnimationFrames {
             $currentIntensity = $ElementColors.intensity * $StrengthMod.intensity * $pulseIntensity
             $pct = [int][Math]::Round($currentIntensity * 100)
             & $magickExe $BaseImagePath -modulate "$pct,100,100" "PNG32:$framePath"
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $framePath)) {
+                Write-Host "  [WARN] ImageMagick failed on frame $frame (exit $LASTEXITCODE); using the unpulsed variant" -ForegroundColor Yellow
+                Copy-Item $BaseImagePath $framePath -Force
+            }
         } else {
             Copy-Item $BaseImagePath $framePath -Force
         }

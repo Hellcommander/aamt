@@ -102,7 +102,7 @@ test("initialize handshake (newline-delimited)", async () => {
   const r = await nextLine(nd);
   assert.strictEqual(r.id, sent);
   assert.strictEqual(r.result.protocolVersion, "2025-06-18");
-  assert.deepStrictEqual(r.result.serverInfo, { name: "local-agent-bridge", version: "2.1.0" });
+  assert.deepStrictEqual(r.result.serverInfo, { name: "local-agent-bridge", version: require(path.join(EXT, "package.json")).version });
   assert.ok(r.result.capabilities.tools);
 });
 

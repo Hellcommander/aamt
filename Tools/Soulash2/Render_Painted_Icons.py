@@ -150,6 +150,9 @@ def render(mod_dir: Path, mod: str, cell: int, keep: set[tuple[str, int]]) -> Pa
     sheets = {s["name"]: s for s in json.load(open(mod_dir / "assets.json", encoding="utf-8-sig"))["graphics"]["tilesheets"]}
     emblem = collect(st / "raw")
     scene = collect(st / "raw_scene")
+    if not emblem and not scene:
+        print(f"[WARN] {mod}: no raw tiles found in {st / 'raw'} or {st / 'raw_scene'}; "
+              "only kept tiles (if any) will be drawn")
     for grid, fname in SHEET_FILES.items():
         sh = sheets.get(SHEET_NAMES[grid])
         if not sh:

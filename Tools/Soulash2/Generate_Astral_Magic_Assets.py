@@ -9,8 +9,9 @@ Generate Soulash 2 Astral Magic asset grids:
 - stackers.png
 - entities.png
 
-Each grid is a packed tilesheet (e.g. 64x64 tiles) suitable for tilemap.json
-and glyph indices. Tiles are Stable Diffusion art (SD3.5 on :1338): every tile is
+Each grid is a packed tilesheet of 64x64 tiles. When the mod's assets.json declares
+the sheet, it is written to that file (e.g. assets/abilities.png) in that grid shape
+("tiles": [cols, rows]); undeclared grids (entities) go to <mod>/tiles/. Tiles are Stable Diffusion art (SD3.5 on :1338): every tile is
 generated on a pure black background and the brightness becomes alpha, so glow
 falls off to true transparency. There is NO silent procedural fallback in SD mode:
 if SD is unreachable or a tile cannot be produced the run aborts (set
@@ -35,6 +36,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import random
 import sys
@@ -82,7 +84,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--mod-path",
         type=Path,
-        default=_default_mod_path("arendeth_astral_magic"),
+        default=None,
+        help="Mod folder (default: arendeth_astral_magic in the detected Soulash 2 mods dir).",
     )
     p.add_argument(
         "--mode",
@@ -122,6 +125,11 @@ def parse_args() -> argparse.Namespace:
         "Kept outside the mod's tiles folder; the real sheets never contain a background.",
     )
     p.add_argument("--use-sd", action="store_true")
+    p.add_argument(
+        "--replace-sheets",
+        action="store_true",
+        help="Overwrite a mod sheet drawn at another cell size (the live sheets are hand-made at 128px; these are 64px).",
+    )
     p.add_argument("--sd-drafts-dir", type=Path, default=None)
     p.add_argument("--sd-draft-icon", type=Path, default=None)
     p.add_argument("--sd-draft-thumbnail", type=Path, default=None)
@@ -459,6 +467,28 @@ def write_preview(sheet: Image.Image, dest: Path) -> None:
     Image.alpha_composite(board, sheet).convert("RGB").save(dest, "PNG")
 
 
+def sheet_layout(mod_path: Path, grid_name: str) -> Tuple[Path, int, int]:
+    """Where a grid's sheet goes and its (cols, count), as the mod's assets.json loads it.
+
+    Soulash 2 reads tilesheets from assets.json ("file" + "tiles": [cols, rows]); a sheet
+    written anywhere else, or with another grid shape, is never shown (or is sliced wrong).
+    Grids the mod does not declare (e.g. entities) fall back to <mod>/tiles/ with the
+    GRID_DEFS shape.
+    """
+    grid_def = GRID_DEFS[grid_name]
+    file_name = str(grid_def["file"])
+    assets_json = mod_path / "assets.json"
+    if assets_json.is_file():
+        data = json.loads(assets_json.read_text(encoding="utf-8"))
+        for sheet in (data.get("graphics") or {}).get("tilesheets") or []:
+            rel = str(sheet.get("file") or "")
+            tiles = sheet.get("tiles") or []
+            if Path(rel).name == file_name and len(tiles) == 2:
+                cols, rows = int(tiles[0]), int(tiles[1])
+                return mod_path / rel, cols, cols * rows
+    return mod_path / "tiles" / file_name, int(grid_def["cols"]), int(grid_def["count"])
+
+
 def pack_grid(
     mod_path: Path,
     grid_name: str,
@@ -467,15 +497,19 @@ def pack_grid(
     opacity_overrides: Dict[str, float] | None = None,
     sd_source: "SdTileSource | None" = None,
     strict: bool = True,
-) -> Path:
+    replace_sheets: bool = False,
+) -> Path | None:
     grid_def = GRID_DEFS[grid_name]
     opacity = float((opacity_overrides or {}).get(grid_name, grid_def["opacity"]))
-    out_dir = mod_path / "tiles"
-    ensure_dir(out_dir)
-
-    count = int(grid_def["count"])
-    cols = int(grid_def["cols"])
+    out_path, cols, count = sheet_layout(mod_path, grid_name)
+    ensure_dir(out_path.parent)
     rows = (count + cols - 1) // cols
+    if out_path.is_file() and not replace_sheets:
+        with Image.open(out_path) as old:
+            if old.size != (cols * TILE_SIZE, rows * TILE_SIZE):
+                print(f"  [SKIP] {grid_name}: {out_path} is {old.size[0]}x{old.size[1]} ({old.size[0] // cols}px cells), "
+                      f"this draws {TILE_SIZE}px cells; left as it is (--replace-sheets to overwrite)")
+                return None
 
     # No background colour: the sheet starts fully transparent.
     sheet = Image.new("RGBA", (cols * TILE_SIZE, rows * TILE_SIZE), (0, 0, 0, 0))
@@ -498,7 +532,6 @@ def pack_grid(
         # so a straight copy is exact.
         sheet.paste(tile, (x, y))
 
-    out_path = out_dir / str(grid_def["file"])
     sheet.save(out_path, "PNG")
     transparent, peak = verify_sheet(out_path, grid_name, cols, count, opacity)
     if preview_dir is not None:
@@ -509,7 +542,7 @@ def pack_grid(
 
 def main() -> int:
     args = parse_args()
-    mod_path = args.mod_path.resolve()
+    mod_path = (args.mod_path or _default_mod_path("arendeth_astral_magic")).resolve()
 
     grids = [g.strip() for g in args.grids.split(",") if g.strip()]
     opacity_overrides = parse_opacity_overrides(args.opacity)
@@ -528,7 +561,7 @@ def main() -> int:
                 print(f"  [WARN] Unknown grid '{grid}', skipping")
                 continue
             print(f"  {grid}:", flush=True)
-            pack_grid(mod_path, grid, args.mode, preview_dir, opacity_overrides, sd_source, strict)
+            pack_grid(mod_path, grid, args.mode, preview_dir, opacity_overrides, sd_source, strict, args.replace_sheets)
 
     if use_sd_tiles:
         # Starts the SD3.5 server if it is down, waits for it, and stops it afterwards

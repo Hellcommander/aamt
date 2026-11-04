@@ -1648,11 +1648,12 @@ Style: Starbound pixel art aesthetic, game-ready concept art, high detail, clear
     }
 
     # Art policy hand-off: StarboundAssetGenerator.ps1 makes the pixels with Stable Diffusion and
-    # throws when SD fails. Forward -AllowProcedural only when the caller asked for it. If the
+    # throws when SD fails. Forward -AllowProcedural only when the caller allowed it (switch or
+    # AAMT_SD_STRICT=0). If the
     # downstream generator has no such switch it is not SD-converted: refuse to run it for
     # image-bearing asset types unless procedural art was explicitly allowed.
     $downstreamParams = (Get-Command $assetGenerator -ErrorAction Stop).Parameters
-    if ($AllowProcedural.IsPresent) {
+    if ($script:ProceduralAllowed) {
         if ($downstreamParams.ContainsKey("AllowProcedural")) {
             $generatorParams["AllowProcedural"] = $true
         }

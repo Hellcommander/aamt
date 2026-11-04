@@ -58,6 +58,41 @@ Unified Blender / ImageMagick / Ollama detection: **[QUD_TOOLSET_INTEGRATION.md]
 
 ---
 
+## Particle shaders (Qud Shader Library)
+
+Spec JSON → procedural particle map shaders (sparks, spores, shards, motes) for the Qud Shader Library, with
+offline fxc lint, numpy previews, a Unity bundle build and install into the mod. **[ParticleShaders/QUD_PARTICLE_SHADERS.md](ParticleShaders/QUD_PARTICLE_SHADERS.md)**
+
+| Launch | What |
+|---|---|
+| `ParticleShaders\New-QudParticleShader.bat` / `.ps1` | Spec → shaders, presets, previews; `-Build -Install` to compile and drop into the mod; `-Describe` drafts a spec with Ollama |
+| `ParticleShaders\Build-QudShaderBundle.bat` / `.ps1` | Build any folder of ShaderKit shaders into a bundle with the game-matched Unity |
+| `ParticleShaders\qud_particle_shader.py` | The generator: `generate`, `lint`, `preview`, `install`, `draft`, `schema` |
+| `ParticleShaders\specs\*.particles.json` | Samples for Broodmother, Space Time Vortex, Telekinesis Throw, Mountwright, Truecolor Status |
+
+`settings.json` may add `shaderLibraryPath` (the workshop item 3822020203) when autodetection misses it.
+
+---
+
+## Spring Molting UI windows (Conjoined picker, Arendeth Spring UI library)
+
+Spec JSON → lint → PNG mock-up → Unity prefab + bundles → install, for the modern-UI windows of Arendeth's mods:
+the Conjoined Extended creature picker and the shared `Arendeth_SpringUI` list window used by Mountwright
+(Anchoring / Orders) and every Broodmother menu. **[SpringUI/QUD_SPRING_UI_PIPELINE.md](SpringUI/QUD_SPRING_UI_PIPELINE.md)**
+
+| Launch | What |
+|---|---|
+| `SpringUI\New-QudSpringUI.bat` / `.ps1` | The pipeline: `-Spec specs\<window>.springui.json [-Build] [-Install] [-OpenProject]` |
+| `SpringUI\qud_spring_ui.py` | `generate`, `lint`, `preview`, `install`, `contract`, `schema` |
+| `SpringUI\specs\*.springui.json`, `SpringUI\themes\*.theme.json` | The two windows and the qud-dark / biomutation themes |
+| `SpringUI\Build-SpringUIBundle.bat`, `ConjoinedUI\Build-ConjoinedUIBundle.bat` | Shortcuts: pipeline on that spec with `-Build -Install` |
+| `SpringUI\Editor\BuildQudUI.cs` | The generic spec-driven Unity editor builder |
+
+Runtime notes per window: [SpringUI/SPRING_UI.md](SpringUI/SPRING_UI.md), [ConjoinedUI/CONJOINED_UI.md](ConjoinedUI/CONJOINED_UI.md).
+
+---
+
+
 ## Choose Your Fighter
 
 Player tile + unfiltered detailed art from Recur export / save. **[CHOOSE_YOUR_FIGHTER.md](CHOOSE_YOUR_FIGHTER.md)**

@@ -107,6 +107,11 @@ from s2_validate import format_issues, validate_spec
 EDITOR_DIR = _HERE / "editor"
 _STATE: Dict[str, Any] = {"spec_path": None}
 _PICK_LOCK = threading.Lock()
+# ThreadingHTTPServer runs requests in parallel; spec POSTs load, modify and save the
+# spec file, so two at once would drop one edit. Serialise them (planner and folder
+# picker POSTs never touch the spec and may block, so they stay outside).
+_SPEC_LOCK = threading.RLock()
+_UNLOCKED_POSTS = ("/api/planner/", "/api/pick-folder")
 
 
 def _spec_counts(spec: Dict[str, Any]) -> Dict[str, int]:
@@ -502,6 +507,14 @@ class Handler(BaseHTTPRequestHandler):
         _json_response(self, 404, {"error": "not found"})
 
     def do_POST(self) -> None:
+        path = urlparse(self.path).path
+        if path.startswith(_UNLOCKED_POSTS):
+            self._do_post()
+            return
+        with _SPEC_LOCK:
+            self._do_post()
+
+    def _do_post(self) -> None:
         path = urlparse(self.path).path
         body = _read_json(self)
 

@@ -177,7 +177,7 @@ def import_scripts(game: GamePaths, sources: Sequence[dict], out_mod: Path, cfg:
             body = gd.read_bytes().decode("latin-1")
             missing = [l for l in loads if l.lower() not in body.lower()]
             if missing:
-                body = body.rstrip() + "\n\n// Crucible (added by world_content.py)\n" + "\n".join(missing) + "\n"
+                body = body.rstrip() + "\n\n-- Crucible (added by world_content.py)\n" + "\n".join(missing) + "\n"
                 gd.write_bytes(body.encode("latin-1"))
                 n += 1
         if n or broken:  # broken = packed with a wrong prefix by an older build
@@ -257,7 +257,7 @@ def _merge_lua_entry(paths: Sequence[Path]) -> bytes:
                 have.add(m.lower())
                 extra.append(f'Script.Load("{m}")')
     if extra:
-        base = base.rstrip() + "\n\n// merged from other mods (world_content.py)\n" + "\n".join(extra) + "\n"
+        base = base.rstrip() + "\n\n-- merged from other mods (world_content.py)\n" + "\n".join(extra) + "\n"
     return base.encode("latin-1")
 
 

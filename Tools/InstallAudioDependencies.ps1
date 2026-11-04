@@ -70,7 +70,7 @@ if ([string]::IsNullOrWhiteSpace($PythonPath)) {
     } else {
         Write-Host "ERROR: Python not found!" -ForegroundColor Red
         Write-Host ""
-        Write-Host "Please install Python 3.8 or later from:" -ForegroundColor Yellow
+        Write-Host "Please install Python 3.9 or later from:" -ForegroundColor Yellow
         Write-Host "  https://www.python.org/downloads/" -ForegroundColor Cyan
         Write-Host ""
         Write-Host "Or specify Python path with -PythonPath parameter" -ForegroundColor Yellow

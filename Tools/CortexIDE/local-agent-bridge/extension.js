@@ -122,16 +122,22 @@ async function doSync(context, getState, setState) {
     return state;
   }
   let last;
+  const skipped = [];
   for (const root of roots) {
     last = syncWorkspace(root, state.skills, state.canvases, { maxSkills: cfg().get("maxSkills", 64) });
+    for (const s of last.skippedSkills || []) skipped.push(`${s.name} (${path.join(root, ".cortexide", "skills", s.name)})`);
+  }
+  if (skipped.length) {
+    console.warn("Local Agent Bridge: kept native skills, bridged copies skipped: " + skipped.join(", "));
   }
   const extDir = context.extensionPath;
   const mcpPath = path.join(home(), ".cortexide", "mcp.json");
-  mergeMcp(mcpPath, extDir, roots[0]);
-  return { ...state, last };
+  mergeMcp(mcpPath, extDir, roots);
+  return { ...state, last, skipped };
 }
 
-function mergeMcp(mcpPath, extDir, workspaceRoot) {
+/** @param {string|string[]} workspaceRoots  every open root; mcp-server.js splits the env var on ";" */
+function mergeMcp(mcpPath, extDir, workspaceRoots) {
   let json = { mcpServers: {} };
   if (exists(mcpPath)) {
     try {
@@ -148,7 +154,7 @@ function mergeMcp(mcpPath, extDir, workspaceRoot) {
     command: "node",
     args: [path.join(extDir, "mcp-server.js")],
     env: {
-      AGENT_BRIDGE_WORKSPACE: workspaceRoot || "",
+      AGENT_BRIDGE_WORKSPACE: [].concat(workspaceRoots || []).filter(Boolean).join(";"),
     },
   };
   fs.mkdirSync(path.dirname(mcpPath), { recursive: true });
@@ -184,7 +190,7 @@ function activate(context) {
   const agentStatus = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 49);
   agentStatus.text = "$(hubot) Agent";
   agentStatus.command = "localAgentBridge.openAgent";
-  agentStatus.tooltip = "Open the CortexIDE Agent (local model + coding tools)";
+  agentStatus.tooltip = "Open the CortexIDE Agent (local model or Claude + coding tools)";
   agentStatus.show();
   context.subscriptions.push(agentStatus);
 
@@ -193,6 +199,7 @@ function activate(context) {
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentNewChat", () => agent.newChat()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentStop", () => agent.stop()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentProgress", () => agent.openProgress()));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.setClaudeApiKey", () => agent.setClaudeApiKey()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.askAgentAboutSelection", async () => {
     const ed = vscode.window.activeTextEditor;
     if (!ed) return agent.focus();
@@ -202,8 +209,11 @@ function activate(context) {
 
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.sync", async () => {
     const result = await doSync(context, getState, setState);
+    const kept = result.skipped && result.skipped.length
+      ? ` Skipped ${result.skipped.length} bridged skill(s) whose name matches a native .cortexide/skills folder: ${result.skipped.map((s) => s.split(" (")[0]).join(", ")}.`
+      : "";
     vscode.window.showInformationMessage(
-      `Local Agent Bridge: ${result.skills.length} skills, ${result.canvases.length} canvases. Reload CortexIDE chat if MCP was just added.`
+      `Local Agent Bridge: ${result.skills.length} skills, ${result.canvases.length} canvases.${kept} Reload CortexIDE chat if MCP was just added.`
     );
   }));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.showCatalog", async () => {

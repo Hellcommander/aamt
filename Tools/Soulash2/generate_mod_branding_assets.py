@@ -721,7 +721,19 @@ def _acquire_sd_lock(label: str) -> bool:
             if SD_LOCK_PATH.exists() and time.time() - SD_LOCK_PATH.stat().st_mtime < SD_LOCK_STALE_SEC:
                 print("  [WARN] SD lock timeout; skipping SD for this image")
                 return False
-    SD_LOCK_PATH.write_text(f"{label} pid={os.getpid()}", encoding="utf-8")
+        # Stale lock (older than SD_LOCK_STALE_SEC): drop it so the atomic create can win.
+        try:
+            SD_LOCK_PATH.unlink()
+        except OSError:
+            pass
+    # Atomic create: two runs that both saw "no lock" must not both take it.
+    try:
+        fd = os.open(str(SD_LOCK_PATH), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        print("  [WARN] SD lock taken by another run; skipping SD for this image")
+        return False
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(f"{label} pid={os.getpid()}")
     return True
 
 

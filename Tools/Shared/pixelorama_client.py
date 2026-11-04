@@ -521,8 +521,10 @@ def export_project(
     if out.suffix.lower() == ".json":
         as_json = True
     out.parent.mkdir(parents=True, exist_ok=True)
-    stage = out.parent / f".pxexport_{time.strftime('%Y%m%d-%H%M%S')}_{os.getpid()}"
-    stage.mkdir(parents=True, exist_ok=True)
+    import tempfile
+
+    # unique per call (same-second exports from one process must not share a stage)
+    stage = Path(tempfile.mkdtemp(prefix=f".pxexport_{time.strftime('%Y%m%d-%H%M%S')}_", dir=str(out.parent)))
     image_ext = ".png" if as_json else (out.suffix.lower() or ".png")
     # Godot/Pixelorama join paths poorly with backslashes on some builds.
     out_arg = (stage / (out.stem + image_ext)).resolve().as_posix()
@@ -1147,8 +1149,11 @@ def spriteforge(
         return {"ok": False, "error": "AAMT Sprite Forge not installed/enabled", "status": st}
     if cmd is None and job_file is None:
         return {"ok": False, "error": "need cmd or job_file"}
-    if cmd == "ai":
-        params.setdefault("gpu_lock_held", True)  # we hold the lock; helper must not re-take it
+    if cmd == "ai" or job_file is not None:
+        # we hold the GPU lock while Godot runs, so the helper must not re-take it; with a
+        # job file these key=values become defaults for every job (only ai jobs read them)
+        params.setdefault("gpu_lock_held", True)
+        params.setdefault("helper", SPRITEFORGE_SRC / "tools" / "sf_ai_assist.py")
     log_dir = _SHARED.parent / "Logs" / "pixelorama" / "spriteforge"
     log_dir.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%d-%H%M%S") + f"-{__import__('os').getpid()}"

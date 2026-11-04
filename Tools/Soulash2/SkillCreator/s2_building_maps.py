@@ -241,7 +241,13 @@ def scan_mod_maps(folder: Path, *, other_map_ids: Optional[Dict[str, List[str]]]
 
 def _backup(path: Path, mod: Path) -> Path:
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    dest = output_root() / "_building_map_backups" / mod.name / stamp / path.name
+    # Keep the path under the mod: maps are found with rglob, so two subfolders can
+    # hold the same file name, and one run backs them up within the same second.
+    try:
+        rel = path.resolve().relative_to(Path(mod).resolve())
+    except ValueError:
+        rel = Path(path.name)
+    dest = output_root() / "_building_map_backups" / mod.name / stamp / rel
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(path, dest)
     return dest
@@ -267,6 +273,16 @@ def plan_relink(folder: Path, *, only: Optional[str] = None) -> List[Dict[str, A
     referenced = {map_id: where for where, map_id in location_map_refs(folder)}
     plan: List[Dict[str, Any]] = []
     seen_hash: Dict[str, str] = {}
+    if only:
+        # The skipped siblings still own their ids: reserve them before the target
+        # picks a new one, or it can be renamed onto a sibling's id.
+        for path in map_files(folder):
+            if path.name == only:
+                continue
+            try:
+                taken.add(read_header(path)[0][0])
+            except ValueError:
+                pass
     for path in map_files(folder):
         if only and path.name != only:
             continue

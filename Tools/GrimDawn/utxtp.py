@@ -288,6 +288,7 @@ def apply_patches(
     report = ApplyReport()
     roots = official_layer_roots(vanilla_cache)
     mod_dbs = mod_dbs or {}
+    seeded: set = set()  # records copied from an explicit layer this run (later patches edit, not re-copy)
     for patch in patches:
         for spec in patch.files:
             target, src, label = resolve_record(spec, target_db, roots, mod_dbs)
@@ -300,9 +301,10 @@ def apply_patches(
                 if not src.is_file():
                     report.skipped.append(f"{patch.source}: {spec} (not in {label})")
                     continue
-                if not dry_run:
+                if not dry_run and rel not in seeded:
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(src.read_bytes())
+                    seeded.add(rel)
             elif not target.is_file():
                 src = src if (src and src.is_file()) else (None if label.startswith("MOD") else highest_official(rel, roots))
                 if src is None:

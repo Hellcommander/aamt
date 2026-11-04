@@ -50,7 +50,8 @@ DEFAULT_NEGATIVE = (
 
 # Pack ToS: "reference" tier packs (Noise Alchemy incl. its Dark Fantasy Studio packs, unknown)
 # are DNA only — unique SA3 mode. "direct" tier packs (Function Loops bt25, Tao &
-# Sound bundle) may also go through close-copy. No tier ships an original: every
+# Sound bundle) and Ovani's packs never reach SA3: their licenses bar AI use (ai_allowed), so
+# every search here asks for_ai and mix_references refuses them. No tier ships an original: every
 # output is altered until its source_corr against each raw reference clip is
 # under UNIQUE_MAX_CORR, so a pack file cannot be recovered from a mod.
 # "own" tier clips (D:\assets\audio\made, filled by --keep) are ours: they ship
@@ -63,6 +64,13 @@ UNIQUE_MAX_CORR = 0.22
 # Extra SA3 retries with escalating noise when the first pass stays too close.
 UNIQUE_CORR_RETRIES = 3
 UNIQUE_NOISE_BUMP = 0.18
+# Dry, single-source prompts can come back from SA3 with one signal in both channels. Re-seed, asking for
+# width, until the clip has a stereo image.
+STEREO_MIN_WIDTH = 0.02
+STEREO_RETRIES = 4
+STEREO_PROMPT = ", wide stereo field, sound spreading from left to right"
+# Takes per clip; above 1 the CLAP judge (audio_quality_model) keeps the one it hears as best.
+AUDIO_CANDIDATES = int(os.environ.get("AAMT_AUDIO_CANDIDATES", "1"))
 # How hard unique mode mutates the reference mix *before* SA3 sees it (0–1).
 UNIQUE_DNA_MUTATE = float(os.environ.get("AAMT_AUDIO_DNA_MUTATE", "0.72"))
 # Escalating DSP alteration for close-copy / blend output (stops once distinct).
@@ -196,15 +204,15 @@ def generate_audio(
         lib.load()
         if example:
             wav, sr = _read_wav(Path(example))
-            hits = lib.search_audio(wav, sr, k=k, archetype=archetype, license=lic)
+            hits = lib.search_audio(wav, sr, k=k, archetype=archetype, license=lic, for_ai=True)
         elif lib.records:
-            hits = lib.search_text(prompt, k=k, archetype=archetype, tags=tags, license=lic)
+            hits = lib.search_text(prompt, k=k, archetype=archetype, tags=tags, license=lic, for_ai=True)
             # Unique mode must use pack DNA. Archetype/tag filters can wipe the
             # index; widen the search rather than falling through to text-only.
             if unique and not hits:
-                hits = lib.search_text(prompt, k=k, archetype=archetype, license=lic)
+                hits = lib.search_text(prompt, k=k, archetype=archetype, license=lic, for_ai=True)
             if unique and not hits:
-                hits = lib.search_text(prompt, k=k, license=lic)
+                hits = lib.search_text(prompt, k=k, license=lic, for_ai=True)
         if unique and not no_refs and not hits:
             raise RuntimeError(
                 "unique mode needs pack DNA hits (ToS: modify/mix/transform); "
@@ -244,11 +252,13 @@ def generate_audio(
         try:
             import aamt_stable_audio_backend as backend
 
-            def _sa3(noise: float, run_seed: Optional[int]) -> Optional[Tuple[np.ndarray, int]]:
+            def _sa3(
+                noise: float, run_seed: Optional[int], text: str = conditioned
+            ) -> Optional[Tuple[np.ndarray, int]]:
                 return backend.maybe_generate(
                     engine=engine,
                     model_name=model_name,
-                    prompt=conditioned,
+                    prompt=text,
                     duration=float(duration),
                     seed=run_seed if run_seed is not None else backend.seed_from_text(conditioned),
                     init_audio=init_audio,
@@ -265,7 +275,7 @@ def generate_audio(
                 if unique and init_audio is not None:
                     # Compare against the *unmutated* search mix when available via used refs;
                     # init_audio is already mutated, so corr vs that understates pack leakage.
-                    copy_corr = _copy_corr(arr, init_audio[1])
+                    copy_corr = _copy_corr(arr, init_audio[1], sr, init_audio[0])
                     attempt = 0
                     while copy_corr > UNIQUE_MAX_CORR and attempt < UNIQUE_CORR_RETRIES:
                         attempt += 1
@@ -282,11 +292,53 @@ def generate_audio(
                         if retry is None:
                             break
                         arr2, sr2 = retry
-                        corr2 = _copy_corr(arr2, init_audio[1])
+                        corr2 = _copy_corr(arr2, init_audio[1], sr2, init_audio[0])
                         if corr2 < copy_corr:
                             arr, sr = arr2, sr2
                             copy_corr = corr2
                             init_noise = retry_noise
+                attempt = 0
+                while _stereo_width(arr) < STEREO_MIN_WIDTH and attempt < STEREO_RETRIES:
+                    attempt += 1
+                    retry_seed = (
+                        base_seed if base_seed is not None else backend.seed_from_text(conditioned)
+                    ) + 104729 * attempt
+                    print(
+                        f"[audio] width {_stereo_width(arr):.3f} is mono; "
+                        f"retry {attempt}/{STEREO_RETRIES} seed={retry_seed}",
+                        flush=True,
+                    )
+                    retry = _sa3(init_noise, retry_seed, conditioned + STEREO_PROMPT)
+                    if retry is None:
+                        break
+                    arr2, sr2 = retry
+                    corr2 = _copy_corr(arr2, init_audio[1], sr2, init_audio[0]) if unique and init_audio is not None else 0.0
+                    if corr2 <= max(copy_corr, UNIQUE_MAX_CORR):
+                        arr, sr = arr2, sr2
+                        copy_corr = corr2
+                if AUDIO_CANDIDATES > 1:
+                    # The listener (audio_listener) picks the take, not a person: more takes, same seed series.
+                    from audio_listener import Listener
+
+                    takes = [(arr, sr, copy_corr)]
+                    for take in range(1, AUDIO_CANDIDATES):
+                        take_seed = (
+                            base_seed if base_seed is not None else backend.seed_from_text(conditioned)
+                        ) + 15485863 * take
+                        retry = _sa3(init_noise, take_seed, conditioned + STEREO_PROMPT)
+                        if retry is None:
+                            break
+                        arr2, sr2 = retry
+                        corr2 = _copy_corr(arr2, init_audio[1], sr2, init_audio[0]) if unique and init_audio is not None else 0.0
+                        if corr2 > max(copy_corr, UNIQUE_MAX_CORR) or _stereo_width(arr2) < STEREO_MIN_WIDTH:
+                            print(f"[audio] take {take + 1}/{AUDIO_CANDIDATES} skipped: corr {corr2:.3f}, width {_stereo_width(arr2):.3f}", flush=True)
+                            continue
+                        takes.append((arr2, sr2, corr2))
+                    if len(takes) > 1:
+                        best, scores = Listener().pick([t[0] for t in takes], takes[0][1], prompt)
+                        for i, s in enumerate(scores):
+                            print(f"[audio] take {i + 1}/{AUDIO_CANDIDATES}: {s['rank']:.3f}{'  <- best' if i == best else ''}", flush=True)
+                        arr, sr, copy_corr = takes[best]
         except Exception as exc:
             if unique or engine == "stable-audio":
                 raise RuntimeError(
@@ -332,7 +384,7 @@ def generate_audio(
             )
     _write_wav(output, arr, sr)
 
-    reference_tier = any(h.record.license_tier() == "reference" for h in hits)
+    reference_tier = any(h.record.license_tier() in ("reference", "restricted") for h in hits)
     shippable = source_corr <= UNIQUE_MAX_CORR and (bool(unique) or not reference_tier)
     if not shippable:
         why = (
@@ -406,7 +458,7 @@ def blend_assets(
     output = Path(output)
     _write_wav(output, mixed, sr)
     print(f"[audio] blend {rec_a.label()} × {rec_b.label()} α={alpha} → {output}")
-    reference_tier = "reference" in (rec_a.license_tier(), rec_b.license_tier())
+    reference_tier = any(t in ("reference", "restricted") for t in (rec_a.license_tier(), rec_b.license_tier()))
     shippable = source_corr <= UNIQUE_MAX_CORR and not reference_tier
     if reference_tier:
         print("[audio] WARNING: blend uses reference-tier clips — do not add it to a mod")
@@ -429,19 +481,21 @@ def blend_assets(
 
 
 def _attribution(lib: AudioLibrary, records: Sequence[Any]) -> str:
-    """Credit owed by clips built from `records` (own clips carry theirs in a sidecar meta)."""
+    """Every credit owed by clips built from `records` (own clips carry theirs in a sidecar
+    meta), deduplicated and joined with "; " in first-seen order."""
+    credits: List[str] = []
     for rec in records:
         tier = rec.license_tier()
-        if tier == "reference":
-            return NOISE_ALCHEMY_CREDIT
-        if tier == "own" and rec.source == "file":
+        if tier in ("reference", "restricted"):
+            credits.append(NOISE_ALCHEMY_CREDIT)
+        elif tier == "own" and rec.source == "file":
             try:
                 side = json.loads((lib.library / Path(rec.inner).with_suffix(".meta.json")).read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 continue
             if side.get("attribution"):
-                return str(side["attribution"])
-    return ""
+                credits.extend(c.strip() for c in str(side["attribution"]).split("; ") if c.strip())
+    return "; ".join(dict.fromkeys(credits))
 
 
 def _keep(lib: AudioLibrary, wav: Path, meta: Dict[str, Any]) -> Optional[Path]:
@@ -510,7 +564,7 @@ def _source_corr(lib: AudioLibrary, records: Sequence[Any], arr: np.ndarray, sr:
         except Exception as exc:
             print(f"  [audio] cannot verify against {rec.label()} (treated as too close): {exc}")
             return 1.0
-        best = max(best, _copy_corr(arr, raw))
+        best = max(best, _copy_corr(arr, raw, sr, sr))
     return best
 
 
@@ -696,25 +750,48 @@ def _unique_post_morph(arr: np.ndarray, sr: int, *, seed: int = 0) -> np.ndarray
     return y
 
 
-def _copy_corr(generated: np.ndarray, reference: np.ndarray) -> float:
-    """Absolute cosine similarity of downsampled mono clips (0 = distinct)."""
+def _stereo_width(arr: np.ndarray) -> float:
+    """Side level over mid level: 0 is one signal in both channels."""
+    x = np.asarray(arr, dtype=np.float32)
+    if x.ndim == 1 or x.shape[1] < 2:
+        return 0.0
+    mid, side = (x[:, 0] + x[:, 1]) / 2, (x[:, 0] - x[:, 1]) / 2
+    return float(np.sqrt(np.mean(side * side) / max(float(np.mean(mid * mid)), 1e-12)))
 
-    def _mono(x: np.ndarray) -> np.ndarray:
+
+CORR_SR = 4000  # both clips are brought to this rate before comparing (length never changes the rate)
+
+
+def _copy_corr(
+    generated: np.ndarray, reference: np.ndarray, sr: Optional[int] = None, ref_sr: Optional[int] = None
+) -> float:
+    """Absolute normalised cross-correlation of mono clips at CORR_SR, best over every time
+    shift (0 = distinct, 1 = same signal), so a trimmed or offset copy is still caught.
+    Unknown rates are taken as 48 kHz."""
+
+    def _mono(x: np.ndarray, rate: Optional[int]) -> np.ndarray:
         y = np.asarray(x, dtype=np.float32)
         if y.ndim > 1:
             y = y.mean(axis=1)
-        if y.size > 24000:
-            y = y[:: max(1, y.size // 12000)]
-        y = y - float(y.mean())
+        rate = int(rate or 48000)
+        step = max(1, rate // CORR_SR)
+        if step > 1:  # mean-pool (crude low-pass), then land exactly on CORR_SR
+            y = y[: y.size - y.size % step].reshape(-1, step).mean(axis=1)
+        pooled = rate / step
+        if y.size > 1 and abs(pooled - CORR_SR) > 1e-6:
+            m = max(1, int(round(y.size * CORR_SR / pooled)))
+            y = np.interp(np.arange(m) * (pooled / CORR_SR), np.arange(y.size), y).astype(np.float32)
+        y = y - float(y.mean()) if y.size else y
         n = float(np.linalg.norm(y) + 1e-8)
         return y / n
 
-    a = _mono(generated)
-    b = _mono(reference)
-    n = min(a.size, b.size)
-    if n < 64:
+    a = _mono(generated, sr)
+    b = _mono(reference, ref_sr if ref_sr is not None else sr)
+    if min(a.size, b.size) < 64:
         return 0.0
-    return float(np.abs(np.dot(a[:n], b[:n])))
+    size = 1 << int(np.ceil(np.log2(a.size + b.size - 1)))
+    xc = np.fft.irfft(np.fft.rfft(a, size) * np.conj(np.fft.rfft(b, size)), size)
+    return float(min(1.0, np.max(np.abs(xc))))
 
 
 def _pack_hint(pack: str) -> str:
@@ -946,12 +1023,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         rows = check_files([Path(p) for p in args.paths], k=args.k)
         for row in rows:
             if row["ok"] is None:
-                print(f"  skip  {row['file']}: {row['error']}")
+                print(f"  ERROR {row['file']}: {row['error']}")  # unverified counts as a failure
             elif row["ok"]:
                 print(f"  ok    {row['source_corr']:.3f}  {row['file']}")
             else:
                 print(f"  COPY  {row['source_corr']:.3f}  {row['file']}  <- {row['closest']}")
-        return 0 if all(row["ok"] is not False for row in rows) else 1
+        return 0 if all(row["ok"] is True for row in rows) else 1
 
     if args.cmd == "blend":
         blend_assets(

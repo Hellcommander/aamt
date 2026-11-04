@@ -165,7 +165,7 @@ function handleMessage(msg) {
     sendResult(msg.id, {
       protocolVersion: asked || "2024-11-05",
       capabilities: { tools: {} },
-      serverInfo: { name: "local-agent-bridge", version: "2.1.0" },
+      serverInfo: { name: "local-agent-bridge", version: "2.2.1" },
     });
   } else if (msg.method === "tools/list") {
     sendResult(msg.id, { tools: TOOLS });

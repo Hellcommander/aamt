@@ -656,9 +656,10 @@ def upgrade_outdated_mod(folder: Path) -> List[str]:
         notes.extend(_fix_generic_buildings(folder))
     notes.extend(_ensure_assets_json(folder))
     notes.extend(_fix_skills_json_parse(folder))
+    # Rename amplifiers.json first so the shape fix sees ability_amplifiers.json.
+    notes.extend(_fix_amplifiers_filename(folder))
     notes.extend(_fix_list_file_shapes(folder))
     notes.extend(_fix_skills_start_level(folder))
-    notes.extend(_fix_amplifiers_filename(folder))
     notes.extend(_fix_passives_file(folder))
     notes.extend(_fix_amplifier_encoding(folder))
     notes.extend(_fix_missing_control_actions(folder))

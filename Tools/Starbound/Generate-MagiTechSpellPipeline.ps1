@@ -304,8 +304,10 @@ if (-not $IconsOnly -and $FrameCount -gt 1) {
         --stage-frames $frameStaging
     if ($LASTEXITCODE -ne 0) { throw "Frame staging failed (exit $LASTEXITCODE) for $AssetId." }
     if (Test-Path $sheetScript) {
+        # One row of FrameCount frames, so the .frames grid matches the staged animation.
         & $sheetScript -InputDir $frameStaging -OutputDir $outDir -GameFormat Starbound `
-            -TileSize $TileSize -SpritesheetName $AssetId -ErrorAction SilentlyContinue
+            -TileSize $TileSize -SpritesheetName $AssetId `
+            -AnimationFrames $FrameCount -Columns $FrameCount -ErrorAction SilentlyContinue
     }
 } else {
     Write-Host "Step 4: IconsOnly — single-frame .frames only." -ForegroundColor Cyan

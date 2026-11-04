@@ -323,7 +323,7 @@ function New-PlaceholderTexture {
                     $frameSpec.seed = $frame * 31
                     $json = $frameSpec | ConvertTo-Json -Depth 6
                     [System.IO.File]::WriteAllText($tempSpec, $json, (New-Object System.Text.UTF8Encoding $false))
-                    $frameOut = & $pythonCmd.Source $pythonScript --spec $tempSpec --output $framePath --type texture --size $Width @allowArgs 2>&1
+                    $frameOut = & $pythonCmd.Source $pythonScript --spec $tempSpec --output $framePath --type texture --size $Width --height $Height @allowArgs 2>&1
                     if (Test-Path $framePath) {
                         $frameBmp = [System.Drawing.Image]::FromFile($framePath)
                         $g.DrawImage($frameBmp, $frame * $Width, 0, $Width, $Height)
@@ -339,7 +339,9 @@ function New-PlaceholderTexture {
                 $strip.Dispose()
             }
             else {
-                $texOut = & $pythonCmd.Source $pythonScript --spec $tempSpec --output $OutputPath --type texture --size $Width @allowArgs 2>&1
+                # A file left by an earlier run must not count as this run's success.
+                if (Test-Path -LiteralPath $OutputPath) { Remove-Item -LiteralPath $OutputPath -Force }
+                $texOut = & $pythonCmd.Source $pythonScript --spec $tempSpec --output $OutputPath --type texture --size $Width --height $Height @allowArgs 2>&1
                 if (-not (Test-Path $OutputPath)) { $sdFailure = ($texOut | Select-Object -Last 3) -join ' | ' }
             }
 

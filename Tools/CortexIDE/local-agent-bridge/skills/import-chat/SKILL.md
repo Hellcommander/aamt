@@ -8,8 +8,8 @@ Slash-only. `/import-chat` continues a Cursor export as an **agent**, not a chat
 ## What to do
 
 1. If the user attached a `.md` / `.jsonl` or pasted an absolute path, call `import_cursor_chat` with that path immediately.
-2. If there is no path, look in `%USERPROFILE%\Downloads` for `cursor_*.md` or `*_chat.md` and import the newest one.
-3. After import, `read_file` the written `.cortexide/imported-chats/<slug>.md`.
+2. If there is no path, look in `%USERPROFILE%\Downloads` for `cursor_*.md`, `cursor_*.jsonl` or `*_chat.md` and import the newest one.
+3. After import, `read_file` the written `.cortexide/imported-chats/<slug>-<hash>.md` (the import result gives the exact path).
 4. Resume the last user task with tools. Do not recap. Do not ask what they want to do with todos.
 
 Do not behave as an instructor. Do not say a path does not exist without a tool result.

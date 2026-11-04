@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 from copy import deepcopy
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from s2_paths import core2_dir, mods_dir, skip_mod_path, workshop_root
@@ -361,10 +361,19 @@ def add_production_action(spec: Dict[str, Any], action: Dict[str, Any]) -> Dict[
     return action
 
 
+def _inside(base: Path, rel: str) -> Optional[Path]:
+    """base/rel, or None when rel would leave base (.., absolute, drive)."""
+    cand = (base / rel).resolve()
+    return cand if cand.is_relative_to(base.resolve()) else None
+
+
 def _read_name_text(rel: str) -> Optional[str]:
     rel = str(rel).replace("\\", "/").lstrip("/")
-    core = core2_dir() / rel
-    if core.is_file():
+    parts = PurePosixPath(rel).parts
+    if not rel or ".." in parts or PureWindowsPath(rel).drive or PureWindowsPath(rel).is_absolute():
+        return None
+    core = _inside(core2_dir(), rel)
+    if core is not None and core.is_file():
         return core.read_text(encoding="utf-8")
     roots = []
     try:
@@ -379,8 +388,8 @@ def _read_name_text(rel: str) -> Optional[str]:
             for mod in root.iterdir():
                 if not mod.is_dir() or mod.name.lower() == "core_2" or skip_mod_path(mod):
                     continue
-                cand = mod / rel
-                if cand.is_file():
+                cand = _inside(mod, rel)
+                if cand is not None and cand.is_file():
                     return cand.read_text(encoding="utf-8")
     return None
 
@@ -667,6 +676,12 @@ def _merge_rows_by_id(existing: List[Any], incoming: List[Any], *, key: str) -> 
     return rows
 
 
+def _all_rows_have_ids(rows: List[Any]) -> bool:
+    """Unknown sections only merge by id when every row is an object with an id;
+    lists of strings/numbers or id-less rows are replaced as a whole."""
+    return all(isinstance(r, dict) and str(r.get("id") or "").strip() for r in rows)
+
+
 def merge_character_json_into_spec(spec: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, int]:
     """Merge partial game character.json data into a SkillCreator spec by entry id.
 
@@ -690,7 +705,12 @@ def merge_character_json_into_spec(spec: Dict[str, Any], payload: Dict[str, Any]
     for key, value in payload.items():
         if key in CHARACTER_SPEC_KEYS:
             continue
-        if isinstance(value, list) and isinstance(extra.get(key), list):
+        if (
+            isinstance(value, list)
+            and isinstance(extra.get(key), list)
+            and _all_rows_have_ids(extra[key])
+            and _all_rows_have_ids(value)
+        ):
             extra[key] = _merge_rows_by_id(extra[key], value, key=key)
         else:
             extra[key] = deepcopy(value)

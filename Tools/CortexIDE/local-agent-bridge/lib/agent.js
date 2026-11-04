@@ -1,6 +1,6 @@
 "use strict";
 
-// Agent loop for local models: gather → act → verify → attempt_completion.
+// Agent loop (local models or Claude): gather → act → verify → attempt_completion.
 
 const llm = require("./llm");
 const { TOOL_DEFS, MUTATING, canonName, execTool, clip } = require("./agent-tools");
@@ -92,6 +92,7 @@ function sanitize(messages) {
     if (m.tool_calls) out.tool_calls = m.tool_calls;
     if (m.tool_call_id) out.tool_call_id = m.tool_call_id;
     if (m.name) out.name = m.name;
+    if (m.blocks) out.blocks = m.blocks; // raw Claude content, replayed verbatim (thinking + tool_use)
     if (m.role === "assistant" && m.tool_calls && !m.content) out.content = null;
     return out;
   });
@@ -102,6 +103,7 @@ function sanitize(messages) {
  * @param {object} o.backend from llm.discover()
  * @param {string} o.model
  * @param {number} o.contextTokens
+ * @param {string} [o.effort] Claude reasoning effort (low|medium|high|xhigh|max); "" = model default
  * @param {string} o.prompt
  * @param {{role:string,content:string}[]} [o.history] prior turns (user/assistant text only)
  * @param {object} [o.prior] Progress JSON from earlier turns
@@ -119,6 +121,12 @@ async function runAgent(o) {
   const progress = new Progress({ ...(o.prior || {}), task: o.prompt });
   const priorText = o.prior ? new Progress(o.prior).toText() : "";
   let textMode = !!o.textMode;
+  // Claude binds its thinking blocks to an unedited history: once compaction has rewritten the
+  // transcript they are no longer replayed (the API would reject them on newer accounts).
+  let historyEdited = false;
+  const usage = { input: 0, cached: 0, output: 0 };
+  let streamed = 0;
+  let shown = 0;
 
   const buildSystem = () =>
     systemPrompt({ env: o.env || {}, skills: o.skills || [], task: o.prompt, prior: priorText, textMode });
@@ -142,10 +150,15 @@ async function runAgent(o) {
   for (let round = 1; round <= maxRounds; round++) {
     if (o.signal && o.signal.aborted) throw new Error("stopped");
     const level = compact(messages, budget, progress, { firstUser });
-    if (level) emit({ type: "status", text: "Context compacted (level " + level + ") to fit " + budget + " tokens" });
+    if (level) {
+      historyEdited = true;
+      emit({ type: "status", text: "Context compacted (level " + level + ") to fit " + budget + " tokens" });
+    }
     emit({ type: "status", text: "Round " + round + " · ~" + estimateTokens(messages) + "/" + budget + " tokens", transient: true });
 
     let reply;
+    streamed = 0;
+    shown = 0;
     try {
       reply = await llm.chat({
         backend: o.backend,
@@ -155,9 +168,24 @@ async function runAgent(o) {
         maxTokens,
         temperature: o.temperature == null ? 0.2 : o.temperature,
         numCtx: o.backend.provider === "ollama" ? o.contextTokens : undefined,
+        effort: o.effort || "",
+        replayThinking: !historyEdited,
+        onText: (t) => {
+          streamed += t.length;
+          if (streamed - shown >= 300) {
+            shown = streamed;
+            emit({ type: "status", text: "Writing… " + streamed + " chars", transient: true });
+          }
+        },
         signal: o.signal,
       });
     } catch (e) {
+      if (e instanceof llm.ThinkingMismatch && !historyEdited) {
+        historyEdited = true;
+        emit({ type: "status", text: "Claude rejected the replayed thinking blocks — resending without them" });
+        round--;
+        continue;
+      }
       if (e instanceof llm.ToolsUnsupported && !textMode) {
         textMode = true;
         messages[0].content = buildSystem();
@@ -167,11 +195,19 @@ async function runAgent(o) {
       }
       if (/maximum context length|context length|too many tokens|prompt is too long/i.test(e.message || "") && round < maxRounds) {
         emit({ type: "status", text: "Backend says the prompt is too long — compacting harder" });
+        historyEdited = true;
         compact(messages, Math.floor(budget * 0.6), progress, { firstUser, keepRecent: 4 });
         continue;
       }
       throw e;
     }
+
+    if (reply.usage) {
+      usage.input += Number(reply.usage.prompt_tokens) || 0;
+      usage.cached += Number(reply.usage.cache_read) || 0;
+      usage.output += Number(reply.usage.completion_tokens) || 0;
+    }
+    if (reply.truncated) emit({ type: "status", text: "Reply was cut at the output token limit (localAgentBridge.agent.claudeMaxOutputTokens)" });
 
     let calls = (reply.tool_calls || [])
       .filter((tc) => tc && tc.function && tc.function.name)
@@ -196,7 +232,7 @@ async function runAgent(o) {
       if (reason) {
         nudges++;
         if (said) emit({ type: "thought", text: said });
-        messages.push({ role: "assistant", content: reply.content || "(empty)" });
+        messages.push({ role: "assistant", content: reply.content || "(empty)", blocks: reply.blocks });
         messages.push({ role: "user", content: reason });
         emit({ type: "status", text: "Not done yet — " + reason.split(".")[0].toLowerCase() });
         continue;
@@ -207,14 +243,20 @@ async function runAgent(o) {
 
     if (said) emit({ type: "thought", text: said });
     if (fromText) messages.push({ role: "assistant", content: reply.content });
-    else messages.push({ role: "assistant", content: reply.content || null, tool_calls: calls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.args) } })) });
+    else messages.push({ role: "assistant", content: reply.content || null, blocks: reply.blocks, tool_calls: calls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.args) } })) });
 
     const textResults = [];
     let completion = null;
     for (const c of calls) {
       if (o.signal && o.signal.aborted) throw new Error("stopped");
       let result;
-      if (c.name === "attempt_completion") {
+      if (completion) {
+        // Completion is final: anything the model queued after attempt_completion in the same
+        // reply is not run (it would change files after the summary was accepted). Native tool
+        // calls still need a result each, so they get a "skipped" one.
+        result = "skipped: attempt_completion was already accepted, so this call was not run.";
+        emit({ type: "status", text: "Ignored " + c.name + " queued after attempt_completion" });
+      } else if (c.name === "attempt_completion") {
         let why = "";
         if (nudges < MAX_NUDGES && wantsEdit(o.prompt) && !mutated) why = "no file has been changed yet. Make the change first.";
         else if (nudges < MAX_NUDGES && mutated && wantsVerify(o.prompt) && !verified) why = "the change is not verified. Run the requested check with Shell first.";
@@ -246,7 +288,9 @@ async function runAgent(o) {
         if (c.name !== "Shell" && MUTATING.has(c.name) && !/^error/.test(result)) {
           mutated = true;
           verified = false;
-        } else if (mutated && (c.name === "Shell" || c.name === "ReadLints")) verified = true;
+        } else if (mutated && c.name === "ReadLints" && !/^error/.test(result)) verified = true;
+        // A failed, blocked or declined command proves nothing; only a clean exit verifies.
+        else if (mutated && c.name === "Shell" && /^exit 0 \(/.test(result)) verified = true;
         progress.record(c.name, c.args, result);
         emit({ type: "tool", name: c.name, label: String(label), status: "done", ok: !/^(error|skipped)/.test(result), result: result.slice(0, 4000) });
       }
@@ -270,6 +314,8 @@ async function runAgent(o) {
         tools: null,
         maxTokens,
         numCtx: o.backend.provider === "ollama" ? o.contextTokens : undefined,
+        effort: o.effort || "",
+        replayThinking: !historyEdited,
         signal: o.signal,
       });
       final = narration(wrap.content) || "(stopped after " + maxRounds + " rounds)";
@@ -278,6 +324,12 @@ async function runAgent(o) {
 
   if (!final) final = mutated ? "Done." : "(no answer)";
   progress.notes.push("Turn: " + short(o.prompt, 200) + " → " + short(final, 300));
+  if (o.backend && o.backend.provider === "anthropic" && usage.input + usage.output > 0) {
+    emit({
+      type: "status",
+      text: "Claude usage this turn: " + usage.input.toLocaleString() + " input tokens (" + usage.cached.toLocaleString() + " from cache) · " + usage.output.toLocaleString() + " output",
+    });
+  }
   emit({ type: "assistant", text: final });
   return { text: final, progress: progress.toJSON(), toolsUsed, mutated };
 }

@@ -145,12 +145,28 @@ def _break_lock_if_unchanged(path: Path, seen_raw: bytes, reason: str) -> bool:
     current = _read_lock_raw(path)
     if current is None or current != seen_raw:
         return False
+    # Compare-then-unlink is racy: move the lock aside atomically first, then re-check
+    # what we actually took. Only one breaker can win the rename.
+    aside = path.with_name(f"{path.name}.stale-{os.getpid()}-{time.time_ns()}")
     try:
-        path.unlink()
-        _log(f"broke stale {path.name} ({reason})")
-        return True
+        os.rename(str(path), str(aside))
     except OSError:
         return False
+    try:
+        if _read_lock_raw(aside) == seen_raw:
+            _log(f"broke stale {path.name} ({reason})")
+            return True
+        # re-acquired in between: put the new holder's lock back (link never overwrites)
+        try:
+            os.link(str(aside), str(path))
+        except OSError as exc:
+            _log(f"could not restore {path.name} after a racing re-acquire: {exc}")
+        return False
+    finally:
+        try:
+            aside.unlink()
+        except OSError:
+            pass
 
 
 def _try_acquire(path: Path, label: str) -> bool:

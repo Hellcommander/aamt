@@ -75,6 +75,8 @@ $env:HF_HUB_CACHE = $hfHub
 Remove-Item Env:HF_HOME -ErrorAction SilentlyContinue
 Write-Host "  HF model cache: $hfHub (token stays in user profile)" -ForegroundColor Gray
 # Confirm the existing Hugging Face login (hf auth login). The token is never copied anywhere.
+# HfTokenSwitch checks with AAMT_STABLE_AUDIO_PYTHON first: point it at the -PythonPath choice.
+if ($PythonPath) { $env:AAMT_STABLE_AUDIO_PYTHON = $pythonCmd }
 $hfLoginOk = $false
 $tokenSwitch = Join-Path $ToolsRoot "Shared\HfTokenSwitch.psm1"
 if (Test-Path $tokenSwitch) {

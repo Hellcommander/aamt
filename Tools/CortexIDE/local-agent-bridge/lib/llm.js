@@ -1,15 +1,16 @@
 "use strict";
 
-// OpenAI-compatible client for local backends (vLLM / SGLang router, Ollama, LM Studio, ...).
-// Ollama goes through its native /api/chat so we can raise num_ctx; its /v1 endpoint is
-// stuck at the server default context, which is what kept truncating long agent turns.
+// Model backends behind one chat() call:
+// - OpenAI-compatible local servers (vLLM / SGLang router, LM Studio, llama.cpp, ...)
+// - Ollama through its native /api/chat, so num_ctx can be raised (its /v1 endpoint is stuck at
+//   the server default context, which is what kept truncating long agent turns)
+// - Claude through the Anthropic Messages API (lib/anthropic.js)
 
-const http = require("http");
-const https = require("https");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { URL } = require("url");
+const { request, errText } = require("./http");
+const anthropic = require("./anthropic");
 
 const PROVIDERS = {
   vllm: {
@@ -32,6 +33,13 @@ const PROVIDERS = {
     urls: [],
     preferred: [],
     defaultCtx: 32768,
+  },
+  anthropic: {
+    id: "anthropic",
+    label: "Claude",
+    urls: [anthropic.DEFAULT_URL],
+    preferred: anthropic.PREFERRED,
+    defaultCtx: anthropic.DEFAULT_CTX,
   },
 };
 
@@ -60,61 +68,6 @@ function qudlabKey() {
   }
 }
 
-function request(url, { method = "GET", body, timeout = 300000, apiKey, signal } = {}) {
-  return new Promise((resolve, reject) => {
-    const parsed = new URL(url);
-    const lib = parsed.protocol === "https:" ? https : http;
-    const payload = body ? JSON.stringify(body) : null;
-    const headers = { Accept: "application/json" };
-    if (payload) {
-      headers["Content-Type"] = "application/json";
-      headers["Content-Length"] = Buffer.byteLength(payload);
-    }
-    if (apiKey) headers.Authorization = "Bearer " + apiKey;
-    const req = lib.request(
-      {
-        hostname: parsed.hostname,
-        port: parsed.port || (parsed.protocol === "https:" ? 443 : 80),
-        path: parsed.pathname + (parsed.search || ""),
-        method,
-        family: parsed.hostname === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(parsed.hostname) ? 4 : undefined,
-        timeout,
-        headers,
-      },
-      (res) => {
-        const chunks = [];
-        res.on("data", (c) => chunks.push(c));
-        res.on("end", () => {
-          const raw = Buffer.concat(chunks).toString("utf8");
-          let json = null;
-          try {
-            json = JSON.parse(raw);
-          } catch {
-            /* non-JSON body */
-          }
-          resolve({ status: res.statusCode || 0, json, raw });
-        });
-      }
-    );
-    const onAbort = () => req.destroy(new Error("stopped"));
-    if (signal) {
-      if (signal.aborted) return onAbort();
-      signal.addEventListener("abort", onAbort, { once: true });
-    }
-    req.on("error", reject);
-    req.on("timeout", () => req.destroy(new Error("timeout talking to " + url)));
-    req.on("close", () => signal && signal.removeEventListener("abort", onAbort));
-    if (payload) req.write(payload);
-    req.end();
-  });
-}
-
-function errText(res) {
-  const j = res.json;
-  if (j && j.error) return typeof j.error === "string" ? j.error : j.error.message || JSON.stringify(j.error);
-  return "HTTP " + res.status + " " + String(res.raw || "").slice(0, 300);
-}
-
 async function listModels(baseUrl, apiKey) {
   const res = await request(trimBase(baseUrl) + "/models", { timeout: 4000, apiKey });
   if (res.status >= 400 || !res.json) throw new Error(errText(res));
@@ -136,12 +89,33 @@ async function ollamaContextLength(baseUrl, model) {
   return 0;
 }
 
-/** Find a live backend. provider "auto" tries vLLM, then Ollama. */
-async function discover({ provider = "auto", baseUrl = "", apiKey = "" } = {}) {
-  const order = provider === "auto" ? ["vllm", "ollama"] : [provider];
+/**
+ * Find a live backend. provider "auto" tries vLLM, then Ollama, then Claude when credentials exist.
+ * anthropicApiKey is the key from Secret Storage; the generic apiKey setting also counts for Claude
+ * when it looks like an Anthropic key.
+ */
+async function discover({ provider = "auto", baseUrl = "", apiKey = "", anthropicApiKey = "", anthropicWorkspaceId = "" } = {}) {
+  const order = provider === "auto" ? ["vllm", "ollama", "anthropic"] : [provider];
   const errors = [];
   for (const id of order) {
     const spec = providerOf(id);
+    if (id === "anthropic") {
+      const cred = anthropic.credentials({ apiKey: anthropicApiKey || (/^sk-ant-/i.test(apiKey) ? apiKey : ""), workspaceId: anthropicWorkspaceId });
+      if (!cred) {
+        errors.push("Claude: no credentials (run \u201cAgent: Set Claude API Key\u201d, set ANTHROPIC_API_KEY, or `ant auth login`)");
+        continue;
+      }
+      const u = anthropic.root(provider === "anthropic" && baseUrl ? baseUrl : spec.urls[0]);
+      try {
+        const models = await anthropic.listModels(u, cred);
+        return { provider: "anthropic", label: spec.label, baseUrl: u, models, cred, credSource: cred.source };
+      } catch (e) {
+        let msg = String((e && e.message) || e);
+        if (/anthropic-workspace-id/i.test(msg)) msg += " Set localAgentBridge.agent.claudeWorkspaceId (or ANTHROPIC_WORKSPACE_ID) to the wrkspc_... id from console.anthropic.com → Settings → Workspaces.";
+        errors.push("Claude " + u + ": " + msg);
+      }
+      continue;
+    }
     const urls = [];
     if (baseUrl) urls.push(trimBase(baseUrl));
     for (const u of spec.urls) if (!urls.includes(u)) urls.push(u);
@@ -155,7 +129,7 @@ async function discover({ provider = "auto", baseUrl = "", apiKey = "" } = {}) {
       }
     }
   }
-  throw new Error("No local model backend reachable.\n" + errors.join("\n"));
+  throw new Error("No model backend reachable.\n" + errors.join("\n"));
 }
 
 function pickModel(models, requested, provider) {
@@ -168,6 +142,11 @@ function pickModel(models, requested, provider) {
 /** Usable prompt window for the chosen model. */
 async function contextWindow(backend, model, { override = 0, ollamaNumCtx = 16384 } = {}) {
   if (override > 0) return override;
+  if (backend.provider === "anthropic") {
+    // Plan for 200k unless the user asks for more: the whole conversation is resent every round.
+    const m = (backend.models || []).find((x) => x.id === model);
+    return Math.min((m && m.ctx) || anthropic.DEFAULT_CTX, anthropic.DEFAULT_CTX);
+  }
   if (backend.provider === "ollama") {
     const native = await ollamaContextLength(backend.baseUrl, model);
     return native ? Math.min(native, ollamaNumCtx) : ollamaNumCtx;
@@ -207,11 +186,17 @@ function newId() {
 }
 
 /**
- * One chat completion. Returns { content, tool_calls, usage } with OpenAI-shaped tool_calls.
+ * One chat completion. Returns { content, tool_calls, usage } with OpenAI-shaped tool_calls
+ * (Claude adds `blocks`, the raw assistant content to replay, and `truncated`).
  * Throws ToolsUnsupported when the backend rejects the tools field (vLLM without
- * --enable-auto-tool-choice, Ollama models without the tools capability).
+ * --enable-auto-tool-choice, Ollama models without the tools capability), and
+ * ThinkingMismatch when Claude rejects replayed thinking blocks after the history changed.
+ * effort / replayThinking / onText are Claude-only; temperature is not sent to Claude.
  */
-async function chat({ backend, model, messages, tools, maxTokens = 2048, temperature = 0.2, numCtx, signal }) {
+async function chat({ backend, model, messages, tools, maxTokens = 2048, temperature = 0.2, numCtx, signal, effort = "", replayThinking = true, onText }) {
+  if (backend.provider === "anthropic") {
+    return anthropic.chat({ baseUrl: backend.baseUrl, cred: backend.cred, model, messages, tools, maxTokens, effort, replayThinking, signal, onText });
+  }
   const isOllama = backend.provider === "ollama";
   let res;
   if (isOllama) {
@@ -268,6 +253,9 @@ async function chat({ backend, model, messages, tools, maxTokens = 2048, tempera
 module.exports = {
   PROVIDERS,
   ToolsUnsupported,
+  ThinkingMismatch: anthropic.ThinkingMismatch,
+  anthropic,
+  request,
   providerOf,
   discover,
   listModels,

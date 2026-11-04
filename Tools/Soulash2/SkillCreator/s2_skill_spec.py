@@ -23,7 +23,7 @@ from s2_paths import (
     workshop_root,
 )
 from s2_races import load_character_into_spec, write_character_json
-from s2_procedural_maps import map_folder_name, procedural_map_filename, public_procedural_map
+from s2_procedural_maps import MAP_DIR_NAMES, map_folder_name, procedural_map_filename, public_procedural_map
 from s2_schema import infer_amplifier_type, is_effects_keys_id, slug_name
 
 # Vanilla Pyromancy interleaves +1 statistic with empty/milestone-only levels.
@@ -1458,7 +1458,7 @@ def write_mod(spec: Dict[str, Any], dest: Optional[Path] = None) -> Path:
             (bdir / building_filename(building)).write_text(
                 _dump(public_building(building)), encoding="utf-8"
             )
-    if spec.get("procedural_maps"):
+    if spec.get("procedural_maps") is not None:
         written_maps = set()
         default_map_dir = map_folder_name(spec.get("procedural_map_dir"))
         for row in spec["procedural_maps"]:
@@ -1471,6 +1471,14 @@ def write_mod(spec: Dict[str, Any], dest: Optional[Path] = None) -> Path:
                 raise ValueError(f"Procedural map filename collision in {folder_name}: {fname}")
             (map_dir / fname).write_text(_dump(public_procedural_map(row)), encoding="utf-8")
             written_maps.add(collision)
+        # Same as abilities/milestones/entities: a map removed from the spec must not
+        # linger on disk (the loader reads every *.json in both map folders).
+        for folder_name in MAP_DIR_NAMES:
+            map_dir = root / folder_name
+            if map_dir.is_dir():
+                for stale in map_dir.glob("*.json"):
+                    if (folder_name.casefold(), stale.name.casefold()) not in written_maps:
+                        stale.unlink()
     if spec.get("weather"):
         from s2_weather import public_weather
 

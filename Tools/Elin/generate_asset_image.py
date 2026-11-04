@@ -245,7 +245,9 @@ Error Codes:
     parser.add_argument('--spec', required=True, help='JSON specification file path')
     parser.add_argument('--output', required=True, help='Output image path')
     parser.add_argument('--type', required=True, help='Asset type (icon, sprite, texture, spell_asset)')
-    parser.add_argument('--size', type=int, help='Override size in pixels')
+    parser.add_argument('--size', type=int, help='Override size in pixels (width)')
+    parser.add_argument('--height', type=int, default=None,
+                        help='Output height in pixels when it differs from --size (non-square presets)')
     parser.add_argument('--seed', type=int, default=None, help='Optional render seed')
     parser.add_argument('--sd', choices=['auto', 'on', 'off'], default=None,
                         help='Local Stable Diffusion: auto/on=SD required (fails if SD is down or QA fails), '
@@ -320,6 +322,13 @@ Error Codes:
         print(f"ERROR: Invalid size value: {size}", file=sys.stderr)
         print(f"  Error: {e}", file=sys.stderr)
         sys.exit(2)
+    out_w = size
+    out_h = int(args.height) if args.height else size
+    if out_h <= 0 or out_h > 8192:
+        print(f"ERROR: Invalid height {out_h}. Height must be between 1 and 8192 pixels.", file=sys.stderr)
+        sys.exit(2)
+    # Generators draw squares: render at the larger side, then fit to width x height below.
+    size = max(out_w, out_h)
     
     # Generate based on type
     asset_type = args.type.lower()
@@ -345,6 +354,16 @@ Error Codes:
         traceback.print_exc()
         sys.exit(3)
     
+    if out_w != out_h and (out_w, out_h) != img.size:
+        if img.size != (size, size):
+            img = img.resize((size, size), Image.Resampling.LANCZOS)
+        if asset_type == 'texture':
+            # Scale, not crop: cropping would break the seamless tiling.
+            img = img.resize((out_w, out_h), Image.Resampling.LANCZOS)
+        else:
+            left, top = (size - out_w) // 2, (size - out_h) // 2
+            img = img.crop((left, top, left + out_w, top + out_h))
+
     # Ensure output directory exists
     output_path = Path(args.output)
     try:

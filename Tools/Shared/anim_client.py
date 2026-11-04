@@ -109,10 +109,12 @@ def blender_exe() -> Path:
 
 def status() -> Dict[str, Any]:
     local = Path(os.environ.get("HF_HOME") or r"D:\hf-cache") / "local"
+    # the transformer file itself (same default as anim/wan_video.py), not just its folder
+    gguf = Path(os.environ.get("AAMT_WAN_GGUF") or local / "Wan2.2-TI2V-5B-GGUF" / "Wan2.2-TI2V-5B-Q8_0.gguf")
     return {
         "anim_venv": _py().exists(),
         "unirig": _unirig_py().exists() and (unirig_home() / "experiments" / "skin" / "articulation-xl" / "model.ckpt").exists(),
-        "wan": (local / "Wan2.2-TI2V-5B-Diffusers" / "model_index.json").exists() and (local / "Wan2.2-TI2V-5B-GGUF").exists(),
+        "wan": (local / "Wan2.2-TI2V-5B-Diffusers" / "model_index.json").exists() and gguf.is_file(),
         "cotracker": (local / "cotracker3" / "scaled_offline.pth").exists(),
         "blender": str(blender_exe()),
     }
@@ -360,7 +362,7 @@ def reroll_bad_fits(work: Path, texts: Dict[str, str], body: str, *, steps: int 
 
     def needs(c):
         px, sw = _fit_px(work, c), _swing(work, c)
-        return (px or 0) > max_px or (sw is not None and sw < min_swing.get(c, 0))
+        return px is None or px > max_px or (sw is not None and sw < min_swing.get(c, 0))
     for r in range(1, rounds + 1):
         bad = {c: (_fit_px(work, c), _swing(work, c), _take_score(work, c, max_px)) for c in texts if needs(c)}
         if not bad:
@@ -370,7 +372,7 @@ def reroll_bad_fits(work: Path, texts: Dict[str, str], body: str, *, steps: int 
             meta = work / "video" / f"{c}.json"
             # onward from the seed of the take being replaced: same prompt + same seed films the same clip again
             last = json.loads(meta.read_text()).get("seed", seed + i) if meta.exists() else seed + i
-            seeds[c] = int(last) + 5000
+            seeds[c] = int(last) + 5000 * r  # a kept old take brings its seed back: step further each round
             for f in take(c):
                 if f.exists():
                     shutil.copy2(f, f.with_name(f.name + ".prev"))

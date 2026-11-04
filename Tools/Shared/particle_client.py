@@ -200,6 +200,9 @@ def recipe(r: Dict[str, Any]) -> Dict[str, Any]:
     base.setdefault("seed", 1)
     if not base.get("name"):
         raise ValueError("a recipe needs a name")
+    name = str(base["name"])
+    if name in (".", "..") or any(c in name for c in "/\\:") or Path(name).name != name:
+        raise ValueError(f"recipe name {name!r} must be a plain file name (no folders or '..')")
     return base
 
 

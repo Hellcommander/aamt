@@ -457,10 +457,9 @@ if ($Loops -gt 0) {
 $animationJson = $animationFile | ConvertTo-Json -Depth 5
 $animationJson = $animationJson -replace '(?<="):\s*', ' : '
 
-# Write .animation file
+# .animation / .frames are written only once the spritesheet exists (see below), so a failed
+# sheet never leaves metadata pointing at a missing or stale PNG.
 $animationPath = Join-Path $animOutputDir "$AnimationName.animation"
-$animationJson | Out-File -FilePath $animationPath -Encoding UTF8 -NoNewline
-Write-Log "Created: $animationPath" "SUCCESS"
 
 # Build .frames file
 $framesFile = [ordered]@{
@@ -473,10 +472,7 @@ $framesFile = [ordered]@{
 $framesJson = $framesFile | ConvertTo-Json -Depth 5
 $framesJson = $framesJson -replace '(?<="):\s*', ' : '
 
-# Write .frames file
 $framesPath = Join-Path $animOutputDir "$AnimationName.frames"
-$framesJson | Out-File -FilePath $framesPath -Encoding UTF8 -NoNewline
-Write-Log "Created: $framesPath" "SUCCESS"
 
 # Generate intelligent visual asset using Ollama if requested
 $script:visualDesign = $null
@@ -573,6 +569,7 @@ if (-not $haveExternalImage) {
 }
 
 # Legacy System.Drawing sheet: only after an SD failure with procedural output explicitly allowed.
+$procSheetOk = $false
 if (-not $haveExternalImage -and -not $sdSheetOk) {
     Write-Log "Stable Diffusion unavailable - drawing procedural placeholder sheet (-AllowProcedural)" "WARN"
 
@@ -679,6 +676,7 @@ if (-not $haveExternalImage -and -not $sdSheetOk) {
         $graphics.Dispose()
         $bitmap.Dispose()
 
+        $procSheetOk = $true
         Write-Log "Created procedural placeholder spritesheet: $sheetPath" "SUCCESS"
         Write-Log "  Spritesheet size: ${totalWidth}x${totalHeight}" "INFO"
     }
@@ -699,6 +697,16 @@ if (-not [string]::IsNullOrEmpty($ImagePath) -and (Test-Path $ImagePath)) {
         Write-Log "Copied source image to: $destImagePath" "SUCCESS"
     }
 }
+
+if (-not ($haveExternalImage -or $sdSheetOk -or $procSheetOk) -or -not (Test-Path -LiteralPath $sheetPath)) {
+    Write-Log "No spritesheet was produced for $AnimationName; not writing .animation/.frames" "ERROR"
+    exit 1
+}
+
+$animationJson | Out-File -FilePath $animationPath -Encoding UTF8 -NoNewline
+Write-Log "Created: $animationPath" "SUCCESS"
+$framesJson | Out-File -FilePath $framesPath -Encoding UTF8 -NoNewline
+Write-Log "Created: $framesPath" "SUCCESS"
 
 # Generate metadata
 $metadata = @{

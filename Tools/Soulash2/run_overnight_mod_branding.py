@@ -104,6 +104,25 @@ def sd_generation_works() -> bool:
         return False
 
 
+def child_env() -> dict:
+    """Jobs share one SD server: a child's sd_session must not stop it after each job."""
+    env = os.environ.copy()
+    env["AAMT_SD_KEEP_SERVER"] = "1"
+    return env
+
+
+def stop_sd_after_run() -> None:
+    """Children keep the server up; stop it once the whole run is done."""
+    if os.environ.get("AAMT_SD_KEEP_SERVER") == "1":
+        return
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Shared"))
+        from sd_server_lifecycle import stop_sd_server
+        stop_sd_server()
+    except Exception as exc:  # noqa: BLE001
+        log(f"SD stop after run failed: {exc}")
+
+
 def start_sd_server() -> subprocess.Popen:
     env = os.environ.copy()
     env["SD_ALLOW_NONADMIN"] = "1"
@@ -173,7 +192,7 @@ def run_image_job(job: dict, job_index: int, total_jobs: int) -> dict:
     source = f"SD {job['mode']}" if job.get("use_sd", True) else f"procedural {job['mode']} (--no-sd)"
     log(f"=== JOB {job_index + 1}/{total_jobs}: {label} ({job['theme']}, {source}) ===")
     t0 = time.monotonic()
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=child_env())
     elapsed = time.monotonic() - t0
     print(proc.stdout, flush=True)
     if proc.stderr:
@@ -272,6 +291,7 @@ def main() -> int:
     out_log.write_text(json.dumps(report, indent=2), encoding="utf-8")
     log(f"Report saved: {out_log}")
 
+    stop_sd_after_run()
     failed = [r for r in results if r.get("exit_code", 1) != 0]
     return 1 if failed else 0
 

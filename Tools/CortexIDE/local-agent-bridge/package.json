@@ -1,8 +1,8 @@
 {
   "name": "local-agent-bridge",
   "displayName": "Local Agent Bridge",
-  "description": "CortexIDE coding agent on local models (vLLM / Ollama) with file, search and shell tools, SKILL.md skills, .canvas.tsx canvases, and chat import (including Cursor exports).",
-  "version": "2.1.0",
+  "description": "CortexIDE coding agent on local models (vLLM / Ollama) or Claude (Anthropic API) with file, search and shell tools, SKILL.md skills, .canvas.tsx canvases, and chat import (including Cursor exports).",
+  "version": "2.2.1",
   "publisher": "arend",
   "engines": {
     "vscode": "^1.80.0"
@@ -52,6 +52,11 @@
       {
         "command": "localAgentBridge.agentProgress",
         "title": "Agent: Open Progress Index",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.setClaudeApiKey",
+        "title": "Agent: Set Claude API Key",
         "category": "Local Agent Bridge"
       },
       {
@@ -257,7 +262,10 @@
         "modelDescription": "List SKILL.md skills with name, description, and path.",
         "userDescription": "List bridged skills",
         "canBeReferencedInPrompt": true,
-        "inputSchema": { "type": "object", "properties": {} }
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
       },
       {
         "name": "read_skill",
@@ -268,8 +276,14 @@
         "canBeReferencedInPrompt": true,
         "inputSchema": {
           "type": "object",
-          "properties": { "name": { "type": "string" } },
-          "required": ["name"]
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ]
         }
       },
       {
@@ -282,10 +296,16 @@
         "inputSchema": {
           "type": "object",
           "properties": {
-            "query": { "type": "string" },
-            "limit": { "type": "number" }
+            "query": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            }
           },
-          "required": ["query"]
+          "required": [
+            "query"
+          ]
         }
       },
       {
@@ -295,7 +315,10 @@
         "modelDescription": "List .canvas.tsx canvases.",
         "userDescription": "List canvases",
         "canBeReferencedInPrompt": true,
-        "inputSchema": { "type": "object", "properties": {} }
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
       },
       {
         "name": "read_canvas",
@@ -306,8 +329,14 @@
         "canBeReferencedInPrompt": true,
         "inputSchema": {
           "type": "object",
-          "properties": { "name": { "type": "string" } },
-          "required": ["name"]
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ]
         }
       },
       {
@@ -319,8 +348,15 @@
         "canBeReferencedInPrompt": true,
         "inputSchema": {
           "type": "object",
-          "properties": { "path": { "type": "string", "description": "Absolute path to a Cursor export .md or .jsonl" } },
-          "required": ["path"]
+          "properties": {
+            "path": {
+              "type": "string",
+              "description": "Absolute path to a Cursor export .md or .jsonl"
+            }
+          },
+          "required": [
+            "path"
+          ]
         }
       },
       {
@@ -330,7 +366,10 @@
         "modelDescription": "List chats imported into .cortexide/imported-chats.",
         "userDescription": "List imported chats",
         "canBeReferencedInPrompt": true,
-        "inputSchema": { "type": "object", "properties": {} }
+        "inputSchema": {
+          "type": "object",
+          "properties": {}
+        }
       }
     ],
     "configuration": {
@@ -353,7 +392,9 @@
         },
         "localAgentBridge.extraSkillRoots": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Extra directories to scan for SKILL.md files."
         },
@@ -369,11 +410,18 @@
         },
         "localAgentBridge.agent.provider": {
           "type": "string",
-          "enum": ["auto", "vllm", "ollama", "openai"],
+          "enum": [
+            "auto",
+            "vllm",
+            "ollama",
+            "anthropic",
+            "openai"
+          ],
           "enumDescriptions": [
-            "vLLM / SGLang router if running, otherwise Ollama",
+            "vLLM / SGLang router if running, otherwise Ollama, otherwise Claude when credentials are set",
             "vLLM or the Qud Lab SGLang router (:30000, then :8000)",
             "Ollama (:11434), using its native API so num_ctx is honoured",
+            "Claude through the Anthropic Messages API (api.anthropic.com). Key from “Agent: Set Claude API Key”, ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN or `ant auth login`.",
             "Any OpenAI-compatible URL set in localAgentBridge.agent.baseUrl"
           ],
           "default": "auto",
@@ -382,7 +430,7 @@
         "localAgentBridge.agent.baseUrl": {
           "type": "string",
           "default": "",
-          "description": "Override the backend URL (ending in /v1). Empty = provider defaults."
+          "description": "Override the backend URL (ending in /v1; for Claude, an API gateway in front of api.anthropic.com). Empty = provider defaults."
         },
         "localAgentBridge.agent.model": {
           "type": "string",
@@ -392,12 +440,12 @@
         "localAgentBridge.agent.apiKey": {
           "type": "string",
           "default": "",
-          "description": "Bearer key for the backend. Empty = %LOCALAPPDATA%\\QudLab\\vllm-proxy-key.txt for vLLM."
+          "description": "Bearer key for the backend. Empty = %LOCALAPPDATA%QudLab\u000bllm-proxy-key.txt for vLLM. For Claude prefer “Agent: Set Claude API Key”, which uses Secret Storage."
         },
         "localAgentBridge.agent.contextTokens": {
           "type": "number",
           "default": 0,
-          "description": "Context window to plan for. 0 = read max_model_len from the backend (Ollama: min(model limit, ollamaNumCtx))."
+          "description": "Context window to plan for. 0 = read max_model_len from the backend (Ollama: min(model limit, ollamaNumCtx); Claude: min(model window, 200k))."
         },
         "localAgentBridge.agent.ollamaNumCtx": {
           "type": "number",
@@ -407,7 +455,38 @@
         "localAgentBridge.agent.maxOutputTokens": {
           "type": "number",
           "default": 2048,
-          "description": "Max tokens per model reply."
+          "description": "Max tokens per model reply on local backends (Claude uses claudeMaxOutputTokens)."
+        },
+        "localAgentBridge.agent.claudeMaxOutputTokens": {
+          "type": "number",
+          "default": 16000,
+          "description": "Max tokens per Claude reply, thinking included. Replaces maxOutputTokens on the Claude backend."
+        },
+        "localAgentBridge.agent.claudeEffort": {
+          "type": "string",
+          "enum": [
+            "default",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "enumDescriptions": [
+            "The model's own default (medium on Claude Opus 5.5, high on most others)",
+            "Fewest thinking tokens; cheapest and fastest",
+            "",
+            "",
+            "Best for hard coding and long agentic tasks",
+            "Correctness over cost"
+          ],
+          "default": "default",
+          "description": "Claude reasoning effort (output_config.effort). Only sent to models with adaptive thinking (Claude 4.6 and later)."
+        },
+        "localAgentBridge.agent.claudeWorkspaceId": {
+          "type": "string",
+          "default": "",
+          "description": "Anthropic workspace id (wrkspc_…) sent as anthropic-workspace-id. Needed with a user-scoped key (sk-ant-usr-…); workspace-scoped keys leave it empty. Empty = ANTHROPIC_WORKSPACE_ID from the environment."
         },
         "localAgentBridge.agent.maxRounds": {
           "type": "number",
@@ -420,7 +499,11 @@
         },
         "localAgentBridge.agent.shell": {
           "type": "string",
-          "enum": ["auto", "confirm", "off"],
+          "enum": [
+            "auto",
+            "confirm",
+            "off"
+          ],
           "default": "auto",
           "description": "Shell tool: run without asking, ask for each command, or disabled. Obviously destructive commands are always blocked."
         },
@@ -430,7 +513,9 @@
         },
         "localAgentBridge.agent.writableRoots": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Folders outside the open workspace that the agent may edit and run commands in (e.g. a game's Mods folder)."
         },

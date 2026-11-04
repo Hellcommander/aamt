@@ -112,9 +112,15 @@ def add_combat_sound(
     sid = sound_id or f"{owner}_{slug}"
     if sid.isdigit():
         raise ValueError(f"sound id {sid!r} is numeric; vanilla uses 1-168, pick a prefixed string id")
-    rel = f"assets/sfx/{slug}.{kind}"
-    row = {"id": sid, "name": name, "file": rel}
     rows = _spec_sounds(spec)
+    # Two sounds whose names slug the same must not share (and overwrite) one file.
+    taken = {str(r.get("file")) for r in rows if str(r.get("id")) != sid}
+    rel = f"assets/sfx/{slug}.{kind}"
+    n = 2
+    while rel in taken:
+        rel = f"assets/sfx/{slug}_{n}.{kind}"
+        n += 1
+    row = {"id": sid, "name": name, "file": rel}
     for index, previous in enumerate(rows):
         if str(previous.get("id")) == sid:
             rows[index] = row
@@ -140,10 +146,20 @@ def bind_animation_sound(spec: Dict[str, Any], animation_id: str, sound_id: str,
 def copy_sound_sources(spec: Dict[str, Any], root: Path) -> List[str]:
     """`write` helper: make sure every staged sound file exists under the written mod folder."""
     written = []
+    base = Path(root).resolve()
     for rel, src in (spec.get("sound_sources") or {}).items():
-        dest = Path(root) / rel
-        if dest.is_file() or not Path(src).is_file():
+        dest = (base / str(rel)).resolve()
+        if not dest.is_relative_to(base) or dest == base:
+            print(f"[WARN] sound_sources key {rel!r} leaves the mod folder; skipped")
             continue
+        src_path = Path(src)
+        if not src_path.is_file():
+            continue
+        if dest.is_file():
+            # Skip only an unchanged copy, so a replaced source still reaches the mod.
+            s, d = src_path.stat(), dest.stat()
+            if s.st_size == d.st_size and int(s.st_mtime) == int(d.st_mtime):
+                continue
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dest)
         written.append(rel)

@@ -30,6 +30,7 @@ def bake_creature_art(
     *,
     no_sd: bool = True,
     allow_procedural: bool = False,
+    force: bool = False,
 ) -> Dict[str, Any]:
     """
     Attempt a simple Blender bake. If Blender is unavailable, no-op and call
@@ -41,7 +42,7 @@ def bake_creature_art(
     if not blender:
         print("[df_blender_bake] Blender not found via tool_paths; skipping bake.")
         arts = generate_art_for_spec(
-            spec, mod_root, no_sd=no_sd, allow_procedural=allow_procedural
+            spec, mod_root, no_sd=no_sd, force=force, allow_procedural=allow_procedural
         )
         return {"blender": None, "fallback": "tile_generator", "arts": arts}
 
@@ -49,7 +50,7 @@ def bake_creature_art(
     print(f"[df_blender_bake] Found Blender at {blender}")
     print("[df_blender_bake] No DF-specific bake script wired yet; using tile generator PNGs.")
     arts = generate_art_for_spec(
-        spec, mod_root, no_sd=no_sd, allow_procedural=allow_procedural
+        spec, mod_root, no_sd=no_sd, force=force, allow_procedural=allow_procedural
     )
     return {"blender": blender, "fallback": "tile_generator", "arts": arts}
 

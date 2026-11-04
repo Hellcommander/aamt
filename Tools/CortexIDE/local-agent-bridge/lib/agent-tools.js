@@ -431,8 +431,10 @@ async function saveText(abs, contents) {
     if (doc && doc.isDirty) {
       const edit = new vscode.WorkspaceEdit();
       edit.replace(doc.uri, new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), contents);
-      await vscode.workspace.applyEdit(edit);
-      await doc.save();
+      // Both report failure by returning false rather than throwing; the caller turns a throw into
+      // an "error:" tool result, so the agent never claims an edit that did not land.
+      if (!(await vscode.workspace.applyEdit(edit))) throw new Error("the editor refused the edit to " + abs);
+      if (!(await doc.save())) throw new Error("the edit was applied but saving " + abs + " failed");
       return;
     }
   }
@@ -534,9 +536,13 @@ function webFetch(a, depth = 0) {
         resolve(webFetch({ url: new URL(res.headers.location, u).toString() }, depth + 1));
         return;
       }
+      // Keep at most ~1 MB: the result is clipped to 12k chars anyway, so a huge or endless
+      // response must not be buffered whole.
+      const MAX_BYTES = 1024 * 1024;
       const chunks = [];
-      res.on("data", (c) => chunks.push(c));
-      res.on("end", () => {
+      let size = 0;
+      let cut = false;
+      const finish = () => {
         let text = Buffer.concat(chunks).toString("utf8");
         if (/html/i.test(res.headers["content-type"] || "")) {
           text = text
@@ -549,7 +555,27 @@ function webFetch(a, depth = 0) {
             .replace(/[ \t]+/g, " ")
             .replace(/\n\s*\n+/g, "\n");
         }
-        resolve("HTTP " + res.statusCode + " " + u + "\n" + clip(text.trim(), 12000));
+        resolve("HTTP " + res.statusCode + " " + u + (cut ? " (first 1 MB only)" : "") + "\n" + clip(text.trim(), 12000));
+      };
+      res.on("data", (c) => {
+        if (cut) return;
+        const room = MAX_BYTES - size;
+        if (c.length >= room) {
+          chunks.push(c.subarray(0, room));
+          size = MAX_BYTES;
+          cut = true;
+          finish();
+          res.destroy();
+          return;
+        }
+        chunks.push(c);
+        size += c.length;
+      });
+      res.on("end", () => {
+        if (!cut) finish();
+      });
+      res.on("error", (e) => {
+        if (!cut) resolve("error: " + e.message);
       });
     });
     req.on("error", (e) => resolve("error: " + e.message));

@@ -108,10 +108,10 @@ def generate_fast_meshes(pairs: Sequence[Tuple[Path, Path]], *, bake_res: int = 
         spec = Path(tmp) / "jobs.json"
         spec.write_text(json.dumps({"bake_res": bake_res, "remesh": remesh, "vertex_count": vertex_count,
                                     "foreground_ratio": foreground_ratio, "jobs": jobs}), encoding="utf-8")
-        _free_gpu()
         env = dict(os.environ)
         env.pop("NoDefaultCurrentDirectoryInExePath", None)  # agent shells set it; breaks child launchers
         with acquire_gpu(f"SF3D x{len(jobs)}"):
+            _free_gpu()  # only once we own the lock (never stop another job's SD/TRELLIS mid-run)
             proc = subprocess.run([str(_python()), str(sf3d_home() / "sf3d_batch.py"), "--jobs", str(spec)],
                                   cwd=str(sf3d_home()), env=env, capture_output=True, text=True, timeout=timeout)
     results, by_image = [], {}
@@ -151,7 +151,14 @@ def main(argv: Iterable[str] = None) -> int:
     ap.add_argument("--vertex-count", type=int, default=-1)
     a = ap.parse_args(list(argv) if argv is not None else None)
     a.out_dir.mkdir(parents=True, exist_ok=True)
-    res = generate_fast_meshes([(i, a.out_dir / (i.stem + ".glb")) for i in a.images], bake_res=a.bake_res, remesh=a.remesh, vertex_count=a.vertex_count)
+    pairs, used = [], set()
+    for i in a.images:  # same-named images from different folders must not overwrite each other
+        stem, n = i.stem, 2
+        while stem.lower() in used:
+            stem, n = f"{i.stem}_{n}", n + 1
+        used.add(stem.lower())
+        pairs.append((i, a.out_dir / (stem + ".glb")))
+    res = generate_fast_meshes(pairs, bake_res=a.bake_res, remesh=a.remesh, vertex_count=a.vertex_count)
     for r in res:
         print(json.dumps(r))
     return 0 if all(r.get("ok") for r in res) else 1

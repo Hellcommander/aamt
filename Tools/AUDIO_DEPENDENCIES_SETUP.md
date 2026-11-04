@@ -142,7 +142,7 @@ python -c "import librosa; print('✓ Librosa OK')"
 ## Troubleshooting
 
 ### Python Not Found
-- Install Python 3.8 or later from [python.org](https://www.python.org/downloads/)
+- Install Python 3.9 or later (av>=14 and sentence-transformers need 3.9+) from [python.org](https://www.python.org/downloads/)
 - Make sure Python is added to PATH during installation
 - Or specify Python path: `.\InstallAudioDependencies.ps1 -PythonPath "C:\Python39\python.exe"`
 

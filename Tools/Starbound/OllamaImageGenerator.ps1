@@ -39,17 +39,20 @@ $sharedPath = Join-Path (Split-Path -Parent (Split-Path -Parent $MyInvocation.My
 Import-Module (Join-Path $sharedPath "ToolDetection.psm1") -ErrorAction SilentlyContinue
 Import-Module (Join-Path $sharedPath "ToolsetIntegration.psm1") -ErrorAction SilentlyContinue
 
-# Initialize tools for image generation
+# Initialize tools for image generation. -EnhanceOnly only talks to Ollama, so ImageMagick
+# (used for image post-processing) is required only when an image is produced.
+$requiredTools = if ($EnhanceOnly) { @() } else { @("ImageMagick") }
+$optionalTools = if ($EnhanceOnly) { @("Ollama", "StableDiffusion", "ImageMagick") } else { @("Ollama", "StableDiffusion") }
 $tools = Initialize-ToolsetTools `
-    -RequiredTools @("ImageMagick") `
-    -OptionalTools @("Ollama", "StableDiffusion")
+    -RequiredTools $requiredTools `
+    -OptionalTools $optionalTools
 
 # Check required tools
 if (-not $tools.AllRequiredAvailable) {
     Write-Host "`nERROR: Missing required tools for image generation" -ForegroundColor Red
     Show-ToolsetStatus -ToolsetName "Starbound - Image Generator" `
-        -RequiredTools @("ImageMagick") `
-        -OptionalTools @("Ollama", "StableDiffusion")
+        -RequiredTools $requiredTools `
+        -OptionalTools $optionalTools
     exit 1
 }
 

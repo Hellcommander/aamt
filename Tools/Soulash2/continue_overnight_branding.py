@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import os
 import sys
 import time
 import urllib.request
@@ -33,6 +34,25 @@ def log(msg: str) -> None:
     print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
+def child_env() -> dict:
+    """Jobs share one SD server: a child's sd_session must not stop it after each job."""
+    env = os.environ.copy()
+    env["AAMT_SD_KEEP_SERVER"] = "1"
+    return env
+
+
+def stop_sd_after_run() -> None:
+    """Children keep the server up; stop it once the whole run is done."""
+    if os.environ.get("AAMT_SD_KEEP_SERVER") == "1":
+        return
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "Shared"))
+        from sd_server_lifecycle import stop_sd_server
+        stop_sd_server()
+    except Exception as exc:  # noqa: BLE001
+        log(f"SD stop after run failed: {exc}")
+
+
 def wait_for_sd_idle(max_wait: float = 7200.0) -> None:
     deadline = time.monotonic() + max_wait
     while time.monotonic() < deadline:
@@ -57,7 +77,7 @@ def run_job(job: dict, idx: int) -> dict:
     label = f"{job['mod'].name}/{job['mode']}"
     log(f"JOB {idx}: {label} ({job.get('note', '')})")
     t0 = time.monotonic()
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=child_env())
     elapsed = time.monotonic() - t0
     print(proc.stdout, flush=True)
     if proc.stderr:
@@ -86,6 +106,7 @@ def main() -> int:
     existing["continuation_jobs"] = results
     report.write_text(json.dumps(existing, indent=2), encoding="utf-8")
     log(f"Report updated: {report}")
+    stop_sd_after_run()
     return 0 if all(r["exit_code"] == 0 for r in results) else 1
 
 

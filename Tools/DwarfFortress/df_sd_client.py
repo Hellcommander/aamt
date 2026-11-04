@@ -140,20 +140,23 @@ def generate_sd_draft(
             if retry_on_oom and is_oom_error(exc):
                 print(f"  [WARN] SD OOM; retrying reduced settings: {exc}")
                 rs = REDUCED_SD
-                generate_image(
-                    prompt=prompt,
-                    output_path=output_path,
-                    api_url=url,
-                    negative_prompt=negative_prompt,
-                    width=rs["width"],
-                    height=rs["height"],
-                    steps=rs["steps"],
-                    guidance_scale=rs["guidance_scale"],
-                    seed=seed,
-                    timeout=timeout,
-                )
-                ok = output_path.exists() and output_path.stat().st_size > 0
-                return SdGenerateResult(ok, output_path if ok else None, rs)
+                try:
+                    generate_image(
+                        prompt=prompt,
+                        output_path=output_path,
+                        api_url=url,
+                        negative_prompt=negative_prompt,
+                        width=rs["width"],
+                        height=rs["height"],
+                        steps=rs["steps"],
+                        guidance_scale=rs["guidance_scale"],
+                        seed=seed,
+                        timeout=timeout,
+                    )
+                    ok = output_path.exists() and output_path.stat().st_size > 0
+                    return SdGenerateResult(ok, output_path if ok else None, rs)
+                except Exception as retry_exc:  # second OOM / server error: report, never raise
+                    return SdGenerateResult(False, None, rs, f"{exc}; reduced retry failed: {retry_exc}")
             try:
                 from sd_http_client import salvage_server_output  # type: ignore
 

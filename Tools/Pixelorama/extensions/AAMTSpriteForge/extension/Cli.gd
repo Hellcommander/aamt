@@ -57,8 +57,9 @@ static func run(args: PackedStringArray) -> Dictionary:
 		elif typeof(data) == TYPE_DICTIONARY:
 			jobs = [data]
 		# CLI key=values (other than job/result) act as defaults for every job
+		# (a helper= path set in the job file's own defaults wins over the wrapper's)
 		for k in kv:
-			if k not in ["job", "result", "cmd"]:
+			if k not in ["job", "result", "cmd"] and not (k == "helper" and defaults.has(k)):
 				defaults[k] = kv[k]
 	else:
 		if not kv.has("cmd"):
@@ -557,10 +558,14 @@ static func _job_palette(job: Dictionary, res: Dictionary) -> Dictionary:
 	var pal: PackedColorArray = pr.colors
 	var out_path := Forge.norm_path(job.get("out", job.get("palette_out", "")))
 	if out_path != "":
+		var wrote := false
 		if out_path.get_extension().to_lower() == "json":
-			Forge.write_json(out_path, Forge.palette_dict(pal), " ")
+			wrote = Forge.write_json(out_path, Forge.palette_dict(pal), " ")
 		else:
-			Forge.write_gpl(pal, out_path, str(job.get("name", "AAMT Sprite Forge")))
+			wrote = Forge.write_gpl(pal, out_path, str(job.get("name", "AAMT Sprite Forge")))
+		if not wrote:
+			res["error"] = "cannot write palette: " + out_path
+			return res
 		res.outputs["palette"] = out_path
 	res["palette"] = _palette_summary(pal, pr.source)
 	res.ok = true

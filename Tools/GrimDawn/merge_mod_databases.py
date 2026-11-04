@@ -277,6 +277,8 @@ def merge_mods(
     kill_orphan_archivetool()
     tool = ArchiveTool(game.game_dir)
     out_dir = game.mods_dir / out_name
+    if not out_name or out_dir.resolve().parent != game.mods_dir.resolve():
+        raise SystemExit(f"--out {out_name!r} must be a plain folder name directly under {game.mods_dir}")
     if any(out_dir.resolve() == m.resolve() for m in mod_roots):
         raise SystemExit(f"--out {out_name} is one of the input mods")
     if out_dir.exists():

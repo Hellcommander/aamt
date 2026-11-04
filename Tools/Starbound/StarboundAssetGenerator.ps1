@@ -488,8 +488,7 @@ function Generate-AssetSprite {
 
     # Legacy fallback only (SD failed and -AllowProcedural / AAMT_SD_STRICT=0):
     # prioritize Description-based drawing when Description is provided (from Ollama),
-    # otherwise the C++ backend.
-    $cppBackendPath ="F:\Games\OpenStarbound\mods\Magi-Tech Arcane Alchemy and Sorcery\cpp_backend"
+    # otherwise the C++ backend ($cppBackendPath is the script's -CppBackendPath parameter).
     
     # Validate PSScriptRoot before using it
     if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
@@ -1269,8 +1268,7 @@ function Generate-AnimationSprite {
     }
 
     # Legacy fallback only (SD failed and -AllowProcedural / AAMT_SD_STRICT=0):
-    # try the C++ backend if available, otherwise draw System.Drawing shapes.
-    $cppBackendPath = "F:\Games\OpenStarbound\mods\Magi-Tech Arcane Alchemy and Sorcery\cpp_backend"
+    # try the C++ backend if available (-CppBackendPath), otherwise draw System.Drawing shapes.
     # Use PSScriptRoot instead of MyInvocation.MyCommand.Path (already validated)
     if ([string]::IsNullOrWhiteSpace($PSScriptRoot)) {
         Write-Host "  [FAIL] PSScriptRoot is null, cannot locate bridge script" -ForegroundColor Red
@@ -2020,7 +2018,8 @@ if ($UseCppBackend -and $script:ProceduralAllowed) {
                     -ShipName $AssetName `
                     -Description $Description `
                     -UseOllama:($null -ne $Description) `
-                    -OutputDir $OutputDir
+                    -OutputDir $OutputDir `
+                    -AllowProcedural:$script:ProceduralAllowed
             } else {
                 Write-Host "StarboundShipGenerator not found" -ForegroundColor Yellow
             }
@@ -2036,6 +2035,7 @@ if ($UseCppBackend -and $script:ProceduralAllowed) {
                     OutputDir = $OutputDir
                     GeneratePlaceholderImage = $false
                     UseOllama = $true
+                    AllowProcedural = [bool]$script:ProceduralAllowed
                 }
                 
                 if ($Parameters.TileSize) { $tileParams['TileSize'] = $Parameters.TileSize }
@@ -2058,6 +2058,7 @@ if ($UseCppBackend -and $script:ProceduralAllowed) {
                     OutputDir = $OutputDir
                     GeneratePlaceholderImage = $false
                     UseOllama = $true
+                    AllowProcedural = [bool]$script:ProceduralAllowed
                 }
                 
                 if ($Parameters.Preset) { $cursorParams['Preset'] = $Parameters.Preset }

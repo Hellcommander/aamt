@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
+const crypto = require("crypto");
 
 const MAX_PROMPT = 12000;
 const MAX_TURNS_IN_PROMPT = 24;
@@ -167,7 +168,10 @@ function importChatFile(filePath, workspaceRoot) {
     : path.join(home(), ".cortexide", "imported-chats");
   fs.mkdirSync(destRoot, { recursive: true });
   const slug = slugFromName(path.basename(filePath));
-  const dest = path.join(destRoot, `${slug}.md`);
+  // Short hash of the source path: two exports with the same file name (say two "chat.md" from
+  // different folders) get separate files, while re-importing the same source replaces its copy.
+  const tag = crypto.createHash("sha1").update(path.resolve(filePath).toLowerCase()).digest("hex").slice(0, 8);
+  const dest = path.join(destRoot, `${slug}-${tag}.md`);
   const header = [
     `# Imported Cursor chat: ${slug}`,
     "",

@@ -102,10 +102,13 @@ def pack_arc(root: Path, arc_path: Path) -> None:
 
 
 def arc_entries(game_dir: Path, arc_path: Path) -> list:
-    out = subprocess.run(
+    proc = subprocess.run(
         [str(Path(game_dir) / "ArchiveTool.exe"), str(Path(arc_path).resolve()), "-list"],
         capture_output=True, text=True, cwd=str(game_dir), errors="replace",
-    ).stdout
+    )
+    if proc.returncode != 0:
+        raise ArchiveToolError(f"ArchiveTool -list {arc_path}: {(proc.stdout + proc.stderr)[-1500:]}")
+    out = proc.stdout
     return [l.strip().replace("\\", "/") for l in out.splitlines() if l.strip()]
 
 

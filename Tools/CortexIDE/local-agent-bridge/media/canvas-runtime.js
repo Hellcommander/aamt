@@ -256,10 +256,15 @@
       onClick: (e) => {
         e.preventDefault();
         if (!href) return;
-        if (/^[a-zA-Z]:[\\/]/.test(href) || href.startsWith("/") || href.startsWith(".")) {
-          dispatch({ type: "openFile", path: href });
-        } else {
+        if (href.startsWith("#")) {
+          const el = document.getElementById(decodeURIComponent(href.slice(1)));
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(href) && !/^[a-zA-Z]:[\\/]/.test(href)) {
+          // Has a URL scheme (https:, mailto:, …) and is not a Windows drive path.
           window.open(href, "_blank");
+        } else {
+          // No scheme: a file path, absolute or relative (src/app.ts); the host resolves it.
+          dispatch({ type: "openFile", path: href });
         }
       },
     }, children);
@@ -487,19 +492,36 @@
   function LineChart({ categories, series, height, style }) {
     const theme = useHostTheme();
     const cats = categories || [];
-    const data = (series && series[0] && series[0].data) || [];
-    const max = Math.max(1, ...data.map(Number));
+    const all = (series || []).filter((s) => s && Array.isArray(s.data));
+    // The first line keeps the accent colour it always had; extra series take the palette.
+    const lineColor = (si) => (si === 0 ? theme.accent.primary : seriesColor(theme, si));
+    const max = Math.max(1, ...all.flatMap((s) => s.data.map((v) => Number(v) || 0)));
     const hgt = height || 180;
-    const pts = data.map((v, i) => {
-      const x = cats.length <= 1 ? 0 : (i / (cats.length - 1)) * 100;
-      const y = 100 - (Number(v) / max * 100);
-      return x + "," + y;
-    }).join(" ");
-    return h("div", { style: mergeStyle({ height: hgt }, style) },
-      h("svg", { viewBox: "0 0 100 100", preserveAspectRatio: "none", width: "100%", height: "100%" },
-        h("polyline", { fill: "none", stroke: theme.accent.primary, strokeWidth: 1.5, points: pts, vectorEffect: "non-scaling-stroke" })
-      )
+    const lines = all.map((s, si) => {
+      const pts = s.data.map((v, i) => {
+        const x = cats.length <= 1 ? 0 : (i / (cats.length - 1)) * 100;
+        const y = 100 - ((Number(v) || 0) / max * 100);
+        return x + "," + y;
+      }).join(" ");
+      return h("polyline", { key: si, fill: "none", stroke: lineColor(si), strokeWidth: 1.5, points: pts, vectorEffect: "non-scaling-stroke" });
+    });
+    const legend = all.length > 1
+      ? h("div", { style: { display: "flex", flexWrap: "wrap", gap: 12, marginTop: 6 } },
+          all.map((s, si) => h("span", { key: si, style: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11, color: theme.text.secondary } },
+            h("span", { style: { width: 10, height: 2, background: lineColor(si) } }),
+            s.name || s.label || "Series " + (si + 1))))
+      : null;
+    return h("div", { style },
+      h("div", { style: { height: hgt } },
+        h("svg", { viewBox: "0 0 100 100", preserveAspectRatio: "none", width: "100%", height: "100%" }, lines)
+      ),
+      legend
     );
+  }
+
+  function seriesColor(theme, i) {
+    const key = usageColorSequence[i % usageColorSequence.length];
+    return (key && colorPalette[key]) || theme.accent.primary;
   }
 
   function PieChart({ data, series, style }) {
@@ -520,6 +542,8 @@
             fill: "transparent",
             stroke: usageColorSequence[i % usageColorSequence.length] ? colorPalette[usageColorSequence[i % usageColorSequence.length]] : theme.accent.primary,
             strokeWidth: 6,
+            // Dash lengths are percentages, so measure the circle as 100 units long.
+            pathLength: 100,
             strokeDasharray: dash + " " + (100 - dash),
             strokeDashoffset: 25 - acc,
           });
@@ -619,7 +643,7 @@
     const theme = useHostTheme();
     return h("input", {
       type: type || "text",
-      value: value || "",
+      value: value ?? "",
       placeholder,
       disabled,
       onChange: (e) => onChange && onChange(e.target.value),
@@ -629,7 +653,7 @@
   function TextArea({ value, onChange, placeholder, disabled, rows, style }) {
     const theme = useHostTheme();
     return h("textarea", {
-      value: value || "",
+      value: value ?? "",
       placeholder,
       disabled,
       rows: rows || 3,
@@ -662,7 +686,7 @@
   function Select({ value, onChange, options, placeholder, disabled, style }) {
     const theme = useHostTheme();
     return h("select", {
-      value: value || "",
+      value: value ?? "",
       disabled,
       onChange: (e) => onChange && onChange(e.target.value),
       style: mergeStyle(fieldStyle(theme), style),

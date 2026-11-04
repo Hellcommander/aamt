@@ -5,7 +5,8 @@
 #   - Server:  copies Shared\sd35_server.py (the canonical server) to <InstallPath>\sd3.5\server.py
 #   - Weights: downloads stabilityai/stable-diffusion-3.5-medium (diffusers layout, incl. T5)
 #              into the normal Hugging Face cache using the machine's existing `hf auth login`.
-#   - Start:   Start-StableDiffusionServer.ps1 (unchanged; it re-syncs server.py on every start)
+#   - Start:   Start-StableDiffusionServer.ps1 (it re-syncs server.py on every start). A custom
+#              -InstallPath is saved as AAMT_SD_HOME (user environment) so the start script finds it.
 #
 # Nothing here stores or copies a token; huggingface_hub reads the existing login itself.
 
@@ -91,6 +92,12 @@ if (-not (Test-Path $InstallPath)) {
 
 # Same location Start-StableDiffusionServer.ps1 uses (override with AAMT_SD_HOME).
 $repoPath = if ($env:AAMT_SD_HOME) { $env:AAMT_SD_HOME } else { Join-Path $InstallPath "sd3.5" }
+# A custom -InstallPath must reach the start script, which otherwise looks in E:\tools\sd3.5\sd3.5.
+if ($PSBoundParameters.ContainsKey('InstallPath') -and -not $env:AAMT_SD_HOME) {
+    [Environment]::SetEnvironmentVariable('AAMT_SD_HOME', $repoPath, 'User')
+    $env:AAMT_SD_HOME = $repoPath
+    Write-Host "  [OK] Saved AAMT_SD_HOME=$repoPath (user environment)" -ForegroundColor Green
+}
 $repoUrl = "https://github.com/Stability-AI/sd3.5.git"
 
 # --- Step 1: code (clone or update) -----------------------------------------
@@ -124,7 +131,8 @@ Write-Host "  Installing diffusers stack (torch is left alone so a CUDA build is
 if ($LASTEXITCODE -eq 0) {
     Write-Host "  [OK] Dependencies installed" -ForegroundColor Green
 } else {
-    Write-Host "  [WARN] Some dependencies may have failed to install" -ForegroundColor Yellow
+    Write-Host "  [ERROR] pip install of the diffusers stack failed (exit $LASTEXITCODE); the server cannot run without it" -ForegroundColor Red
+    exit 1
 }
 
 # --- Step 3: model weights via the existing login ----------------------------

@@ -113,8 +113,12 @@ def run(args: argparse.Namespace) -> Dict[str, Any]:
         return {"ok": False, "error": f"only {vram} MB VRAM free (< {args.min_vram_mb}); try again later", "vram_free_mb": vram}
 
     size = max(64, (args.sd_size // 64) * 64)
-    k = max(1, size // max(w, h))
-    big = src.resize((w * k, h * k), Image.NEAREST)
+    if max(w, h) > size:  # larger than the SD canvas: shrink to fit (scaled back up below)
+        k = size / max(w, h)
+        big = src.resize((max(1, min(size, round(w * k))), max(1, min(size, round(h * k)))), Image.LANCZOS)
+    else:
+        k = max(1, size // max(w, h))
+        big = src.resize((w * k, h * k), Image.NEAREST)
     canvas = Image.new("RGBA", (size, size), (255, 255, 255, 255))
     ox, oy = (size - big.width) // 2, (size - big.height) // 2
     canvas.alpha_composite(big, (ox, oy))

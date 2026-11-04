@@ -928,7 +928,7 @@
       const bind = $("addStBind");
       if (bind) {
         const cur = bind.value;
-        bind.innerHTML = `<option value="">—</option>` + ((spec && spec.abilities) || []).map(a => `<option value="${a.id}">${a.name||a.id}</option>`).join("");
+        bind.innerHTML = `<option value="">—</option>` + ((spec && spec.abilities) || []).map(a => `<option value="${esc(a.id)}">${esc(a.name||a.id)}</option>`).join("");
         if (cur) bind.value = cur;
       }
     }
@@ -938,7 +938,7 @@
       const actions = (spec && spec.control_actions) || [];
       let html = races.map(r => {
         const kit = [...(r.passives||[]), ...(r.abilities||[])].join(", ");
-        return `<div class="ent-card"><strong>${esc(r.name||r.id)}</strong> <code>${esc(r.id)}</code> playable=${r.playable} ${kit ? `<em style="color:var(--muted)">${esc(kit)}</em>` : ""} <button data-edit-race-json="${esc(r.id)}">Edit JSON</button></div>`;
+        return `<div class="ent-card"><strong>${esc(r.name||r.id)}</strong> <code>${esc(r.id)}</code> playable=${esc(String(r.playable))} ${kit ? `<em style="color:var(--muted)">${esc(kit)}</em>` : ""} <button data-edit-race-json="${esc(r.id)}">Edit JSON</button></div>`;
       }).join("") || "<p>No races yet.</p>";
       const slots = (spec && spec.custom_eq_slots) || [];
       if (slots.length) {
@@ -1064,11 +1064,22 @@
           showTab("conversations");
         };
       });
+      const rowsAtRender = rows.slice();
       $("conversationList").querySelectorAll("button[data-conv-remove]").forEach(button => {
         button.onclick = async () => {
-          rows.splice(Number(button.dataset.convRemove), 1);
-          conversationEditIndex = null;
-          await persistConversationSpec("Removed conversation node");
+          // A second click before the list re-renders would splice a stale index:
+          // lock every Remove button and remove the row object this button was drawn for.
+          const removeButtons = $("conversationList").querySelectorAll("button[data-conv-remove]");
+          removeButtons.forEach(b => { b.disabled = true; });
+          try {
+            const target = rows.indexOf(rowsAtRender[Number(button.dataset.convRemove)]);
+            if (target < 0) return;
+            rows.splice(target, 1);
+            conversationEditIndex = null;
+            await persistConversationSpec("Removed conversation node");
+          } finally {
+            removeButtons.forEach(b => { b.disabled = false; });
+          }
         };
       });
       $("conversationList").querySelectorAll("button[data-conv-link]").forEach(button => {
@@ -1352,7 +1363,7 @@
       });
       const sel = $("entSummonAb");
       const cur = sel.value;
-      sel.innerHTML = `<option value="">—</option>` + ((spec && spec.abilities) || []).map(a => `<option value="${a.id}">${a.name||a.id}</option>`).join("");
+      sel.innerHTML = `<option value="">—</option>` + ((spec && spec.abilities) || []).map(a => `<option value="${esc(a.id)}">${esc(a.name||a.id)}</option>`).join("");
       if (cur) sel.value = cur;
     }
 

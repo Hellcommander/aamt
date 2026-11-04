@@ -543,6 +543,8 @@ function Generate-Asset {
         if (-not $sdStrict) {
             # Procedural placeholder only when explicitly allowed (-AllowProcedural / AAMT_SD_STRICT=0)
             Create-PlaceholderAsset -OutputPath $outputFile -Specification $Specification -AssetType $AssetType
+            # The allowed placeholder is this asset's output: report it as produced.
+            return [bool](Test-Path -LiteralPath $outputFile)
         } else {
             Write-Host "  [SD] No placeholder written: SD art is required (use -AllowProcedural to override)" -ForegroundColor Red
         }
@@ -575,6 +577,9 @@ function Generate-Asset {
                 "--size", $Specification.size
             )
             if (-not $sdStrict) { $args += "--allow-procedural" }
+            # -Quality -> generate_asset_image.py --sd-quality (low=draft, medium=standard).
+            $sdQuality = switch ($script:Quality) { "low" { "draft" } "medium" { "standard" } "ultra" { "ultra" } default { "high" } }
+            $args += @("--sd-quality", $sdQuality)
 
             $result = & $pythonCmd.Source $args 2>&1
             $exitCode = $LASTEXITCODE
@@ -612,13 +617,14 @@ function Generate-Asset {
                     "Add Python to your system PATH",
                     "Or use python3 if installed"
                 )
+            $success = $false
             if (-not $sdStrict) {
                 # Procedural placeholder only when explicitly allowed (-AllowProcedural / AAMT_SD_STRICT=0)
                 Create-PlaceholderAsset -OutputPath $outputFile -Specification $Specification -AssetType $AssetType
+                $success = [bool](Test-Path -LiteralPath $outputFile)
             } else {
                 Write-Host "  [SD] No placeholder written: SD art is required (use -AllowProcedural to override)" -ForegroundColor Red
             }
-            $success = $false
         }
     }
     catch {

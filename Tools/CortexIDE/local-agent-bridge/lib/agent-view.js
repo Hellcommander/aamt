@@ -11,6 +11,7 @@ const { Progress } = require("./agent-context");
 const { parseChatFile } = require("./import-chat");
 
 const STATE_KEY = "localAgentBridge.agent.conversation";
+const SECRET_KEY = "localAgentBridge.anthropicApiKey";
 const MAX_LOG = 400;
 const MAX_HISTORY_TURNS = 12;
 
@@ -187,6 +188,8 @@ class AgentViewProvider {
         provider: c.get("provider", "auto"),
         baseUrl: c.get("baseUrl", ""),
         apiKey: c.get("apiKey", ""),
+        anthropicApiKey: await this.secret(),
+        anthropicWorkspaceId: c.get("claudeWorkspaceId", ""),
       });
       this.model = llm.pickModel(this.backend.models, c.get("model", ""), this.backend.provider);
       this.ctxTokens = await llm.contextWindow(this.backend, this.model, {
@@ -195,7 +198,8 @@ class AgentViewProvider {
       });
     } catch (e) {
       this.backend = null;
-      this.post({ type: "header", ok: false, text: "No backend · " + String(e.message || e).split("\n")[0] });
+      const lines = String(e.message || e).split("\n").filter(Boolean);
+      this.post({ type: "header", ok: false, text: "No backend · " + (lines.length > 1 && c.get("provider", "auto") !== "auto" ? lines[1] : lines[0]) });
       return null;
     }
     this.postHeader();
@@ -208,7 +212,7 @@ class AgentViewProvider {
       type: "header",
       ok: true,
       text: this.backend.label + " · " + this.model + " · " + Math.round(this.ctxTokens / 1024) + "k ctx",
-      title: this.backend.baseUrl,
+      title: this.backend.baseUrl + (this.backend.credSource ? " · credentials: " + this.backend.credSource : ""),
     });
   }
 
@@ -227,17 +231,32 @@ class AgentViewProvider {
       vscode.window.showWarningMessage("The agent is still working. Stop it first.");
       return;
     }
-    const backend = await this.refreshBackend(!this.backend);
+    // Claim the run before the first await, so a second quick send sees it and is refused.
+    const controller = new AbortController();
+    this.running = controller;
+    // New Chat / Import bump this; a run from an older chat must not save over the new one.
+    const gen = this.chatGen || 0;
+    let backend;
+    try {
+      backend = await this.refreshBackend(!this.backend);
+    } catch (e) {
+      this.running = null;
+      throw e;
+    }
+    if (controller.signal.aborted || gen !== (this.chatGen || 0)) {
+      this.running = null;
+      this.post({ type: "idle" });
+      return;
+    }
     if (!backend) {
-      this.post({ type: "error", text: "No local model reachable. Start vLLM (:30000 / :8000) or Ollama (:11434), or set localAgentBridge.agent.baseUrl." });
+      this.running = null;
+      this.post({ type: "error", text: "No model backend reachable. Start vLLM (:30000 / :8000) or Ollama (:11434), pick Claude under Model (needs an Anthropic API key), or set localAgentBridge.agent.baseUrl." });
       this.post({ type: "idle" });
       return;
     }
     const c = this.conv();
     await this.log(c, "user", text);
     this.post({ type: "busy" });
-    const controller = new AbortController();
-    this.running = controller;
     const a = cfg();
     const env = editorEnv();
     const tools = new ToolContext({
@@ -259,7 +278,8 @@ class AgentViewProvider {
         backend,
         model: this.model,
         contextTokens: this.ctxTokens,
-        maxOutputTokens: a.get("maxOutputTokens", 2048),
+        maxOutputTokens: backend.provider === "anthropic" ? a.get("claudeMaxOutputTokens", 16000) : a.get("maxOutputTokens", 2048),
+        effort: backend.provider === "anthropic" ? a.get("claudeEffort", "default") : "",
         maxRounds: a.get("maxRounds", 30),
         temperature: a.get("temperature", 0.2),
         prompt: text,
@@ -288,13 +308,16 @@ class AgentViewProvider {
       this.post({ type: msg === "stopped" ? "status" : "error", text: msg === "stopped" ? "Stopped." : msg });
       if (msg !== "stopped") this.backend = null;
     } finally {
-      this.running = null;
-      await this.saveConv(c);
+      if (this.running === controller) this.running = null;
+      // After New Chat (or an import) during this run, c is the old conversation: saving it
+      // would bring the cleared history back.
+      if (gen === (this.chatGen || 0)) await this.saveConv(c);
       this.post({ type: "idle" });
     }
   }
 
   async newChat() {
+    this.chatGen = (this.chatGen || 0) + 1;
     this.stop();
     await this.saveConv(emptyConv());
     this.post({ type: "restore", log: [] });
@@ -312,6 +335,7 @@ class AgentViewProvider {
       { label: "Auto", description: "vLLM if running, else Ollama", id: "auto" },
       { label: "vLLM / SGLang router", description: ":30000 → :8000", id: "vllm" },
       { label: "Ollama", description: ":11434", id: "ollama" },
+      { label: "Claude (Anthropic API)", description: "api.anthropic.com · key from Secret Storage, ANTHROPIC_API_KEY or ant auth login", id: "anthropic" },
       { label: "OpenAI-compatible URL…", description: "LM Studio, llama.cpp, a tunnel, …", id: "openai" },
     ];
     const p = await vscode.window.showQuickPick(providers, { placeHolder: "Model backend for the CortexIDE Agent" });
@@ -322,15 +346,23 @@ class AgentViewProvider {
       baseUrl = (await vscode.window.showInputBox({ prompt: "Base URL (ending in /v1)", value: c.get("baseUrl", "") || "http://127.0.0.1:1234/v1", ignoreFocusOut: true })) || "";
       if (!baseUrl) return;
     }
+    if (p.id === "anthropic" && !llm.anthropic.credentials({ apiKey: (await this.secret()) || c.get("apiKey", "") })) {
+      const ok = await this.setClaudeApiKey();
+      if (!ok) return;
+    }
     let backend;
     try {
-      backend = await llm.discover({ provider: p.id, baseUrl, apiKey: c.get("apiKey", "") });
+      backend = await llm.discover({ provider: p.id, baseUrl, apiKey: c.get("apiKey", ""), anthropicApiKey: await this.secret(), anthropicWorkspaceId: c.get("claudeWorkspaceId", "") });
     } catch (e) {
       vscode.window.showErrorMessage(String(e.message || e));
       return;
     }
     const m = await vscode.window.showQuickPick(
-      backend.models.map((x) => ({ label: x.id, description: x.ctx ? Math.round(x.ctx / 1024) + "k ctx" : "", id: x.id })),
+      backend.models.map((x) => ({
+        label: x.id,
+        description: [x.display && x.display !== x.id ? x.display : "", x.ctx ? Math.round(x.ctx / 1024) + "k ctx" : ""].filter(Boolean).join(" · "),
+        id: x.id,
+      })),
       { placeHolder: backend.label + " models at " + backend.baseUrl }
     );
     if (!m) return;
@@ -339,6 +371,41 @@ class AgentViewProvider {
     await c.update("baseUrl", p.id === "openai" ? baseUrl : "", G);
     await c.update("model", m.id, G);
     await this.refreshBackend(true);
+  }
+
+  /** Anthropic API key saved with "Agent: Set Claude API Key" (CortexIDE Secret Storage). */
+  async secret() {
+    const store = this.context.secrets;
+    if (!store) return "";
+    try {
+      return (await store.get(SECRET_KEY)) || "";
+    } catch {
+      return "";
+    }
+  }
+
+  /** Prompt for (or take) an Anthropic API key and keep it in Secret Storage; empty clears it. */
+  async setClaudeApiKey(value) {
+    if (value === undefined) {
+      value = await vscode.window.showInputBox({
+        prompt: "Anthropic API key for the Claude backend (kept in CortexIDE Secret Storage; leave empty to clear). Get one at console.anthropic.com/settings/keys, or run 'ant auth login' and leave this empty.",
+        password: true,
+        ignoreFocusOut: true,
+        placeHolder: "sk-ant-…",
+      });
+      if (value === undefined) return false;
+    }
+    const store = this.context.secrets;
+    if (!store) {
+      vscode.window.showErrorMessage("Secret Storage is not available in this CortexIDE build. Set ANTHROPIC_API_KEY in the environment instead.");
+      return false;
+    }
+    const v = String(value || "").trim();
+    if (v) await store.store(SECRET_KEY, v);
+    else await store.delete(SECRET_KEY);
+    this.backend = null;
+    vscode.window.showInformationMessage(v ? "Claude API key saved. Pick Claude under Model in the Agent panel." : "Claude API key cleared.");
+    return true;
   }
 
   async importChat(fileArg) {
@@ -392,6 +459,8 @@ class AgentViewProvider {
     }).toJSON();
     c.log.push({ cls: "sys", text: "Imported " + turns.length + " turns from " + file + ". The last " + c.history.length + " are in context; older requests are in the progress index." });
     for (const t of turns.slice(-8)) c.log.push({ cls: t.role === "user" ? "user" : "assistant", text: t.content.slice(0, 1500) });
+    this.chatGen = (this.chatGen || 0) + 1;
+    this.stop();
     await this.saveConv(c);
     await this.focus();
     this.post({ type: "restore", log: c.log });
@@ -450,7 +519,7 @@ function html() {
 </style></head>
 <body><div id="wrap">
 <header>
-  <div id="hdr">Connecting to local model…</div>
+  <div id="hdr">Connecting to model backend…</div>
   <button id="model" title="Pick backend and model">Model</button>
   <button id="import" title="Import a Cursor chat to continue">Import chat</button>
   <button id="progress" title="Open the programmatic progress index">Progress</button>

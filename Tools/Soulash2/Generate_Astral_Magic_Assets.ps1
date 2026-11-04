@@ -1,7 +1,7 @@
 param(
     [string]$ModPath = "E:\SteamLibrary\steamapps\common\Soulash 2\data\mods\arendeth_astral_magic",
 
-    [ValidateSet("references", "procedural", "ollama", "sd", "all")]
+    [ValidateSet("procedural", "ollama", "sd", "all")]
     [string]$Mode = "all",
 
     [ValidateSet("fast", "mechanical", "full")]

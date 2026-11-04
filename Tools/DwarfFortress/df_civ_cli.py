@@ -204,15 +204,22 @@ def cmd_art(args: argparse.Namespace) -> int:
 
     write_graphics(spec, root)
 
+    from sd_policy import SdUnavailable
+
     if getattr(args, "blender", False):
         from df_blender_bake import bake_creature_art
 
-        bake = bake_creature_art(
-            spec,
-            root,
-            no_sd=args.no_sd,
-            allow_procedural=bool(getattr(args, "allow_procedural", False)),
-        )
+        try:
+            bake = bake_creature_art(
+                spec,
+                root,
+                no_sd=args.no_sd,
+                force=args.force,
+                allow_procedural=bool(getattr(args, "allow_procedural", False)),
+            )
+        except SdUnavailable as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
         print("[art] blender bake:")
         print(json.dumps({
             "blender": bake.get("blender"),
@@ -220,8 +227,6 @@ def cmd_art(args: argparse.Namespace) -> int:
             "arts": {k: str(v) for k, v in (bake.get("arts") or {}).items() if k != "sd"},
         }, indent=2))
         return 0
-
-    from sd_policy import SdUnavailable
 
     try:
         arts = generate_art_for_spec(

@@ -446,7 +446,8 @@ def generate(
 ) -> Dict[str, int]:
     # backend: sd = SD only; procedural = explicit procedural; auto = SD required, and a
     # procedural stand-in only if allow_procedural / AAMT_SD_STRICT=0 (see sd_policy).
-    stats ={"icon_sd": 0, "icon_proc": 0, "concept_sd": 0, "concept_proc": 0, "skipped": 0, "fail": 0}
+    stats ={"icon_sd": 0, "icon_proc": 0, "concept_sd": 0, "concept_proc": 0, "skipped": 0, "fail": 0,
+            "concept_fail": 0}
     work = spells[:limit] if limit else spells
     for i, sp in enumerate(work, 1):
         act_path = Path(sp["paths"]["act"])
@@ -501,6 +502,8 @@ def generate(
             if cimg is not None:
                 concept.parent.mkdir(parents=True, exist_ok=True)
                 cimg.convert("RGBA").save(concept, optimize=True)
+            else:
+                stats["concept_fail"] += 1
     return stats
 
 
@@ -752,6 +755,7 @@ def main() -> int:
 
     spells = collect_elin_spells()
     print(f"spells collected: {len(spells)}")
+    failures = 0
 
     if args.cmd in ("catalog", "all"):
         write_catalog(spells)
@@ -769,6 +773,7 @@ def main() -> int:
             allow_procedural=args.allow_procedural,
         )
         print("generate", stats)
+        failures += int(stats.get("fail", 0)) + int(stats.get("concept_fail", 0))
 
     if args.cmd == "overnight":
         if not _SPELL_ART_CAT.is_file():
@@ -799,6 +804,9 @@ def main() -> int:
             hashes[hashlib.md5(p.read_bytes()).hexdigest()] += 1
         print(f"Act uniqueness: {len(hashes)} unique hashes / {sum(hashes.values())} files")
         print(f"  dup groups (>=2): {sum(1 for c in hashes.values() if c >= 2)}")
+    if failures:
+        print(f"[FAIL] {failures} icon/concept render(s) failed", file=sys.stderr)
+        return 1
     return 0
 
 

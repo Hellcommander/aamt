@@ -16,6 +16,7 @@ function install({ workspace, settings = {}, appRoot = process.env.CORTEXIDE_APP
   const customEditors = new Map();
   const messages = [];
   const workspaceState = new Map();
+  const secrets = new Map();
 
   class EventEmitter {
     constructor() {
@@ -115,10 +116,15 @@ function install({ workspace, settings = {}, appRoot = process.env.CORTEXIDE_APP
       extensionUri: Uri.file(extPath),
       workspaceState: { get: (k) => workspaceState.get(k), update: async (k, v) => workspaceState.set(k, v) },
       globalState: { get: () => undefined, update: async () => {} },
+      secrets: {
+        get: async (k) => secrets.get(k),
+        store: async (k, v) => secrets.set(k, v),
+        delete: async (k) => secrets.delete(k),
+      },
     };
   }
 
-  return { vscode, commands, webviewProviders, treeProviders, customEditors, messages, workspaceState, makeContext, disposable, noop };
+  return { vscode, commands, webviewProviders, treeProviders, customEditors, messages, workspaceState, secrets, makeContext, disposable, noop };
 }
 
 module.exports = { install };

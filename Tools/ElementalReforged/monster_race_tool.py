@@ -533,8 +533,9 @@ def cmd_generate(cfg: dict[str, Any], args: argparse.Namespace) -> int:
             f"SD={'OK' if tools.get('sd') else 'no'} | "
             f"Magick={'OK' if tools.get('magick') else 'no'}"
         )
-        if mode == "ai" and not tools.get("sd"):
-            _log("ERROR: --mode ai requires Stable Diffusion. Use --start-sd or --mode tools.")
+        # --allow-procedural lets the AI pass fall back to procedural icons instead.
+        if mode == "ai" and not tools.get("sd") and not getattr(args, "allow_procedural", False):
+            _log("ERROR: --mode ai requires Stable Diffusion. Use --start-sd, --mode tools or --allow-procedural.")
             return 1
 
     t0 = time.perf_counter()

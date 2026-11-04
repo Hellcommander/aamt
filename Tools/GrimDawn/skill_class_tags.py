@@ -260,13 +260,22 @@ def regenerate_base_game_mod(
     mod = find_skill_class_tags_mod(game_dir)
     if not mod:
         raise FileNotFoundError("GDMod-SkillClassTags folder not found under mods/")
+    # the vanilla layer cache is CompatEngine's; fill it (or refresh it after a patch) before touching the mod
+    from compat_engine import CompatEngine
+    from gd_paths import GamePaths
+
+    game = GamePaths(Path(game_dir))
+    CompatEngine(game, game.game_dir / "database", Path(vanilla_cache)).ensure_layers_extracted()
+    gdx3_pc = Path(vanilla_cache) / "layers"
+    if not (gdx3_pc / "database" / "records/creatures/pc/malepc01.dbr").is_file():
+        raise FileNotFoundError(f"vanilla layer cache has no player record under {gdx3_pc}")
+
     text_dir = mod / "text_en"
     backup = mod / "_original_text_en"
     if not backup.exists():
         shutil.copytree(text_dir, backup)
 
     roots = extract_text_roots(Path(game_dir), [], work)
-    gdx3_pc = Path(vanilla_cache) / "layers"
     newest = sorted((d for d in gdx3_pc.glob("gdx*") if d.name[3:].isdigit()), key=lambda d: int(d.name[3:]))
     pc_root = newest[-1] if newest else gdx3_pc / "database"
     roster = get_list_field(read_dbr(pc_root / "records/creatures/pc/malepc01.dbr"), "skillTree")

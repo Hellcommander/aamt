@@ -16,6 +16,8 @@ import json
 import os
 import re
 import sys
+import shutil
+import subprocess
 import zipfile
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -75,8 +77,18 @@ ARCHETYPE_RULES: Tuple[Tuple[str, Tuple[str, ...]], ...] = (
 #               clips, and credit NOISE_ALCHEMY_CREDIT once in the project.
 #   own       — audio we made (D:\assets\audio\made, filled by `--keep`): ships and
 #               is reused as-is. Its sidecar .meta.json carries any credit still owed.
+#   restricted — the Ovani packs, kept in D:\assets\audio\Omni: the most restricted tier. No AI inputs or training,
+#               nothing standalone or lightly altered ever ships; a sound built on one (by plain processing, see
+#               audio_bench / sfx_alter) ships only inside the mod, under the licensed-sound terms. They are kept because
+#               they cover what Noise Alchemy and Dark Fantasy don't (ice, microscale bugs, robotic beings).
 DIRECT_USE_PACKS = ("magicspellssfxbundle", "inventorysfxbundle", "puzzleaudiokit", "buttonssfxlibrary")
 DIRECT_USE_DIRS = ("bt25_ultimatesfxforgames_softwarebundle",)
+RESTRICTED_DIRS = ("omni",)
+# Licenses that bar generative AI use or AI inputs: the Function Loops and Unity Asset Store terms cover every "direct"
+# pack, and Ovani's terms forbid AI training and warn against standalone files. These clips may be trimmed and levelled
+# but never fed to an AI step (init audio, reference mix, close-copy): see ai_allowed. The pack names here catch the
+# Ovani packs in an index made before they moved into Omni/.
+NO_AI_PACKS = ("ice sound fx pack", "microscale bugs sound fx pack", "robotic beings sound fx pack")
 OWN_DIR = "made"
 NOISE_ALCHEMY_CREDIT = "Sound effects created with NOISE ALCHEMY – NOISEALCHEMY.COM"
 
@@ -152,16 +164,25 @@ def infer_tags(pack: str, inner: str) -> List[str]:
 
 
 def license_tier(pack: str, inner: str = "") -> str:
-    """'own', 'direct' or 'reference' — see OWN_DIR / DIRECT_USE_PACKS / DIRECT_USE_DIRS."""
+    """'own', 'direct', 'restricted' or 'reference' — see OWN_DIR / DIRECT_USE_* / RESTRICTED_DIRS. `pack` is a zip's
+    path relative to the library (so a zip in a folder carries the folder) or a folder pack's name."""
     head = inner.replace("\\", "/").split("/", 1)[0].lower()
+    pack_head = pack.replace("\\", "/").split("/", 1)[0].lower() if "/" in pack.replace("\\", "/") else ""
     if head == OWN_DIR:
         return "own"
-    if head in DIRECT_USE_DIRS:
-        return "direct"
     stem = Path(pack).stem.lower()
+    if pack_head in RESTRICTED_DIRS or any(stem.startswith(p) for p in NO_AI_PACKS):
+        return "restricted"
+    if head in DIRECT_USE_DIRS or pack_head in DIRECT_USE_DIRS or stem in DIRECT_USE_DIRS:
+        return "direct"
     if any(stem.startswith(p) for p in DIRECT_USE_PACKS):
         return "direct"
     return "reference"
+
+
+def ai_allowed(pack: str, inner: str = "") -> bool:
+    """Whether a clip's license lets it go into an AI tool. Every AI path checks this; plain audio editing doesn't need to."""
+    return license_tier(pack, inner) in ("own", "reference")
 
 
 def asset_id(pack: str, inner: str) -> str:
@@ -189,6 +210,9 @@ class AssetRecord:
 
     def license_tier(self) -> str:
         return license_tier(self.pack, self.inner)
+
+    def ai_allowed(self) -> bool:
+        return ai_allowed(self.pack, self.inner)
 
     def search_text(self) -> str:
         bits = [self.name, _pack_stem(self.pack), " ".join(self.tags), " ".join(self.archetypes)]
@@ -256,39 +280,60 @@ def _resample_audio(arr: np.ndarray, in_sr: int, sr: int) -> np.ndarray:
     return np.interp(x_new, x_old, audio).astype(np.float32)
 
 
-def _decode_compressed(data: bytes) -> Tuple[np.ndarray, int]:
+def _to_stereo_float32(audio: Any) -> np.ndarray:
+    """(samples, 2) float32: mono is doubled, surround keeps its front pair."""
+    arr = np.asarray(audio, dtype=np.float32)
+    if arr.ndim == 1:
+        arr = arr.reshape(-1, 1)
+    elif arr.shape[1] > arr.shape[0]:
+        arr = arr.T  # torchaudio: (C, T)
+    return (np.repeat(arr, 2, axis=1) if arr.shape[1] == 1 else arr[:, :2]).astype(np.float32)
+
+
+def _decode_compressed(data: bytes, *, stereo: bool = False) -> Tuple[np.ndarray, int]:
     """Decode MP3/OGG/M4A/etc from memory: PyAV (bundles FFmpeg), then torchcodec
-    (needs a shared FFmpeg on PATH). No librosa/numba — avoids numpy pin fights."""
+    (needs a shared FFmpeg on PATH). No librosa/numba — avoids numpy pin fights.
+    Returns (samples,) mono, or (samples, 2) with stereo=True."""
     errors: List[str] = []
+    channels = 2 if stereo else 1
     try:
         import av
 
         with av.open(io.BytesIO(data)) as container:
             stream = container.streams.audio[0]
             in_sr = int(stream.rate or 0)
-            # Resampler normalizes any sample format/layout to float mono.
-            resampler = av.AudioResampler(format="fltp", layout="mono", rate=in_sr or None)
+            # Resampler normalizes any sample format/layout to planar float.
+            resampler = av.AudioResampler(format="fltp", layout="stereo" if stereo else "mono", rate=in_sr or None)
             chunks: List[np.ndarray] = []
             for frame in container.decode(stream):
-                chunks.extend(out.to_ndarray().reshape(-1) for out in resampler.resample(frame))
-            chunks.extend(out.to_ndarray().reshape(-1) for out in resampler.resample(None))
+                chunks.extend(out.to_ndarray().reshape(channels, -1) for out in resampler.resample(frame))
+            chunks.extend(out.to_ndarray().reshape(channels, -1) for out in resampler.resample(None))
         if not chunks or not in_sr:
             raise RuntimeError("no audio frames")
-        return np.concatenate(chunks).astype(np.float32), in_sr
+        audio = np.concatenate(chunks, axis=1).astype(np.float32)
+        return (audio.T if stereo else audio[0]), in_sr
     except Exception as exc:
         errors.append(f"av: {exc}")
     try:
         from torchcodec.decoders import AudioDecoder
 
         samples = AudioDecoder(data).get_all_samples()  # (C, T) float32
-        return _to_mono_float32(samples.data.numpy()), int(samples.sample_rate)
+        convert = _to_stereo_float32 if stereo else _to_mono_float32
+        return convert(samples.data.numpy()), int(samples.sample_rate)
     except Exception as exc:
         errors.append(f"torchcodec: {exc}")
     raise RuntimeError("; ".join(errors))
 
 
-def _decode_bytes(data: bytes, *, max_seconds: float = EMBED_SECONDS, sr: int = EMBED_SR) -> Tuple[np.ndarray, int]:
-    """Return (samples,) float32 mono at `sr`, clipped to max_seconds."""
+def _decode_bytes(
+    data: bytes,
+    *,
+    max_seconds: float = EMBED_SECONDS,
+    sr: int = EMBED_SR,
+    stereo: bool = False,
+) -> Tuple[np.ndarray, int]:
+    """Return float32 at `sr`, clipped to max_seconds: (samples,) mono for embedding
+    and features, or (samples, 2) with stereo=True for anything that makes sound."""
     bio = io.BytesIO(data)
     audio = None
     in_sr = sr
@@ -300,12 +345,15 @@ def _decode_bytes(data: bytes, *, max_seconds: float = EMBED_SECONDS, sr: int = 
         audio = None
     if audio is None:
         try:
-            audio, in_sr = _decode_compressed(data)
+            audio, in_sr = _decode_compressed(data, stereo=stereo)
         except Exception as exc:
             raise RuntimeError(f"decode failed: {exc}") from exc
-    arr = _to_mono_float32(audio)
+    arr = _to_stereo_float32(audio) if stereo else _to_mono_float32(audio)
     if in_sr != sr and arr.size:
-        arr = _resample_audio(arr, int(in_sr), int(sr))
+        if stereo:
+            arr = np.stack([_resample_audio(arr[:, c], int(in_sr), int(sr)) for c in range(2)], axis=1)
+        else:
+            arr = _resample_audio(arr, int(in_sr), int(sr))
         in_sr = sr
     max_n = int(max_seconds * in_sr)
     if arr.shape[0] > max_n:
@@ -573,17 +621,115 @@ def _open_zip(path: Path) -> zipfile.ZipFile:
     return zipfile.ZipFile(path, "r", allowZip64=True)
 
 
+SEVEN_EXTS = (".7z", ".7zip")
+
+
+def _seven_zip_exe() -> Optional[str]:
+    """7-Zip's command line, which reads a solid LZMA2 archive far faster than pure Python; None when not installed."""
+    for cand in (shutil.which("7z"), r"C:\Program Files\7-Zip\7z.exe", r"C:\Program Files (x86)\7-Zip\7z.exe"):
+        if cand and Path(cand).is_file():
+            return cand
+    return None
+
+
+def _seven_list(path: Path) -> List[str]:
+    """Member paths of a 7z archive (files only)."""
+    exe = _seven_zip_exe()
+    if exe:
+        out = subprocess.run([exe, "l", "-slt", "-ba", str(path)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        names, folder = [], False
+        for line in out.stdout.splitlines():
+            if line.startswith("Path = "):
+                current = line[7:].replace("\\", "/")
+            elif line.startswith("Folder = "):
+                folder = line.endswith("+")
+            elif line.startswith("Size = ") and not folder:
+                names.append(current)
+        return names
+    import py7zr
+
+    with py7zr.SevenZipFile(path, "r") as z:
+        return [i.filename.replace("\\", "/") for i in z.list() if not i.is_directory]
+
+
+def _seven_read(path: Path, inner: str) -> bytes:
+    """One member of a 7z archive. A solid archive makes this cost a block's worth of decompression, so callers cache."""
+    exe = _seven_zip_exe()
+    if exe:
+        out = subprocess.run([exe, "e", "-so", str(path), inner], capture_output=True)
+        if out.returncode == 0 and out.stdout:
+            return out.stdout
+    import py7zr
+
+    with py7zr.SevenZipFile(path, "r") as z:
+        got = z.read(targets=[inner])
+    for k, v in got.items():
+        if k.replace("\\", "/") == inner:
+            return v.read()
+    raise FileNotFoundError(f"{inner} not in {path.name}")
+
+
+def _seven_extract_all(path: Path, dest: Path) -> None:
+    exe = _seven_zip_exe()
+    dest.mkdir(parents=True, exist_ok=True)
+    if exe:
+        r = subprocess.run([exe, "x", "-y", f"-o{dest}", str(path)], capture_output=True)
+        if r.returncode == 0:
+            return
+    import py7zr
+
+    with py7zr.SevenZipFile(path, "r") as z:
+        z.extractall(path=str(dest))
+
+
+def _iter_seven(path: Path, pack: str) -> Iterable[Tuple[str, str, bytes, str]]:
+    """Every audio member of a 7z archive, by extracting it once to a scratch folder next to the index (a solid archive
+    can't be read member by member at any speed), then deleting that folder."""
+    scratch = _index_dir() / "_extract" / Path(pack).stem
+    try:
+        _seven_extract_all(path, scratch)
+        for f in sorted(scratch.rglob("*")):
+            if not f.is_file() or not _is_audio_name(f.name):
+                continue
+            inner = f.relative_to(scratch).as_posix()
+            low = inner.lower()
+            if "reverse" in low or re.search(r"\brev\b", low):
+                continue
+            yield pack, inner, f.read_bytes(), "7z"
+    finally:
+        shutil.rmtree(scratch, ignore_errors=True)
+
+
 def iter_library_entries(root: Path) -> Iterable[Tuple[str, str, bytes, str]]:
     """Yield (pack, inner, bytes, source) for every audio clip under root."""
     root = Path(root)
     if not root.is_dir():
         return
-    for zip_path in sorted(root.glob("*.zip")):
-        pack = zip_path.name
+    # Zips anywhere under the library; one in a folder is named with that folder (Omni/..., bt25.../...), which is
+    # what the license tiers read.
+    def under_index(p: Path) -> bool:
+        return p.relative_to(root).parts[0].startswith("_aamt_index")
+
+    archives = sorted(p for p in root.rglob("*") if p.is_file() and p.suffix.lower() in (".zip",) + SEVEN_EXTS and not under_index(p)
+                      and "__MACOSX" not in p.parts and not p.name.startswith("._"))
+    # A folder pack that has been compressed to an archive of the same name is read from the archive only.
+    shadowed = {p.with_suffix("").name for p in archives if (root / p.with_suffix("").name).is_dir()}
+    for arc in archives:
+        if arc.suffix.lower() in SEVEN_EXTS:
+            pack = arc.relative_to(root).as_posix()
+            try:
+                if not any(_is_audio_name(n) for n in _seven_list(arc)):
+                    continue   # a software archive that happens to live here
+            except OSError as exc:
+                print(f"  [audio-lib] skip archive {pack}: {exc}")
+                continue
+            yield from _iter_seven(arc, pack)
+    for zip_path in (p for p in archives if p.suffix.lower() == ".zip"):
+        pack = zip_path.relative_to(root).as_posix()
         try:
             zf = _open_zip(zip_path)
-        except zipfile.BadZipFile:
-            print(f"  [audio-lib] skip bad zip: {pack}")
+        except (zipfile.BadZipFile, OSError) as exc:   # a bad zip, or one deleted since the scan began
+            print(f"  [audio-lib] skip zip {pack}: {exc}")
             continue
         with zf:
             for info in zf.infolist():
@@ -601,11 +747,13 @@ def iter_library_entries(root: Path) -> Iterable[Tuple[str, str, bytes, str]]:
     for p in sorted(root.rglob("*")):
         if not p.is_file() or not _is_audio_name(p.name):
             continue
-        if "_aamt_index" in p.parts:
+        if under_index(p):
             continue
-        if p.suffix.lower() == ".zip":
+        if p.suffix.lower() in (".zip",) + SEVEN_EXTS:
             continue
         rel = p.relative_to(root).as_posix()
+        if rel.split("/", 1)[0] in shadowed:
+            continue
         try:
             yield p.parent.name or "loose", rel, p.read_bytes(), "file"
         except Exception as exc:
@@ -613,18 +761,24 @@ def iter_library_entries(root: Path) -> Iterable[Tuple[str, str, bytes, str]]:
 
 
 def load_asset_audio(record: AssetRecord, library: Optional[Path] = None, *, max_seconds: float = 30.0, sr: int = 48000) -> Tuple[np.ndarray, int]:
-    """Load a catalogued clip as (samples, channels) float32 at `sr`."""
+    """Load a catalogued clip as (samples, 2) float32 at `sr`, keeping its stereo image (mono clips are doubled)."""
     library = Path(library or _library_dir())
     if record.source == "file":
         path = library / record.inner
         data = path.read_bytes()
+    elif record.source == "7z":
+        cached = _index_dir() / "cache7z" / Path(record.pack).stem / record.inner
+        if cached.is_file():
+            data = cached.read_bytes()
+        else:
+            data = _seven_read(library / record.pack, record.inner)
+            cached.parent.mkdir(parents=True, exist_ok=True)
+            cached.write_bytes(data)
     else:
         zpath = library / record.pack
         with _open_zip(zpath) as zf:
             data = zf.read(record.inner)
-    mono, in_sr = _decode_bytes(data, max_seconds=max_seconds, sr=sr)
-    # Return stereo-shaped [samples, 2] for generators
-    stereo = np.stack([mono, mono], axis=1)
+    stereo, in_sr = _decode_bytes(data, max_seconds=max_seconds, sr=sr, stereo=True)
     return stereo.astype(np.float32), int(in_sr)
 
 
@@ -663,7 +817,7 @@ class AudioLibrary:
             "archetypes": sorted({a for r in self.records for a in r.archetypes}),
             "license_tiers": {
                 t: sum(1 for r in self.records if r.license_tier() == t)
-                for t in ("own", "direct", "reference")
+                for t in ("own", "direct", "restricted", "reference")
             },
         }
 
@@ -716,6 +870,12 @@ class AudioLibrary:
                 print(
                     f"  [audio-lib] WARNING: tag index built with {self.tag_model} but the "
                     f"embedder is {self._tags.name} — run `audio_pipeline.py rebuild-tags`"
+                )
+            elif not self.tag_model:
+                # older indexes never recorded their embedder; same-size vectors would rank wrongly
+                print(
+                    f"  [audio-lib] WARNING: tag index has no recorded tag model (embedder is "
+                    f"{self._tags.name}) — run `audio_pipeline.py rebuild-tags` if searches look off"
                 )
         return self._tags
 
@@ -861,8 +1021,13 @@ class AudioLibrary:
             start = existing.shape[0]
             skipped = start
 
+        withheld = 0
         for i in range(start, n):
             rec = self.records[i]
+            if not rec.ai_allowed():   # license bars AI inputs / datasets: name and spectrum search only
+                rows.append(np.zeros((clap_e.dim,), dtype=np.float32))
+                withheld += 1
+                continue
             try:
                 mono, sr = self._load_record_mono(rec, sr=CLAP_SR)
                 vec = clap_e.audio(mono, sr)
@@ -883,6 +1048,7 @@ class AudioLibrary:
         self.clap_vectors = np.stack(rows, axis=0)
         self.save()
         return {
+            "withheld_by_license": withheld,
             "built": built,
             "skipped": skipped,
             "failed": failed,
@@ -996,7 +1162,11 @@ class AudioLibrary:
         if whisper_e is not None and "voice" in archetypes and mono.size:
             rec.transcript = whisper_e.transcribe(mono, sr)
         tag_v = tagger.embed(rec.search_text())
-        clap_v = clap_e.audio(mono, sr) if clap_e is not None else None
+        # Packs whose terms bar AI inputs or dataset building (Tao & Sound EULA g, Ovani, Function Loops) are never
+        # embedded: a zero vector keeps the matrix aligned and scores nothing, so they are found by name and spectrum only.
+        clap_v = None
+        if clap_e is not None:
+            clap_v = clap_e.audio(mono, sr) if rec.ai_allowed() else np.zeros((clap_e.dim,), dtype=np.float32)
         return rec, tag_v, clap_v, spec
 
     def search_text(
@@ -1007,12 +1177,13 @@ class AudioLibrary:
         archetype: str = "",
         tags: Optional[Sequence[str]] = None,
         license: Union[str, Sequence[str]] = "",
+        for_ai: bool = False,
     ) -> List[RetrievalHit]:
         if not self.records:
             self.load()
         if not self.records:
             return []
-        mask = self._filter_mask(archetype=archetype, tags=tags, license=license)
+        mask = self._filter_mask(archetype=archetype, tags=tags, license=license, for_ai=for_ai)
         scores = np.zeros(len(self.records), dtype=np.float32)
         via = "tag"
         clap = self._ensure_clap()
@@ -1042,6 +1213,7 @@ class AudioLibrary:
         k: int = 8,
         archetype: str = "",
         license: Union[str, Sequence[str]] = "",
+        for_ai: bool = False,
     ) -> List[RetrievalHit]:
         if not self.records:
             self.load()
@@ -1067,7 +1239,7 @@ class AudioLibrary:
         if q is not None and self.clap_vectors is not None and self.clap_vectors.shape[0] == len(self.records):
             scores = 0.55 * _cosine_scores(q, self.clap_vectors) + 0.45 * scores
             via = "clap+spectral"
-        mask = self._filter_mask(archetype=archetype, license=license)
+        mask = self._filter_mask(archetype=archetype, license=license, for_ai=for_ai)
         scores = np.where(mask, scores, -1.0)
         return self._hits_from_scores(scores, k, via)
 
@@ -1077,8 +1249,11 @@ class AudioLibrary:
         archetype: str = "",
         tags: Optional[Sequence[str]] = None,
         license: Union[str, Sequence[str]] = "",
+        for_ai: bool = False,
     ) -> np.ndarray:
         mask = np.ones(len(self.records), dtype=bool)
+        if for_ai:
+            mask &= np.array([r.ai_allowed() for r in self.records])
         if license:
             allowed = {license} if isinstance(license, str) else set(license)
             mask &= np.array([r.license_tier() in allowed for r in self.records])
@@ -1111,6 +1286,9 @@ class AudioLibrary:
         """Weighted mix of retrieved clips → (samples, channels) init audio."""
         if not hits:
             raise ValueError("no reference hits to mix")
+        barred = [h.record.label() for h in hits if not h.record.ai_allowed()]
+        if barred:
+            raise ValueError(f"these clips' licenses bar AI use: {', '.join(barred)}")
         weights = np.array([max(0.05, h.score) for h in hits], dtype=np.float32)
         weights = weights / weights.sum()
         n = int(max_seconds * sr)

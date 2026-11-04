@@ -235,6 +235,7 @@ def ensure_sd(wait_sec: int = 300) -> None:
         # Hidden console, not DETACHED_PROCESS: with no console at all the script's
         # Write-Host / python child died silently and SD never came up.
         log_dir = SERVER_PY.parent if SERVER_PY.parent.is_dir() else _TOOLS / "Logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
         subprocess.Popen(
             [
                 "powershell.exe",

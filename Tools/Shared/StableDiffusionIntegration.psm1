@@ -607,7 +607,7 @@ function Stop-StableDiffusionServer {
     foreach ($root in $candidates) {
         $stop = Join-Path $root "Stop-StableDiffusionServer.ps1"
         if (Test-Path -LiteralPath $stop) {
-            & $stop
+            & $stop -Port $script:SDPort
             $script:SDLastGoodPing = $null
             return ($LASTEXITCODE -eq 0)
         }
@@ -690,7 +690,7 @@ function Start-StableDiffusionServerIfNeeded {
     Write-Host "  Starting SD3.5 server: $startScript" -ForegroundColor Cyan
     $proc = $null
     try {
-        $psArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ('"' + $startScript + '"'), "-NoStatusGui")
+        $psArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ('"' + $startScript + '"'), "-NoStatusGui", "-Port", "$($script:SDPort)")
         $proc = Start-Process -FilePath $psExe -ArgumentList $psArgs -WindowStyle Hidden -PassThru
     } catch {
         Write-Host "  [ERROR] Could not launch start script: $($_.Exception.Message)" -ForegroundColor Red

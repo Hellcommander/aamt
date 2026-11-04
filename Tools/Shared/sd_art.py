@@ -171,11 +171,13 @@ def render(
     bg_clause = "isolated on a pure black background, centered, " if transparent else "fills the whole frame, "
     full_prompt = f"{prompt.strip()}, {bg_clause}{LOOK}"
     last_err: Optional[Exception] = None
+    # The cache key covers everything that changes the raw image: the negative prompt and the
+    # reference's bytes (a re-rendered reference keeps its file name).
+    ref_tag = hashlib.md5(Path(reference).read_bytes()).hexdigest() if reference else ""
     for attempt in range(max(1, attempts)):
         s = ((seed or 1) + attempt * 7919) % 1_000_000 or 1
-        ref_tag = reference.name if reference else ""
         key = hashlib.md5(
-            f"{full_prompt}|{gw}x{gh}|{s}|{steps or plan_steps}|{ref_tag}|{strength}".encode()
+            f"{full_prompt}|{negative}|{gw}x{gh}|{s}|{steps or plan_steps}|{ref_tag}|{strength}".encode()
         ).hexdigest()
         raw = _cache_dir() / f"{key}.png"
         try:

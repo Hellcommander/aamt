@@ -122,10 +122,10 @@ def main() -> int:
     parser.add_argument(
         "--mod-path",
         type=Path,
-        default=mods_dir() / "arendeth_hydromancy",
+        default=None,
     )
     args = parser.parse_args()
-    mod_path = args.mod_path.resolve()
+    mod_path = (args.mod_path or (mods_dir() / "arendeth_hydromancy")).resolve()
     refs = load_map(mod_path)
 
     total = 0

@@ -30,9 +30,12 @@ if ($PSVersionTable.PSEdition -eq 'Desktop' -and $env:PSModulePath -match '\\Pow
     $env:PSModulePath = (($stock + $machine) | Where-Object { $_ } | Select-Object -Unique) -join ';'
 }
 
-# SD3.5 installation path (override with AAMT_SD_HOME)
+# SD3.5 installation path (override with AAMT_SD_HOME). Setup-SD35Server.ps1 -InstallPath
+# saves AAMT_SD_HOME in the user environment, which a running session may not have yet.
 $sd35Path = "E:\tools\sd3.5\sd3.5"
-if ($env:AAMT_SD_HOME) { $sd35Path = $env:AAMT_SD_HOME }
+$sdHome = $env:AAMT_SD_HOME
+if (-not $sdHome) { $sdHome = [Environment]::GetEnvironmentVariable('AAMT_SD_HOME', 'User') }
+if ($sdHome) { $sd35Path = $sdHome }
 $sd35Server = Join-Path $sd35Path "server.py"
 
 # Canonical source: Tools\Shared\sd35_server.py (this script lives in Tools\)
@@ -77,9 +80,14 @@ if (Test-Path -LiteralPath $canonical) {
     exit 1
 }
 
-# Python
+# Python: same order as Setup-SD35Server.ps1 (AAMT_PYTHON first), so the server runs in the
+# environment setup installed into.
 $pythonCmd = $null
-if (Get-Command python -ErrorAction SilentlyContinue) {
+$aamtPython = $env:AAMT_PYTHON
+if (-not $aamtPython) { $aamtPython = [Environment]::GetEnvironmentVariable('AAMT_PYTHON', 'User') }
+if ($aamtPython -and (Test-Path -LiteralPath $aamtPython)) {
+    $pythonCmd = $aamtPython
+} elseif (Get-Command python -ErrorAction SilentlyContinue) {
     $pythonCmd = "python"
 } elseif (Get-Command python3 -ErrorAction SilentlyContinue) {
     $pythonCmd = "python3"

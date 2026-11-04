@@ -246,7 +246,8 @@ private:
         std::vector<glm::vec4> bone_weights;
         std::vector<glm::uvec4> bone_indices;
         glm::mat4 transform = glm::mat4(1.0f);
-        std::string material_name;
+        std::string material_name;                  // first material (whole mesh when the list below is empty)
+        std::vector<std::string> triangle_materials; // OBJ usemtl per triangle (indices / 3), may be empty
     };
 
     struct AnimationClip {
