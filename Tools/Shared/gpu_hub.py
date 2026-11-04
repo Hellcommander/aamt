@@ -21,3 +21,7 @@ _spec.loader.exec_module(_mod)
 acquire_gpu = _mod.acquire_gpu
 current_holder = _mod.current_holder
 LOCK_FILE = _mod.LOCK_FILE
+current_job = _mod.current_job
+release_gpu_job = _mod.release_gpu_job
+JOB_LOCK_FILE = _mod.JOB_LOCK_FILE
+hold_gpu_job = _mod.hold_gpu_job

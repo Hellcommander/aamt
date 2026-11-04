@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional
@@ -47,17 +48,29 @@ class GamePaths:
     def base_arz(self) -> Path:
         return self.game_dir / "database" / "database.arz"
 
+    def dlc_layer_names(self) -> List[str]:
+        """Expansion folders (gdx1, gdx2, gdx3, ... future gdxN) in load order."""
+        return [p.name.lower() for p in dlc_layer_dirs(self.game_dir)]
+
     def dlc_arz_files(self) -> List[Path]:
         files: List[Path] = []
-        for name, arz in (
-            ("gdx1", "GDX1.arz"),
-            ("gdx2", "GDX2.arz"),
-            ("gdx3", "GDX3.arz"),
-        ):
-            p = self.game_dir / name / "database" / arz
-            if p.is_file():
-                files.append(p)
+        for layer in dlc_layer_dirs(self.game_dir):
+            db = layer / "database"
+            preferred = db / f"{layer.name.upper()}.arz"
+            if preferred.is_file():
+                files.append(preferred)
+            elif db.is_dir():
+                files.extend(sorted(db.glob("*.arz")))
         return files
+
+    def text_arcs(self, lang: str = "EN") -> List[Path]:
+        """Text_<lang>.arc for base game + every expansion, in load order."""
+        out: List[Path] = []
+        for root in [self.game_dir, *dlc_layer_dirs(self.game_dir)]:
+            p = root / "resources" / f"Text_{lang}.arc"
+            if p.is_file():
+                out.append(p)
+        return out
 
     def survival_arz_files(self) -> List[Path]:
         """Official Crucible/Survival DLC layers (survivalmode1–3) next to the game EXE."""
@@ -82,6 +95,30 @@ class GamePaths:
         if not self.archive_tool.is_file():
             raise FileNotFoundError(f"ArchiveTool.exe not found in {self.game_dir}")
         self.mods_dir.mkdir(parents=True, exist_ok=True)
+
+
+def dlc_layer_dirs(game_dir: Path) -> List[Path]:
+    """gdx1..gdxN at the game root, sorted numerically (new expansions picked up automatically)."""
+    root = Path(game_dir)
+    found = []
+    if not root.is_dir():
+        return []
+    for child in root.iterdir():
+        m = re.fullmatch(r"gdx(\d+)", child.name.lower())
+        if child.is_dir() and m and (child / "database").is_dir():
+            found.append((int(m.group(1)), child))
+    return [p for _, p in sorted(found)]
+
+
+def file_stamp(paths: Iterable[Path]) -> str:
+    """Size+mtime fingerprint; changes whenever Steam patches a file."""
+    parts = []
+    for p in paths:
+        p = Path(p)
+        if p.is_file():
+            st = p.stat()
+            parts.append(f"{p.name}:{st.st_size}:{int(st.st_mtime)}")
+    return "|".join(parts)
 
 
 def survival_layer_dirs(game_dir: Path) -> List[Path]:

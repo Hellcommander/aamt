@@ -1,0 +1,29 @@
+{
+  "_note": "Merge Nydiamar into the campaign world and link them with a two-way portal. Rebuild after game/mod updates: python world_link.py --profile nydiamar",
+  "output_mod": "CampaignKitchenSink",
+  "base": {"mod": "grimarillion", "arc": "Levels.arc", "map": "world001.map"},
+  "out_arc": "Levels.arc",
+  "remove_maps_from": {"Maps.arc": ["nydiamar.map", "nydiamardungeons.map"]},
+  "worlds": [
+    {"id": "nydiamar", "mod": "Nydiamar", "arc": "Maps.arc", "map": "nydiamar.map"}
+  ],
+  "portals": [
+    {
+      "id": "nydiamar",
+      "template": "records/_edited records/catacombs/portal_to_ruins.dbr",
+      "template_mod": "Nydiamar",
+      "a": {
+        "world": "base",
+        "near_uid": "b77f0b80294f94f65069f7b7d76ce753",
+        "label": "Devil's Crossing riftgate",
+        "name": "Portal to Nydiamar"
+      },
+      "b": {
+        "world": "nydiamar",
+        "near": "start",
+        "label": "Nydiamar starting area",
+        "name": "Portal to Devil's Crossing"
+      }
+    }
+  ]
+}

@@ -26,7 +26,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Sequence, Set, Tuple
 
-from archive_tool import ArchiveTool, kill_orphan_archivetool
+from archive_tool import ArchiveTool, arc_root, kill_orphan_archivetool, pack_arc
 from arz_backend import build_database
 from class_combo_names import (
     collect_tags,
@@ -295,24 +295,32 @@ def overlay_content_resources(
             print(f"  WARN: extract failed {arc.name}: {exc}", file=sys.stderr)
             continue
 
-        # Merge files into a per-arc source folder then pack into out resources
-        dest_src = source_merge / arc.stem
-        dest_src.mkdir(parents=True, exist_ok=True)
-        for path in extract_to.rglob("*"):
-            if not path.is_file():
-                continue
-            rel = path.relative_to(extract_to)
-            target = dest_src / rel
-            target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(path, target)
-
         dest_arc = (
             out_mod / "resources" / arc.name
             if arc.parent.name.lower() == "resources"
             else out_mod / "database" / arc.name
         )
+        # Merge files into a per-arc source folder (seeded with the output's current archive),
+        # then pack it as the archive's top level
+        dest_src = source_merge / arc.stem
+        if not dest_src.exists():
+            dest_src.mkdir(parents=True)
+            if dest_arc.is_file():
+                seed = stage_root / f"_seed_{arc.stem}"
+                tool.extract_arc(dest_arc, seed)
+                shutil.copytree(arc_root(seed, dest_arc), dest_src, dirs_exist_ok=True)
+                shutil.rmtree(seed, ignore_errors=True)
+        src_root = arc_root(extract_to, arc)
+        for path in src_root.rglob("*"):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(src_root)
+            target = dest_src / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, target)
+
         try:
-            tool.update_arc(dest_arc, dest_src)
+            pack_arc(dest_src, dest_arc)
             done.append(f"{content_mod.name}/{arc.name}")
         except Exception as exc:
             print(f"  WARN: pack failed {arc.name}: {exc}", file=sys.stderr)
@@ -363,53 +371,22 @@ def prepare_dbs(game: GamePaths, work: Path, mods: Sequence[Path]) -> List[Path]
 
 def write_combo_tags(mod_db: Path, out_mod: Path, dry_run: bool, model: Optional[str]) -> int:
     """Fill ALL missing dual-class combo tags (not just Berserker), harvesting existing mod tags."""
-    from class_combo_names import (
-        collect_tags,
-        discover_mastery_ids,
-        harvest_tag_roots,
-        missing_all_combos,
-        ollama_generate,
-        placeholder_names,
-        resolve_ollama_model,
-        write_tags,
-    )
+    from class_combo_names import generate_combo_tags
 
     tag_out = out_mod / "localization" / "tags_kitchen_sink_combos.txt"
-    game_mods = out_mod.parent if out_mod.parent.name.lower() == "mods" else None
-    roots = harvest_tag_roots(mod_db, out_mod, game_mods)
-    # Keep legacy foa tags file in the harvest set
-    roots.append(out_mod / "localization" / "tags_survival_foa.txt")
-    tags = collect_tags(roots)
-    masteries = discover_mastery_ids(mod_db)
-    missing = missing_all_combos(tags, masteries)
-    if not missing:
-        print(
-            f"No missing combo tags (masteries={len(masteries)}, existing={len(tags)}).",
-            flush=True,
-        )
-        return 0
-    print(
-        f"Combo tags: masteries={len(masteries)} existing={len(tags)} missing={len(missing)}",
-        flush=True,
+    game_dir = out_mod.parent.parent if out_mod.parent.name.lower() == "mods" else None
+    if game_dir is None and (out_mod.parent / "ArchiveTool.exe").is_file():
+        game_dir = out_mod.parent  # survivalmode4 lives at the game root
+    n, _ = generate_combo_tags(
+        mod_db,
+        tag_out,
+        game_dir=game_dir,
+        use_ollama=not dry_run,
+        model=model,
+        limit=-1,
     )
-    generated = placeholder_names(missing)
-    if not dry_run:
-        # Polish a limited batch with Ollama; rest stay as CamelCase placeholders
-        m = resolve_ollama_model(model)
-        polish_n = min(80, len(missing))
-        try:
-            polished = ollama_generate(m, missing[:polish_n])
-            generated.update(polished)
-            print(f"Ollama polished {len(polished)} combo names", flush=True)
-        except Exception as exc:
-            print(f"Ollama failed ({exc}); placeholders only", file=sys.stderr)
-    write_tags(tag_out, generated, tags)
     shutil.copy2(tag_out, out_mod / "database" / "tags_kitchen_sink_combos.txt")
-    # Also keep/refresh legacy foa file with Berserker-related lines for older tooling
-    legacy = out_mod / "localization" / "tags_survival_foa.txt"
-    if not legacy.is_file():
-        shutil.copy2(tag_out, legacy)
-    return len(generated)
+    return n
 
 
 def main(argv=None) -> int:

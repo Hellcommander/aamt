@@ -1,0 +1,15 @@
+{
+  "id": "sparker",
+  "match": ["Sparker"],
+  "mode": "class",
+  "enabled": true,
+  "priority": 91,
+  "class_priority": 91,
+  "items_mode": "merge",
+  "conflict_merge": true,
+  "conflict_merge_prefixes": [],
+  "prefer_field_substrings": [],
+  "keep_base_field_substrings": [],
+  "compat": "auto",
+  "notes": "Standalone Sparker (Scintillist) is newer than the copies bundled in Grimarillion (90) and Dawn of Masteries (70). Priority 91 so it merges after both; conflict_merge on every overlapping record = field-merge where the standalone wins conflicting fields but Grim/DoM-only Sparker records and fields are kept. PC/class hubs union as usual."
+}

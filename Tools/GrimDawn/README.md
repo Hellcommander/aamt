@@ -4,11 +4,115 @@ Python + PowerShell utilities for a **FoA/v1.3 kitchen-sink** install: many mast
 
 | | |
 |---|---|
-| **Tools** | `D:\games\Steam\steamapps\common\Transcendence\Tools\GrimDawn` |
+| **Tools** | `D:\games\Ai assisted toolkit\Tools\GrimDawn` |
 | **Game** | `D:\games\Steam\steamapps\common\Grim Dawn` |
 | **Override** | `--game` or env `GD_GAME_DIR` / `GRIM_DAWN_DIR` |
 
 Credits: [NOTICE.md](NOTICE.md). Living checklist: [TODOS.md](TODOS.md). Layer notes: [profiles/survival_dlc.md](profiles/survival_dlc.md).
+
+---
+
+## Quick start: the two main tools
+
+### 1. Update a mod for the latest patch + DLC
+
+```bat
+Run-GdUpdateMod.bat dom
+```
+
+or GUI → **Update mod (latest)** tab, or:
+
+```powershell
+python -u patch_mod_for_dlc.py --mod dom --latest --ollama [--rebuild] [--class-mods grimarillion]
+```
+
+Writes a **new** Custom Game `mods\<mod>_Latest` (original untouched; `--in-place` backs up the `.arz` and edits the mod itself). Steps:
+
+1. Extracts the mod (re-extracts automatically when the mod's `.arz` changes).
+2. Extracts base + every `gdxN` expansion (re-extracts automatically when Steam patches a layer — no stale cache after a game update; a future `gdx4` is picked up without code changes).
+3. Compat Pass A + B: imports missing DLC records, merges class hubs (mod classes first, official classes appended — Berserker today, any new class later).
+4. Class selection UI expanded (up to 120) and PC skill trees aligned with UI slots.
+5. Combo names for **every** mastery pair → `localization\tags_mod_combos.txt`, injected into `resources\Text_EN.arc` (created if the mod has none). See [Combo names](#dual-class-combo-tags).
+6. `--rebuild` compiles the `.arz` with `bin\arzedit.exe`.
+
+Re-run it after every game patch or mod update.
+
+### 2. Merge mod databases
+
+```powershell
+python -u merge_mod_databases.py --out MyMerge --mods grimarillion Rebirth dom --latest --ollama --rebuild
+```
+
+or GUI → **Mod merge** tab / `Run-GdModMerger.ps1 -Out MyMerge -Mods grimarillion,Rebirth -Latest -Ollama`.
+
+- Order comes from `profiles\merge_rules\*.json` (`priority`, higher wins; `enabled:false` mods skipped unless `--include-disabled`). `--keep-order` = command-line order, later wins.
+- Mastery-tree overlaps (`records/skills/playerclass*`, `records/ui/skills/class*`) go to the higher `class_priority`.
+- `--field-merge` (default `rules`): `none` whole-file replace · `hubs` class hubs union their class lists · `rules` hubs + paths a rule marks `conflict_merge` (with its prefer/keep field lists) · `all` every overlapping `.dbr` keeps unique fields from both mods.
+- Rule `skip_overlay_prefixes` and `items_mode: isolate` are honoured.
+- `--latest` runs the updater steps 2–5 on the merged result. Each source mod's own combo names survive the renumbering.
+- `merge_report.md` (counts per mod pair and merge method) + `merge_conflicts.txt` (every overlapping path) in the output.
+- Extracts are cached in `work\_merge_cache` and refreshed when a mod's `.arz` changes.
+
+### 3. Changes that survive game updates (uTXTp patches)
+
+Put tweaks in `patches\*.txt` using the GD-DPS "User Text Patch" format (see `patches\_README.md`); `mods\GD-DPS*\User Text Patch\*.txt` is picked up too. Every update/merge re-extracts fresh game + mod data (game layers and mod `.arz` files are fingerprinted, so a Steam patch or mod update triggers a re-extract) and re-applies the patches, so nothing is lost when the game patches. `utxtp.py` is a native implementation of the format — GD-DPS itself is not installed or run.
+
+### 4. Only out-of-date mods get compat
+
+`--compat auto` (default): a mod is patched only if its player record or class tables lack official classes, or many of its copies of official records miss fields the current game has. Up-to-date mods pass through untouched. Rule override: `"compat": "skip" | "force"` in `profiles\merge_rules\<mod>.json` (Grimarillion = `skip`; its devs update it for each expansion). Merges run this per mod and cache the result until the mod or the game changes.
+
+### 5. Skill class labels (SkillClassTags, regenerated)
+
+`python skill_class_tags.py --base-game` rebuilds `mods\GDMod-SkillClassTags…\text_en` from the current game text (now includes `tagsgdx3_skills.txt` and `[Be]` Berserker; originals kept in `_original_text_en`). Every `--latest` build also labels the skills of **all** classes on its roster (mod masteries get short unique tags, saved in `profiles\skill_class_tags.json`) via `tags_skill_class_labels.txt` in the mod's `Text_EN.arc`.
+
+### 6. Other inputs
+
+- `mods\Sparker` (standalone) outranks the Sparker copies inside Grimarillion and Dawn of Masteries (`merge_rules\sparker.json`: priority 91, field-merge, standalone wins conflicting fields; nothing unique from the bundled copies is dropped).
+- Template packs in `mods\<X>\templates\` (e.g. `Templates-82…` that DoM links) are copied into each build's `database\templates`, so arzedit / Asset Manager stop skipping records that use `oneshot_potion.tpl` / `skilltree_expanded.tpl`.
+
+### 7. CLI map editor (`gd_map.py`)
+
+Reads/writes MAP9 world files (the `.map` inside `Levels.arc` / `Maps.arc`); verified byte-identical round trips on the 2.6 GB FoA/Grimarillion world and both Nydiamar worlds.
+
+```powershell
+python gd_map.py extract grimarillion --arc Levels.arc        # -> work\maps\grimarillion\world001.map
+python gd_map.py info   work\maps\grimarillion\world001.map
+python gd_map.py points <map> --category riftgate              # riftgates / dungeon entrances / shrines
+python gd_map.py merge  world001.map nydiamar.map -o merged.map --offset 0,0,20000
+python gd_map.py pack   CampaignKitchenSink merged.map --arc Levels.arc
+```
+
+`merge` appends the other worlds' regions, level data, minimaps, quest files and riftgate/entrance index (GUID-deduplicated; start point stays the campaign's). One game session = one world, so this is how other worlds become reachable with the same progress. Limit: MAP9 stores offsets as 32-bit numbers, so one world file is ≤ 4 GB whether or not the game is 64-bit: campaign + Nydiamar + Crucible arenas fits (~3.5 GB); Nydiamar **and** NydiamarDungeons do not, and they share region IDs (Dungeons is an alternate version of the same world), so Dungeons stays its own Custom Game.
+
+### 8. Portals: Nydiamar + Crucible inside the campaign (`world_link.py`)
+
+```powershell
+python -u world_link.py --profile campaign --rebuild      # or --dry-run to only build/verify the world
+```
+
+Profile `profiles\world_links\campaign.json` builds the campaign Custom Game the way the expansions do it — one bigger `world001.map` that replaces the old one, new areas joined by in-world doors:
+
+- World: Grimarillion's FoA world001 + Nydiamar + the 10 FoA Crucible arenas (`survivalmode3\resources\Maps.arc`), packed into `CampaignKitchenSink\resources\Levels.arc` (old one kept as `Levels.arc.bak_worldlink`; the separate Nydiamar `Maps.arc` is moved aside so it can't compete at start).
+- Portals: 11 two-way portals on clear ground around the Devil's Crossing riftgate — "Portal to Nydiamar" and "Crucible: <arena>" — each paired with a return portal at the destination's start point. Pairing uses the world's "Dungeon Entrances" index, the same mechanism as every cave door, so no quest or riftgate unlock is needed. Portal ids are deterministic, so rebuilds don't break saves.
+- Crucible content: records, scripts and assets from `mods\survivalmode` + `survivalmode1..3` (game load order) are imported into the Custom Game every build: Crucible-only records/files refreshed, campaign records never overwritten, the Crucible's `questevents.lua` kept renamed to `questeventssurvival.lua`. This replaces the earlier `survivalmode4` approach — the engine only ever loads `survivalmode1..3` and `mods/survivalmode` (paths are hard-coded in `Engine.dll`), so a `survivalmode4` folder is never read.
+- `CampaignKitchenSink\WORLD_LINKS.md` lists where every portal was placed.
+
+- Placement: each merged world is shifted as a whole into empty floor space (Nydiamar east of the campaign, arenas in a row after it). The game's own worlds never have overlapping region footprints, and the first build — arenas all stacked around the origin, Nydiamar over the campaign — hung on a black screen while loading. The build now refuses to write a world with any overlap.
+- Resources: the profile's `resources.sources` (low → high merge priority: Nydiamar, ShatteredAffixes, dom, ReignOfTerror, grimarillion, Sparker, Rebirth, Wereform Buffs) build the mod's resource archives every run: archives only one mod has are copied, same-named ones merged per file (later wins), text per tag, `grimdawn.lua`/`main.lua` by combining every mod's `Script.Load` lines. The Cursor-era CampaignKitchenSink had merged only the database ("skip resources"), so it lacked all of Grimarillion's own archives (world art, effects, quests) its Grimarillion world needs.
+- Text: a mod text file named like a game file replaces it, so stale copies (Nydiamar's `tags_items.txt` lacked ~4,000 current item names, `tags_ui.txt` 73 UI tags) are merged with the current game's text on every injection (mod wins per tag).
+
+Not verified in-game yet: whether the Crucible's wave logic fully runs outside the main-menu Crucible mode (it is plain Lua + records with no mode checks, but the engine's survival calls could still be mode-gated).
+
+### 9. Archive paths (fixed bug) and `archive_tool.py --repair`
+
+Paths inside an `.arc` never include the archive's own name (`Creatures.arc` holds `ambient/...`; the game resolves `creatures/ambient/x` as Creatures.arc + `ambient/x`). ArchiveTool extracts into a `<stem>/` folder, and earlier versions of this toolkit repacked that folder, so archives came out as `ui/...`, `quests/...`, `text_en/text_en/...` and the game could not find those files (seen in CampaignKitchenSink's ui/Quests/text and NydiamarIntegrated's Maps/Quests). All packers now go through `archive_tool.pack_arc()` from the real top level, and text injection flattens any old nesting itself.
+
+```powershell
+python archive_tool.py --repair CampaignKitchenSink NydiamarIntegrated            # fixes archives whose entries ALL carry the prefix
+python archive_tool.py --repair CampaignKitchenSink --strip ui.arc text_en.arc    # also mixed nesting (newest copy wins)
+```
+
+Use `--strip` only on archives known to be broken: some mods ship a real sub-folder named like the archive (Nydiamar's `Sound.arc` has `sound/...` on purpose). Repaired archives keep a `.bak_prefix` copy. `Levels.arc` (>2 GB map) can't be unpacked by ArchiveTool — rebuild it with `world_link.py` instead.
 
 ---
 
@@ -79,7 +183,7 @@ If your Nexus zip is nested (e.g. `Nydiamar-40-…\Nydiamar\`), move/copy the in
 ### 1. Confirm paths
 
 ```powershell
-cd "D:\games\Steam\steamapps\common\Transcendence\Tools\GrimDawn"
+cd "D:\games\Ai assisted toolkit\Tools\GrimDawn"
 dir "D:\games\Steam\steamapps\common\Grim Dawn\ArchiveTool.exe"
 dir "D:\games\Steam\steamapps\common\Grim Dawn\mods"
 ```
@@ -131,7 +235,7 @@ Use the GUI or the equivalent `.bat` / Python steps. First full run is long (ext
 ### Option B — Batch files (same pipeline)
 
 ```bat
-cd /d "D:\games\Steam\steamapps\common\Transcendence\Tools\GrimDawn"
+cd /d "D:\games\Ai assisted toolkit\Tools\GrimDawn"
 
 REM 1) Nydiamar + Dungeons + FoA + portal stubs
 Run-NydiamarFoACampaign.bat
@@ -152,7 +256,7 @@ Run-GdPatchClassUi.bat
 ### Option C — PowerShell / Python (more control)
 
 ```powershell
-cd "D:\games\Steam\steamapps\common\Transcendence\Tools\GrimDawn"
+cd "D:\games\Ai assisted toolkit\Tools\GrimDawn"
 
 # Nydiamar unified prep
 .\Run-NydiamarFoACampaign.ps1 -PortalHub devils_crossing -DryRunNames
@@ -166,7 +270,7 @@ cd "D:\games\Steam\steamapps\common\Transcendence\Tools\GrimDawn"
 # Dual pack + ARZ
 python -u pack_dual_archives.py --source SurvivalPlayground
 python -u build_mod_arz.py --target both
-python -u patch_class_ui.py --targets SurvivalPlayground,CampaignKitchenSink,survivalmode4
+python -u patch_class_ui.py   # default: SurvivalPlayground, CampaignKitchenSink, survivalmode4 (or --mod X repeatable)
 ```
 
 ### After packing — expected artifacts
@@ -249,15 +353,22 @@ Run-GdPatchClassUi.bat
 
 Or GUI → **Re-apply class UI (up to 120)**.  
 Maps PC `skillTree` lines into the selection UI; does **not** unlock more than two active masteries.
+Entries with no class pane (junk like `a`) are dropped from both PC records so mastery N, UI slot N and combo id N stay the same class.
 
 ### Dual-class combo tags
 
-Placeholders (or Ollama names) go into `Text_EN.arc` / localization:
+Combo tags are index-based (`tagSkillClassName0110` = class 01 + class 10), and each mod numbers its classes differently, so the generator works by **mastery name pair**:
+
+1. Mastery names come from the text (class tree → mastery skill → `skillDisplayName` tag), so mod classes get real names (e.g. *Demon Hunter*), not path guesses.
+2. Known names: official game combos, then each source mod read against its **own original** class order, then `work\combo_name_cache.json`.
+3. Pairs still unnamed go to Ollama (if enabled), else an `AB` placeholder. Ollama replies are validated (only requested tags, 1–3 word names, no duplicates); accepted names are cached after every batch, so long runs are resumable and rebuilds reuse them.
+4. A tag is written for every pair in the final roster, in the game's `tag=value` format; stale index-based combo lines in the mod's other text files are stripped so ours win.
+
+Ollama is auto-started (`ollama serve`) if installed but not running; the model auto-picks a general model (`llama3.1:8b` here), override with `--ollama-model`.
 
 ```powershell
-python -u fill_combo_tags.py --target CampaignKitchenSink
-python -u fill_combo_tags.py --target survivalmode4
-# or via class_combo_names.py / Survival pipeline -DryRunNames vs live Ollama
+python -u fill_combo_tags.py --mod CampaignKitchenSink --ollama
+python -u fill_combo_tags.py            # placeholders/cache only, default targets
 ```
 
 Re-run combo injection on CampaignKitchenSink **after** a dual pack if Text_EN was overwritten.
@@ -281,6 +392,7 @@ Re-run combo injection on CampaignKitchenSink **after** a dual pack if Text_EN w
 | Bat | Purpose |
 |-----|---------|
 | `Run-GdToolsGui.bat` | Desktop GUI for all common steps |
+| `Run-GdUpdateMod.bat` | Update one mod for latest patch + DLC (+ Ollama combo names) |
 | `Run-NydiamarFoACampaign.bat` | Build `NydiamarIntegrated` |
 | `Run-GdSurvivalClasses.bat` | Build `SurvivalPlayground` (DB, profile-driven) |
 | `Run-GdSurvivalKitchenSink.bat` | Same + resource ARCs (slow) |
@@ -290,7 +402,7 @@ Re-run combo injection on CampaignKitchenSink **after** a dual pack if Text_EN w
 | `Run-GdPatchClassUi.bat` | Expand class UI to 120 |
 | `Build-Arzedit.bat` | Compile `bin\arzedit.exe` once |
 | `Run-GdFoACompat.bat` | FoA compat on one mod |
-| `Run-GdModMerger.bat` | Simple later-wins merge |
+| `Run-GdModMerger.bat` | Rules-aware merge (`OutName Mod1 Mod2 …`) |
 | `Run-GdStash.bat` | GD Stash |
 
 ### CLI scripts
@@ -304,8 +416,8 @@ Re-run combo injection on CampaignKitchenSink **after** a dual pack if Text_EN w
 | `build_mod_arz.py` | arzedit CLI build |
 | `patch_class_ui.py` | Class selection UI |
 | `fill_combo_tags.py` / `class_combo_names.py` | Combo name tags |
-| `merge_mod_databases.py` | Generic mod merge |
-| `patch_mod_for_dlc.py` / `patch_dlc_for_mod.py` | Bidirectional FoA compat |
+| `merge_mod_databases.py` | Merge any mods (rules, field merge, `--latest`) |
+| `patch_mod_for_dlc.py` / `patch_dlc_for_mod.py` | Latest-patch updater (`--latest`) / bidirectional compat |
 | `quest_remap.py` | Namespace quests under a prefix |
 | `editor_stitch.py` | Unpack maps + portal stubs + checklist |
 

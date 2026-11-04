@@ -29,5 +29,6 @@
     "mastery"
   ],
   "keep_base_field_substrings": [],
-  "notes": "Priority 90 with field-merge vs earlier packs (DoM). vs Rebirth (later): Rebirth field-merges on top — Grim loot/merchant fields kept via Rebirth keep_base; Grim unique class trees unaffected. Custom D3/Zenith/TQ paths are unique."
+  "compat": "skip",
+  "notes": "compat=skip: the Grimarillion devs already update it for each expansion, so latest-patch compat never touches it. Priority 90 with field-merge vs earlier packs (DoM). vs Rebirth (later): Rebirth field-merges on top — Grim loot/merchant fields kept via Rebirth keep_base; Grim unique class trees unaffected. Custom D3/Zenith/TQ paths are unique."
 }
