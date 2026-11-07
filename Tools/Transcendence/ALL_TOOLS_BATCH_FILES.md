@@ -4,6 +4,29 @@
 
 All batch files are in the `Tools` directory. Double-click any `.bat` file to run it - no console commands needed!
 
+## Testing
+
+### ✅ `TestTranscendenceImages.bat` (shortcut: "Transcendence Image Tester" on the Desktop and in the game folder)
+**Engine-rule image / facing tester** (`tx_image_tester.py`)
+- Rules mirrored from the engine source (cited in the script): column-major rotation layout,
+  frame 0 nose-up turning clockwise, required sheet size, mask size/bit depth, module-relative paths
+- Flags frames clipped by the cell edge and ShipClasses below 120 facings (`--inventory`)
+- No arguments: tests ZZZ_CrossModCompatibility. Drop any extension folder or XML onto it to test that
+- Report + contact strips (0/90/180/270 deg): `Tools\Transcendence\Logs\image_tester\`
+- Calibrated on vanilla Svarog / Viking sheets (pass)
+
+### ✅ `tx_apply_mod_patches.py` (re-apply your own fixes after a third-party mod updates)
+- One folder per mod in `mod_patches/` (`patch.json` + the XML fragment to insert): entities to declare, root attributes to drop, overrides to add
+- `python tx_apply_mod_patches.py` reports; `--write` patches (backup `.bak_<stamp>_modpatch`); safe to run again, already-patched mods report OK
+- Current: `corporate_command_ep_addon` (EI7000 Chimera hull, Thorin 300 fireRate 21, unidHumanSpaceLibrary, loads in every adventure)
+
+### ✅ `tx_fix_obsolete_images.py` (mod issue: "Unknown image: <unid>" stops the game loading)
+**Finds mod ships that still use retired TransCore ship images** (old sprite sheets with `obsoleteVersion`)
+- `python tx_fix_obsolete_images.py <extension folder>` reports; add `--write` to patch (each file backed up `.bak_<stamp>_obsimg`)
+- Swaps in the image vanilla uses today: same-UNID override, `scFooNPC`/`scDSFoo` named after `scFoo`, or the vanilla
+  ship that used that old sheet cell (map `data\obsolete_ship_image_map.json`, built from upstream TransCore 2017 + current)
+- "MANUAL" lines have no vanilla equivalent and need an image chosen by hand
+
 ## Main Generators
 
 ### 🚀 `StartSpaceWhaleAssetGeneration.bat`

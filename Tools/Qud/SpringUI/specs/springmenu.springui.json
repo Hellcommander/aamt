@@ -1,0 +1,160 @@
+{
+  "mod": "Arendeth_SpringUI",
+  "modFolder": "Arendeth_SpringUI",
+  "bundle": "arendeth_springui",
+  "prefab": "SpringMenu",
+  "kind": "springmenu",
+  "theme": "qud-dark",
+  "reference": [1600, 900],
+  "root": {
+    "name": "SpringMenu", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "backdrop", "raycast": true,
+    "children": [
+      {
+        "name": "Window", "type": "panel", "rect": {"anchors": [0.08, 0.06, 0.92, 0.94]}, "fill": "frame", "raycast": true,
+        "border": {"color": "border", "thickness": 2},
+        "children": [
+          {"name": "TitleBand", "type": "panel", "rect": {"top": [0, 48, 2]}, "fill": "status"},
+          {"name": "TitleText", "type": "text", "rect": {"top": [6, 38, 24]},
+           "text": {"sample": "Mounted Orders — giant dromad", "size": "header", "color": "textBright", "align": "center"}},
+          {"name": "AccentTitleRule", "type": "panel", "rect": {"top": [48, 2, 2]}, "fill": "accent", "accent": true},
+          {"name": "StatusText", "type": "text", "rect": {"top": [54, 24, 24]},
+           "text": {"sample": "Issue orders to party allies and conjoined bodies.", "size": "small", "color": "text", "align": "center"}},
+
+          {
+            "name": "Body", "type": "panel", "rect": {"stretch": [16, 72, 16, 86]},
+            "children": [
+              {
+                "name": "LeftPanel", "type": "panel", "rect": {"anchors": [0, 0, 0.58, 1]},
+                "layout": {"type": "vertical", "spacing": 8, "padding": [0, 0, 0, 0], "controlWidth": true, "controlHeight": true, "expandWidth": true, "expandHeight": false},
+                "children": [
+                  {
+                    "name": "HeaderScroll", "type": "scroll", "fill": "panel", "border": {"color": "borderSoft", "thickness": 1},
+                    "element": {"preferredHeight": 120, "flexibleHeight": 0},
+                    "scroll": {"horizontal": false, "vertical": true, "sensitivity": 20, "inertia": false, "viewport": "HeaderViewport", "content": "HeaderContent"},
+                    "children": [
+                      {
+                        "name": "HeaderViewport", "type": "panel", "rect": {"stretch": [2, 2, 2, 2]}, "fill": "transparent", "raycast": true, "mask": true,
+                        "children": [
+                          {
+                            "name": "HeaderContent", "type": "panel", "rect": {"topStretch": true}, "fitter": "vertical",
+                            "layout": {"type": "vertical", "padding": [10, 10, 8, 8], "controlWidth": true, "controlHeight": true, "expandWidth": true, "expandHeight": false},
+                            "children": [
+                              {"name": "HeaderText", "type": "text",
+                               "text": {"sample": "  .--[Ch]--.\n /  MECH   \\\n|  [Bk][Fr] |\n \\__[SL][SR]_/\n   ||    ||", "size": "normal", "color": "textCyan", "valign": "top"}}
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "ListScroll", "type": "scroll", "fill": "panel", "border": {"color": "border", "thickness": 1},
+                    "element": {"flexibleHeight": 1, "minHeight": 120},
+                    "scroll": {"horizontal": false, "vertical": true, "sensitivity": 20, "inertia": false, "viewport": "ListViewport", "content": "ListContent"},
+                    "children": [
+                      {
+                        "name": "ListViewport", "type": "panel", "rect": {"stretch": [2, 2, 2, 2]}, "fill": "transparent", "raycast": true, "mask": true,
+                        "children": [
+                          {
+                            "name": "ListContent", "type": "panel", "rect": {"topStretch": true}, "fitter": "vertical",
+                            "layout": {"type": "vertical", "spacing": 2, "padding": [6, 6, 6, 6], "controlWidth": true, "controlHeight": true, "expandWidth": true, "expandHeight": false},
+                            "preview": {"repeat": "RowTemplate", "count": 9, "selected": 2, "activate": ["Selection"]},
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "DetailPanel", "type": "panel", "rect": {"anchors": [0.595, 0, 1, 1]}, "fill": "panel", "border": {"color": "border", "thickness": 1},
+                "children": [
+                  {"name": "DetailCaption", "type": "text", "rect": {"top": [4, 22, 10]},
+                   "text": {"sample": "DETAILS", "size": "xsmall", "color": "textMuted", "align": "left"}},
+                  {
+                    "name": "DetailScroll", "type": "scroll", "rect": {"stretch": [4, 4, 4, 28]},
+                    "scroll": {"horizontal": false, "vertical": true, "sensitivity": 25, "inertia": false, "viewport": "DetailViewport", "content": "DetailContent"},
+                    "children": [
+                      {
+                        "name": "DetailViewport", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "transparent", "raycast": true, "mask": true,
+                        "children": [
+                          {
+                            "name": "DetailContent", "type": "panel", "rect": {"topStretch": true}, "fitter": "vertical",
+                            "layout": {"type": "vertical", "padding": [12, 12, 8, 10], "controlWidth": true, "controlHeight": true, "expandWidth": true, "expandHeight": false},
+                            "children": [
+                              {"name": "DetailText", "type": "text",
+                               "text": {"sample": "Greyed entries show why they are unavailable. Orders cost a little of your time; conjoined attach/detach use cabling costs.\n\n──────────\n\nGuard rider\nThe mount's allies screen you from attackers while you stay in the saddle.", "size": "normal", "color": "text", "valign": "top"}}
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+
+          {
+            "name": "Footer", "type": "panel", "rect": {"bottom": [10, 52, 16]},
+            "children": [
+              {
+                "name": "HotkeyBar", "type": "scroll", "rect": {"anchors": [0, 0, 0.75, 1]},
+                "element": {"flexibleWidth": 1},
+                "scroll": {"horizontal": false, "vertical": false, "inertia": false, "content": "HotkeyContent", "horizontalOnly": true},
+                "children": [
+                  {
+                    "name": "HotkeyContent", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]},
+                    "layout": {"type": "horizontal", "spacing": 28, "padding": [8, 8, 4, 4], "alignment": "MiddleLeft", "controlWidth": true, "controlHeight": true, "expandWidth": false, "expandHeight": false},
+                    "children": [
+                      {"name": "PreviewKey1", "type": "text", "text": {"sample": "[Enter] Issue order", "size": "small", "color": "text"}},
+                      {"name": "PreviewKey2", "type": "text", "text": {"sample": "[Esc] Close", "size": "small", "color": "text"}}
+                    ]
+                  }
+                ]
+              },
+              {"name": "HintText", "type": "text", "rect": {"anchors": [0.75, 0, 1, 1]},
+               "text": {"sample": "3 / 11", "size": "small", "color": "textMuted", "align": "right"}}
+            ]
+          }
+        ]
+      },
+
+      {
+        "name": "Templates", "type": "template", "rect": {"stretch": [0, 0, 0, 0]}, "active": false,
+        "children": [
+          {
+            "name": "RowTemplate", "type": "panel", "rect": {"size": [600, 32], "anchor": [0, 1], "pivot": [0, 1]}, "fill": "transparent", "raycast": true,
+            "element": {"minHeight": 30, "flexibleWidth": 1},
+            "layout": {"type": "horizontal", "spacing": 8, "padding": [8, 8, 3, 3], "alignment": "MiddleLeft", "controlWidth": true, "controlHeight": true, "expandWidth": false, "expandHeight": false},
+            "children": [
+              {
+                "name": "Selection", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "select", "element": {"ignoreLayout": true}, "active": false,
+                "children": [
+                  {"name": "AccentSelectionEdge", "type": "panel", "rect": {"left": [0, 3]}, "fill": "selectEdge", "accent": true}
+                ]
+              },
+              {"name": "HotkeySlot", "type": "panel", "element": {"preferredWidth": 34, "minWidth": 34},
+               "children": [
+                 {"name": "HotkeyText", "type": "text", "rect": {"stretch": [0, 0, 0, 0]}, "text": {"sample": "[a]", "size": "normal", "color": "textBright"}}
+               ]},
+              {"name": "IconSlot", "type": "panel", "element": {"preferredWidth": 22, "minWidth": 22, "preferredHeight": 30},
+               "children": [
+                 {"name": "Icon", "type": "image", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "textBright", "preserveAspect": true}
+               ]},
+              {
+                "name": "TextColumn", "type": "panel", "element": {"flexibleWidth": 1},
+                "layout": {"type": "vertical", "spacing": 0, "controlWidth": true, "controlHeight": true, "expandWidth": true, "expandHeight": false},
+                "children": [
+                  {"name": "LabelText", "type": "text", "rect": {"topStretch": true}, "text": {"sample": "Guard rider", "size": "normal", "color": "text"}},
+                  {"name": "SecondaryText", "type": "text", "rect": {"topStretch": true}, "text": {"sample": "Party — allies screen you from attackers", "size": "small", "color": "textMuted"}}
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

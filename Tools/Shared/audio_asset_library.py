@@ -467,7 +467,7 @@ def _hash_embed(text: str, dim: int = 384) -> np.ndarray:
 
 
 class _ClapEmbedder:
-    def __init__(self, device: str = "cpu"):
+    def __init__(self, device: str = "cpu", name: Optional[str] = None):
         self.ok = False
         self.device = device
         self.dim = 512
@@ -483,7 +483,7 @@ class _ClapEmbedder:
             import torch
             from transformers import ClapModel, ClapProcessor
 
-            name = os.environ.get("AAMT_CLAP_MODEL", "laion/clap-htsat-unfused")
+            name = name or os.environ.get("AAMT_CLAP_MODEL", "laion/clap-htsat-unfused")
             self.processor = ClapProcessor.from_pretrained(name)
             self.model = ClapModel.from_pretrained(name).to(device).eval()
             self.dim = int(getattr(self.model.config, "projection_dim", 512) or 512)

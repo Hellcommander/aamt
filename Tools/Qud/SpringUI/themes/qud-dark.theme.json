@@ -1,0 +1,23 @@
+{
+  "name": "qud-dark",
+  "notes": "Caves of Qud modern-UI look: near-black umber frame, dark teal-grey panels, pale teal borders, 'W' yellow highlight. Text colors are the console palette letters the game maps markup to.",
+  "colors": {
+    "backdrop":     "#000000D6",
+    "frame":        "#0B0D0EFA",
+    "panel":        "#10151A",
+    "panelAlt":     "#151B20",
+    "status":       "#1A2024",
+    "border":       "#5C7370",
+    "borderSoft":   "#33423F",
+    "select":       "#FFFF0026",
+    "selectEdge":   "#FFFF00E6",
+    "accent":       "#FFFF00",
+    "badge":        "#C02E2E",
+    "frameTint":    "#FFFF001F",
+    "text":         "#B1C9C3",
+    "textBright":   "#FFFFFF",
+    "textMuted":    "#6B7A7A",
+    "textCyan":     "#77BFCF",
+    "transparent":  "#00000000"
+  }
+}

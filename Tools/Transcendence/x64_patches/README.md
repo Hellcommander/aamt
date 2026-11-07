@@ -22,6 +22,8 @@ Anyone who later runs this patcher can mix whatever overlays they want into *the
 | `Fix-Api59X64Deps.py` | zlib toolset / JPEG itemdefs (`--api-root`) |
 | `Audit-X64Libs.py` | Reject x86-only `.lib` on x64 builds |
 | `Fix-TranscendenceJobSystem.py` | Persistent `CJobSystem` + wreck-image prefetch |
+| `Fix-TranscendenceForkGaps.py` | Runs for every platform. **features:** sealed sound archive (`Resources\sounds.mtsa`; overlay `fork_overlays/Mammoth/Include/SealedArchive.h`; `SealedKey.h` is generated from `Tools/Shared/audio_seal.key` and never stored) and the `isBound` TLisp primitive. **upstream-fixes** (optional, kept until upstream fixes them): CCAtomTable/CArchiver INT_PTR, ICCItem refcount pointer-sized, WndProc LRESULT, TLisp object refs pointer-sized (sysFindObject lists, gSource/gPlayerShip/gScreen, DefineSpaceObject: without it any object above 4 GB is a wild pointer, e.g. Eternity Port "No adventure defined"), nebula CTile section pointers (save format unchanged), smart-pointer NULL compares. **diagnostics:** native crashes inside TLisp primitives log `[crash] fn: exception at file:line` with a stack. **build-config:** LibJPEGTurboUtil, zlibstat CRT, TSUI Hexarc stub x64, sln mapping. Leave groups out with `"ForkGapsSkip": ["upstream-fixes"]` in `ApiSwitcher.config.json` |
+| `Fix-ExtensionApi59Warnings.py` | Run on `Transcendence/TransCore` by the switcher (maxInSystem etc.) |
 | `TranscendenceApiSwitcher.ps1` | `-Platform x64` uses workspace by default |
 
 **Multiverse:** Hexarc username/password needs proprietary `HexarcKeys.h` (not in source). For Steam Multiverse use `-Configuration SteamRelease` and keep `steam_api.dll` (omit `-DisableSteamApi`).

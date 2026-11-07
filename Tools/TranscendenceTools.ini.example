@@ -56,6 +56,9 @@ SDPort = 1338
 StableAudioDir = E:\tools\stable-audio
 AudioLibraryDir = D:\assets\audio
 AudioIndexDir = D:\assets\audio\_aamt_index
+# CPU worker processes for the audio tools' parallel steps (chance rows, pass marks). auto = half the
+# logical processors; a number sets it. AAMT_AUDIO_WORKERS overrides.
+AudioCpuWorkers = auto
 
 [Trellis]
 # trellis2 = TRELLIS.2-4B Windows RAM-offload (lags microsoft/TRELLIS.2)

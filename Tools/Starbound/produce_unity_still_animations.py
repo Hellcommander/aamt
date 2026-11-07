@@ -378,7 +378,9 @@ def pack_strip(frames: List[Path], dest: Path, tile: int) -> None:
             "dimensions": [len(names), 1],
             "names": [names],
         },
-        "aliases": {"default": names[0], "idle": names[0]},
+        # an alias may not share a frame's name: "idle": "idle" is an infinite alias loop, and the
+        # game's client dies on it the moment the sprite is drawn (found by the sbtest player bot)
+        "aliases": {k: v for k, v in {"default": names[0], "idle": names[0]}.items() if k not in names},
     }
     dest.with_suffix(".frames").write_text(json.dumps(frames_json, indent=2) + "\n", encoding="utf-8")
 

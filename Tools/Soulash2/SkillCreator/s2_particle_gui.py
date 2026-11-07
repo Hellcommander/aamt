@@ -310,6 +310,21 @@ class ParticleProducer(tk.Tk):
             ttk.Entry(inspector, textvariable=var, width=22).grid(row=i, column=1, sticky=tk.EW, pady=1)
             var.trace_add("write", lambda *_: self._from_part_fields())
         inspector.columnconfigure(1, weight=1)
+
+        # Named particle flags (decoded F3 editor checkboxes, s2_particle_flags).
+        from s2_particle_flags import FLAGS as _PFLAGS
+
+        flag_box = ttk.LabelFrame(right, text="Particle flags (same as F3 editor checkboxes)")
+        flag_box.pack(fill=tk.X, padx=6, pady=(0, 6))
+        self.flag_vars: List[tk.BooleanVar] = []
+        for bit, _key, label, _note in _PFLAGS:
+            var = tk.BooleanVar()
+            self.flag_vars.append(var)
+            ttk.Checkbutton(flag_box, text=label, variable=var, command=self._from_flag_boxes).grid(
+                row=bit % 12, column=bit // 12, sticky=tk.W
+            )
+        self.part_fields["flags"].trace_add("write", lambda *_: self._sync_flag_boxes())
+
         ttk.Button(right, text="Use selected glyph", command=self._assign_glyph).pack(anchor=tk.W, padx=6, pady=(0, 8))
 
         ttk.Label(self, textvariable=self.status, style="Muted.TLabel").pack(fill=tk.X, padx=8, pady=(0, 6))
@@ -656,13 +671,34 @@ class ParticleProducer(tk.Tk):
         self.part_fields["tile_id"].set(str(part.get("tile_id") or 0))
         self.part_fields["delay"].set(str(part.get("delay") or 0))
         self.part_fields["life"].set(str(part.get("life") or ""))
-        self.part_fields["flags"].set(str(part.get("flags") or 0))
+        from s2_particle_flags import legacy_bits
+
+        self.part_fields["flags"].set(str(int(part.get("flags") or 0) | legacy_bits(part)))
         self.part_fields["velocity"].set("" if part.get("velocity") is None else str(part.get("velocity")))
         self.part_fields["height"].set("" if part.get("height") is None else str(part.get("height")))
         self.part_fields["elevation"].set("" if part.get("elevation") is None else str(part.get("elevation")))
         self.part_fields["on_impact"].set(str(part.get("on_impact") or ""))
         self.part_fields["color"].set(",".join(str(x) for x in particle_rgba(part)))
         self._ignore = False
+
+    def _sync_flag_boxes(self) -> None:
+        try:
+            value = int(float(self.part_fields["flags"].get().strip() or 0))
+        except ValueError:
+            return
+        for bit, var in enumerate(getattr(self, "flag_vars", [])):
+            var.set(bool(value & (1 << bit)))
+
+    def _from_flag_boxes(self) -> None:
+        value = sum(1 << bit for bit, var in enumerate(self.flag_vars) if var.get())
+        part = self._part()
+        if part is not None:
+            # fold legacy booleans so a cleared box is not resurrected by e.g. elevation_drop: true
+            from s2_particle_flags import LEGACY_BOOL_KEYS
+
+            for key in LEGACY_BOOL_KEYS:
+                part.pop(key, None)
+        self.part_fields["flags"].set(str(value))
 
     def _from_part_fields(self) -> None:
         if self._ignore:

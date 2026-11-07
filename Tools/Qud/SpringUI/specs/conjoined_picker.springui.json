@@ -1,0 +1,142 @@
+{
+  "mod": "Arendeth_Conjoined_Extended",
+  "modFolder": "Arendeth_Conjoined_Extended",
+  "bundle": "conjoined_ui",
+  "prefab": "ConjoinedPicker",
+  "kind": "conjoined_picker",
+  "theme": "qud-dark",
+  "reference": [1600, 900],
+  "root": {
+    "name": "ConjoinedPicker", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "backdrop", "raycast": true,
+    "children": [
+      {
+        "name": "Window", "type": "panel", "rect": {"anchors": [0.03, 0.04, 0.97, 0.96]}, "fill": "frame", "raycast": true,
+        "border": {"color": "border", "thickness": 2},
+        "children": [
+          {
+            "name": "Header", "type": "panel", "rect": {"top": [0, 140, 16]},
+            "children": [
+              {"name": "TitleBand", "type": "panel", "rect": {"top": [0, 44, -14]}, "fill": "status"},
+              {"name": "TitleText", "type": "text", "rect": {"top": [4, 36, 0]},
+               "text": {"sample": "Conjoined", "size": "header", "color": "textBright", "align": "center"}},
+              {"name": "PromptText", "type": "text", "rect": {"top": [48, 28, 0]},
+               "text": {"sample": "Choose the 1st creature conjoined to you.", "size": "normal", "color": "text", "align": "center"}},
+              {
+                "name": "ChosenRow", "type": "panel", "rect": {"top": [78, 62, 0]},
+                "layout": {"type": "horizontal", "spacing": 8, "alignment": "MiddleCenter", "controlWidth": false, "controlHeight": false, "expandWidth": false, "expandHeight": false},
+                "preview": {"repeat": "TileTemplate", "count": 2},
+                "children": []
+              }
+            ]
+          },
+
+          {
+            "name": "Body", "type": "panel", "rect": {"stretch": [16, 70, 16, 160]},
+            "children": [
+              {
+                "name": "GridPanel", "type": "panel", "rect": {"anchors": [0, 0, 0.64, 1]}, "fill": "panel", "border": {"color": "border", "thickness": 1},
+                "children": [
+                  {
+                    "name": "SearchBar", "type": "panel", "rect": {"top": [6, 34, 6]}, "fill": "status", "raycast": true, "border": {"color": "borderSoft", "thickness": 1},
+                    "children": [
+                      {"name": "SearchText", "type": "text", "rect": {"stretch": [10, 2, 10, 2]},
+                       "text": {"sample": "Search creatures… (click, or press your Filter key)", "size": "normal", "color": "textMuted"}}
+                    ]
+                  },
+                  {
+                    "name": "GridScroll", "type": "scroll", "rect": {"stretch": [6, 6, 6, 46]}, "element": {"flexibleHeight": 1},
+                    "scroll": {"horizontal": false, "vertical": true, "sensitivity": 15, "inertia": false, "viewport": "GridViewport", "content": "GridContent"},
+                    "children": [
+                      {
+                        "name": "GridViewport", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "transparent", "raycast": true, "mask": true,
+                        "children": [
+                          {
+                            "name": "GridContent", "type": "panel", "rect": {"topStretch": true}, "fitter": "vertical",
+                            "layout": {"type": "grid", "cell": [40, 56], "cellSpacing": [6, 6], "padding": [8, 8, 8, 8], "alignment": "UpperLeft"},
+                            "preview": {"repeat": "TileTemplate", "count": 120, "selected": 23, "activate": ["Frame", "Badge"]},
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "DetailPanel", "type": "panel", "rect": {"anchors": [0.655, 0, 1, 1]}, "fill": "panel", "border": {"color": "border", "thickness": 1},
+                "children": [
+                  {"name": "DetailCaption", "type": "text", "rect": {"top": [4, 22, 10]},
+                   "text": {"sample": "CREATURE", "size": "xsmall", "color": "textMuted", "align": "left"}},
+                  {
+                    "name": "DetailScroll", "type": "scroll", "rect": {"stretch": [6, 6, 6, 28]},
+                    "scroll": {"horizontal": false, "vertical": true, "sensitivity": 25, "inertia": false, "viewport": "DetailViewport", "content": "DetailContent"},
+                    "children": [
+                      {
+                        "name": "DetailViewport", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "transparent", "raycast": true, "mask": true,
+                        "children": [
+                          {
+                            "name": "DetailContent", "type": "panel", "rect": {"topStretch": true}, "fitter": "vertical",
+                            "layout": {"type": "vertical", "padding": [12, 12, 8, 10], "controlWidth": true, "controlHeight": true, "expandWidth": true, "expandHeight": false},
+                            "children": [
+                              {"name": "DetailText", "type": "text",
+                               "text": {"sample": "snapjaw scavenger [Lv.1]\n\nA snapjaw, lean and quick, picks over the dead.\n\n12 HP 0 AV +1 DV\n100 QN 100 MS  Role: Minion\n\n— traits —\nTraits: Snapjaw\nSkills: Short Blades", "size": "normal", "color": "text", "valign": "top"}}
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+
+          {
+            "name": "Footer", "type": "panel", "rect": {"bottom": [10, 52, 16]},
+            "children": [
+              {
+                "name": "HotkeyBar", "type": "scroll", "rect": {"anchors": [0, 0, 0.68, 1]}, "element": {"flexibleWidth": 1},
+                "scroll": {"horizontal": false, "vertical": false, "inertia": false, "content": "HotkeyContent", "horizontalOnly": true},
+                "children": [
+                  {
+                    "name": "HotkeyContent", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]},
+                    "layout": {"type": "horizontal", "spacing": 28, "padding": [8, 8, 4, 4], "alignment": "MiddleLeft", "controlWidth": true, "controlHeight": true, "expandWidth": false, "expandHeight": false},
+                    "children": [
+                      {"name": "PreviewKey1", "type": "text", "text": {"sample": "[Enter] Choose", "size": "small", "color": "text"}},
+                      {"name": "PreviewKey2", "type": "text", "text": {"sample": "[F] Search", "size": "small", "color": "text"}},
+                      {"name": "PreviewKey3", "type": "text", "text": {"sample": "[R] Random", "size": "small", "color": "text"}},
+                      {"name": "PreviewKey4", "type": "text", "text": {"sample": "[Esc] Undo / clear search", "size": "small", "color": "text"}}
+                    ]
+                  }
+                ]
+              },
+              {"name": "StatusText", "type": "text", "rect": {"anchors": [0.68, 0, 1, 1]},
+               "text": {"sample": "214 / 214 creatures  •  chosen 1 / 2", "size": "small", "color": "textMuted", "align": "right"}}
+            ]
+          }
+        ]
+      },
+
+      {
+        "name": "Templates", "type": "template", "rect": {"stretch": [0, 0, 0, 0]}, "active": false,
+        "children": [
+          {
+            "name": "TileTemplate", "type": "panel", "rect": {"size": [40, 56], "anchor": [0.5, 0.5]}, "fill": "transparent", "raycast": true,
+            "children": [
+              {"name": "Icon", "type": "image", "rect": {"stretch": [2, 2, 2, 2]}, "fill": "textBright", "preserveAspect": true},
+              {
+                "name": "Frame", "type": "panel", "rect": {"stretch": [-2, -2, -2, -2]}, "fill": "frameTint", "border": {"color": "accent", "thickness": 2}, "active": false
+              },
+              {
+                "name": "Badge", "type": "panel", "rect": {"size": [18, 18], "anchor": [1, 0], "pivot": [1, 0], "pos": [2, -2]}, "fill": "badge", "active": false,
+                "children": [
+                  {"name": "BadgeText", "type": "text", "rect": {"stretch": [0, 0, 0, 0]}, "text": {"sample": "1", "size": "xsmall", "color": "textBright", "align": "center"}}
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

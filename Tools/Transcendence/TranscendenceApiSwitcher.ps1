@@ -257,6 +257,7 @@ function Invoke-ApiTreeAutofix {
         [string]$ApiFolder,
         [string]$Platform,
         [string]$SteamworksSdk = "",
+        [string[]]$ForkGapsSkip = @(),
         [switch]$SkipX64Autofix,
         [switch]$ForceX64Autofix,
         [switch]$SkipSegmentedShipsAutofix,
@@ -271,6 +272,10 @@ function Invoke-ApiTreeAutofix {
     if ($SteamworksSdk) {
         $api59Extra += @("--steamworks-sdk", $SteamworksSdk)
     }
+    $forkGapsExtra = @("--api-root", $ApiFolder)
+    foreach ($g in @($ForkGapsSkip)) {
+        if ($g) { $forkGapsExtra += @("--skip", [string]$g) }
+    }
     $fixes = @(
         @{
             Skip = $SkipSegmentedShipsAutofix
@@ -283,6 +288,21 @@ function Invoke-ApiTreeAutofix {
             Force = $ForceResizeApiAutofix
             Script = "Fix-TranscendenceResizeAPI.py"
             Extra = @("--api-root", $ApiFolder)
+        },
+        @{
+            # Features the other fixers do not cover (sealed sound archive, isBound), optional upstream-bug
+            # fixes and build-config fixes; groups can be left out with ForkGapsSkip in ApiSwitcher.config.json
+            Skip = $false
+            Force = $false
+            Script = "Fix-TranscendenceForkGaps.py"
+            Extra = $forkGapsExtra
+        },
+        @{
+            # TransCore API59 attribute cleanup (maxInSystem etc.) the user's tree carried
+            Skip = $false
+            Force = $false
+            Script = "Fix-ExtensionApi59Warnings.py"
+            Extra = @("--root", (Join-Path $ApiFolder "Transcendence\TransCore"))
         }
     )
     if ($Platform -eq "x64") {
@@ -756,8 +776,10 @@ if ($UseX64Workspace -and $Platform -eq "x64") {
 
 $sdkPath = ""
 if ($cfg.SteamworksSdk) { $sdkPath = [string]$cfg.SteamworksSdk }
+$forkGapsSkip = @()
+if ($cfg.PSObject.Properties.Name -contains "ForkGapsSkip" -and $cfg.ForkGapsSkip) { $forkGapsSkip = @($cfg.ForkGapsSkip) }
 Invoke-ApiTreeAutofix -ApiFolder $target.Path -Platform $Platform `
-    -SteamworksSdk $sdkPath `
+    -SteamworksSdk $sdkPath -ForkGapsSkip $forkGapsSkip `
     -SkipX64Autofix:$SkipX64Autofix -ForceX64Autofix:$ForceX64Autofix `
     -SkipSegmentedShipsAutofix:$SkipSegmentedShipsAutofix -ForceSegmentedShipsAutofix:$ForceSegmentedShipsAutofix `
     -SkipResizeApiAutofix:$SkipResizeApiAutofix -ForceResizeApiAutofix:$ForceResizeApiAutofix `

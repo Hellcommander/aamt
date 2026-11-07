@@ -1,0 +1,17 @@
+{
+  "_about": "Local fixes for 'Corporate Command for Eternity Port Addon' (DigaRW, UNID 0xD845E0A0). Re-apply after every update with tx_apply_mod_patches.py.",
+  "target": "CorporateCommandforEternityPortAddon.xml",
+  "match_unid": "0xD845E0A0",
+  "entities": {
+    "unidHumanSpaceLibrary": "0x00100000",
+    "unidCorporateHierarchyVol01": "0x00810000",
+    "scEI7000Chimera": "0x00810175",
+    "itThorin300cannon": "0x008101EC",
+    "efThermoShellDefault": "0x00000045",
+    "snRecoillessCannon": "0x0000F202"
+  },
+  "remove_root_attributes": ["extends"],
+  "_remove_why": "v1.02 limits the addon to Eternity Port; without extends it loads in every adventure so the overrides apply in SotP too",
+  "insert_fragment": "overrides.xml",
+  "marker": "LOCAL-PATCH corporate_command_ep_addon"
+}

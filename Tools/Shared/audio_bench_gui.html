@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audio Bench</title>
+<style>
+:root{--bg:#07131c;--panel:#0b1f2b;--panel2:#0e2735;--line:#1f5f6e;--glow:#2ad4e6;--text:#cfe8ee;--dim:#7fa8b3;--warn:#ffb454;--bad:#ff6b6b;--ok:#6ee7a0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg) radial-gradient(circle at 20% 0%,#0d2a3a 0,#07131c 60%);color:var(--text);font:13px/1.4 "Segoe UI",system-ui,sans-serif}
+header{display:flex;align-items:center;gap:16px;padding:10px 18px;border-bottom:1px solid var(--line);background:linear-gradient(#0b1f2b,#07131c)}
+header h1{margin:0;font-size:15px;letter-spacing:.25em;color:var(--glow);font-weight:600}
+header .status{color:var(--dim);font-size:12px;flex:1}
+header button{margin-left:6px}
+main{display:grid;grid-template-columns:300px 1fr 330px;grid-template-areas:"agent agent agent" "sources layers master" "eq eq eq" "transport transport analysis" "recipe recipe recipe";gap:10px;padding:10px}
+@media (max-width:1100px){main{grid-template-columns:1fr;grid-template-areas:"agent" "sources" "layers" "master" "eq" "transport" "analysis" "recipe"}}
+#agent{grid-area:agent}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;min-width:0}
+.panel h2{margin:-10px -12px 10px;padding:6px 12px;font-size:11px;letter-spacing:.22em;color:var(--glow);background:var(--panel2);border-bottom:1px solid var(--line);border-radius:6px 6px 0 0;text-transform:uppercase}
+#sources{grid-area:sources}#layers{grid-area:layers}#master{grid-area:master}#eq{grid-area:eq}#transport{grid-area:transport}#analysis{grid-area:analysis}#recipe{grid-area:recipe}
+button,select,input[type=text],input[type=number],textarea{background:#0a1a24;color:var(--text);border:1px solid var(--line);border-radius:4px;padding:4px 8px;font:inherit}
+button{cursor:pointer;letter-spacing:.06em}button:hover{border-color:var(--glow);color:#fff}button.primary{background:#124556;border-color:var(--glow)}button.danger:hover{border-color:var(--bad)}
+button:disabled{opacity:.45;cursor:default}
+input[type=range]{accent-color:var(--glow);width:100%}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:4px 0}
+.row label{color:var(--dim);font-size:11px;letter-spacing:.08em;text-transform:uppercase;min-width:70px}
+.list{display:flex;flex-direction:column;gap:3px;max-height:220px;overflow:auto}
+.item{display:flex;gap:6px;align-items:center;padding:4px 6px;border:1px solid transparent;border-radius:4px;background:#0a1a24}
+.item.sel{border-color:var(--glow);background:#10303f}.item .name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item small{color:var(--dim)}
+.knob{display:grid;grid-template-columns:110px 1fr 70px;gap:8px;align-items:center;margin:3px 0}
+.knob .lbl{color:var(--dim);font-size:11px;letter-spacing:.06em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.knob input[type=number]{width:70px;text-align:right}
+.step{border:1px solid var(--line);border-radius:5px;margin:5px 0;background:#0a1a24}
+.step .head{display:flex;gap:6px;align-items:center;padding:4px 8px;background:#0e2735;border-radius:5px 5px 0 0;cursor:pointer}
+.step .head .fx{flex:1;color:#fff;letter-spacing:.1em;text-transform:uppercase;font-size:12px}
+.step .head small{color:var(--dim)}
+.step .body{padding:6px 10px}.step.closed .body{display:none}.step.bypass .head .fx{text-decoration:line-through;color:var(--dim)}
+.tiny{padding:1px 6px;font-size:11px}
+.eqwrap{display:grid;grid-template-columns:repeat(30,1fr);gap:2px;height:190px;align-items:end}
+.eqband{display:flex;flex-direction:column;align-items:center;height:100%}
+.eqband input[type=range]{writing-mode:vertical-lr;direction:rtl;height:150px;width:16px;padding:0;margin:0}
+.eqband .hz{font-size:9px;color:var(--dim);margin-top:3px}.eqband .db{font-size:9px;color:var(--glow);height:12px}
+canvas{width:100%;display:block;background:#061018;border:1px solid var(--line);border-radius:4px}
+#wave{height:110px}#bands{height:110px}
+table.kv{width:100%;border-collapse:collapse;font-size:12px}table.kv td{padding:2px 4px;border-bottom:1px solid #123}table.kv td:first-child{color:var(--dim)}
+table.kv td.b{color:var(--glow)}
+textarea{width:100%;min-height:160px;font:12px/1.35 Consolas,monospace;white-space:pre}
+.verdict{font-size:14px;letter-spacing:.12em;text-transform:uppercase}.better{color:var(--ok)}.worse{color:var(--bad)}.same{color:var(--warn)}
+.muted{color:var(--dim)}.hint{color:var(--dim);font-size:11px}
+.mrow{display:grid;grid-template-columns:90px 1fr 48px;gap:6px;align-items:center;margin:3px 0;font-size:11px}
+.mrow .lbl{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbar{position:relative;height:12px;background:#061018;border:1px solid var(--line);border-radius:3px}
+.mbar .fill{position:absolute;left:0;top:0;bottom:0;background:var(--ok);border-radius:2px}.mbar .fill.over{background:var(--bad)}
+.mbar .bar{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--bad)}
+.mrow .pct{text-align:right;color:var(--text)}
+.pill{display:inline-block;padding:0 6px;border:1px solid var(--line);border-radius:10px;font-size:10px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase}
+.pill.restricted,.pill.direct{border-color:var(--warn);color:var(--warn)}
+</style>
+</head>
+<body>
+<header>
+  <h1>AUDIO BENCH</h1>
+  <span class="status" id="status">starting…</span>
+  <button id="btnDescribe" title="The whole catalog as JSON, for agents">Catalog</button>
+  <button id="btnHelp">Help</button>
+</header>
+<main>
+  <section class="panel" id="agent">
+    <h2>Audio agent · says what the sound needs, the bench makes it</h2>
+    <div class="row">
+      <input type="text" id="agentPurpose" placeholder="what sound do you need? e.g. heavy iron portcullis slams shut" style="flex:2;min-width:240px">
+      <select id="agentKind"><option value="auto">auto</option><option value="impact">impact (punch · body · tail)</option><option value="boom">boom (random stack)</option><option value="texture">texture bed</option><option value="voice">voice / character</option><option value="plain">plain clip</option></select>
+      <input type="number" id="agentSeconds" placeholder="s" step="0.1" min="0.1" style="width:70px" title="target length, optional">
+      <input type="number" id="agentCandidates" value="4" min="1" max="12" style="width:60px" title="seeds the listener chooses from">
+      <label style="min-width:0"><input type="checkbox" id="agentUseLoaded"> from loaded sources</label>
+      <button id="btnPropose" class="primary">Propose</button>
+    </div>
+    <div class="row"><span class="hint" id="agentReport">The agent searches the library (licensed packs by name only), decides layers, roles, gains, offsets and pitches from the analysis numbers, renders a few seeds, and the listener picks. It never edits audio; the bench does. You then add or remove layers here and A/B against the base clip.</span></div>
+  </section>
+  <section class="panel" id="sources">
+    <h2>Sources</h2>
+    <div class="row"><input type="file" id="fileIn" multiple accept="audio/*,.wav,.ogg,.mp3,.flac" style="max-width:190px"><button id="btnRec">● Record</button></div>
+    <div class="row"><input type="text" id="pathIn" placeholder="path to a sound file on disk" style="flex:1"><button id="btnPath">Add</button></div>
+    <div class="row"><input type="text" id="libQ" placeholder="search the asset library (textures, hits…)" style="flex:1"><button id="btnLib">Search</button></div>
+    <div class="row"><label>Synth</label><select id="synthKind"><option value="material">material hit</option><option value="footstep">footstep</option></select><select id="synthWhat"></select><input type="number" id="synthA" value="0.5" step="0.05" min="0" max="1" style="width:60px" title="size / weight"><input type="number" id="synthB" value="0.5" step="0.05" min="0" max="1" style="width:60px" title="force / speed"><input type="number" id="synthSeed" value="1" style="width:60px" title="seed"><button id="btnSynth" title="a source from parameters alone: no clip, no license">+ Make</button></div>
+    <div class="list" id="libHits"></div>
+    <div class="hint" id="libHint"></div>
+    <div class="row" style="margin-top:8px"><label>Loaded</label></div>
+    <div class="list" id="srcList"></div>
+  </section>
+
+  <section class="panel" id="layers">
+    <h2>Layers</h2>
+    <div class="row"><select id="newLayerSrc"></select><button id="btnAddLayer">+ Layer</button><button id="btnImpact" title="punch, body and tail layers from this source, each with its own gain, offset and pitch">⚡ Impact engine</button><button id="btnBoom" title="stack every loaded source with randomized role, gain, offset, pitch and pan; the seed re-rolls it">🎲 Boom</button><button id="btnTransmute" title="the main layer takes the loudness shape and colour of a second source ('model'), by plain processing">⇄ Transmute</button><span class="hint">first layer is the main sound; others can follow it (texture layering)</span></div>
+    <div class="list" id="layerList" style="max-height:120px"></div>
+    <div id="layerEd"></div>
+    <div class="row" style="margin-top:8px"><label>Chain</label><select id="addFx"></select><button id="btnAddFx">+ Effect</button><select id="addPreset"></select><button id="btnAddPreset">+ Preset</button></div>
+    <div id="layerChain"></div>
+  </section>
+
+  <section class="panel" id="master">
+    <h2>Master · Blend · Length</h2>
+    <div class="row"><label>Length</label><select id="lenMode"><option value="main">main layer</option><option value="longest">longest</option><option value="seconds">seconds</option></select><input type="number" id="lenSec" step="0.05" min="0.05" value="1.0" style="width:80px"></div>
+    <div class="row"><label>Seed</label><input type="number" id="seed" value="7" style="width:90px"><button id="btnReseed" class="tiny">↻ new</button></div>
+    <div class="row"><label>Blend</label><select id="blendMode"><option value="sum">sum</option><option value="crossfade">crossfade 1→2</option><option value="morph">spectral morph 1↔2</option></select></div>
+    <div class="row" id="blendOpts"></div>
+    <div class="row" style="margin-top:8px"><label>Master</label><select id="addFxM"></select><button id="btnAddFxM">+ Effect</button><select id="addPresetM"></select><button id="btnAddPresetM">+ Preset</button></div>
+    <div id="masterChain"></div>
+  </section>
+
+  <section class="panel" id="eq">
+    <h2>30-band equaliser</h2>
+    <div class="row"><label>Edits</label><select id="eqTarget"></select><button id="btnEqAddMaster" class="tiny">+ EQ on master</button><button id="btnEqAddLayer" class="tiny">+ EQ on layer</button><span style="flex:1"></span><span id="eqPresets"></span><button id="btnEqFlat" class="tiny">Flat</button></div>
+    <div class="eqwrap" id="eqBands"></div>
+    <div class="hint">Drag a band, or type over it. −24 to +24 dB per ISO third-octave band. Double-click a band to zero it.</div>
+  </section>
+
+  <section class="panel" id="transport">
+    <h2>Transport</h2>
+    <div class="row">
+      <button id="btnOrig">▶ Original</button>
+      <button id="btnRender" class="primary">▶ Render &amp; listen</button>
+      <button id="btnAB" disabled>A / B</button>
+      <button id="btnStop">■ Stop</button>
+      <label style="min-width:0"><input type="checkbox" id="loop"> loop</label>
+      <span style="flex:1"></span>
+      <span class="muted" id="playing"></span>
+    </div>
+    <canvas id="wave"></canvas>
+    <div class="row">
+      <label>Export</label><input type="text" id="exportPath" placeholder="D:\…\sound.wav  (.wav .ogg .flac)" style="flex:1">
+      <label style="min-width:0"><input type="checkbox" id="exportMono"> mono</label>
+      <select id="exportSr"><option value="44100">44.1 kHz</option><option value="48000">48 kHz</option></select>
+      <button id="btnExport">Save</button><a id="dl" href="/api/render.wav" download="render.wav"><button>Download</button></a>
+    </div>
+    <div class="row">
+      <label>Listener</label><input type="text" id="purpose" placeholder="what the sound is for, in words (e.g. heavy metal door slams shut)" style="flex:1"><button id="btnListen">Ask the listener</button>
+    </div>
+    <div class="row"><span class="verdict" id="verdict"></span><span class="muted" id="verdictDetail"></span></div>
+    <div class="row"><label>Checks</label><span class="muted" id="checks"></span><span style="flex:1"></span><button id="btnTags" class="tiny">Tags of render</button><span class="muted" id="tags"></span></div>
+    <div class="row"><label>Breed</label><input type="file" id="breedIn" accept=".json" style="max-width:220px" title="the other parent recipe (.json)"><input type="number" id="breedRatio" value="0.6" step="0.1" min="0" max="1" style="width:60px" title="share of this recipe"><input type="number" id="breedMut" value="0.15" step="0.05" min="0" max="1" style="width:60px" title="mutation"><button id="btnBreed">Breed with this recipe</button></div>
+    <div class="row">
+      <label>Hand-off</label><input type="text" id="handoffDir" placeholder="folder for seed variants to tune by hand elsewhere" style="flex:1"><input type="text" id="handoffSeeds" value="1,2,3" style="width:80px" title="seeds"><button id="btnHandoff">Write variants</button>
+      <input type="text" id="takebackPath" placeholder="tuned file to bring back" style="flex:1"><button id="btnTakeback">Take back</button>
+    </div>
+    <div class="row"><span class="hint" id="handoffNote"></span></div>
+    <div class="row"><label>Recipe</label><button id="btnSaveRecipe">Save .json</button><input type="file" id="recipeIn" accept=".json" style="max-width:220px"><button id="btnApplyJson">Apply JSON below</button><button id="btnUndo">Undo</button></div>
+  </section>
+
+  <section class="panel" id="analysis">
+    <h2>Analysis</h2>
+    <table class="kv" id="kv"></table>
+    <canvas id="bands"></canvas>
+    <div class="hint">Band spectrum: original (dim) and render (bright), dB under the loudest band.</div>
+    <div class="row" style="margin-top:8px"><label>Distance</label><span class="hint">from each source clip; the red line is the terms bar (waveform similarity must stay under it for licensed clips)</span></div>
+    <div id="meter"></div>
+  </section>
+
+  <section class="panel" id="recipe">
+    <h2>Recipe (what agents send to the same bench)</h2>
+    <textarea id="json" spellcheck="false"></textarea>
+  </section>
+</main>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+const api = async (path, body) => {
+  const r = await fetch(path, body === undefined ? {} : {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+  const j = await r.json();
+  if (j.error) throw new Error(j.error);
+  return j;
+};
+const status = (t, bad) => { const s = $("status"); s.textContent = t; s.style.color = bad ? "var(--bad)" : "var(--dim)"; };
+
+let catalog = null;
+let sources = {};               // name -> meta (analysis)
+let state = {seed: 7, length: "main", layers: [], blend: {mode: "sum"}, master: [{fx: "level"}, {fx: "fade"}]};
+let selLayer = 0;
+let eqBound = null;             // {where:"master"|"layer", layer, index}
+let history = [];
+let lastRender = null;          // {url, analysis}
+let origUrl = null, abState = "render";
+let openSteps = new WeakMap();
+const GROUPS = {
+  "Utility": ["gain","level","normalize","fade","trim","length","reverse","dc","denoise"],
+  "Tone": ["lowcut","highcut","bandpass","bass","treble","mid","tilt","eq30"],
+  "Pitch & time": ["pitch","stretch","formant","tone_from","envelope_from"],
+  "Dynamics & drive": ["saturate","bitcrush","compress","intensity","transient","gate"],
+  "Modulation": ["tremolo","chop","ring","vibrato","chorus","flanger","phaser"],
+  "Space & stereo": ["echo","reverb","width","pan","decorrelate","doubles","noise","shimmer"],
+  "Generators & resonance": ["sub","comb","glide"],
+};
+const PRESET_GROUPS = {"Character bank": ["brute","fiend","wraith","automaton","giant","imp","operator","cavern"], "Impact engine": ["impact_punch","impact_body","impact_tail","huge_impact"], "Shaping": ["heavier","smaller","distant","metallic","ghostly","crushed","robot","clean_up","rebuild","transmute"]};
+
+function snapshot() { history.push(JSON.stringify(state)); if (history.length > 60) history.shift(); }
+function cleanRecipe() {
+  const strip = steps => (steps || []).filter(s => !s._bypass).map(s => { const c = {...s}; delete c._bypass; return c; });
+  const r = {seed: state.seed, length: state.length, sources: Object.fromEntries(Object.keys(sources).map(n => [n, n])),
+    layers: state.layers.map(l => { const c = {...l, chain: strip(l.chain)}; if (!c.band) delete c.band; if (!c.follow) delete c.follow; if (c.pan === null || c.pan === undefined) delete c.pan; if (!c.offset_ms) delete c.offset_ms; if (!c.pitch) { delete c.pitch; delete c.keep_length; } for (const k of ["align", "reverse", "repeat", "duck", "pan_sweep", "doppler", "auto_gain_db"]) if (!c[k]) delete c[k]; return c; }),
+    blend: state.blend, master: strip(state.master)};
+  return r;
+}
+function syncJson() { $("json").value = JSON.stringify(cleanRecipe(), null, 1); }
+
+// ---- sources ---------------------------------------------------------------------------------------------------
+async function refreshSources() {
+  const j = await api("/api/sources"); sources = j.sources;
+  const names = Object.keys(sources);
+  $("srcList").innerHTML = "";
+  for (const n of names) {
+    const a = sources[n].analysis || {};
+    const el = document.createElement("div"); el.className = "item";
+    const tier = sources[n].tier ? `<span class="pill ${sources[n].tier}">${sources[n].tier}</span>` : "";
+    el.innerHTML = `<span class="name" title="${(sources[n].origin || "")}">${n}</span>${tier}<small>${a.seconds ?? "?"} s · ${a.rms_db ?? "?"} dB</small>`;
+    const play = document.createElement("button"); play.className = "tiny"; play.textContent = "▶"; play.onclick = () => playUrl(`/api/source/${encodeURIComponent(n)}.wav`, "source " + n);
+    const use = document.createElement("button"); use.className = "tiny"; use.textContent = "+ layer"; use.onclick = () => addLayer(n);
+    const rm = document.createElement("button"); rm.className = "tiny danger"; rm.textContent = "×"; rm.onclick = async () => { await api("/api/remove_source", {name: n}); await refreshSources(); };
+    el.append(play, use, rm); $("srcList").append(el);
+  }
+  const sel = $("newLayerSrc"); sel.innerHTML = names.map(n => `<option>${n}</option>`).join("");
+  renderAll();
+}
+function encodeWav(buffer) {
+  const ch = Math.min(2, buffer.numberOfChannels), n = buffer.length, sr = buffer.sampleRate;
+  const out = new ArrayBuffer(44 + n * ch * 2), v = new DataView(out);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, "RIFF"); v.setUint32(4, 36 + n * ch * 2, true); str(8, "WAVE"); str(12, "fmt "); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+  v.setUint16(22, ch, true); v.setUint32(24, sr, true); v.setUint32(28, sr * ch * 2, true); v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true); str(36, "data"); v.setUint32(40, n * ch * 2, true);
+  const chans = []; for (let c = 0; c < ch; c++) chans.push(buffer.getChannelData(c));
+  let o = 44; for (let i = 0; i < n; i++) for (let c = 0; c < ch; c++) { const s = Math.max(-1, Math.min(1, chans[c][i])); v.setInt16(o, s < 0 ? s * 32768 : s * 32767, true); o += 2; }
+  return out;
+}
+const b64 = buf => { let s = ""; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+async function addFromArrayBuffer(name, ab, origin) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const buf = await ctx.decodeAudioData(ab.slice(0));
+  await api("/api/source", {name, wav_base64: b64(encodeWav(buf)), origin});
+  ctx.close();
+}
+$("fileIn").onchange = async e => {
+  for (const f of e.target.files) {
+    try { status("decoding " + f.name); await addFromArrayBuffer(f.name.replace(/\.[^.]+$/, ""), await f.arrayBuffer(), "file " + f.name); }
+    catch (err) { status("could not read " + f.name + ": " + err.message, true); }
+  }
+  e.target.value = ""; await refreshSources(); status("ready");
+};
+$("btnPath").onclick = async () => {
+  const p = $("pathIn").value.trim(); if (!p) return;
+  try { status("loading " + p); await api("/api/source_path", {path: p}); $("pathIn").value = ""; await refreshSources(); status("ready"); }
+  catch (err) { status(err.message, true); }
+};
+let rec = null, recChunks = [];
+$("btnRec").onclick = async () => {
+  if (rec) { rec.stop(); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({audio: true});
+    rec = new MediaRecorder(stream); recChunks = [];
+    rec.ondataavailable = e => recChunks.push(e.data);
+    rec.onstop = async () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(recChunks, {type: rec.mimeType}); rec = null; $("btnRec").textContent = "● Record";
+      try { await addFromArrayBuffer("recording" + (Object.keys(sources).length + 1), await blob.arrayBuffer(), "microphone"); await refreshSources(); status("recording added"); }
+      catch (err) { status("recording failed: " + err.message, true); }
+    };
+    rec.start(); $("btnRec").textContent = "■ Stop recording"; status("recording… press again to stop");
+  } catch (err) { status("microphone: " + err.message, true); }
+};
+$("btnLib").onclick = async () => {
+  const q = $("libQ").value.trim(); if (!q) return;
+  $("libHits").innerHTML = ""; $("libHint").textContent = "searching…";
+  try {
+    const j = await api(`/api/library?q=${encodeURIComponent(q)}&k=12`);
+    $("libHint").textContent = j.hits.length ? "tier shown: direct and restricted clips may only ship altered, inside a project" : "nothing found";
+    for (const h of j.hits) {
+      const el = document.createElement("div"); el.className = "item";
+      el.innerHTML = `<span class="name" title="${h.pack} :: ${h.inner}">${h.name}</span><span class="pill ${h.tier}">${h.tier}</span><small>${h.seconds} s</small>`;
+      const add = document.createElement("button"); add.className = "tiny"; add.textContent = "+"; add.onclick = async () => { try { status("loading clip"); await api("/api/source_library", {id: h.id}); await refreshSources(); status("ready"); } catch (err) { status(err.message, true); } };
+      el.append(add); $("libHits").append(el);
+    }
+  } catch (err) { $("libHint").textContent = err.message; }
+};
+
+// ---- layers ----------------------------------------------------------------------------------------------------
+function addLayer(name) {
+  snapshot();
+  state.layers.push({source: name, gain_db: state.layers.length ? -10 : 0, chain: [], fit: "cut"});
+  selLayer = state.layers.length - 1; renderAll();
+}
+$("btnAddLayer").onclick = () => { const n = $("newLayerSrc").value; if (n) addLayer(n); };
+$("btnImpact").onclick = () => {
+  const n = $("newLayerSrc").value; if (!n) return status("load a source first", true);
+  snapshot();
+  const roles = [["impact_punch", 0, 0, 0], ["impact_body", -2, 6, -4], ["impact_tail", -6, 25, -9]];
+  for (const [preset, g, o, p] of roles) {
+    const layer = {source: n, gain_db: g, offset_ms: o, fit: "cut", chain: [{fx: "preset", name: preset}]};
+    if (p) { layer.pitch = p; layer.keep_length = preset !== "impact_tail"; }
+    state.layers.push(layer);
+  }
+  state.length = "longest"; selLayer = state.layers.length - 3; renderAll(); status("impact engine: punch, body and tail layers added; set each one's gain, offset and pitch");
+};
+$("btnTransmute").onclick = () => {
+  const names = Object.keys(sources); if (names.length < 2) return status("transmute needs two sources: the sound and the model it takes shape and colour from", true);
+  const main = $("newLayerSrc").value, model = names.find(n => n !== main);
+  snapshot();
+  if (!state.layers.length || state.layers[0].source !== main) state.layers.unshift({source: main, gain_db: 0, fit: "cut", chain: []});
+  const chain = state.layers[0].chain; chain.push({fx: "envelope_from", ref: model, amount: 1.0, ms: 6}, {fx: "tone_from", ref: model, amount: 0.7});
+  selLayer = 0; renderAll(); status(`transmute: '${main}' takes the loudness shape and colour of '${model}'; adjust the two amounts, or pick another reference in each step`);
+};
+// Boom: a seeded randomizer over the loaded sources. A tiny PRNG keeps it repeatable per seed; the bench's own
+// boom_recipe() does the same for agents.
+function mulberry(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+$("btnBoom").onclick = () => {
+  const names = Object.keys(sources); if (!names.length) return status("load some sources first", true);
+  snapshot();
+  const rnd = mulberry(state.seed || 1), roles = ["impact_punch", "impact_body", "impact_tail", "heavier", "distant", "metallic"];
+  const count = Math.max(3, Math.min(5, names.length + 1));
+  state.layers = [];
+  for (let i = 0; i < count; i++) {
+    const src = i < names.length ? names[i] : names[Math.floor(rnd() * names.length)];
+    const role = i < 3 ? roles[i] : roles[Math.floor(rnd() * roles.length)];
+    const layer = {source: src, fit: "cut", chain: [{fx: "preset", name: role}], gain_db: i === 0 ? 0 : Math.round((-14 + rnd() * 14) * 2) / 2, offset_ms: i === 0 ? 0 : Math.round(rnd() * 60)};
+    const p = Math.round((-7 + rnd() * 12) * 2) / 2; if (p && (i > 0 || Math.abs(p) >= 2)) { layer.pitch = p; layer.keep_length = role !== "impact_tail"; }
+    if (i > 0) layer.pan = Math.round((rnd() * 1.2 - 0.6) * 100) / 100;
+    state.layers.push(layer);
+  }
+  state.length = "longest"; state.master = [{fx: "compress", threshold_db: -14, ratio: 3, attack_ms: 4, release_ms: 90}, {fx: "level"}, {fx: "fade", in_ms: 1, out_ms: 150}];
+  selLayer = 0; renderAll(); status(`boom: ${count} layers rolled from seed ${state.seed}; press ↻ new seed and Boom again to re-roll`);
+};
+
+function numKnob(label, value, min, max, step, onChange, unit) {
+  const row = document.createElement("div"); row.className = "knob";
+  const lbl = document.createElement("div"); lbl.className = "lbl"; lbl.textContent = label; lbl.title = unit || label;
+  const range = document.createElement("input"); range.type = "range";
+  const num = document.createElement("input"); num.type = "number";
+  const hasRange = min !== null && min !== undefined && max !== null && max !== undefined;
+  if (hasRange) { range.min = min; range.max = max; } else { range.min = -100; range.max = 100; }
+  range.step = step; num.step = step; range.value = value; num.value = value;
+  range.oninput = () => { num.value = range.value; onChange(parseFloat(range.value)); };
+  num.onchange = () => { range.value = num.value; onChange(parseFloat(num.value)); };
+  row.append(lbl, range, num); return row;
+}
+function stepOf(p) { const span = Math.abs((p.max ?? 10) - (p.min ?? 0)); return span > 200 ? 1 : span > 40 ? 0.5 : span > 5 ? 0.1 : 0.01; }
+function paramControl(step, name, p, onChange) {
+  const cur = step[name] !== undefined ? step[name] : p.default;
+  if (typeof p.default === "boolean") {
+    const row = document.createElement("div"); row.className = "row";
+    row.innerHTML = `<label>${name}</label>`; const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!cur;
+    cb.onchange = () => { step[name] = cb.checked; onChange(); }; row.append(cb); return row;
+  }
+  if (name === "ref") {
+    const row = document.createElement("div"); row.className = "row"; row.innerHTML = `<label>reference</label>`;
+    const sel = document.createElement("select"); sel.innerHTML = Object.keys(sources).map(n => `<option ${n === cur ? "selected" : ""}>${n}</option>`).join("");
+    sel.onchange = () => { step[name] = sel.value; onChange(); }; if (!step[name] && sel.value) step[name] = sel.value; row.append(sel); return row;
+  }
+  if (name === "gains_db") {
+    const row = document.createElement("div"); row.className = "row"; row.innerHTML = `<label>bands</label><span class="hint">edit in the equaliser panel</span>`; return row;
+  }
+  if (name === "band") {
+    const row = document.createElement("div"); row.className = "row"; row.innerHTML = `<label>band hz</label>`;
+    const lo = document.createElement("input"); lo.type = "number"; lo.value = (cur && cur[0]) || 200; lo.style.width = "80px";
+    const hi = document.createElement("input"); hi.type = "number"; hi.value = (cur && cur[1]) || 8000; hi.style.width = "80px";
+    const on = document.createElement("input"); on.type = "checkbox"; on.checked = !!cur;
+    const upd = () => { step[name] = on.checked ? [parseFloat(lo.value), parseFloat(hi.value)] : null; onChange(); };
+    lo.onchange = hi.onchange = on.onchange = upd; row.append(on, lo, document.createTextNode("–"), hi); return row;
+  }
+  if (typeof p.default === "string" || (p.default === null && typeof p.meaning === "string" && /one of|,/.test(p.meaning) && p.min === null)) {
+    const opts = (p.meaning || "").replace(/^one of /, "").split(",").map(s => s.trim()).filter(Boolean);
+    const row = document.createElement("div"); row.className = "row"; row.innerHTML = `<label>${name}</label>`;
+    const sel = document.createElement("select"); sel.innerHTML = `<option value="">(none)</option>` + opts.map(o => `<option ${o === cur ? "selected" : ""}>${o}</option>`).join("");
+    sel.onchange = () => { if (sel.value) step[name] = sel.value; else delete step[name]; onChange(); }; row.append(sel); return row;
+  }
+  return numKnob(name, cur ?? 0, p.min, p.max, stepOf(p), v => { step[name] = v; onChange(); }, p.meaning);
+}
+function chainEditor(container, steps, where, layerIdx) {
+  container.innerHTML = "";
+  steps.forEach((step, i) => {
+    const el = document.createElement("div"); el.className = "step" + (openSteps.get(step) === false ? " closed" : "") + (step._bypass ? " bypass" : "");
+    const head = document.createElement("div"); head.className = "head";
+    const isPreset = step.fx === "preset";
+    const title = isPreset ? `preset · ${step.name}` : step.fx;
+    const doc = isPreset ? (catalog.presets[step.name] || {}).doc : (catalog.effects[step.fx] || {}).doc;
+    head.innerHTML = `<span class="fx">${title}</span><small>${doc || ""}</small>`;
+    const mk = (t, title, fn, cls) => { const b = document.createElement("button"); b.className = "tiny" + (cls ? " " + cls : ""); b.textContent = t; b.title = title; b.onclick = e => { e.stopPropagation(); fn(); }; return b; };
+    head.append(mk("↑", "earlier", () => { if (i > 0) { snapshot(); [steps[i - 1], steps[i]] = [steps[i], steps[i - 1]]; renderAll(); } }),
+                mk("↓", "later", () => { if (i < steps.length - 1) { snapshot(); [steps[i + 1], steps[i]] = [steps[i], steps[i + 1]]; renderAll(); } }),
+                mk(step._bypass ? "off" : "on", "bypass", () => { step._bypass = !step._bypass; renderAll(); }),
+                mk("×", "remove", () => { snapshot(); steps.splice(i, 1); if (eqBound && eqBound.where === where && eqBound.index === i) eqBound = null; renderAll(); }, "danger"));
+    head.onclick = () => { openSteps.set(step, el.classList.contains("closed")); renderAll(); };
+    const body = document.createElement("div"); body.className = "body";
+    if (isPreset) {
+      body.innerHTML = `<div class="hint">${JSON.stringify((catalog.presets[step.name] || {}).chain)}</div>`;
+      const b = document.createElement("button"); b.className = "tiny"; b.textContent = "Expand into steps"; b.onclick = () => { snapshot(); steps.splice(i, 1, ...JSON.parse(JSON.stringify(catalog.presets[step.name].chain))); renderAll(); }; body.append(b);
+    } else {
+      const spec = catalog.effects[step.fx];
+      if (spec) for (const [pn, p] of Object.entries(spec.params)) body.append(paramControl(step, pn, p, () => syncJson()));
+      if (step.fx === "eq30") { const b = document.createElement("button"); b.className = "tiny"; b.textContent = "Edit in equaliser"; b.onclick = () => { eqBound = {where, layer: layerIdx, index: i}; renderEq(); }; body.append(b); }
+    }
+    el.append(head, body); container.append(el);
+  });
+}
+function renderLayers() {
+  const list = $("layerList"); list.innerHTML = "";
+  state.layers.forEach((l, i) => {
+    const el = document.createElement("div"); el.className = "item" + (i === selLayer ? " sel" : "");
+    el.innerHTML = `<span class="name">${i === 0 ? "main · " : `${i + 1} · `}${l.source}</span><small>${l.gain_db ?? 0} dB · ${l.chain.length} fx${l.follow ? " · follows " + ((l.follow.layer ?? 0) + 1) : ""}</small>`;
+    el.onclick = () => { selLayer = i; renderAll(); };
+    const rm = document.createElement("button"); rm.className = "tiny danger"; rm.textContent = "×"; rm.onclick = e => { e.stopPropagation(); snapshot(); state.layers.splice(i, 1); selLayer = Math.max(0, Math.min(selLayer, state.layers.length - 1)); renderAll(); };
+    el.append(rm); list.append(el);
+  });
+  const ed = $("layerEd"); ed.innerHTML = "";
+  const l = state.layers[selLayer];
+  if (!l) { ed.innerHTML = `<div class="hint">Add a source, then a layer.</div>`; $("layerChain").innerHTML = ""; return; }
+  const row1 = document.createElement("div"); row1.className = "row"; row1.innerHTML = `<label>source</label>`;
+  const sel = document.createElement("select"); sel.innerHTML = Object.keys(sources).map(n => `<option ${n === l.source ? "selected" : ""}>${n}</option>`).join(""); sel.onchange = () => { l.source = sel.value; renderAll(); }; row1.append(sel);
+  const fit = document.createElement("select"); fit.innerHTML = ["cut", "stretch", "loop", "grains"].map(f => `<option ${f === (l.fit || "cut") ? "selected" : ""}>${f}</option>`).join(""); fit.title = "how the layer meets the length: grains = granular re-synthesis, for textures"; fit.onchange = () => { l.fit = fit.value; syncJson(); };
+  row1.append(document.createTextNode(" fit "), fit); ed.append(row1);
+  ed.append(numKnob("gain dB", l.gain_db ?? 0, -48, 12, 0.5, v => { l.gain_db = v; syncJson(); renderLayers(); }));
+  ed.append(numKnob("pitch st", l.pitch ?? 0, -24, 24, 0.5, v => { l.pitch = v || undefined; syncJson(); }, "semitones, before the chain"));
+  ed.append(numKnob("pan", l.pan ?? 0, -1, 1, 0.05, v => { l.pan = v; syncJson(); }));
+  ed.append(numKnob("offset ms", l.offset_ms ?? 0, 0, 5000, 1, v => { l.offset_ms = v; syncJson(); }));
+  const band = paramControl(l, "band", {default: null}, () => syncJson()); ed.append(band);
+  const extra = document.createElement("div"); extra.className = "row";
+  const mk = (label, key, kind) => {
+    const w = document.createElement("label"); w.style.minWidth = "0";
+    const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!l[key];
+    cb.onchange = () => { if (cb.checked) l[key] = kind === "bool" ? true : kind === "onset" ? "onset" : kind(); else delete l[key]; syncJson(); renderLayers(); };
+    w.append(cb, document.createTextNode(" " + label)); return w;
+  };
+  extra.innerHTML = `<label>more</label>`;
+  extra.append(mk("align attack to main", "align", "onset"), mk("reverse", "reverse", "bool"),
+               mk("repeat ×3", "repeat", () => ({count: 3, ms: 120, decay_db: -4, pitch_st: -1})),
+               mk("duck under main", "duck", () => ({layer: 0, depth: 0.8, ms: 30})),
+               mk("pan sweep L→R", "pan_sweep", () => ({from: -1, to: 1})),
+               mk("doppler", "doppler", () => ({semitones: 4, depth: 0.6})));
+  ed.append(extra);
+  ed.append(numKnob("auto gain dB", l.auto_gain_db ?? 0, -40, 6, 0.5, v => { if (v) l.auto_gain_db = v; else delete l.auto_gain_db; syncJson(); }, "level relative to the main layer; 0 = off"));
+  if (l.repeat) { ed.append(numKnob("repeat count", l.repeat.count, 1, 12, 1, v => { l.repeat.count = v; syncJson(); })); ed.append(numKnob("repeat ms", l.repeat.ms, 10, 2000, 5, v => { l.repeat.ms = v; syncJson(); })); ed.append(numKnob("repeat decay dB", l.repeat.decay_db, -24, 0, 0.5, v => { l.repeat.decay_db = v; syncJson(); })); ed.append(numKnob("repeat pitch st", l.repeat.pitch_st, -12, 12, 0.5, v => { l.repeat.pitch_st = v; syncJson(); })); }
+  if (l.duck) ed.append(numKnob("duck depth", l.duck.depth, 0, 1, 0.05, v => { l.duck.depth = v; syncJson(); }));
+  if (l.doppler) ed.append(numKnob("doppler st", l.doppler.semitones, 0, 12, 0.5, v => { l.doppler.semitones = v; syncJson(); }));
+  const fr = document.createElement("div"); fr.className = "row"; fr.innerHTML = `<label>follow</label>`;
+  const fon = document.createElement("input"); fon.type = "checkbox"; fon.checked = !!l.follow;
+  const fl = document.createElement("select"); fl.innerHTML = state.layers.map((x, i) => `<option value="${i}" ${l.follow && l.follow.layer === i ? "selected" : ""}>layer ${i + 1}</option>`).join("");
+  const fa = document.createElement("input"); fa.type = "number"; fa.step = "0.1"; fa.min = "0"; fa.max = "2"; fa.value = l.follow ? l.follow.amount ?? 1 : 1; fa.style.width = "60px"; fa.title = "amount";
+  const fm = document.createElement("input"); fm.type = "number"; fm.step = "1"; fm.min = "1"; fm.max = "200"; fm.value = l.follow ? l.follow.ms ?? 10 : 10; fm.style.width = "60px"; fm.title = "smoothing ms";
+  const upd = () => { l.follow = fon.checked ? {layer: parseInt(fl.value), amount: parseFloat(fa.value), ms: parseFloat(fm.value)} : null; syncJson(); renderLayers(); };
+  fon.onchange = fl.onchange = fa.onchange = fm.onchange = upd;
+  fr.append(fon, fl, document.createTextNode(" × "), fa, document.createTextNode(" ms "), fm, Object.assign(document.createElement("span"), {className: "hint", textContent: "its loudness follows that layer: texture layering"}));
+  ed.append(fr);
+  chainEditor($("layerChain"), l.chain, "layer", selLayer);
+}
+function fillFxSelects() {
+  const groups = Object.entries(GROUPS).map(([g, names]) => `<optgroup label="${g}">` + names.filter(n => catalog.effects[n]).map(n => `<option value="${n}">${n}</option>`).join("") + "</optgroup>").join("");
+  const seen = new Set();
+  let presets = Object.entries(PRESET_GROUPS).map(([g, names]) => `<optgroup label="${g}">` + names.filter(n => catalog.presets[n] && (seen.add(n), true)).map(n => `<option value="${n}" title="${catalog.presets[n].doc}">${n}</option>`).join("") + "</optgroup>").join("");
+  const rest = Object.keys(catalog.presets).filter(n => !seen.has(n)); if (rest.length) presets += `<optgroup label="Other">` + rest.map(n => `<option value="${n}" title="${catalog.presets[n].doc}">${n}</option>`).join("") + "</optgroup>";
+  $("addFx").innerHTML = $("addFxM").innerHTML = groups; $("addPreset").innerHTML = $("addPresetM").innerHTML = presets;
+  $("eqPresets").innerHTML = Object.keys(catalog.eq30_presets).map(n => `<button class="tiny" data-eqp="${n}">${n}</button>`).join(" ");
+  $("eqPresets").querySelectorAll("button").forEach(b => b.onclick = () => applyEqPreset(b.dataset.eqp));
+}
+const newStep = fx => { const s = {fx}; for (const [p, v] of Object.entries(catalog.effects[fx].params)) if (v.default !== null && v.default !== undefined) s[p] = v.default; if (fx === "eq30") { s.gains_db = new Array(30).fill(0); delete s.preset; } return s; };
+$("btnAddFx").onclick = () => { const l = state.layers[selLayer]; if (!l) return; snapshot(); l.chain.push(newStep($("addFx").value)); renderAll(); };
+$("btnAddPreset").onclick = () => { const l = state.layers[selLayer]; if (!l) return; snapshot(); l.chain.push({fx: "preset", name: $("addPreset").value}); renderAll(); };
+$("btnAddFxM").onclick = () => { snapshot(); state.master.push(newStep($("addFxM").value)); renderAll(); };
+$("btnAddPresetM").onclick = () => { snapshot(); state.master.push({fx: "preset", name: $("addPresetM").value}); renderAll(); };
+
+// ---- master / blend / length --------------------------------------------------------------------------------------
+function renderMaster() {
+  chainEditor($("masterChain"), state.master, "master", null);
+  $("lenMode").value = typeof state.length === "number" ? "seconds" : state.length;
+  $("lenSec").style.display = $("lenMode").value === "seconds" ? "" : "none";
+  if (typeof state.length === "number") $("lenSec").value = state.length;
+  $("seed").value = state.seed;
+  $("blendMode").value = state.blend.mode || "sum";
+  const o = $("blendOpts"); o.innerHTML = "";
+  if (state.blend.mode === "crossfade") {
+    o.append(numKnob("start s", state.blend.start_s ?? 0, 0, 10, 0.05, v => { state.blend.start_s = v; syncJson(); }), numKnob("seconds", state.blend.seconds ?? 1, 0.05, 10, 0.05, v => { state.blend.seconds = v; syncJson(); }));
+  } else if (state.blend.mode === "morph") {
+    o.append(numKnob("amount", state.blend.amount ?? 0.5, 0, 1, 0.05, v => { state.blend.amount = v; syncJson(); }));
+  }
+}
+$("lenMode").onchange = () => { state.length = $("lenMode").value === "seconds" ? parseFloat($("lenSec").value) : $("lenMode").value; renderAll(); };
+$("lenSec").onchange = () => { state.length = parseFloat($("lenSec").value); syncJson(); };
+$("seed").onchange = () => { state.seed = parseInt($("seed").value) || 0; syncJson(); };
+$("btnReseed").onclick = () => { state.seed = Math.floor(Math.random() * 1e6); renderAll(); };
+$("blendMode").onchange = () => { snapshot(); state.blend = {mode: $("blendMode").value}; if (state.blend.mode === "crossfade") Object.assign(state.blend, {start_s: 0, seconds: 1}); if (state.blend.mode === "morph") state.blend.amount = 0.5; renderAll(); };
+
+// ---- equaliser -------------------------------------------------------------------------------------------------------
+function eqSteps() {
+  const out = [];
+  state.master.forEach((s, i) => { if (s.fx === "eq30") out.push({where: "master", layer: null, index: i, label: `master · eq30 #${i + 1}`}); });
+  state.layers.forEach((l, li) => l.chain.forEach((s, i) => { if (s.fx === "eq30") out.push({where: "layer", layer: li, index: i, label: `layer ${li + 1} · eq30 #${i + 1}`}); }));
+  return out;
+}
+function boundStep() {
+  if (!eqBound) return null;
+  const steps = eqBound.where === "master" ? state.master : (state.layers[eqBound.layer] || {}).chain;
+  const s = steps && steps[eqBound.index]; return s && s.fx === "eq30" ? s : null;
+}
+function renderEq() {
+  const all = eqSteps();
+  if (!boundStep()) eqBound = all[0] || null;
+  const sel = $("eqTarget"); sel.innerHTML = all.length ? all.map((e, i) => `<option value="${i}" ${eqBound && e.where === eqBound.where && e.layer === eqBound.layer && e.index === eqBound.index ? "selected" : ""}>${e.label}</option>`).join("") : `<option>(no eq30 step yet)</option>`;
+  sel.onchange = () => { eqBound = all[parseInt(sel.value)]; renderEq(); };
+  const step = boundStep();
+  const wrap = $("eqBands"); wrap.innerHTML = "";
+  const gains = step ? (step.gains_db || (step.gains_db = new Array(30).fill(0))) : new Array(30).fill(0);
+  const base = step && step.preset ? catalog.eq30_presets[step.preset] : null;
+  catalog.eq30_hz.forEach((hz, i) => {
+    const band = document.createElement("div"); band.className = "eqband";
+    const db = document.createElement("div"); db.className = "db"; const total = (gains[i] || 0) + (base ? base[i] : 0); db.textContent = total ? (total > 0 ? "+" : "") + total.toFixed(1) : "";
+    const r = document.createElement("input"); r.type = "range"; r.min = -24; r.max = 24; r.step = 0.5; r.value = gains[i] || 0; r.disabled = !step; r.title = `${hz} Hz`;
+    r.oninput = () => { gains[i] = parseFloat(r.value); const t = gains[i] + (base ? base[i] : 0); db.textContent = t ? (t > 0 ? "+" : "") + t.toFixed(1) : ""; syncJson(); };
+    r.ondblclick = () => { r.value = 0; r.oninput(); };
+    const lbl = document.createElement("div"); lbl.className = "hz"; lbl.textContent = hz >= 1000 ? (hz / 1000) + "k" : hz;
+    band.append(db, r, lbl); wrap.append(band);
+  });
+}
+function applyEqPreset(name) { const s = boundStep(); if (!s) return; snapshot(); s.preset = name; s.gains_db = new Array(30).fill(0); renderAll(); }
+$("btnEqFlat").onclick = () => { const s = boundStep(); if (!s) return; snapshot(); delete s.preset; s.gains_db = new Array(30).fill(0); renderAll(); };
+$("btnEqAddMaster").onclick = () => { snapshot(); state.master.unshift(newStep("eq30")); eqBound = {where: "master", layer: null, index: 0}; renderAll(); };
+$("btnEqAddLayer").onclick = () => { const l = state.layers[selLayer]; if (!l) return; snapshot(); l.chain.push(newStep("eq30")); eqBound = {where: "layer", layer: selLayer, index: l.chain.length - 1}; renderAll(); };
+
+// ---- transport ---------------------------------------------------------------------------------------------------------
+const player = new Audio(); player.preload = "auto";
+player.onended = () => { if ($("loop").checked) { player.currentTime = 0; player.play(); } else $("playing").textContent = ""; };
+function playUrl(url, what) { player.src = url; player.play().catch(e => status("playback: " + e.message, true)); $("playing").textContent = "playing " + what; }
+$("btnStop").onclick = () => { player.pause(); player.currentTime = 0; $("playing").textContent = ""; };
+$("btnOrig").onclick = () => { const l = state.layers[0]; if (!l) return status("no main layer yet", true); origUrl = `/api/source/${encodeURIComponent(l.source)}.wav`; playUrl(origUrl, "original " + l.source); drawWave(origUrl, "#4b7f8c"); };
+$("btnRender").onclick = async () => {
+  if (!state.layers.length) return status("add a layer first", true);
+  status("rendering…"); $("btnRender").disabled = true;
+  try {
+    const j = await api("/api/render", {recipe: cleanRecipe()});
+    const bytes = Uint8Array.from(atob(j.wav_base64), c => c.charCodeAt(0));
+    if (lastRender) URL.revokeObjectURL(lastRender.url);
+    lastRender = {url: URL.createObjectURL(new Blob([bytes], {type: "audio/wav"})), analysis: j.analysis};
+    abState = "render"; $("btnAB").disabled = false;
+    playUrl(lastRender.url, `render (${j.seconds} s)`); drawWave(lastRender.url, "#2ad4e6"); renderAnalysis();
+    $("checks").textContent = (j.checks && j.checks.length ? "⚠ " + j.checks.join("; ") : "clean") + (j.layer_share ? "  ·  mix: " + j.layer_share.map(s => `${s.source} ${Math.round(s.share * 100)}%`).join(", ") : "");
+    status(`rendered ${j.seconds} s`);
+  } catch (err) { status("render failed: " + err.message, true); }
+  $("btnRender").disabled = false;
+};
+$("btnAB").onclick = () => {
+  if (!lastRender) return; const l = state.layers[0]; if (!l) return;
+  const t = player.currentTime;
+  if (abState === "render") { abState = "orig"; playUrl(`/api/source/${encodeURIComponent(l.source)}.wav`, "A: original"); } else { abState = "render"; playUrl(lastRender.url, "B: render"); }
+  player.onloadedmetadata = () => { player.currentTime = Math.min(t, player.duration || t); };
+};
+async function drawWave(url, color) {
+  const c = $("wave"); const ctx = c.getContext("2d"); c.width = c.clientWidth * devicePixelRatio; c.height = c.clientHeight * devicePixelRatio;
+  ctx.clearRect(0, 0, c.width, c.height);
+  try {
+    const ab = await (await fetch(url)).arrayBuffer(); const ac = new (window.AudioContext || window.webkitAudioContext)(); const buf = await ac.decodeAudioData(ab); ac.close();
+    const d = buf.getChannelData(0), step = Math.max(1, Math.floor(d.length / c.width)), mid = c.height / 2;
+    ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.beginPath();
+    for (let x = 0; x < c.width; x++) { let lo = 1, hi = -1; for (let i = x * step; i < (x + 1) * step && i < d.length; i++) { if (d[i] < lo) lo = d[i]; if (d[i] > hi) hi = d[i]; } ctx.moveTo(x, mid - hi * mid); ctx.lineTo(x, mid - lo * mid); }
+    ctx.stroke(); ctx.strokeStyle = "#1f5f6e"; ctx.beginPath(); ctx.moveTo(0, mid); ctx.lineTo(c.width, mid); ctx.stroke();
+  } catch (e) { /* nothing to draw */ }
+}
+$("btnExport").onclick = async () => {
+  const p = $("exportPath").value.trim(); if (!p) return status("type a path to save to", true);
+  try { const j = await api("/api/export", {path: p, mono: $("exportMono").checked, sr: parseInt($("exportSr").value)}); status("saved " + j.saved); } catch (err) { status(err.message, true); }
+};
+$("btnListen").onclick = async () => {
+  const purpose = $("purpose").value.trim(); if (!lastRender) return status("render first", true); if (!purpose) return status("say what the sound is for", true);
+  status("listening…"); $("verdict").textContent = ""; $("verdictDetail").textContent = "";
+  try {
+    const l = state.layers[0]; const j = await api("/api/listen", {purpose, against: l ? l.source : null});
+    if (j.verdict) { $("verdict").textContent = j.verdict; $("verdict").className = "verdict " + j.verdict; $("verdictDetail").textContent = ` Δ ${j.delta > 0 ? "+" : ""}${j.delta} · render: match ${j.new.match} clean ${j.new.clean} ${j.new.faults.join(",")} · original: match ${j.old.match} clean ${j.old.clean}`; }
+    else { $("verdict").textContent = "scored"; $("verdict").className = "verdict"; $("verdictDetail").textContent = ` match ${j.new.match} clean ${j.new.clean} ${j.new.faults.join(",")}`; }
+    status("ready");
+  } catch (err) { status("listener: " + err.message, true); }
+};
+$("btnHandoff").onclick = async () => {
+  const dir = $("handoffDir").value.trim(); if (!dir) return status("type a folder for the variants", true); if (!state.layers.length) return status("add a layer first", true);
+  const lic = Object.keys(sources).filter(n => state.layers.some(l => l.source === n) && ["direct", "restricted"].includes(sources[n].tier));
+  if (lic.length && !confirm(`These sources are licensed packs whose terms speak against uploading or passing the sound outside the production: ${lic.join(", ")}.\n\nWrite the variants anyway? (your call as the license holder)`)) return;
+  status("writing variants…");
+  try { const j = await api("/api/handoff", {recipe: cleanRecipe(), out_dir: dir, seeds: $("handoffSeeds").value}); $("handoffNote").textContent = `${j.variants.length} variants in ${j.dir}` + (Object.keys(j.licensed_sources).length ? ` · licensed sources: ${Object.keys(j.licensed_sources).join(", ")}` : " · all sources free to take elsewhere"); status("variants written"); }
+  catch (err) { status(err.message, true); }
+};
+$("btnTakeback").onclick = async () => {
+  const p = $("takebackPath").value.trim(), dir = $("handoffDir").value.trim(); if (!p || !dir) return status("need the tuned file and the hand-off folder", true);
+  status("checking the tuned file…");
+  try { const a = await api("/api/takeback", {tuned: p, handoff_dir: dir, name: "tuned"}); $("handoffNote").textContent = (a.ok ? "tuned file accepted and loaded as source 'tuned'" : "tuned file refused: " + a.reasons.join("; ")) + ` · ${a.seconds} s, ${a.rms_db} dB`; if (a.ok) await refreshSources(); status(a.ok ? "ready" : "tuned file refused", !a.ok); }
+  catch (err) { status(err.message, true); }
+};
+$("btnSaveRecipe").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(cleanRecipe(), null, 1)], {type: "application/json"})); a.download = "recipe.json"; a.click(); };
+$("recipeIn").onchange = async e => { const f = e.target.files[0]; if (!f) return; try { loadRecipe(JSON.parse(await f.text())); } catch (err) { status("bad recipe: " + err.message, true); } e.target.value = ""; };
+$("btnApplyJson").onclick = () => { try { loadRecipe(JSON.parse($("json").value)); } catch (err) { status("bad JSON: " + err.message, true); } };
+$("btnUndo").onclick = () => { const s = history.pop(); if (s) { state = JSON.parse(s); renderAll(); } };
+function loadRecipe(r) {
+  snapshot();
+  state = {seed: r.seed ?? 7, length: r.length ?? "main", layers: (r.layers || []).map(l => ({...l, chain: l.chain || []})), blend: r.blend || {mode: "sum"}, master: r.master || []};
+  selLayer = 0; eqBound = null; renderAll(); status("recipe loaded");
+}
+
+// ---- analysis ---------------------------------------------------------------------------------------------------------
+function renderAnalysis() {
+  const l = state.layers[0]; const before = l && sources[l.source] ? sources[l.source].analysis : null; const after = lastRender ? lastRender.analysis : null;
+  const keys = ["seconds", "rms_db", "peak_db", "crest_db", "attack_ms", "centroid_hz", "rolloff95_hz", "stereo_width", "clipped"];
+  const tbl = $("kv"); tbl.innerHTML = `<tr><td></td><td>original</td><td class="b">render</td></tr>` + keys.map(k => `<tr><td>${k}</td><td>${before ? before[k] : ""}</td><td class="b">${after ? after[k] : ""}</td></tr>`).join("");
+  if (after && after.against && after.against.main) { const a = after.against.main; tbl.innerHTML += `<tr><td>vs original</td><td colspan="2" class="b">correlation ${a.correlation} · tone ${a.tone_match} · level ${a.rms_delta_db > 0 ? "+" : ""}${a.rms_delta_db} dB</td></tr>`; }
+  const c = $("bands"); const ctx = c.getContext("2d"); c.width = c.clientWidth * devicePixelRatio; c.height = c.clientHeight * devicePixelRatio; ctx.clearRect(0, 0, c.width, c.height);
+  const draw = (arr, color) => { if (!arr) return; const w = c.width / 30; ctx.fillStyle = color; arr.forEach((db, i) => { const h = Math.max(0, (db + 60) / 60) * c.height; ctx.fillRect(i * w + 1, c.height - h, w - 2, h); }); };
+  draw(before && before.band_db, "rgba(75,127,140,.55)"); draw(after && after.band_db, "rgba(42,212,230,.75)");
+  const mt = $("meter"); mt.innerHTML = "";
+  const ag = after && after.against;
+  if (!ag) { mt.innerHTML = `<div class="hint">render to measure</div>`; return; }
+  for (const [name, d] of Object.entries(ag)) {
+    const head = document.createElement("div"); head.className = "hint"; head.innerHTML = `<b>${name}</b> <span class="pill ${d.tier || "own"}">${d.tier || "own"}</span> · level ${d.rms_delta_db > 0 ? "+" : ""}${d.rms_delta_db} dB · length ×${d.length_ratio}${d.rule ? `<br>${d.rule}` : ""}`; mt.append(head);
+    for (const [k, v, judged] of [["waveform", d.waveform_pct, true], ["tone", d.tone_pct, false], ["envelope", d.envelope_pct, false]]) {
+      const row = document.createElement("div"); row.className = "mrow";
+      const over = judged && v > d.bar_pct;
+      row.innerHTML = `<span class="lbl">${k}${judged ? " (terms)" : ""}</span><div class="mbar"><div class="fill ${over ? "over" : ""}" style="width:${Math.min(100, v)}%"></div>${judged ? `<div class="bar" style="left:${d.bar_pct}%"></div>` : ""}</div><span class="pct">${v}%</span>`;
+      mt.append(row);
+    }
+  }
+}
+
+function renderAll() { renderLayers(); renderMaster(); renderEq(); renderAnalysis(); syncJson(); }
+
+$("btnPropose").onclick = async () => {
+  const purpose = $("agentPurpose").value.trim(); if (!purpose) return status("tell the agent what sound you need", true);
+  status("agent: searching, deciding, rendering, listening… (first run loads the library and the listener)"); $("btnPropose").disabled = true;
+  try {
+    const body = {purpose, kind: $("agentKind").value, candidates: parseInt($("agentCandidates").value) || 4, seed: state.seed || 1};
+    if ($("agentSeconds").value) body.seconds = parseFloat($("agentSeconds").value);
+    if ($("agentUseLoaded").checked) body.use = Object.keys(sources);
+    const j = await api("/api/propose", body);
+    await refreshSources();
+    loadRecipe(j.recipe);
+    $("purpose").value = purpose;
+    const bytes = Uint8Array.from(atob(j.wav_base64), c => c.charCodeAt(0));
+    if (lastRender) URL.revokeObjectURL(lastRender.url);
+    lastRender = {url: URL.createObjectURL(new Blob([bytes], {type: "audio/wav"})), analysis: j.analysis}; abState = "render"; $("btnAB").disabled = false;
+    playUrl(lastRender.url, `agent's pick (${j.seconds} s)`); drawWave(lastRender.url, "#2ad4e6"); renderAnalysis();
+    $("agentReport").innerHTML = j.report.map(l => `<div>${l}</div>`).join("") + `<div>candidates: ${j.candidates.map((c, i) => `${i === j.chosen ? "<b>" : ""}seed ${c.seed} ${c.total >= 0 ? "+" : ""}${c.total}${i === j.chosen ? "</b>" : ""}`).join(" · ")}</div>`;
+    status(`agent proposed a ${j.kind} recipe; press ▶ Original to hear the base clip, edit the layers, Render & listen`);
+  } catch (err) { status("agent: " + err.message, true); }
+  $("btnPropose").disabled = false;
+};
+function fillSynth() {
+  const k = $("synthKind").value; const cat = catalog.synth_sources ? catalog.synth_sources.kinds : null; if (!cat) return;
+  const list = k === "material" ? cat.material.materials : cat.footstep.surfaces;
+  $("synthWhat").innerHTML = list.map(n => `<option>${n}</option>`).join("");
+}
+$("synthKind").onchange = fillSynth;
+$("btnSynth").onclick = async () => {
+  const k = $("synthKind").value, what = $("synthWhat").value;
+  const body = k === "material" ? {synth: "material", material: what, size: parseFloat($("synthA").value), force: parseFloat($("synthB").value), seed: parseInt($("synthSeed").value) || 0}
+                                : {synth: "footstep", surface: what, weight: parseFloat($("synthA").value), speed: parseFloat($("synthB").value), seed: parseInt($("synthSeed").value) || 0};
+  body.name = `${what}_${k}_${body.seed}`;
+  try { status("synthesizing…"); await api("/api/synth", body); await refreshSources(); status(`made ${body.name}: no clip behind it, free to use`); } catch (err) { status(err.message, true); }
+};
+$("btnTags").onclick = async () => { if (!lastRender) return status("render first", true); status("listening for tags…"); try { const j = await api("/api/tags", {render: true}); $("tags").textContent = Object.entries(j.tags).slice(0, 6).map(([t, v]) => `${t} ${v}`).join(" · "); status("ready"); } catch (err) { status(err.message, true); } };
+$("btnBreed").onclick = async () => {
+  const f = $("breedIn").files[0]; if (!f) return status("pick the other parent recipe (.json) first", true);
+  try {
+    const other = JSON.parse(await f.text());
+    const j = await api("/api/breed", {a: cleanRecipe(), b: other, ratio: parseFloat($("breedRatio").value), mutation: parseFloat($("breedMut").value), seed: state.seed});
+    if (j.problems && j.problems.length) status("offspring has problems: " + j.problems.join("; "), true);
+    loadRecipe(j.recipe); status(`bred from ${j.recipe.parents.join(" × ")}; render to hear it, ↻ new seed and breed again for a sibling`);
+  } catch (err) { status("breed: " + err.message, true); }
+};
+$("btnDescribe").onclick = () => window.open("/api/catalog", "_blank");
+$("btnHelp").onclick = () => alert("Audio Bench\n\n1. Load sounds: import files, record, type a path, or search the asset library.\n2. The first layer is the main sound. Add more layers for textures; tick 'follow' so a texture's loudness follows the main sound, set a band to place it, choose 'grains' to refit any length.\n3. Build each layer's chain from effects and presets; the equaliser panel edits any eq30 step.\n4. Master chain, blend mode, length and seed apply to the mix. The same seed renders the same sound.\n5. Render & listen, A/B against the original, ask the listener (an audio model judges, nothing is generated), export as wav/ogg/flac.\n6. The recipe JSON is exactly what an agent sends the bench.");
+
+(async () => {
+  try { catalog = await api("/api/catalog"); fillFxSelects(); fillSynth(); await refreshSources(); status("ready · " + Object.keys(catalog.effects).length + " effects · " + Object.keys(catalog.presets).length + " presets"); }
+  catch (err) { status("server not reachable: " + err.message, true); }
+})();
+})();
+</script>
+</body>
+</html>

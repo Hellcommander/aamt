@@ -503,7 +503,18 @@ def patch_restore_archive_int_ids(text: str) -> tuple[str, list[str]]:
         text = text2
         notes.append(f"restore int iID Write-object-ID x{n}")
 
-    # Inside Reference2ID keep INT_PTR for FindOrAdd, but narrow when writing out
+    # Inside Reference2ID keep INT_PTR for FindOrAdd, but narrow when writing out.
+    # Upstream (master f2871676) declares `int iID;` here; the x64 CDictionary
+    # takes INT_PTR *, so widen it (C2664 otherwise). Idempotent.
+    text2, n = re.subn(
+        r"(bool bFound;\s*\n\s*)int iID;(\s*\n\s*//\tWe always map NULL to -1)",
+        r"\1INT_PTR iID;\2",
+        text,
+    )
+    if n:
+        text = text2
+        notes.append(f"widen Reference2ID iID for FindOrAdd x{n}")
+
     text2, n = re.subn(
         r"(\*retiID = )(?!\(int\))iID;",
         r"\1(int)iID;",

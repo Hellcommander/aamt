@@ -1,0 +1,23 @@
+{
+  "name": "biomutation",
+  "notes": "Broodmother theme from the mod's UNITY_SPRING_UI_INSTRUCTIONS: magenta membrane / biometal / chitin on umber chrome. For a Broodmother-only window; the shared SpringMenu stays qud-dark and tints its Accent* images at runtime instead.",
+  "colors": {
+    "backdrop":     "#0A0508D6",
+    "frame":        "#15090FFA",
+    "panel":        "#1A1014",
+    "panelAlt":     "#20141A",
+    "status":       "#2A1420",
+    "border":       "#7A4A6A",
+    "borderSoft":   "#4A2A40",
+    "select":       "#E040A026",
+    "selectEdge":   "#FF5AC8E6",
+    "accent":       "#FF5AC8",
+    "badge":        "#C02E2E",
+    "frameTint":    "#FF5AC81F",
+    "text":         "#C9B1C3",
+    "textBright":   "#FFFFFF",
+    "textMuted":    "#7A6A74",
+    "textCyan":     "#BF77CF",
+    "transparent":  "#00000000"
+  }
+}

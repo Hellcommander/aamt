@@ -1,0 +1,43 @@
+{
+  "mod": "Arendeth_Broodmother",
+  "modFolder": "Broodmother Mutation",
+  "bundle": "bm_fx",
+  "shaderPath": "Hidden/Broodmother",
+  "presetPrefix": "BM_",
+  "wrapper": "BroodmotherShaderFX.Play",
+  "effects": [
+    {
+      "name": "SporeBurst",
+      "anchor": "focus",
+      "emitter": { "shape": "disc", "radius": 0.03 },
+      "mode": "burst",
+      "count": 60, "life": [1.2, 2.4], "stagger": 0.4,
+      "direction": "radial", "spread": 60, "speed": [0.02, 0.08], "gravity": -0.02, "drag": 1.0, "wobble": 0.01,
+      "shape": "dot", "size": [0.003, 0.006], "colors": ["#9be35a", "#3f7a2a"], "glow": 1.2, "blend": "add",
+      "fadeIn": 0.15, "fadeOut": 0.5, "flicker": 0.3,
+      "preset": { "seconds": 3.0, "amount": 1.2 }
+    },
+    {
+      "name": "ChitinShards",
+      "anchor": "focus",
+      "emitter": { "shape": "point" },
+      "mode": "burst",
+      "count": 28, "life": [0.4, 0.9], "stagger": 0.05,
+      "direction": "radial", "spread": 360, "speed": [0.3, 0.7], "gravity": 0.5, "drag": 2.0,
+      "shape": "streak", "stretch": 5, "size": [0.003, 0.005], "colors": ["#d9c08a", "#6b4f2a"], "glow": 1.0, "blend": "alpha",
+      "fadeIn": 0.05, "fadeOut": 0.4,
+      "preset": { "seconds": 1.4, "amount": 1.3 }
+    },
+    {
+      "name": "WebDrift",
+      "anchor": "focus",
+      "emitter": { "shape": "cells", "radius": 0.2 },
+      "mode": "continuous",
+      "count": 40, "life": [2.0, 4.0],
+      "direction": 0, "spread": 40, "speed": [0.01, 0.03], "wobble": 0.02,
+      "shape": "glyph", "cellSnap": true, "size": [0.012, 0.016], "colors": ["#cfd8dc", "#90a4ae"], "glow": 0.6, "blend": "screen",
+      "fadeIn": 0.3, "fadeOut": 0.4, "flicker": 0.2,
+      "preset": { "seconds": 4.0, "amount": 1.0, "fadeIn": 0.5, "fadeOut": 1.0 }
+    }
+  ]
+}

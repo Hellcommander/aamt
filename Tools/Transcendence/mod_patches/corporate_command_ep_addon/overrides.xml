@@ -1,0 +1,35 @@
+	<!-- Hierarchy EI7000 chimera wears 10t massive chimeric; maxArmor heavy is 6t.
+	     Override replaces the whole Hull element, so keep the rest of the hull. -->
+	<ShipClassOverride UNID="&scEI7000Chimera;">
+		<Hull
+			size=				"84"
+			mass=				"2900"
+			cargoSpace=			"1000"
+			maxReactorPower=	"10000"
+			maxCargoSpace=		"1000"
+			maxDevices=			"10"
+			maxWeapons=			"4"
+			maxArmor=			"massive"
+			stdArmor=			"medium"
+			/>
+	</ShipClassOverride>
+
+	<!-- Thorin 300: repeating 7 * (default shot delay 2 + 1) = 21; fireRate was 20.
+	     Override replaces the whole Weapon element. -->
+	<ItemTypeOverride UNID="&itThorin300cannon;">
+		<Weapon
+				type=				"missile"
+				repeating=			"7"
+				damage=				"thermo:1d8+1; momentum1; WMD2"
+				fireRate=			"21"
+				missileSpeed=		"50"
+				lifetime=			"60"
+				powerUse=			"1200"
+				effect=				"&efThermoShellDefault;"
+				sound=				"&snRecoillessCannon;"
+				>
+			<Configuration aimTolerance="5">
+				<Shot angle="3d3-6"/>
+			</Configuration>
+		</Weapon>
+	</ItemTypeOverride>

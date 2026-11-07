@@ -291,6 +291,18 @@ def audio_library_dir() -> Path:
     return p or Path(r"D:\assets\audio")
 
 
+def audio_cpu_workers() -> int:
+    """[Audio] AudioCpuWorkers: worker processes for the audio tools' parallel CPU steps. 'auto' (the default) is half
+    the logical processors, leaving room for a GPU job's own CPU work and the desktop; AAMT_AUDIO_WORKERS overrides."""
+    raw = (get_setting("AudioCpuWorkers", env=("AAMT_AUDIO_WORKERS",), default="auto") or "auto").strip().lower()
+    if raw != "auto":
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            pass
+    return max(1, (os.cpu_count() or 2) // 2)
+
+
 def audio_index_dir() -> Path:
     """Sidecar embeddings + catalog for audio_asset_library (not inside the zips)."""
     p = get_path(

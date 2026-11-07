@@ -1,0 +1,18 @@
+{
+  "_about": "Retired TransCore design types (obsoleteVersion) -> current vanilla equivalent, used by tx_fix_obsolete_designs.py in XML attribute references only (load blockers). Script references are left alone.",
+  "tbStoneAsteroidOre":      {"to": "0x00020068", "as": "tbAsteroidOre", "why": "vanilla now uses one asteroid ore table"},
+  "tbFrostAsteroidOre":      {"to": "0x00020068", "as": "tbAsteroidOre", "why": "vanilla now uses one asteroid ore table"},
+  "tbMetallicAsteroidOre":   {"to": "0x00020068", "as": "tbAsteroidOre", "why": "vanilla now uses one asteroid ore table"},
+  "tbVolcanicAsteroidOre":   {"to": "0x00020068", "as": "tbAsteroidOre", "why": "vanilla now uses one asteroid ore table"},
+  "tbPrimordialAsteroidOre": {"to": "0x00020068", "as": "tbAsteroidOre", "why": "vanilla now uses one asteroid ore table"},
+  "stRedDwarfStar":          {"to": "0x00020071", "as": "stStarClassM5", "why": "red dwarf = M class"},
+  "stPrimordialStar":        {"to": "0x0002007B", "as": "stStarClassA0", "why": "young bright star"},
+  "stPlanetoid":             {"to": "0x00020031", "as": "stRockyPlanetoidSizeF", "why": "generic rocky planetoid"},
+  "stCrateredPlanet":        {"to": "0x00020055", "as": "stDesertTerrestrialSizeH", "why": "retired type was a rocky terrestrial"},
+  "stBiospherePlanet":       {"to": "0x00020053", "as": "stBiosphereTerrestrialSizeI", "why": "direct successor"},
+  "stSungNEWall":            {"to": "0x00100132", "as": "stSungFortressWallNE", "why": "direct successor"},
+  "stSungNWWall":            {"to": "0x00100133", "as": "stSungFortressWallNW", "why": "direct successor"},
+  "stSungSEWall":            {"to": "0x00100134", "as": "stSungFortressWallSE", "why": "direct successor"},
+  "stSungSWWall":            {"to": "0x00100135", "as": "stSungFortressWallSW", "why": "direct successor"},
+  "itDarkMatterPlate":       {"to": "0x001C4001", "as": "itIocrymPlate", "why": "closest current alien high-level armor (TransCore armor now tops out at level 12)"}
+}

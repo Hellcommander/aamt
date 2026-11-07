@@ -1,0 +1,30 @@
+{
+  "mod": "Arendeth_TelekinesisThrow",
+  "bundle": "tkt_fx",
+  "shaderPath": "Hidden/TelekinesisThrow",
+  "presetPrefix": "TKT_",
+  "effects": [
+    {
+      "name": "PsiMotes",
+      "anchor": "focus",
+      "emitter": { "shape": "disc", "radius": 0.04 },
+      "mode": "continuous",
+      "count": 36, "life": [0.8, 1.6],
+      "direction": "radial", "spread": 360, "speed": [0.02, 0.05], "swirl": 4.0,
+      "shape": "dot", "size": [0.0025, 0.004], "colors": ["#b388ff", "#4fc3f7"], "glow": 1.4, "blend": "add",
+      "fadeIn": 0.2, "fadeOut": 0.4, "flicker": 0.5,
+      "preset": { "seconds": 1.2, "amount": 1.2, "fadeIn": 0.1, "fadeOut": 0.4 }
+    },
+    {
+      "name": "ShrapnelSparks",
+      "anchor": "focus",
+      "emitter": { "shape": "point" },
+      "mode": "burst",
+      "count": 80, "life": [0.3, 0.8], "stagger": 0.05,
+      "direction": "radial", "spread": 360, "speed": [0.35, 0.9], "gravity": 0.6, "drag": 1.0,
+      "shape": "spark", "stretch": 4, "size": [0.0018, 0.003], "colors": ["#ffffff", "#ff6d00"], "glow": 1.5, "blend": "add",
+      "fadeIn": 0.02, "fadeOut": 0.6,
+      "preset": { "seconds": 1.2, "amount": 1.4 }
+    }
+  ]
+}

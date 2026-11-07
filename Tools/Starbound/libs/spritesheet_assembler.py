@@ -37,6 +37,35 @@ class Layout(str, Enum):
     CUSTOM = "custom"
 
 
+def starbound_aliases(aliases: Dict[str, object], frame_names: Sequence[str]) -> Dict[str, str]:
+    """Aliases the game accepts: each maps a new name to one existing frame name (a string).
+
+    The engine (Assets::parseFramesSpecification) calls toString() on every alias value, so a list
+    value is a load error, and an alias that shares a frame's name ("idle": "idle") is an infinite
+    alias loop that kills the client the first time the sprite is drawn. Lists keep their first
+    frame (the animation states, not aliases, play the sequence)."""
+    names = set(frame_names)
+    out: Dict[str, str] = {}
+    for key, value in aliases.items():
+        if isinstance(value, (list, tuple)):
+            value = value[0] if value else None
+        if not isinstance(value, str) or key in names:
+            continue
+        if value in names or value in aliases:
+            out[key] = value
+    return out
+
+
+def _flat_names(names) -> List[str]:
+    flat: List[str] = []
+    for row in names:
+        if isinstance(row, (list, tuple)):
+            flat.extend(str(n) for n in row if n is not None)
+        elif row is not None:
+            flat.append(str(row))
+    return flat
+
+
 @dataclass
 class PackedSheet:
     image: Image.Image
@@ -59,7 +88,7 @@ class PackedSheet:
                 "dimensions": [self.dimensions[0], self.dimensions[1]],
                 "names": self.names,
             },
-            "aliases": self.aliases,
+            "aliases": starbound_aliases(self.aliases, _flat_names(self.names)),
         }
 
     def save_frames(self, dest: Union[str, Path]) -> Path:
@@ -340,5 +369,5 @@ def write_starbound_frames(
             "dimensions": [len(labels), 1],
             "names": [labels],
         },
-        "aliases": aliases,
+        "aliases": starbound_aliases(aliases, labels),
     }, indent=2) + "\n", encoding="utf-8")

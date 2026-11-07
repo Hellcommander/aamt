@@ -1,0 +1,3069 @@
+{
+ "source": "obsolete = current TransCore obsoleteVersion images; cells = upstream TransCore a4953d3d^ (2017)",
+ "obsolete": {
+  "0x0015F00B": {
+   "name": "rsEI100Image",
+   "obsoleteVersion": 40
+  },
+  "0x0015F008": {
+   "name": "rsEI200Image",
+   "obsoleteVersion": 40
+  },
+  "0x0000F161": {
+   "name": "rsSapphireYachtHD",
+   "obsoleteVersion": 41
+  },
+  "0x0017F001": {
+   "name": "rsMolotok",
+   "obsoleteVersion": 41
+  },
+  "0x0803000B": {
+   "name": "rsT31ArmedTransport",
+   "obsoleteVersion": 41
+  },
+  "0x0803000C": {
+   "name": "rsT55ArmedTransport",
+   "obsoleteVersion": 41
+  },
+  "0x0010F004": {
+   "name": "rsIAVHeavy",
+   "obsoleteVersion": 41
+  },
+  "0x00100490": {
+   "name": "rsHimalInterceptorHD",
+   "obsoleteVersion": 43
+  },
+  "0x00100062": {
+   "name": "rsCSC",
+   "obsoleteVersion": 43
+  },
+  "0x001AF002": {
+   "name": "rsCSCBkgnd",
+   "obsoleteVersion": 43
+  },
+  "0x0016F001": {
+   "name": "rsCharonFrigateImage",
+   "obsoleteVersion": 43
+  },
+  "0x00100100": {
+   "name": "rsTripoli",
+   "obsoleteVersion": 43
+  },
+  "0x0015F00F": {
+   "name": "rsCorporateCruiser",
+   "obsoleteVersion": 43
+  },
+  "0x0015F007": {
+   "name": "rsEI7000Image",
+   "obsoleteVersion": 43
+  },
+  "0x0015F00C": {
+   "name": "rsManufacturingPlant",
+   "obsoleteVersion": 44
+  },
+  "0x0015F006": {
+   "name": "rsAntaresIImage",
+   "obsoleteVersion": 45
+  },
+  "0x0015F009": {
+   "name": "rsAntaresIIImage",
+   "obsoleteVersion": 45
+  },
+  "0x0015F00A": {
+   "name": "rsAntaresVImage",
+   "obsoleteVersion": 45
+  },
+  "0x001000A3": {
+   "name": "rsAresSentryHD",
+   "obsoleteVersion": 39
+  },
+  "0x001000A0": {
+   "name": "rsCometfall",
+   "obsoleteVersion": 45
+  },
+  "0x001000A1": {
+   "name": "rsDeimos",
+   "obsoleteVersion": 45
+  },
+  "0x001000A2": {
+   "name": "rsPolarFreighter",
+   "obsoleteVersion": 45
+  },
+  "0x00100065": {
+   "name": "rsAurochs",
+   "obsoleteVersion": 45
+  },
+  "0x00100064": {
+   "name": "rsAquila",
+   "obsoleteVersion": 45
+  },
+  "0x001CF001": {
+   "name": "rsIocrymSentinel",
+   "obsoleteVersion": 45
+  },
+  "0x001CF007": {
+   "name": "rsIocrymCommandShip",
+   "obsoleteVersion": 45
+  },
+  "0x00100150": {
+   "name": "rsHurin",
+   "obsoleteVersion": 45
+  },
+  "0x00100125": {
+   "name": "rsSteelSlaverHD",
+   "obsoleteVersion": 46
+  },
+  "0x0803000A": {
+   "name": "rsZulu",
+   "obsoleteVersion": 46
+  },
+  "0x0804000C": {
+   "name": "rsBorer",
+   "obsoleteVersion": 46
+  },
+  "0x0000F13E": {
+   "name": "rsWolfenGunship",
+   "obsoleteVersion": 46
+  },
+  "0x0000F163": {
+   "name": "rsWolfenGunshipHD",
+   "obsoleteVersion": 46
+  },
+  "0x0010F005": {
+   "name": "rsStKatsArcology",
+   "obsoleteVersion": 49
+  },
+  "0x0010F006": {
+   "name": "rsStKatsArcologyScreen",
+   "obsoleteVersion": 49
+  },
+  "0x0010F007": {
+   "name": "rsStKatsArcologySchematic",
+   "obsoleteVersion": 49
+  },
+  "0x001CF005": {
+   "name": "rsCorporateExplorer",
+   "obsoleteVersion": 49
+  },
+  "0x0000F104": {
+   "name": "rsSmallShips1",
+   "obsoleteVersion": 49
+  },
+  "0x0000F100": {
+   "name": "rsMediumShips1",
+   "obsoleteVersion": 49
+  },
+  "0x0000F10E": {
+   "name": "rsMediumShips2",
+   "obsoleteVersion": 49
+  },
+  "0x0000F105": {
+   "name": "rsMediumShips3",
+   "obsoleteVersion": 49
+  },
+  "0x0000F112": {
+   "name": "rsMediumShips4",
+   "obsoleteVersion": 49
+  },
+  "0x0000F124": {
+   "name": "rsLargeShips2",
+   "obsoleteVersion": 49
+  },
+  "0x00100120": {
+   "name": "rsSungTransport",
+   "obsoleteVersion": 49
+  },
+  "0x001000C0": {
+   "name": "rsSalvagerNomad",
+   "obsoleteVersion": 49
+  },
+  "0x00100140": {
+   "name": "rsXenophobeDefender",
+   "obsoleteVersion": 49
+  },
+  "0x080400C5": {
+   "name": "rsRanxDreadnought",
+   "obsoleteVersion": 49
+  },
+  "0x0019F001": {
+   "name": "rsDragonSlaverImage",
+   "obsoleteVersion": 49
+  },
+  "0x0000F108": {
+   "name": "rsStargate",
+   "obsoleteVersion": 49
+  },
+  "0x0000F002": {
+   "name": "rsShipInterior",
+   "obsoleteVersion": 49
+  },
+  "0x0000F10F": {
+   "name": "rsLargeExplosions",
+   "obsoleteVersion": 49
+  },
+  "0x00100190": {
+   "name": "rsVentariDestroyer",
+   "obsoleteVersion": 49
+  },
+  "0x0000F10D": {
+   "name": "rsLargeShips1",
+   "obsoleteVersion": 49
+  },
+  "0x001000D0": {
+   "name": "rsUrakDestroyer",
+   "obsoleteVersion": 49
+  },
+  "0x001000F0": {
+   "name": "rsHeliotropeFrigate",
+   "obsoleteVersion": 49
+  },
+  "0x08040103": {
+   "name": "rsFerianWarrior",
+   "obsoleteVersion": 49
+  },
+  "0x08010088": {
+   "name": "rsXenophobeWorldship",
+   "obsoleteVersion": 49
+  },
+  "0x08010086": {
+   "name": "rsXenophobeArk",
+   "obsoleteVersion": 49
+  },
+  "0x00100372": {
+   "name": "rs1MAutonHD",
+   "obsoleteVersion": 50
+  },
+  "0x00100370": {
+   "name": "rsAutosentinelHD",
+   "obsoleteVersion": 50
+  },
+  "0x00100371": {
+   "name": "rsMediumAutonHD",
+   "obsoleteVersion": 50
+  },
+  "0x0000F164": {
+   "name": "rsExplorerAuton",
+   "obsoleteVersion": 50
+  },
+  "0x08020047": {
+   "name": "rsCentauriHeavyRaiderImage",
+   "obsoleteVersion": 51
+  },
+  "0x08020044": {
+   "name": "rsCentauriRaiderImage",
+   "obsoleteVersion": 51
+  },
+  "0x00100391": {
+   "name": "rsTenhoveHD",
+   "obsoleteVersion": 51
+  },
+  "0x001003B0": {
+   "name": "rsPlagueHD",
+   "obsoleteVersion": 52
+  },
+  "0x001003B1": {
+   "name": "rsRevelationsHD",
+   "obsoleteVersion": 52
+  },
+  "0x00100430": {
+   "name": "rsEarthzoneHD",
+   "obsoleteVersion": 52
+  },
+  "0x001AF004": {
+   "name": "rsBritannia",
+   "obsoleteVersion": 52
+  },
+  "0x0010F002": {
+   "name": "rsIAVLight",
+   "obsoleteVersion": 52
+  },
+  "0x0010009D": {
+   "name": "rsIAVLightHD",
+   "obsoleteVersion": 52
+  },
+  "0x001000A5": {
+   "name": "rsSandstormHD",
+   "obsoleteVersion": 53
+  },
+  "0x00100124": {
+   "name": "rsWindSlaverHD",
+   "obsoleteVersion": 53
+  },
+  "0x001AF003": {
+   "name": "rsStationsPointJuno",
+   "obsoleteVersion": 39
+  },
+  "0x001AF001": {
+   "name": "rsPointJunoBkgnd",
+   "obsoleteVersion": 39
+  }
+ },
+ "current": {
+  "0x08040044": {
+   "ship": "scearthzone",
+   "image": {
+    "imageID": "0x00100434",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00325"
+   }
+  },
+  "0x00100436": {
+   "ship": "scearthzone1200",
+   "image": {
+    "imageID": "0x00100437",
+    "imageWidth": "58",
+    "imageHeight": "58",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.004375"
+   }
+  },
+  "0x00100439": {
+   "ship": "scearthzone5000",
+   "image": {
+    "imageID": "0x0010043A",
+    "imageWidth": "66",
+    "imageHeight": "66",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x001B3003": {
+   "ship": "scpolar",
+   "image": {
+    "imageID": "0x00830020",
+    "imageWidth": "180",
+    "imageHeight": "180",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.023125"
+   }
+  },
+  "0x001B3001": {
+   "ship": "scsandstorm",
+   "image": {
+    "imageID": "0x001000BB",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x001000A9": {
+   "ship": "scaressentry",
+   "image": {
+    "imageID": "0x001000A7",
+    "imageWidth": "52",
+    "imageHeight": "52",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x001000AA": {
+   "ship": "scaresdualsentry",
+   "image": {
+    "imageID": "0x001000AB",
+    "imageWidth": "52",
+    "imageHeight": "52",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x001B3004": {
+   "ship": "sctundra",
+   "image": {
+    "imageID": "0x001000A6",
+    "imageWidth": "76",
+    "imageHeight": "76",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x001B3002": {
+   "ship": "scaresadvancedsentry",
+   "image": {
+    "imageID": "0x001000AD",
+    "imageWidth": "52",
+    "imageHeight": "52",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x001B3006": {
+   "ship": "scchasm",
+   "image": {
+    "imageID": "0x001000A4",
+    "imageWidth": "140",
+    "imageHeight": "140",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01625"
+   }
+  },
+  "0x001B3005": {
+   "ship": "sccometfall",
+   "image": {
+    "imageID": "0x0083001E",
+    "imageWidth": "130",
+    "imageHeight": "130",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01375"
+   }
+  },
+  "0x001B3007": {
+   "ship": "scdeimos",
+   "image": {
+    "imageID": "0x0083001F",
+    "imageWidth": "170",
+    "imageHeight": "170",
+    "rotationOffset": "-35",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01875"
+   }
+  },
+  "0x001B3009": {
+   "ship": "scpolar2",
+   "image": {
+    "imageID": "0x00830020",
+    "imageWidth": "180",
+    "imageHeight": "180",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.023125"
+   }
+  },
+  "0x001B3008": {
+   "ship": "scphobos",
+   "image": {
+    "imageID": "0x00830001",
+    "imageWidth": "256",
+    "imageHeight": "256",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01875"
+   }
+  },
+  "0x00143003": {
+   "ship": "sciavmediumg2",
+   "image": {
+    "imageID": "0x0010009E",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12"
+   }
+  },
+  "0x00100230": {
+   "ship": "scbenedictasterion",
+   "image": {
+    "imageID": "0x00100093",
+    "imageWidth": "72",
+    "imageHeight": "72",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00100208": {
+   "ship": "scmolotoka",
+   "image": {
+    "imageID": "0x00100209",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.004875"
+   }
+  },
+  "0x00173001": {
+   "ship": "scmolotokb",
+   "image": {
+    "imageID": "0x00100206",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.004875"
+   }
+  },
+  "0x08020042": {
+   "ship": "sccentauriraider",
+   "image": {
+    "imageID": "0x001003F1",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x08020046": {
+   "ship": "sccentauriheavyraider",
+   "image": {
+    "imageID": "0x001003F0",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.004375"
+   }
+  },
+  "0x0802004B": {
+   "ship": "scarcovaughnheavyraider",
+   "image": {
+    "imageID": "0x001003F0",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.004375"
+   }
+  },
+  "0x00163001": {
+   "ship": "sccorsair",
+   "image": {
+    "imageID": "0x00100105",
+    "imageWidth": "52",
+    "imageHeight": "52",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375",
+    "rotationOffset": "-10"
+   }
+  },
+  "0x08030044": {
+   "ship": "scdrake",
+   "image": {
+    "imageID": "0x0083000B",
+    "imageWidth": "96",
+    "imageHeight": "96",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.009375"
+   }
+  },
+  "0x00163002": {
+   "ship": "scviking",
+   "image": {
+    "imageID": "0x00100106",
+    "imageWidth": "68",
+    "imageHeight": "68",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005125"
+   }
+  },
+  "0x0010011A": {
+   "ship": "sccharonfrigatestock",
+   "image": {
+    "imageID": "0x0083000C",
+    "imageWidth": "140",
+    "imageHeight": "140",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.015625"
+   }
+  },
+  "0x001004B7": {
+   "ship": "sccenturionblock1",
+   "image": {
+    "imageID": "0x001004B8",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x00103001": {
+   "ship": "sccenturionblock2",
+   "image": {
+    "imageID": "0x001004BA",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x001004BC": {
+   "ship": "sccenturionm",
+   "image": {
+    "imageID": "0x001004BF",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x00103004": {
+   "ship": "sccenturionx",
+   "image": {
+    "imageID": "0x001004C1",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x00103005": {
+   "ship": "scaurochs",
+   "image": {
+    "imageID": "0x00100067",
+    "imageWidth": "98",
+    "imageHeight": "98",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.009375"
+   }
+  },
+  "0x00100671": {
+   "ship": "scbritanniastock",
+   "image": {
+    "imageID": "0x00100079",
+    "imageWidth": "80",
+    "imageHeight": "80",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.006"
+   }
+  },
+  "0x001004C4": {
+   "ship": "scminotaur",
+   "image": {
+    "imageID": "0x001004C5",
+    "imageWidth": "110",
+    "imageHeight": "110",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01125"
+   }
+  },
+  "0x001004C7": {
+   "ship": "scminotaurm",
+   "image": {
+    "imageID": "0x001004C8",
+    "imageWidth": "110",
+    "imageHeight": "110",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01125"
+   }
+  },
+  "0x001A3003": {
+   "ship": "scaquilacruiser",
+   "image": {
+    "imageID": "0x00830021",
+    "imageWidth": "210",
+    "imageHeight": "210",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01375"
+   }
+  },
+  "0x00003002": {
+   "ship": "scronina",
+   "image": {
+    "imageID": "0x00100390",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00275"
+   }
+  },
+  "0x00003003": {
+   "ship": "scroninb",
+   "image": {
+    "imageID": "0x0010039D",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00275"
+   }
+  },
+  "0x00003004": {
+   "ship": "scroninc",
+   "image": {
+    "imageID": "0x0010039F",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00275"
+   }
+  },
+  "0x0015300E": {
+   "ship": "schornetstock",
+   "image": {
+    "imageID": "0x00100431",
+    "imageWidth": "32",
+    "imageHeight": "32",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0029375"
+   }
+  },
+  "0x00100714": {
+   "ship": "scantaresistock",
+   "image": {
+    "imageID": "0x00830003",
+    "imageWidth": "144",
+    "imageHeight": "144",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0175"
+   }
+  },
+  "0x00100708": {
+   "ship": "scborerstock",
+   "image": {
+    "imageID": "0x0010018A",
+    "imageWidth": "72",
+    "imageHeight": "72",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x00100396": {
+   "ship": "scei100stock",
+   "image": {
+    "imageID": "0x0010029C",
+    "imageWidth": "70",
+    "imageHeight": "70",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00003008": {
+   "ship": "scsapphireyacht",
+   "image": {
+    "imageID": "0x00100399",
+    "imageWidth": "62",
+    "imageHeight": "62",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00475"
+   }
+  },
+  "0x00100715": {
+   "ship": "scantaresiistock",
+   "image": {
+    "imageID": "0x00830004",
+    "imageWidth": "144",
+    "imageHeight": "144",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0175"
+   }
+  },
+  "0x00100593": {
+   "ship": "scei200stock",
+   "image": {
+    "imageID": "0x00100394",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0075"
+   }
+  },
+  "0x00103008": {
+   "ship": "sciavlight",
+   "image": {
+    "imageID": "0x00100712",
+    "imageWidth": "52",
+    "imageHeight": "52",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x00100719": {
+   "ship": "sct31armedtransportstock",
+   "image": {
+    "imageID": "0x00100330",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.008125"
+   }
+  },
+  "0x00100092": {
+   "ship": "scasterionheavygunship",
+   "image": {
+    "imageID": "0x00100093",
+    "imageWidth": "72",
+    "imageHeight": "72",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00100709": {
+   "ship": "scboreriistock",
+   "image": {
+    "imageID": "0x0010018A",
+    "imageWidth": "72",
+    "imageHeight": "72",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x00100530": {
+   "ship": "scei500stock",
+   "image": {
+    "imageID": "0x0010039A",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0045"
+   }
+  },
+  "0x00100716": {
+   "ship": "scantaresvstock",
+   "image": {
+    "imageID": "0x00830005",
+    "imageWidth": "180",
+    "imageHeight": "180",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.02375"
+   }
+  },
+  "0x0010071A": {
+   "ship": "sct55armedtransportstock",
+   "image": {
+    "imageID": "0x00100332",
+    "imageWidth": "114",
+    "imageHeight": "114",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01225"
+   }
+  },
+  "0x00003011": {
+   "ship": "scwolfenc",
+   "image": {
+    "imageID": "0x00100700",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x00100701": {
+   "ship": "scwolfenc2",
+   "image": {
+    "imageID": "0x001003AC",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x00100702": {
+   "ship": "scwolfenc3",
+   "image": {
+    "imageID": "0x001003AE",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x001003A4": {
+   "ship": "scei7000stock",
+   "image": {
+    "imageID": "0x00830009",
+    "imageWidth": "110",
+    "imageHeight": "110",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01"
+   }
+  },
+  "0x00103009": {
+   "ship": "sciavmedium",
+   "image": {
+    "imageID": "0x0010009E",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12"
+   }
+  },
+  "0x0010008F": {
+   "ship": "scarmstrongtransport",
+   "image": {
+    "imageID": "0x00100090",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0075"
+   }
+  },
+  "0x00100711": {
+   "ship": "scboreriiistock",
+   "image": {
+    "imageID": "0x0010018A",
+    "imageWidth": "72",
+    "imageHeight": "72",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x0010008C": {
+   "ship": "scelixirmegayacht",
+   "image": {
+    "imageID": "0x0010008D",
+    "imageWidth": "185",
+    "imageHeight": "185",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0225"
+   }
+  },
+  "0x00100718": {
+   "ship": "scscarabfreighterstock",
+   "image": {
+    "imageID": "0x00830012",
+    "imageWidth": "192",
+    "imageHeight": "192",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.023125"
+   }
+  },
+  "0x0010300A": {
+   "ship": "sciavheavy",
+   "image": {
+    "imageID": "0x0010009F",
+    "imageWidth": "78",
+    "imageHeight": "78",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x0010300B": {
+   "ship": "scmanticore",
+   "image": {
+    "imageID": "0x00100099",
+    "imageWidth": "80",
+    "imageHeight": "80",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00100662": {
+   "ship": "sccscstock",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x00003007": {
+   "ship": "scmikeno",
+   "image": {
+    "imageID": "0x00000030",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "192",
+    "imageHeight": "192",
+    "rotationCount": "20"
+   }
+  },
+  "0x00100051": {
+   "ship": "sccorporateexplorer",
+   "image": {
+    "imageID": "0x00830025",
+    "imageWidth": "192",
+    "imageHeight": "192",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.025"
+   }
+  },
+  "0x00153001": {
+   "ship": "sccorporatecruiser",
+   "image": {
+    "imageID": "0x00830002",
+    "imageWidth": "230",
+    "imageHeight": "230",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.035"
+   }
+  },
+  "0x08020001": {
+   "ship": "scmethenforcer",
+   "image": {
+    "imageID": "0x001003D0",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x08020143": {
+   "ship": "scdwargraider",
+   "image": {
+    "imageID": "0x001002D2",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x08020144": {
+   "ship": "scdwargmaster",
+   "image": {
+    "imageID": "0x00830010",
+    "imageWidth": "96",
+    "imageHeight": "96",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01"
+   }
+  },
+  "0x08020145": {
+   "ship": "scdwargbehemoth",
+   "image": {
+    "imageID": "0x00830011",
+    "imageWidth": "128",
+    "imageHeight": "128",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.014375"
+   }
+  },
+  "0x08040101": {
+   "ship": "scferianminer",
+   "image": {
+    "imageID": "0x00100470",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12"
+   }
+  },
+  "0x08040102": {
+   "ship": "scferianwarrior",
+   "image": {
+    "imageID": "0x0083000F",
+    "imageWidth": "144",
+    "imageHeight": "144",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.016875"
+   }
+  },
+  "0x00100236": {
+   "ship": "scfionascorpion",
+   "image": {
+    "imageID": "0x00100096",
+    "imageWidth": "68",
+    "imageHeight": "68",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x08040141": {
+   "ship": "scgaianprocessor",
+   "image": {
+    "imageID": "0x00830027",
+    "imageWidth": "192",
+    "imageHeight": "192",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01875"
+   }
+  },
+  "0x08010043": {
+   "ship": "scheliotropefrigate",
+   "image": {
+    "imageID": "0x0083000D",
+    "imageWidth": "120",
+    "imageHeight": "120",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01375"
+   }
+  },
+  "0x08010042": {
+   "ship": "scheliotropegunship",
+   "image": {
+    "imageID": "0x001000F1",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "32",
+    "imageHeight": "32",
+    "rotationCount": "120",
+    "rotationColumns": "12"
+   }
+  },
+  "0x001C3005": {
+   "ship": "schuygensexplorer",
+   "image": {
+    "imageID": "0x00830025",
+    "imageWidth": "192",
+    "imageHeight": "192",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.025"
+   }
+  },
+  "0x08030101": {
+   "ship": "schimalinterceptor",
+   "image": {
+    "imageID": "0x00100496",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "rotationOffset": "5",
+    "viewportRatio": "0.004375"
+   }
+  },
+  "0x00100004": {
+   "ship": "scplayerei500base",
+   "image": {
+    "imageID": "0x0000F00C",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "256",
+    "imageHeight": "60"
+   }
+  },
+  "0x00100003": {
+   "ship": "scplayersapphirebase",
+   "image": {
+    "imageID": "0x0000F00C",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "256",
+    "imageHeight": "60"
+   }
+  },
+  "0x00100005": {
+   "ship": "scplayerwolfenbase",
+   "image": {
+    "imageID": "0x0000F00C",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "256",
+    "imageHeight": "60"
+   }
+  },
+  "0x001A3001": {
+   "ship": "sccschospital",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x001A3002": {
+   "ship": "sccsctaskforce",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x08020101": {
+   "ship": "schurindestroyer",
+   "image": {
+    "imageID": "0x0083001C",
+    "imageWidth": "176",
+    "imageHeight": "176",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "rotationOffset": "5",
+    "viewportRatio": "0.0225"
+   }
+  },
+  "0x00100234": {
+   "ship": "schugosandovalarmstrong",
+   "image": {
+    "imageID": "0x00100090",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0075"
+   }
+  },
+  "0x001C3001": {
+   "ship": "sciocrymcommandship",
+   "image": {
+    "imageID": "0x00830023",
+    "imageWidth": "300",
+    "imageHeight": "300",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0475"
+   }
+  },
+  "0x001C3004": {
+   "ship": "sciocrymsentinel",
+   "image": {
+    "imageID": "0x00830024",
+    "imageWidth": "128",
+    "imageHeight": "128",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01375"
+   }
+  },
+  "0x08020082": {
+   "ship": "sckobolgunshipomnitev9",
+   "image": {
+    "imageID": "0x00100412",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x08020081": {
+   "ship": "sckobolgunshipdualtev9",
+   "image": {
+    "imageID": "0x00100410",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x08020083": {
+   "ship": "sckobolgunshipmissiles",
+   "image": {
+    "imageID": "0x00100411",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x080200C1": {
+   "ship": "scluminousdrone",
+   "image": {
+    "imageID": "0x00100510",
+    "imageWidth": "96",
+    "imageHeight": "96",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.009375"
+   }
+  },
+  "0x08030047": {
+   "ship": "scbarbary",
+   "image": {
+    "imageID": "0x00100104",
+    "imageWidth": "52",
+    "imageHeight": "52",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375",
+    "rotationOffset": "-9"
+   }
+  },
+  "0x0010011D": {
+   "ship": "scmarauderraidplatformstock",
+   "image": {
+    "imageID": "0x0083000A",
+    "imageWidth": "128",
+    "imageHeight": "128",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01375"
+   }
+  },
+  "0x08030043": {
+   "ship": "sctripoli",
+   "image": {
+    "imageID": "0x0083000E",
+    "imageWidth": "156",
+    "imageHeight": "156",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.019375"
+   }
+  },
+  "0x08040005": {
+   "ship": "schammerhead",
+   "image": {
+    "imageID": "0x0010018B",
+    "imageWidth": "50",
+    "imageHeight": "50",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.003125"
+   }
+  },
+  "0x08030004": {
+   "ship": "sczulu",
+   "image": {
+    "imageID": "0x0010018E",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "55",
+    "imageHeight": "55",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0040625"
+   }
+  },
+  "0x08030006": {
+   "ship": "scoromo",
+   "image": {
+    "imageID": "0x0010018D",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "80",
+    "imageHeight": "80",
+    "rotationCount": "120",
+    "rotationColumns": "12"
+   }
+  },
+  "0x00100341": {
+   "ship": "scoromoii",
+   "image": {
+    "imageID": "0x0010018D",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "80",
+    "imageHeight": "80",
+    "rotationCount": "120",
+    "rotationColumns": "12"
+   }
+  },
+  "0x08030005": {
+   "ship": "scsotho",
+   "image": {
+    "imageID": "0x00100187",
+    "imageWidth": "72",
+    "imageHeight": "72",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00100342": {
+   "ship": "scsothoii",
+   "image": {
+    "imageID": "0x00100187",
+    "imageWidth": "72",
+    "imageHeight": "72",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00003009": {
+   "ship": "sct31armedtransport",
+   "image": {
+    "imageID": "0x00100330",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.008125"
+   }
+  },
+  "0x08030008": {
+   "ship": "sct55armedtransport",
+   "image": {
+    "imageID": "0x00100332",
+    "imageWidth": "114",
+    "imageHeight": "114",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01225"
+   }
+  },
+  "0x08030082": {
+   "ship": "screpentant",
+   "image": {
+    "imageID": "0x00100217",
+    "imageWidth": "100",
+    "imageHeight": "100",
+    "rotationOffset": "-25",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01"
+   }
+  },
+  "0x08030083": {
+   "ship": "scatonement",
+   "image": {
+    "imageID": "0x00100219",
+    "imageWidth": "100",
+    "imageHeight": "100",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01"
+   }
+  },
+  "0x00100210": {
+   "ship": "scexcruciatordestroyer",
+   "image": {
+    "imageID": "0x00100211",
+    "imageWidth": "190",
+    "imageHeight": "190",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.025"
+   }
+  },
+  "0x080400C2": {
+   "ship": "scranxgunship",
+   "image": {
+    "imageID": "0x00100450",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12"
+   }
+  },
+  "0x00100457": {
+   "ship": "scranxfreighter",
+   "image": {
+    "imageID": "0x00100458",
+    "imageWidth": "200",
+    "imageHeight": "200",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0275"
+   }
+  },
+  "0x080400C3": {
+   "ship": "scranxdreadnought",
+   "image": {
+    "imageID": "0x00830013",
+    "imageWidth": "280",
+    "imageHeight": "280",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0475"
+   }
+  },
+  "0x00100580": {
+   "ship": "sccenturionrogue",
+   "image": {
+    "imageID": "0x00100581",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x00100583": {
+   "ship": "sccenturionxrogue",
+   "image": {
+    "imageID": "0x00100584",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x080300C2": {
+   "ship": "scrogueminelayer",
+   "image": {
+    "imageID": "0x00100586",
+    "imageWidth": "98",
+    "imageHeight": "98",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.009375"
+   }
+  },
+  "0x000F1001": {
+   "ship": "scsalvagernomad",
+   "image": {
+    "imageID": "0x00830007",
+    "imageWidth": "184",
+    "imageHeight": "184",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.02"
+   }
+  },
+  "0x08010002": {
+   "ship": "scplague",
+   "image": {
+    "imageID": "0x001003B5",
+    "imageWidth": "58",
+    "imageHeight": "58",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.004375"
+   }
+  },
+  "0x08010003": {
+   "ship": "screvelations",
+   "image": {
+    "imageID": "0x001003B7",
+    "imageWidth": "66",
+    "imageHeight": "66",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x00100031": {
+   "ship": "schandofdomina",
+   "image": {
+    "imageID": "0x00100032",
+    "imageWidth": "110",
+    "imageHeight": "110",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01"
+   }
+  },
+  "0x0000300A": {
+   "ship": "scautosentinel",
+   "image": {
+    "imageID": "0x00100377",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x00003017": {
+   "ship": "sc200adefenderauton",
+   "image": {
+    "imageID": "0x0010037A",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x0000300C": {
+   "ship": "sc300ddefenderauton",
+   "image": {
+    "imageID": "0x0010037C",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x0000300F": {
+   "ship": "sc310aaegisauton",
+   "image": {
+    "imageID": "0x0010037E",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x0000300B": {
+   "ship": "scmuleauton",
+   "image": {
+    "imageID": "0x00100373",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x0000300D": {
+   "ship": "sc1mbattleauton",
+   "image": {
+    "imageID": "0x00100375",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x0000300E": {
+   "ship": "sc1mibattleauton",
+   "image": {
+    "imageID": "0x00100380",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x00003018": {
+   "ship": "scexplorerauton",
+   "image": {
+    "imageID": "0x00100374",
+    "imageWidth": "32",
+    "imageHeight": "32",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0035"
+   }
+  },
+  "0x00100232": {
+   "ship": "scstormhoundyacht",
+   "image": {
+    "imageID": "0x0010008D",
+    "imageWidth": "185",
+    "imageHeight": "185",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0225"
+   }
+  },
+  "0x00100237": {
+   "ship": "scstormhoundaquila",
+   "image": {
+    "imageID": "0x00830021",
+    "imageWidth": "210",
+    "imageHeight": "210",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01375"
+   }
+  },
+  "0x00193002": {
+   "ship": "scwindslaver",
+   "image": {
+    "imageID": "0x0010013B",
+    "imageWidth": "54",
+    "imageHeight": "54",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x00193003": {
+   "ship": "scsteelslaver",
+   "image": {
+    "imageID": "0x00100129",
+    "imageWidth": "76",
+    "imageHeight": "76",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.006875"
+   }
+  },
+  "0x00193004": {
+   "ship": "scearthslaver",
+   "image": {
+    "imageID": "0x00830014",
+    "imageWidth": "128",
+    "imageHeight": "128",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01375"
+   }
+  },
+  "0x00193005": {
+   "ship": "scdragonslaver",
+   "image": {
+    "imageID": "0x00830018",
+    "imageWidth": "128",
+    "imageHeight": "128",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01375"
+   }
+  },
+  "0x00193001": {
+   "ship": "scsungtransport",
+   "image": {
+    "imageID": "0x00830015",
+    "imageWidth": "290",
+    "imageHeight": "290",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0475"
+   }
+  },
+  "0x00003005": {
+   "ship": "sctenhovesentinel",
+   "image": {
+    "imageID": "0x00100840",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x00100842": {
+   "ship": "sctr200defender",
+   "image": {
+    "imageID": "0x00100844",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x00100843": {
+   "ship": "sctma9battleauton",
+   "image": {
+    "imageID": "0x00100846",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x08030144": {
+   "ship": "scuraksentinel",
+   "image": {
+    "imageID": "0x001000D1",
+    "imageWidth": "50",
+    "imageHeight": "50",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x08030145": {
+   "ship": "scurakdestroyer",
+   "image": {
+    "imageID": "0x00830008",
+    "imageWidth": "180",
+    "imageHeight": "180",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.02375"
+   }
+  },
+  "0x080100C1": {
+   "ship": "scventaridestroyer",
+   "image": {
+    "imageID": "0x00830026",
+    "imageWidth": "160",
+    "imageHeight": "160",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01875"
+   }
+  },
+  "0x08010082": {
+   "ship": "scxenophobefighter",
+   "image": {
+    "imageID": "0x00100141",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12"
+   }
+  },
+  "0x08010083": {
+   "ship": "scxenophobedefender",
+   "image": {
+    "imageID": "0x00830019",
+    "imageWidth": "188",
+    "imageHeight": "188",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.025"
+   }
+  },
+  "0x08010084": {
+   "ship": "scxenophobeworldship",
+   "image": {
+    "imageID": "0x0083001A",
+    "imageWidth": "250",
+    "imageHeight": "250",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0375"
+   }
+  },
+  "0x08010085": {
+   "ship": "scxenophobeark",
+   "image": {
+    "imageID": "0x0083001B",
+    "imageWidth": "256",
+    "imageHeight": "256",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03375"
+   }
+  },
+  "0x00003801": {
+   "ship": "scsapphireplayer",
+   "image": {
+    "imageID": "0x0000F137",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "48",
+    "imageHeight": "48"
+   }
+  },
+  "0x00003802": {
+   "ship": "scei100xplayer",
+   "image": {
+    "imageID": "0x0000F13D",
+    "imageX": "0",
+    "imageY": "0",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "imageFrameCount": "0",
+    "imageTicksPerFrame": "0"
+   }
+  },
+  "0x08040045": {
+   "ship": "schornet",
+   "image": {
+    "imageID": "0x00100431",
+    "imageWidth": "32",
+    "imageHeight": "32",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0029375"
+   }
+  },
+  "0x001A3005": {
+   "ship": "sccscantarctica",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x00143002": {
+   "ship": "scborerg1",
+   "image": {
+    "imageID": "0x0010018A",
+    "imageWidth": "72",
+    "imageHeight": "72",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x00143009": {
+   "ship": "scei100g1",
+   "image": {
+    "imageID": "0x0010029C",
+    "imageWidth": "70",
+    "imageHeight": "70",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00143001": {
+   "ship": "sciavlightg1",
+   "image": {
+    "imageID": "0x00100712",
+    "imageWidth": "52",
+    "imageHeight": "52",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x00143004": {
+   "ship": "scroning1",
+   "image": {
+    "imageID": "0x00100390",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00275"
+   }
+  },
+  "0x00143008": {
+   "ship": "scearthzoneg2",
+   "image": {
+    "imageID": "0x00100434",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00325"
+   }
+  },
+  "0x0014300A": {
+   "ship": "scei100g2",
+   "image": {
+    "imageID": "0x0010029C",
+    "imageWidth": "70",
+    "imageHeight": "70",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00143012": {
+   "ship": "scei500g2",
+   "image": {
+    "imageID": "0x0010039A",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0045"
+   }
+  },
+  "0x0014300B": {
+   "ship": "sciavheavyg2",
+   "image": {
+    "imageID": "0x0010009F",
+    "imageWidth": "78",
+    "imageHeight": "78",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00143005": {
+   "ship": "scroning2",
+   "image": {
+    "imageID": "0x00100390",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00275"
+   }
+  },
+  "0x0014300E": {
+   "ship": "scsapphireg2",
+   "image": {
+    "imageID": "0x00100399",
+    "imageWidth": "62",
+    "imageHeight": "62",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00475"
+   }
+  },
+  "0x00143011": {
+   "ship": "scei200g3",
+   "image": {
+    "imageID": "0x00100394",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0075"
+   }
+  },
+  "0x0014300C": {
+   "ship": "sciavheavyg3",
+   "image": {
+    "imageID": "0x0010009F",
+    "imageWidth": "78",
+    "imageHeight": "78",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00143006": {
+   "ship": "scroning3",
+   "image": {
+    "imageID": "0x0010039D",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00275"
+   }
+  },
+  "0x0014300F": {
+   "ship": "scsapphireg3",
+   "image": {
+    "imageID": "0x00100399",
+    "imageWidth": "62",
+    "imageHeight": "62",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00475"
+   }
+  },
+  "0x0014300D": {
+   "ship": "sct31g3",
+   "image": {
+    "imageID": "0x00100330",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.008125"
+   }
+  },
+  "0x00143013": {
+   "ship": "scei500g4",
+   "image": {
+    "imageID": "0x0010039A",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0045"
+   }
+  },
+  "0x00143015": {
+   "ship": "scmanticoreg4",
+   "image": {
+    "imageID": "0x00100099",
+    "imageWidth": "80",
+    "imageHeight": "80",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00143007": {
+   "ship": "scroning4",
+   "image": {
+    "imageID": "0x0010039F",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00275"
+   }
+  },
+  "0x00143010": {
+   "ship": "scsapphireg4",
+   "image": {
+    "imageID": "0x00100399",
+    "imageWidth": "62",
+    "imageHeight": "62",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00475"
+   }
+  },
+  "0x00143018": {
+   "ship": "scwolfeng4",
+   "image": {
+    "imageID": "0x00100700",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x0014301B": {
+   "ship": "sccenturiong5",
+   "image": {
+    "imageID": "0x001004B8",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x00143014": {
+   "ship": "scei500g5",
+   "image": {
+    "imageID": "0x0010039A",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0045"
+   }
+  },
+  "0x00143016": {
+   "ship": "scmanticoreg5",
+   "image": {
+    "imageID": "0x00100099",
+    "imageWidth": "80",
+    "imageHeight": "80",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00143019": {
+   "ship": "scwolfeng5",
+   "image": {
+    "imageID": "0x00100700",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x0014301C": {
+   "ship": "sccenturiong6",
+   "image": {
+    "imageID": "0x001004BA",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x00143017": {
+   "ship": "scmanticoreg6",
+   "image": {
+    "imageID": "0x00100099",
+    "imageWidth": "80",
+    "imageHeight": "80",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x0014301A": {
+   "ship": "scwolfeng6",
+   "image": {
+    "imageID": "0x001003AC",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x0014301D": {
+   "ship": "sctheslicermanticore",
+   "image": {
+    "imageID": "0x00100099",
+    "imageWidth": "80",
+    "imageHeight": "80",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00100823": {
+   "ship": "sct31playerl5",
+   "image": {
+    "imageID": "0x00100330",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.008125"
+   }
+  },
+  "0x00100825": {
+   "ship": "scmolotokaplayerl6",
+   "image": {
+    "imageID": "0x00100209",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.004875"
+   }
+  },
+  "0x00100824": {
+   "ship": "scmolotokbplayerl8",
+   "image": {
+    "imageID": "0x00100206",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.004875"
+   }
+  },
+  "0x00163004": {
+   "ship": "sccharonfrigateraider",
+   "image": {
+    "imageID": "0x0083000C",
+    "imageWidth": "140",
+    "imageHeight": "140",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.015625"
+   }
+  },
+  "0x001A3007": {
+   "ship": "scbritannia",
+   "image": {
+    "imageID": "0x00100079",
+    "imageWidth": "80",
+    "imageHeight": "80",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.006"
+   }
+  },
+  "0x001A3006": {
+   "ship": "scei500juancarlos",
+   "image": {
+    "imageID": "0x0010039A",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0045"
+   }
+  },
+  "0x0010071B": {
+   "ship": "sct31armedtransporttraffic",
+   "image": {
+    "imageID": "0x00100330",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.008125"
+   }
+  },
+  "0x00003010": {
+   "ship": "scei500",
+   "image": {
+    "imageID": "0x0010039A",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0045"
+   }
+  },
+  "0x00100717": {
+   "ship": "scantaresvlogistics",
+   "image": {
+    "imageID": "0x00830005",
+    "imageWidth": "180",
+    "imageHeight": "180",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.02375"
+   }
+  },
+  "0x0010071C": {
+   "ship": "sct55armedtransporttraffic",
+   "image": {
+    "imageID": "0x00100332",
+    "imageWidth": "114",
+    "imageHeight": "114",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01225"
+   }
+  },
+  "0x00103002": {
+   "ship": "scscarabfreighter",
+   "image": {
+    "imageID": "0x00830012",
+    "imageWidth": "192",
+    "imageHeight": "192",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.023125"
+   }
+  },
+  "0x00100667": {
+   "ship": "sccscamerica",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x00100665": {
+   "ship": "sccscarctica",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x00100669": {
+   "ship": "sccscasia",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x00100668": {
+   "ship": "sccscatlantica",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x0010066A": {
+   "ship": "sccscindia",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x0010066B": {
+   "ship": "sccscpacifica",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x00100666": {
+   "ship": "sccscsahara",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x00100663": {
+   "ship": "sccscsupportstock",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x00100664": {
+   "ship": "sccsctaskforcestock",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x001A3004": {
+   "ship": "sccscterra",
+   "image": {
+    "imageID": "0x0083001D",
+    "imageWidth": "370",
+    "imageHeight": "370",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.03"
+   }
+  },
+  "0x00103006": {
+   "ship": "scborercaptured",
+   "image": {
+    "imageID": "0x0010018A",
+    "imageWidth": "72",
+    "imageHeight": "72",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x00103007": {
+   "ship": "scroninjenna",
+   "image": {
+    "imageID": "0x0010039F",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00275"
+   }
+  },
+  "0x00100007": {
+   "ship": "sckatemorgentalcruiser",
+   "image": {
+    "imageID": "0x00830002",
+    "imageWidth": "230",
+    "imageHeight": "230",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.035"
+   }
+  },
+  "0x001C3002": {
+   "ship": "scsvalbardexplorer",
+   "image": {
+    "imageID": "0x00830025",
+    "imageWidth": "192",
+    "imageHeight": "192",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.025"
+   }
+  },
+  "0x00153002": {
+   "ship": "scantaresi",
+   "image": {
+    "imageID": "0x00830003",
+    "imageWidth": "144",
+    "imageHeight": "144",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0175"
+   }
+  },
+  "0x00153003": {
+   "ship": "scantaresii",
+   "image": {
+    "imageID": "0x00830004",
+    "imageWidth": "144",
+    "imageHeight": "144",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0175"
+   }
+  },
+  "0x00153004": {
+   "ship": "scantaresv",
+   "image": {
+    "imageID": "0x00830005",
+    "imageWidth": "180",
+    "imageHeight": "180",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.02375"
+   }
+  },
+  "0x00003001": {
+   "ship": "scei100",
+   "image": {
+    "imageID": "0x0010029C",
+    "imageWidth": "70",
+    "imageHeight": "70",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00153005": {
+   "ship": "scei200",
+   "image": {
+    "imageID": "0x00100394",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0075"
+   }
+  },
+  "0x00153006": {
+   "ship": "scei7000",
+   "image": {
+    "imageID": "0x00830009",
+    "imageWidth": "110",
+    "imageHeight": "110",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01"
+   }
+  },
+  "0x0010029F": {
+   "ship": "sct31armedtransportkorolov",
+   "image": {
+    "imageID": "0x00100330",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.008125"
+   }
+  },
+  "0x001002A0": {
+   "ship": "sct55armedtransportkorolov",
+   "image": {
+    "imageID": "0x00100332",
+    "imageWidth": "114",
+    "imageHeight": "114",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01225"
+   }
+  },
+  "0x001002A1": {
+   "ship": "scscarabfreighterkorolov",
+   "image": {
+    "imageID": "0x00830012",
+    "imageWidth": "192",
+    "imageHeight": "192",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.023125"
+   }
+  },
+  "0x00163005": {
+   "ship": "sccharonfrigatekronosaurus",
+   "image": {
+    "imageID": "0x0083000C",
+    "imageWidth": "140",
+    "imageHeight": "140",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.015625"
+   }
+  },
+  "0x0015300A": {
+   "ship": "scronincharonbuster",
+   "image": {
+    "imageID": "0x0010039F",
+    "imageWidth": "48",
+    "imageHeight": "48",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00275"
+   }
+  },
+  "0x0015300D": {
+   "ship": "scei200charonbuster",
+   "image": {
+    "imageID": "0x00100394",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0075"
+   }
+  },
+  "0x08030046": {
+   "ship": "scmarauderraidplatform",
+   "image": {
+    "imageID": "0x0083000A",
+    "imageWidth": "128",
+    "imageHeight": "128",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01375"
+   }
+  },
+  "0x001007A2": {
+   "ship": "scnpcpilgrimsapphirel4",
+   "image": {
+    "imageID": "0x00100399",
+    "imageWidth": "62",
+    "imageHeight": "62",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00475"
+   }
+  },
+  "0x001007A5": {
+   "ship": "scnpcpilgrimei500l5",
+   "image": {
+    "imageID": "0x0010039A",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0045"
+   }
+  },
+  "0x001007A7": {
+   "ship": "scnpcpilgrimwolfenl5",
+   "image": {
+    "imageID": "0x00100700",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x001007A3": {
+   "ship": "scnpcpilgrimsapphirel6",
+   "image": {
+    "imageID": "0x00100399",
+    "imageWidth": "62",
+    "imageHeight": "62",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00475"
+   }
+  },
+  "0x001007A8": {
+   "ship": "scnpcpilgrimwolfenl6",
+   "image": {
+    "imageID": "0x00100700",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x001007A6": {
+   "ship": "scnpcpilgrimei500l7",
+   "image": {
+    "imageID": "0x0010039A",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0045"
+   }
+  },
+  "0x001007A9": {
+   "ship": "scnpcpilgrimwolfenl7",
+   "image": {
+    "imageID": "0x00100700",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x001007A4": {
+   "ship": "scnpcpilgrimsapphirel8",
+   "image": {
+    "imageID": "0x00100399",
+    "imageWidth": "62",
+    "imageHeight": "62",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00475"
+   }
+  },
+  "0x08040003": {
+   "ship": "scborer",
+   "image": {
+    "imageID": "0x0010018A",
+    "imageWidth": "72",
+    "imageHeight": "72",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005625"
+   }
+  },
+  "0x00003803": {
+   "ship": "scwolfenplayer",
+   "image": {
+    "imageID": "0x00100700",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x00103003": {
+   "ship": "sccenturionrama",
+   "image": {
+    "imageID": "0x001004C1",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x00100544": {
+   "ship": "scbritanniaplayerl9",
+   "image": {
+    "imageID": "0x00100079",
+    "imageWidth": "80",
+    "imageHeight": "80",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.006"
+   }
+  },
+  "0x0010053A": {
+   "ship": "sccenturionblock2playerl6",
+   "image": {
+    "imageID": "0x001004BA",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x00100540": {
+   "ship": "sccenturionxplayerl7",
+   "image": {
+    "imageID": "0x001004C1",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.005"
+   }
+  },
+  "0x0010053B": {
+   "ship": "scei200playerl4",
+   "image": {
+    "imageID": "0x00100394",
+    "imageWidth": "90",
+    "imageHeight": "90",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0075"
+   }
+  },
+  "0x00100541": {
+   "ship": "scei500playerl3",
+   "image": {
+    "imageID": "0x0010039A",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0045"
+   }
+  },
+  "0x00100531": {
+   "ship": "scei500playerl4a",
+   "image": {
+    "imageID": "0x0010039A",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0045"
+   }
+  },
+  "0x00100532": {
+   "ship": "scei500playerl4b",
+   "image": {
+    "imageID": "0x0010039A",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0045"
+   }
+  },
+  "0x00100533": {
+   "ship": "scei500playerl4c",
+   "image": {
+    "imageID": "0x0010039A",
+    "imageWidth": "64",
+    "imageHeight": "64",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.0045"
+   }
+  },
+  "0x0010053C": {
+   "ship": "scminotaurplayerl7",
+   "image": {
+    "imageID": "0x001004C5",
+    "imageWidth": "110",
+    "imageHeight": "110",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01125"
+   }
+  },
+  "0x0010053D": {
+   "ship": "scminotaurplayerl8",
+   "image": {
+    "imageID": "0x001004C8",
+    "imageWidth": "110",
+    "imageHeight": "110",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01125"
+   }
+  },
+  "0x00100542": {
+   "ship": "scsapphireplayerl3",
+   "image": {
+    "imageID": "0x00100399",
+    "imageWidth": "62",
+    "imageHeight": "62",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00475"
+   }
+  },
+  "0x00100534": {
+   "ship": "scsapphireplayerl5a",
+   "image": {
+    "imageID": "0x00100399",
+    "imageWidth": "62",
+    "imageHeight": "62",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00475"
+   }
+  },
+  "0x00100535": {
+   "ship": "scsapphireplayerl5b",
+   "image": {
+    "imageID": "0x00100399",
+    "imageWidth": "62",
+    "imageHeight": "62",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00475"
+   }
+  },
+  "0x00100536": {
+   "ship": "scsapphireplayerl5c",
+   "image": {
+    "imageID": "0x00100399",
+    "imageWidth": "62",
+    "imageHeight": "62",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00475"
+   }
+  },
+  "0x00100543": {
+   "ship": "scwolfenplayerl3",
+   "image": {
+    "imageID": "0x00100700",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x00100537": {
+   "ship": "scwolfenplayerl6a",
+   "image": {
+    "imageID": "0x001003AC",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x00100538": {
+   "ship": "scwolfenplayerl6b",
+   "image": {
+    "imageID": "0x001003AC",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x00100539": {
+   "ship": "scwolfenplayerl6c",
+   "image": {
+    "imageID": "0x001003AE",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  },
+  "0x00003006": {
+   "ship": "scei100m",
+   "image": {
+    "imageID": "0x0010029C",
+    "imageWidth": "70",
+    "imageHeight": "70",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00625"
+   }
+  },
+  "0x00193006": {
+   "ship": "sccarrierearthslaver",
+   "image": {
+    "imageID": "0x00830014",
+    "imageWidth": "128",
+    "imageHeight": "128",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.01375"
+   }
+  },
+  "0x00153009": {
+   "ship": "scwolfenvolkov",
+   "image": {
+    "imageID": "0x001003AE",
+    "imageWidth": "56",
+    "imageHeight": "56",
+    "rotationCount": "120",
+    "rotationColumns": "12",
+    "viewportRatio": "0.00375"
+   }
+  }
+ },
+ "cells": {
+  "0x00100062:0:0": "0x001A3005",
+  "0x0000F100:576:0": "0x001B3002",
+  "0x0000F10E:1024:0": "0x001B3006",
+  "0x001000A0:0:0": "0x001B3005",
+  "0x001000A1:0:0": "0x001B3007",
+  "0x001000A2:0:0": "0x001B3003",
+  "0x0000F100:144:0": "0x001B3001",
+  "0x0000F10E:576:0": "0x001B3004",
+  "0x0000F124:256:0": "0x001B3008",
+  "0x0015F00F:0:0": "0x00153001",
+  "0x0804000C:0:0": "0x00143002",
+  "0x0015F00B:0:0": "0x00143009",
+  "0x0010F002:0:0": "0x00143001",
+  "0x0000F100:96:0": "0x00143004",
+  "0x0000F100:192:0": "0x00143008",
+  "0x0010F004:0:0": "0x0014300B",
+  "0x0000F161:0:0": "0x0014300E",
+  "0x0015F008:0:0": "0x00143011",
+  "0x0803000B:0:0": "0x0014300D",
+  "0x0000F163:0:0": "0x00143018",
+  "0x0000F10E:320:0": "0x0014301B",
+  "0x0017F001:0:0": "0x00173001",
+  "0x08020047:0:0": "0x0802004B",
+  "0x0000F10E:384:0": "0x08020043",
+  "0x08020044:0:0": "0x08020042",
+  "0x0000F100:288:0": "0x00163001",
+  "0x0000F105:96:0": "0x08030044",
+  "0x0000F100:336:0": "0x00163002",
+  "0x0016F001:0:0": "0x00163004",
+  "0x00100064:0:0": "0x001A3003",
+  "0x001AF004:0:0": "0x001A3007",
+  "0x0000F10D:1344:0": "0x00103002",
+  "0x0000F100:864:0": "0x08020143",
+  "0x0000F105:672:0": "0x08020144",
+  "0x0000F112:896:0": "0x08020145",
+  "0x0000F100:528:0": "0x08010082",
+  "0x00100140:0:0": "0x08010083",
+  "0x08010088:0:0": "0x08010084",
+  "0x08010086:0:0": "0x08010085",
+  "0x0000F10E:192:0": "0x08020001",
+  "0x0000F104:128:0": "0x08040045",
+  "0x0000F10D:1536:0": "0x08040141",
+  "0x001000F0:0:0": "0x08010043",
+  "0x0000F104:224:0": "0x08010042",
+  "0x0000F100:720:0": "0x08030101",
+  "0x0000F10E:832:0": "0x08020082",
+  "0x0000F10E:896:0": "0x08020081",
+  "0x0000F10E:960:0": "0x08020083",
+  "0x0000F100:432:0": "0x08030047",
+  "0x0000F112:0:0": "0x08030046",
+  "0x00100100:0:0": "0x08030043",
+  "0x0803000C:0:0": "0x08030008",
+  "0x0803000A:0:0": "0x08030004",
+  "0x0000F100:624:0": "0x080400C2",
+  "0x080400C5:0:0": "0x080400C3",
+  "0x001000C0:0:0": "0x000F1001",
+  "0x0000F100:384:0": "0x08010002",
+  "0x0000F10E:128:0": "0x08010003",
+  "0x00100190:0:0": "0x080100C1",
+  "0x0000F10E:704:0": "0x08040101",
+  "0x08040103:0:0": "0x08040102",
+  "0x001CF005:0:0": "0x001C3005",
+  "0x00100150:0:0": "0x08020101",
+  "0x001CF007:0:0": "0x001C3001",
+  "0x001CF001:0:0": "0x001C3004",
+  "0x0015F006:0:0": "0x00153002",
+  "0x0015F009:0:0": "0x00153003",
+  "0x0015F00A:0:0": "0x00153004",
+  "0x0015F007:0:0": "0x00153006",
+  "0x0000F105:384:0": "0x080200C1",
+  "0x0000F104:32:0": "0x08040005",
+  "0x0000F13E:0:0": "0x00003803",
+  "0x0000F104:256:0": "0x0000300A",
+  "0x0000F104:288:0": "0x00003017",
+  "0x0000F100:672:0": "0x0000300B",
+  "0x0000F104:320:0": "0x0000300D",
+  "0x0000F164:0:0": "0x00003018",
+  "0x0000F104:96:0": "0x00003005",
+  "0x0000F100:480:0": "0x00193002",
+  "0x0000F10E:512:0": "0x00193003",
+  "0x0000F112:384:0": "0x00193004",
+  "0x0019F001:0:0": "0x00193005",
+  "0x00100120:0:0": "0x00193001",
+  "0x0000F100:816:0": "0x08030144",
+  "0x001000D0:0:0": "0x08030145",
+  "0x0000F124:0:0": "0x001A3004",
+  "0x0000F100:768:0": "0x00003011",
+  "0x00100372:0:0": "0x0000300D",
+  "0x00100370:0:0": "0x0000300A",
+  "0x00100371:0:0": "0x00003017",
+  "0x00100391:0:0": "0x00003005"
+ }
+}

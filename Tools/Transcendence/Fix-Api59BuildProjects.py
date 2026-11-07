@@ -496,10 +496,7 @@ def patch_csimviewer() -> None:
     cpp = API / "Transcendence" / "TransData" / "CSimViewer.cpp"
     hdr = API / "Transcendence" / "TransData" / "Utilities.h"
     for p in (cpp, hdr):
-        t = p.read_text(encoding="utf-8", errors="replace")
-        if "GWLP_USERDATA" in t and "LRESULT APIENTRY" in t:
-            print(f"already fixed: {p.name}")
-            continue
+        orig = t = p.read_text(encoding="utf-8", errors="replace")
         t = t.replace(
             "static LONG APIENTRY WndProc (HWND hWnd, UINT message, UINT wParam, LONG lParam);",
             "static LRESULT APIENTRY WndProc (HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);",
@@ -517,6 +514,9 @@ def patch_csimviewer() -> None:
             "CSimViewer *pViewer = (CSimViewer *)::GetWindowLongPtr(hWnd, GWLP_USERDATA);",
         )
         # cast of lParam for CREATESTRUCT is fine with LPARAM
+        if t == orig:   # only write on a real change (rewriting forces a TransData rebuild every run)
+            print(f"already fixed: {p.name}")
+            continue
         p.write_text(t, encoding="utf-8")
         print(f"patched {p}")
 

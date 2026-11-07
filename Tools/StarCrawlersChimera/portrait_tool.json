@@ -1,0 +1,6 @@
+{
+  "name": "The AI toolkit",
+  "run": ["{python}", "make_portrait.py", "{job}"],
+  "gpu": true,
+  "minutes": 15
+}

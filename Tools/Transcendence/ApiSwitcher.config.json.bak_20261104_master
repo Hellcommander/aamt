@@ -1,0 +1,12 @@
+{
+    "GameRoot":  "D:\\games\\Steam\\steamapps\\common\\Transcendence",
+    "ActiveApiFolder":  "D:\\games\\Steam\\steamapps\\common\\Transcendence\\game_and_dlc_source\\TranscendenceDev-integration-API59",
+    "ActiveApi":  59,
+    "LastConfiguration":  "Debug For Contributors",
+    "SearchRoots":  [
+                        "D:\\games\\Steam\\steamapps\\common\\Transcendence\\game_and_dlc_source",
+                        "D:\\games\\Steam\\steamapps\\common\\Transcendence"
+                    ],
+    "VisualStudioPath":  "D:\\tools\\Microsoft Visual Studio\\18\\Community",
+    "SteamworksSdk":  "E:\\sdks\\steamworks_sdk_165\\sdk"
+}

@@ -34,6 +34,17 @@ InstallAudioDependencies.bat
 .\InstallAudioDependencies.ps1 -InstallOptional -InstallPath "E:\PythonPackages"
 ```
 
+### Download the listener models
+
+The audio tools listen with CLAP models from Hugging Face (CPU only). Sign in first (`hf auth login`), then:
+
+```powershell
+.\Download-AudioModels.bat           # laion/clap-htsat-unfused (the listener in every loop) and
+                                     # laion/larger_clap_general (the second judge: finished takes only)
+.\Download-AudioModels.bat --sa3     # also Stable Audio 3 medium (gated: accept its terms on huggingface.co first)
+.\Download-AudioModels.bat --list    # here / partly / missing for each model
+```
+
 ## What Gets Installed
 
 ### Required Packages

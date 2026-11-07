@@ -693,6 +693,203 @@ def cmd_dump_animation(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_particle_flags(args: argparse.Namespace) -> int:
+    """Show / edit particle ``flags`` by name (s2_particle_flags: decoded editor checkbox bits)."""
+    import s2_particle_flags as pf
+
+    if args.decode is not None:
+        v = pf.to_value(args.decode)
+        print(f"{v} = {pf.describe(v)}")
+        print(f"     {pf.describe(v, labels=True)}")
+        return 0
+    editing = any(x is not None for x in (args.set, args.clear, args.toggle, args.value))
+    if not (args.file or args.spec or args.id or args.source):
+        print(pf.table_text())
+        return 0
+
+    if args.source:
+        anim = load_animation(args.source)
+        anim.pop("_cloned_from", None)
+        if editing:
+            raise SystemExit("--source is read-only (vanilla/workshop); clone it first or use --file/--spec")
+        print(f"{anim.get('id')} {anim.get('name')!r}")
+        for line in pf.summarize_animation(anim):
+            print("  " + line)
+        return 0
+
+    try:
+        if args.file:
+            fpath = Path(args.file)
+            anims = [json.loads(fpath.read_text(encoding="utf-8-sig"))]
+            spec = None
+        else:
+            spec, fpath = _load(args)
+            want = str(args.animation or "").strip()
+            anims = [
+                a for a in spec.get("animations") or []
+                if not want or want in (str(a.get("id")), str(a.get("name")))
+            ]
+            if want and not anims:
+                raise SystemExit(f"Animation '{want}' not in spec {fpath}")
+            if editing and not want:
+                raise SystemExit("--animation is required to edit flags in a spec")
+        for anim in anims:
+            changed = []
+            if editing:
+                for n, part in pf.select_particles(anim, args.particle):
+                    before = int(part.get("flags") or 0) | pf.legacy_bits(part)
+                    after = pf.apply_flags(
+                        part,
+                        set_flags=args.set,
+                        clear_flags=args.clear,
+                        toggle_flags=args.toggle,
+                        value=None if args.value is None else pf.to_value(args.value),
+                    )
+                    changed.append(f"particle {n}: {before} -> {after} = {pf.describe(after)}")
+            print(f"{anim.get('id')} {anim.get('name')!r}")
+            for line in changed or pf.summarize_animation(anim):
+                print("  " + line)
+    except (KeyError, IndexError, ValueError) as exc:
+        raise SystemExit(str(exc)) from exc
+
+    if editing and not args.dry_run:
+        if spec is None:
+            fpath.write_text(json.dumps(anims[0], indent="\t") + "\n", encoding="utf-8")
+        else:
+            save_spec(spec, fpath)
+        print(f"wrote {fpath}")
+    elif editing:
+        print("(dry run, nothing written)")
+    return 0
+
+
+def cmd_editor_flag_check(args: argparse.Namespace) -> int:
+    """Write (and optionally deploy) a TestBot script that edits particle flags in the F3 editor UI."""
+    from s2_editor_check import AnimCheck, build_script, edits_from_animation, list_row
+
+    checks = []
+    names = []
+    for f in args.file:
+        anim = json.loads(Path(f).read_text(encoding="utf-8-sig"))
+        name = str(anim.get("name") or anim.get("id"))
+        names.append(name)
+        try:
+            edits = edits_from_animation(anim, args.particle, args.set, args.clear, args.toggle)
+        except (KeyError, IndexError, ValueError) as exc:
+            raise SystemExit(str(exc)) from exc
+        checks.append(AnimCheck(search=name, edits=edits, label=f"{name} ({Path(f).name})", row=list_row(name, f)))
+    # the bot edits the first filtered row: warn when another animation name contains the search text
+    try:
+        from s2_assets import _iter_animation_files
+
+        others = {}
+        for _src, p in _iter_animation_files():
+            try:
+                n = str(json.loads(p.read_text(encoding="utf-8-sig")).get("name") or "")
+            except Exception:
+                continue
+            for name in names:
+                if name.lower() in n.lower() and n != name:
+                    others.setdefault(name, set()).add(n)
+        for name, hits in others.items():
+            print(f"warning: search '{name}' also matches {sorted(hits)[:5]} — check the _search snapshot")
+    except ImportError:
+        pass
+    inbox_job = args.inbox and not args.navigate
+    text = build_script(args.mod_search, checks, preview_frames=args.frames, preview_ms=args.interval,
+                        navigate=not inbox_job, leave=not inbox_job,
+                        # inbox jobs share one run folder: unique snapshot names per job
+                        tag_prefix=("ec" + datetime.now().strftime("%H%M%S") + "_") if args.inbox else "ec")
+    out = Path(args.out) if args.out else output_root().parent / "Soulash2" / "testbot" / "editor_flag_check.script"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(text, encoding="utf-8")
+    print(f"wrote {out} ({text.count(chr(10))} lines)")
+    for c in checks:
+        for e in c.edits:
+            if e.set_bits or e.clear_bits:
+                print(f"  {c.search} p{e.particle}: +{[pf_label(b) for b in e.set_bits]} -{[pf_label(b) for b in e.clear_bits]}")
+    if args.deploy:
+        import shutil
+
+        dest = Path(args.game_dir) / "SoulashExtender" / "Plugins" / "TestBot.script"
+        if not dest.parent.is_dir():
+            raise SystemExit(f"TestBot plugin folder not found: {dest.parent}")
+        shutil.copyfile(out, dest)
+        print(f"deployed -> {dest} (restart the game to run it)")
+    if args.inbox:
+        import s2_bot_inbox as bot
+
+        name = bot.send(text, "flag_check", Path(args.game_dir))
+        print(f"sent to inbox: {name} ({'full run' if args.navigate else 'job inside the open F3 editor'})")
+        if not args.no_wait:
+            st = bot.wait(name, args.timeout, Path(args.game_dir))
+            print(bot.format_status(st, tail=12))
+            return 0 if st and st.get("result") == "PASS" else 1
+    return 0
+
+
+def cmd_editor_open(args: argparse.Namespace) -> int:
+    """Open the F3 animation editor on a mod and stay there (inbox job, or deploy as the INI script)."""
+    from s2_editor_check import open_editor_script
+
+    text = open_editor_script(args.mod_search)
+    if args.deploy:
+        dest = Path(args.game_dir) / "SoulashExtender" / "Plugins" / "TestBot.script"
+        if not dest.parent.is_dir():
+            raise SystemExit(f"TestBot plugin folder not found: {dest.parent}")
+        dest.write_text(text, encoding="ascii")
+        print(f"deployed -> {dest} (runs when the game starts; then send checks with --inbox)")
+        return 0
+    import s2_bot_inbox as bot
+
+    name = bot.send(text, "open_editor", Path(args.game_dir))
+    print(f"sent to inbox: {name}")
+    st = bot.wait(name, args.timeout, Path(args.game_dir))
+    print(bot.format_status(st, tail=8))
+    return 0 if st and st.get("result") == "PASS" else 1
+
+
+def cmd_editor_survey(args: argparse.Namespace) -> int:
+    """Visit every animation of a mod in the F3 editor (no edits): per animation a search snapshot,
+    preview frames and each particle's form. Split into inbox jobs under TestBot's 2000-step cap."""
+    from s2_editor_check import AnimCheck, edits_from_animation, list_row, script_steps, survey_jobs
+
+    files = [Path(f) for f in (args.file or [])]
+    if args.dir:
+        files += sorted(Path(args.dir).glob("*.json"))
+    if not files:
+        raise SystemExit("no animation files (--dir or --file)")
+    checks = []
+    for f in files:
+        anim = json.loads(f.read_text(encoding="utf-8-sig"))
+        name = str(anim.get("name") or anim.get("id"))
+        checks.append(AnimCheck(search=name, edits=edits_from_animation(anim, None, None, None), label=f"{name} ({f.name})",
+                                row=list_row(name, f)))
+    jobs = survey_jobs(args.mod_search, checks, preview_frames=args.frames, preview_ms=args.interval,
+                       first_navigates=not args.editor_open, tag=args.tag)
+    out_dir = Path(args.out_dir) if args.out_dir else output_root().parent / "Soulash2" / "testbot" / "survey"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stem = "".join(c for c in args.mod_search if c.isalnum())
+    import s2_bot_inbox as bot
+
+    for i, text in enumerate(jobs):
+        anims = [ln[7:].rsplit(" (", 1)[0] for ln in text.splitlines() if ln.startswith("# ---- ")]
+        path = out_dir / f"{args.tag}{i:02d}_{stem}.script"
+        path.write_text(text, encoding="ascii")
+        print(f"job {i}: {script_steps(text)} steps, {len(anims)} animations ({anims[0]} .. {anims[-1]}) -> {path}")
+        if args.stage:
+            print(f"  staged in inbox: {bot.send(text, path.stem, Path(args.game_dir))}")
+    if not args.stage:
+        print("not staged (add --stage to drop the jobs into the TestBot inbox; they run in name order)")
+    return 0
+
+
+def pf_label(bit: int) -> str:
+    import s2_particle_flags as pf
+
+    return pf.FLAGS[bit][1]
+
+
 def cmd_list_particles(args: argparse.Namespace) -> int:
     rows = list_particle_usage(args.search or "", limit=args.limit or 40)
     if args.json:
@@ -3020,6 +3217,67 @@ def build_parser() -> argparse.ArgumentParser:
     lp.add_argument("--limit", type=int, default=40)
     lp.add_argument("--json", action="store_true")
     lp.set_defaults(func=cmd_list_particles)
+
+    pfl = sub.add_parser(
+        "particle-flags",
+        help="Particle flags by name: no args = bit table; --decode N; --source shows vanilla; --file/--spec edits",
+    )
+    spec_args(pfl)
+    pfl.add_argument("--file", help="Edit an animation JSON on disk (e.g. an installed mod's animations/X.json)")
+    pfl.add_argument("--source", help="Show flags of a vanilla/workshop animation (read-only)")
+    pfl.add_argument("--animation", help="Spec animation id or name")
+    pfl.add_argument("--particle", help="1-based particle numbers as in the editor, e.g. 1 or 1,3 (default all)")
+    pfl.add_argument("--set", help="Flags to turn on: names/aliases/bits, comma separated (e.g. fade,elevation_drop)")
+    pfl.add_argument("--clear", help="Flags to turn off")
+    pfl.add_argument("--toggle", help="Flags to flip")
+    pfl.add_argument("--value", help="Replace flags entirely (raw int or names)")
+    pfl.add_argument("--decode", help="Decode a raw flags value or name list and exit")
+    pfl.add_argument("--dry-run", action="store_true")
+    pfl.set_defaults(func=cmd_particle_flags)
+
+    efc = sub.add_parser(
+        "editor-flag-check",
+        help="Write a TestBot script that adds/removes particle flags in the F3 editor and snapshots (never Accepts)",
+    )
+    efc.add_argument("--mod-search", required=True, help="Text for the Mods screen search (e.g. Cinderstorm)")
+    efc.add_argument("--file", action="append", required=True, help="Installed mod animation JSON (repeatable)")
+    efc.add_argument("--particle", help="1-based particle numbers (default all)")
+    efc.add_argument("--set", help="Flags to add in the editor")
+    efc.add_argument("--clear", help="Flags to remove in the editor")
+    efc.add_argument("--toggle", help="Flags to flip in the editor")
+    efc.add_argument("--frames", type=int, default=20, help="Preview snapshot frames (TestBot max 20)")
+    efc.add_argument("--interval", type=int, default=120, help="Preview snapshot interval ms")
+    efc.add_argument("--out", help="Script path (default Tools/Output/Soulash2/testbot/editor_flag_check.script)")
+    efc.add_argument("--deploy", action="store_true", help="Copy to <game>/SoulashExtender/Plugins/TestBot.script")
+    efc.add_argument("--inbox", action="store_true",
+                     help="Send to the running bot's inbox as a job inside the already-open F3 editor (see editor-open) and wait")
+    efc.add_argument("--navigate", action="store_true", help="With --inbox: include main menu -> editor navigation and F4 exit")
+    efc.add_argument("--no-wait", action="store_true", help="With --inbox: do not wait for the job")
+    efc.add_argument("--timeout", type=float, default=300)
+    efc.add_argument("--game-dir", default=r"D:\games\Steam\steamapps\common\Soulash 2")
+    efc.set_defaults(func=cmd_editor_flag_check)
+
+    eo = sub.add_parser("editor-open", help="TestBot: open the F3 animation editor on a mod and stay there (inbox or --deploy)")
+    eo.add_argument("--mod-search", required=True)
+    eo.add_argument("--deploy", action="store_true", help="Write as the INI TestBot.script instead of sending to the inbox")
+    eo.add_argument("--timeout", type=float, default=180)
+    eo.add_argument("--game-dir", default=r"D:\games\Steam\steamapps\common\Soulash 2")
+    eo.set_defaults(func=cmd_editor_open)
+
+    esv = sub.add_parser("editor-survey",
+                         help="TestBot: snapshot every animation of a mod in the F3 editor (no edits), as inbox jobs")
+    esv.add_argument("--mod-search", required=True)
+    esv.add_argument("--dir", help="Mod animations folder (all *.json)")
+    esv.add_argument("--file", action="append", help="Animation JSON (repeatable)")
+    esv.add_argument("--editor-open", action="store_true",
+                     help="The editor is already open on this mod (e.g. editor-open as the INI script): no navigation")
+    esv.add_argument("--frames", type=int, default=12)
+    esv.add_argument("--interval", type=int, default=150)
+    esv.add_argument("--tag", default="sv", help="Snapshot/job prefix (keep distinct per mod)")
+    esv.add_argument("--out-dir")
+    esv.add_argument("--stage", action="store_true", help="Drop the jobs into the inbox (game may be closed)")
+    esv.add_argument("--game-dir", default=r"D:\games\Steam\steamapps\common\Soulash 2")
+    esv.set_defaults(func=cmd_editor_survey)
 
     da = sub.add_parser("dump-animation", help="Print vanilla/workshop animation JSON (does not retarget)")
     da.add_argument("source", help="Animation id, name, or filename stem (e.g. 196 or Water wave)")

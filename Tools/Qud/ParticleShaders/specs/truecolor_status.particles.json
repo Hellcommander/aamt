@@ -1,0 +1,118 @@
+{
+  "mod": "Arendeth_TruecolorStatus",
+  "bundle": "tcs_fx",
+  "shaderPath": "Hidden/TruecolorStatus",
+  "presetPrefix": "TCS_",
+  "effects": [
+    {
+      "name": "BloodMotes",
+      "anchor": "player",
+      "emitter": { "shape": "disc", "radius": 0.06 },
+      "mode": "continuous",
+      "count": 30, "life": [1.5, 3.0],
+      "direction": 90, "spread": 60, "speed": [0.01, 0.03], "wobble": 0.015,
+      "shape": "dot", "size": [0.002, 0.0035], "colors": ["#ff1744", "#4a0010"], "glow": 1.1, "blend": "add",
+      "fadeIn": 0.3, "fadeOut": 0.4, "flicker": 0.3,
+      "preset": { "seconds": 4.0, "amount": 1.0, "fadeIn": 0.8, "fadeOut": 1.2 }
+    },
+    {
+      "name": "EmberRise",
+      "anchor": "player",
+      "emitter": { "shape": "disc", "radius": 0.05 },
+      "mode": "continuous",
+      "count": 48, "life": [0.7, 1.6],
+      "direction": 90, "spread": 50, "speed": [0.08, 0.2], "gravity": -0.12, "wobble": 0.012,
+      "shape": "spark", "stretch": 2.5, "size": [0.002, 0.004], "colors": ["#fff1a8", "#ff4400"], "glow": 1.4, "blend": "add",
+      "fadeIn": 0.05, "fadeOut": 0.6, "flicker": 0.5,
+      "preset": { "seconds": 4.0, "amount": 1.0, "fadeIn": 0.5, "fadeOut": 1.0 }
+    },
+    {
+      "name": "FrostFlakes",
+      "anchor": "player",
+      "emitter": { "shape": "disc", "radius": 0.14 },
+      "mode": "continuous",
+      "count": 40, "life": [2.0, 3.5],
+      "direction": -90, "spread": 30, "speed": [0.02, 0.05], "gravity": 0.02, "wobble": 0.02,
+      "shape": "dot", "size": [0.0025, 0.004], "colors": ["#e6f7ff", "#7fc8ff"], "glow": 1.0, "blend": "add",
+      "fadeIn": 0.3, "fadeOut": 0.3, "flicker": 0.2,
+      "preset": { "seconds": 4.0, "amount": 1.0, "fadeIn": 0.8, "fadeOut": 1.2 }
+    },
+    {
+      "name": "PoisonBubbles",
+      "anchor": "player",
+      "emitter": { "shape": "disc", "radius": 0.05 },
+      "mode": "continuous",
+      "count": 22, "life": [1.4, 2.6],
+      "direction": 90, "spread": 40, "speed": [0.02, 0.05], "wobble": 0.01,
+      "shape": "ring", "size": [0.003, 0.006], "endSize": 2.0, "colors": ["#b6ff5c", "#2e7d32"], "glow": 0.9, "blend": "add",
+      "fadeIn": 0.2, "fadeOut": 0.5,
+      "preset": { "seconds": 4.0, "amount": 1.0, "fadeIn": 0.8, "fadeOut": 1.2 }
+    },
+    {
+      "name": "ConfusionMotes",
+      "anchor": "player",
+      "emitter": { "shape": "ring", "radius": 0.05 },
+      "mode": "continuous",
+      "count": 28, "life": [1.2, 2.2],
+      "direction": "radial", "spread": 90, "speed": [0.01, 0.03], "swirl": 3.0, "wobble": 0.01,
+      "shape": "dot", "size": [0.0025, 0.004], "colors": ["#ff80ff", "#40e0ff"], "glow": 1.2, "blend": "add",
+      "fadeIn": 0.3, "fadeOut": 0.4, "flicker": 0.4,
+      "preset": { "seconds": 4.0, "amount": 1.0, "fadeIn": 0.6, "fadeOut": 1.0 }
+    },
+    {
+      "name": "StunStars",
+      "anchor": "player",
+      "emitter": { "shape": "ring", "radius": 0.035 },
+      "mode": "continuous",
+      "count": 10, "life": [0.8, 1.2],
+      "direction": "radial", "spread": 0, "speed": [0.0, 0.0], "swirl": 7.0,
+      "shape": "spark", "stretch": 3, "size": [0.003, 0.004], "colors": ["#fff59d", "#ffb300"], "glow": 1.5, "blend": "add",
+      "fadeIn": 0.15, "fadeOut": 0.25, "flicker": 0.3,
+      "preset": { "seconds": 3.0, "amount": 1.0, "fadeIn": 0.2, "fadeOut": 0.6 }
+    },
+    {
+      "name": "DreamGlyphs",
+      "anchor": "player",
+      "emitter": { "shape": "disc", "radius": 0.03 },
+      "mode": "continuous",
+      "count": 8, "life": [2.5, 4.0],
+      "direction": 70, "spread": 30, "speed": [0.03, 0.05], "wobble": 0.015,
+      "shape": "glyph", "size": [0.006, 0.009], "endSize": 1.6, "colors": ["#ffffff", "#9fa8ff"], "glow": 0.9, "blend": "screen",
+      "fadeIn": 0.2, "fadeOut": 0.5,
+      "preset": { "seconds": 4.0, "amount": 1.0, "fadeIn": 1.0, "fadeOut": 1.2 }
+    },
+    {
+      "name": "BloodDrips",
+      "anchor": "player",
+      "emitter": { "shape": "disc", "radius": 0.025 },
+      "mode": "continuous",
+      "count": 16, "life": [0.6, 1.1],
+      "direction": -90, "spread": 20, "speed": [0.03, 0.08], "gravity": 0.5,
+      "shape": "streak", "stretch": 4, "size": [0.0025, 0.0035], "colors": ["#ff2a2a", "#5a0000"], "glow": 1.0, "blend": "alpha",
+      "fadeIn": 0.1, "fadeOut": 0.4,
+      "preset": { "seconds": 4.0, "amount": 1.0, "fadeIn": 0.8, "fadeOut": 1.2 }
+    },
+    {
+      "name": "PhaseStatic",
+      "anchor": "player",
+      "emitter": { "shape": "cells", "radius": 0.12 },
+      "mode": "continuous",
+      "count": 36, "life": [0.15, 0.4],
+      "direction": 0, "spread": 0, "speed": [0.0, 0.0],
+      "shape": "glyph", "cellSnap": true, "size": [0.014, 0.018], "colors": ["#80ffff", "#1a4d66"], "glow": 0.5, "blend": "screen",
+      "fadeIn": 0.1, "fadeOut": 0.3, "flicker": 0.8,
+      "preset": { "seconds": 4.0, "amount": 1.0, "fadeIn": 0.3, "fadeOut": 0.6 }
+    },
+    {
+      "name": "DreadWisps",
+      "anchor": "player",
+      "emitter": { "shape": "ring", "radius": 0.22 },
+      "mode": "continuous",
+      "count": 40, "life": [1.5, 3.0],
+      "direction": "inward", "spread": 25, "speed": [0.04, 0.09], "swirl": 1.2, "wobble": 0.02,
+      "shape": "streak", "stretch": 5, "size": [0.003, 0.005], "colors": ["#b388ff", "#1a0033"], "glow": 1.1, "blend": "add",
+      "fadeIn": 0.3, "fadeOut": 0.3, "flicker": 0.3,
+      "preset": { "seconds": 4.0, "amount": 1.0, "fadeIn": 1.0, "fadeOut": 1.2 }
+    }
+  ]
+}
