@@ -4,9 +4,8 @@ A .particles file is a PopcornFX baked effect (runtime 2.9.5). It holds the
 compiled effect, not the editable node graph, and there is no public editor for
 it. This module decodes the container so that the parts that are plain data can
 be changed: renderer properties (textures, meshes, numbers, colours), curves,
-attribute defaults, strings, and the constants of the compiled scripts. The
-bytecode itself (CCompilerBlobCache) is split into its parts but its instructions
-are not decoded yet.
+attribute defaults, strings, and the compiled scripts: their constants and,
+through PopcornVm.py, their instructions.
 
 Layout (little endian), worked out from the game's 1991 files, 2026-11-13:
 
@@ -42,13 +41,18 @@ What the fields mean, as far as it is known:
                                   f3 path string
   CParticleNodeSamplerData_Curve  f17 key times, f18 key values, f19 tangents (two per value)
   CParticleAttributeDeclaration   f0 name, f14 default value, f44 maximum
-  CCompilerBlobCache              one compiled script ("CPU/CPU_VM" in f0). f1 a small number (1-5),
-                                  f5 names the script reads or writes (string indices, -1 = none),
-                                  f4 records of five words (one per external), f6 a word list.
+  CCompilerBlobCache              one compiled script ("CPU/CPU_VM" in f0). f1 a small number (1-5).
+                                  f5 the externals the script loads and stores (string indices, -1 = none);
+                                  f4 one record of five words per external: 0, type (operand type
+                                  minus 1: 1F float, 21 float3, 22 float4, 19 int, 1 bool, -1 a context),
+                                  a size class, 2 for a read-only input, access (1 read, 3 read and
+                                  write, 6 write);
+                                  f6 the functions the script calls, by name with their signature
+                                  ("self.kill_bool_pCtxS", "effect.age_pCtxI", ...).
                                   f2 is the program, as 32-bit words:
-                                    9 header words: w0 ?, w1 bytecode length in bytes, w3 size of the
-                                    constants in bytes, w5 number of constants, w6-w8 small counts
-                                    (w2 and w4 are always 0);
+                                    9 header words: w0 number of instructions, w1 bytecode length in
+                                    bytes, w3 size of the constants in bytes, w5 number of constants,
+                                    w8 number of functions, w6-w7 small counts (w2 and w4 are always 0);
                                     the bytecode (starts 7C, ends 7D);
                                     the constants, 32 bytes each (a value repeated for eight lanes,
                                     or eight different numbers), directly after the code;
@@ -58,6 +62,7 @@ usage:
   PopcornBaked.py dump <file> [--class <name>]      readable listing
   PopcornBaked.py props <file>                      renderers and their properties (PC only)
   PopcornBaked.py code <file>                       compiled scripts: names, constants, bytecode size
+  PopcornBaked.py dis <file> [object number ...]    compiled scripts as readable instructions
   PopcornBaked.py roundtrip <file or folder> ...    parse + write must give the same bytes
 """
 import json
@@ -183,6 +188,16 @@ class Obj:
     def names(self):
         """For a CCompilerBlobCache: the names in f5 (None where the slot is empty)."""
         return [self.baked.strings[i] if 0 <= i < len(self.baked.strings) else None for i in self.ints(5) or []]
+
+    def functions(self):
+        """For a CCompilerBlobCache: the names of the functions its calls refer to (f6)."""
+        return [self.baked.strings[i] if 0 <= i < len(self.baked.strings) else None for i in self.ints(6) or []]
+
+    def disassemble(self):
+        """For a CCompilerBlobCache: its bytecode as text (see PopcornVm.py)."""
+        import PopcornVm
+        prog = self.program()
+        return PopcornVm.listing(PopcornVm.decode(prog['code']), prog['constants'], self.names(), self.functions())
 
     def encode(self):
         if self.fields is None:
@@ -390,6 +405,14 @@ def main():
                 same = len(set(n)) == 1
                 vals = [('%d' % a) if -65536 < a < 65536 else ('%.6g' % b) for a, b in zip(n, f)]
                 print('    const %d: %s' % (i, vals[0] + ' (all lanes)' if same else ' '.join(vals)))
+    elif cmd == 'dis':
+        baked = load(args[1])
+        want = set(int(a) for a in args[2:])
+        for o in baked.of('CCompilerBlobCache'):
+            if want and o.number not in want:
+                continue
+            print('#%d  %d instructions' % (o.number, o.program()['header'][0]))
+            print('\n'.join('    ' + line for line in o.disassemble().split('\n')))
     elif cmd == 'roundtrip':
         files = []
         for a in args[1:]:

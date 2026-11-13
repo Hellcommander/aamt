@@ -329,7 +329,7 @@ D2RMM.copyFile('hd', 'hd', true);   // the generated textures and particle files
 
 ## Particle effect decoder (edit an effect, not only its colours)
 
-`PopcornBaked.py` (+ `PopcornBaked.schema.json`)
+`PopcornBaked.py` (+ `PopcornBaked.schema.json`), `PopcornVm.py`
 
 The game's `.particles` files are PopcornFX baked effects (runtime 2.9.5). There is no public
 editor for them and the PopcornFX editor is a paid product, so the format was decoded from the
@@ -340,14 +340,22 @@ same when nothing is changed.
 - Editable: renderer properties (texture and mesh paths, numbers, modes), curve keys,
   attribute defaults, strings (new ones are added at the end), and the constants of the
   compiled scripts (the literal numbers a script uses: sizes, lifetimes, speeds, colours).
-- Split but not decoded: the bytecode instructions themselves (how particles are spawned and
-  moved). Which constant a script uses for what has to be read from its names and values.
+- Decoded (`PopcornVm.py`): the instructions of the compiled scripts, which say how particles
+  are spawned, moved, sized and coloured. All 11241 distinct scripts of the game decode with
+  the instruction count their header gives and encode back to the same bytes. The listing
+  shows loads and stores by name, arithmetic, comparisons, vector building, and calls with the
+  function's own name (`self.kill_bool_pCtxS`, `effect.age_pCtxI`, `samplerCurve1:sample_float`).
+- Not identified yet: most one-argument math functions (shown as `fn1_XX`), the three-argument
+  ones, and the exact order of the four inequality tests. The module's docstring marks what
+  is presumed.
+- Not tested in the game: a script whose instructions were changed (only constants so far).
 - Confirmed in the game (2026-11-13): an edited file with added strings, a changed length and
   textures drawn from scratch loads and shows.
 
 ```
 python PopcornBaked.py props <file.particles>       renderers and their properties (PC copy)
 python PopcornBaked.py code <file.particles>        compiled scripts: the names they use and their constants
+python PopcornBaked.py dis <file.particles> [n ...]  compiled scripts as readable instructions
 python PopcornBaked.py dump <file.particles> [--class <name>]
 python PopcornBaked.py roundtrip <file or folder>
 ```
