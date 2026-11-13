@@ -1,0 +1,219 @@
+{
+ "CCompilerBlobCache": {
+  "0": "F4",
+  "1": "F4",
+  "2": "A4",
+  "4": "A4",
+  "5": "A4",
+  "6": "A4"
+ },
+ "CLayerCompileCache": {
+  "0": "A16",
+  "1": "A16",
+  "11": "F4",
+  "12": "F4",
+  "13": "F1",
+  "14": "F1",
+  "15": "F1",
+  "16": "F4",
+  "17": "F4",
+  "18": "F4",
+  "19": "F16",
+  "2": "A4",
+  "20": "F4",
+  "21": "F4",
+  "24": "F4",
+  "25": "F4",
+  "27": "F4",
+  "28": "F4",
+  "3": "A4",
+  "30": "F4",
+  "31": "F4",
+  "5": "A4",
+  "7": "A4",
+  "8": "A4",
+  "9": "A4"
+ },
+ "CLayerCompileCacheAttrib": {
+  "0": "F4",
+  "1": "F12",
+  "10": "F16",
+  "2": "F4",
+  "3": "F4",
+  "4": "F4",
+  "6": "F16",
+  "7": "F16",
+  "8": "F16",
+  "9": "F16"
+ },
+ "CLayerCompileCacheEvent": {
+  "0": "F4",
+  "1": "F4",
+  "2": "A4",
+  "3": "F4"
+ },
+ "CLayerCompileCacheEventPayload": {
+  "0": "F4",
+  "1": "F4",
+  "2": "F4",
+  "3": "F4",
+  "4": "F4",
+  "5": "F4",
+  "6": "F2",
+  "7": "F2"
+ },
+ "CLayerCompileCacheField": {
+  "0": "F4",
+  "1": "F4",
+  "2": "F4",
+  "3": "F4",
+  "4": "F4",
+  "5": "F4"
+ },
+ "CLayerCompileCacheRenderer": {
+  "0": "F4",
+  "1": "A4",
+  "103": "F2",
+  "104": "F2",
+  "105": "F48",
+  "2": "A4",
+  "3": "F4",
+  "4": "F4",
+  "68": "F2",
+  "69": "F2",
+  "70": "F48"
+ },
+ "CLayerCompileCacheRendererParticleInput": {
+  "0": "F4",
+  "1": "F4",
+  "2": "F4",
+  "3": "F4"
+ },
+ "CLayerCompileCacheRendererProperty": {
+  "0": "F4",
+  "1": "F4",
+  "2": "F16",
+  "3": "F4"
+ },
+ "CLayerCompileCacheSampler": {
+  "0": "F4",
+  "1": "F4",
+  "3": "F4",
+  "4": "F4"
+ },
+ "CLayerGraphCompileCache": {
+  "0": "F4",
+  "2": "A4",
+  "3": "A4",
+  "4": "A4",
+  "6": "F16"
+ },
+ "CLayerGraphCompileCache_EntrySlot": {
+  "0": "F4",
+  "1": "F4"
+ },
+ "CLayerGraphCompileCache_EventSlot": {
+  "0": "F4",
+  "1": "F4",
+  "2": "A4"
+ },
+ "CLayerGraphCompileCache_LayerSlot": {
+  "0": "F4",
+  "1": "A4",
+  "2": "A4"
+ },
+ "CParticleAttributeDeclaration": {
+  "0": "F4",
+  "1": "F4",
+  "14": "F16",
+  "2": "F12",
+  "21": "F16",
+  "25": "F4",
+  "3": "F12",
+  "32": "F16",
+  "4": "F4",
+  "44": "F16",
+  "5": "F1",
+  "50": "F16",
+  "51": "F1",
+  "6": "F1",
+  "7": "F1"
+ },
+ "CParticleAttributeList": {
+  "0": "A4"
+ },
+ "CParticleEffect": {
+  "1": "A4",
+  "10": "F1",
+  "11": "F4",
+  "3": "F4"
+ },
+ "CParticleNodePinIn": {
+  "0": "F4",
+  "1": "F4",
+  "10": "F4",
+  "2": "F1",
+  "5": "F4",
+  "7": "F16",
+  "8": "F16",
+  "9": "F4"
+ },
+ "CParticleNodePinOut": {
+  "0": "F4",
+  "1": "F4",
+  "4": "F4"
+ },
+ "CParticleNodeSamplerData_Curve": {
+  "0": "F12",
+  "10": "F4",
+  "11": "F4",
+  "12": "F16",
+  "13": "F16",
+  "14": "F4",
+  "16": "F1",
+  "17": "A4",
+  "18": "A4",
+  "19": "A4",
+  "3": "F4",
+  "7": "F8"
+ },
+ "CParticleNodeSamplerData_EventStream": {
+  "11": "A4"
+ },
+ "CParticleNodeSamplerData_Shape": {
+  "10": "F4",
+  "11": "F4",
+  "12": "F12",
+  "13": "F4",
+  "14": "F4",
+  "16": "F4",
+  "17": "F1",
+  "18": "F12",
+  "27": "F1",
+  "28": "F1",
+  "29": "F12",
+  "30": "F12",
+  "7": "F8"
+ },
+ "CParticleNodeSamplerData_Text": {
+  "6": "F8"
+ },
+ "CParticleNodeSamplerData_Turbulence": {
+  "0": "F12",
+  "10": "F4",
+  "11": "F4",
+  "19": "F4",
+  "20": "F4",
+  "21": "F4",
+  "22": "F4",
+  "23": "F4",
+  "24": "F4",
+  "25": "F4",
+  "26": "F4",
+  "27": "F4",
+  "28": "F4",
+  "29": "F4",
+  "3": "F4",
+  "7": "F8"
+ }
+}

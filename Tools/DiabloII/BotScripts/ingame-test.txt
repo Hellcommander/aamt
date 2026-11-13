@@ -1,0 +1,36 @@
+# In-game check of the harness itself. Ran with RESULT PASS on 2026-11-13 (character TEST, a Necromancer).
+# Run it with -Character <name>: the launcher then refuses to start unless that character was played last,
+# because Play enters the character the menu has selected, and that is the one played last.
+# Cheats change and save the character: throwaway characters only.
+
+waitfor menu 120000
+waitfor panel CharacterSelectPanel 20000
+wait 2500
+screenshot menu
+ui MainMenuHD:Play
+waitfor game 60000
+wait 3000
+
+console god 1
+console goto 2
+waitfor area == 2 30000
+wait 2500
+cheat mspawn fallen1,6
+wait 1500
+reset
+# Right click uses the character's right-button skill, left click attacks. Positions are fractions of the window;
+# the character stands at about 0.50 0.42.
+click right 0.53 0.50 300
+wait 900
+click right 0.47 0.48 300
+wait 900
+click left 0.53 0.48 1500
+wait 1500
+screenshot fight
+state
+expect kills >= 1
+
+console goto 1
+waitfor area == 1 30000
+wait 1500
+exit
