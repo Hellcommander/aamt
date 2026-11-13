@@ -364,6 +364,59 @@ The layout and the known field meanings are in the module's docstring. First use
 `SorceressSecondPages\devuild_effects.py`, which draws its own RGBA8 textures (one mip, the
 gradient textures' layout) and points an effect's layers at them.
 
+## Particle effect editor (GUI and command line)
+
+`Start-D2REffectEditor.ps1` / `.bat` -> `EffectEditor.py` + `EffectEditor.html` (the GUI)
+`Edit-D2REffect.ps1` / `.bat` -> `EffectEdit.py` (the command line and the shared core)
+`HdTexture.py` (the game's `.texture` files <-> PNG)
+
+Built on the decoder above. An effect is shown as its named layers ("Root", "tail",
+"headglow" ...). Each layer has renderers (what is drawn, with textures and settings),
+scripts (the compiled code that spawns and updates its particles, with the numbers it uses)
+and samplers (curves and others).
+
+**GUI.** `Start-D2REffectEditor.ps1 -Root <game> -OutDir <mod folder>` starts a server on this
+computer only and opens the page:
+
+- find any of the game's effects by name; pick a layer on the left;
+- middle: a preview and the layer's renderers. Change a texture with the picker (search the
+  game's effect textures, or use your own PNG, which becomes a new texture), type new numbers
+  into settings;
+- right: the layer's scripts with their constants (editable) and their code (read only), and
+  its curves (keys editable, with a plot);
+- changed values turn orange; Undo steps back; Save writes the new `.particles` file, the
+  textures made from PNGs and the recipe into the mod folder, and shows what the mod script
+  needs.
+
+The preview is an approximate still picture: base texture times blend texture, cut by the
+masks, coloured by the gradient map. It does not run the effect, so movement, distortion,
+particle count, size and timing are not shown. Mesh, light and decal renderers are listed but
+not drawn.
+
+**Command line (for scripts and bots).** Everything the GUI does is a *recipe*, a JSON file:
+
+```
+.\Edit-D2REffect.ps1 list mephisto                 particle files whose path matches
+.\Edit-D2REffect.ps1 missiles "^meph"              missile name -> HD definition -> particle files
+.\Edit-D2REffect.ps1 show <effect> [-Json] [-Scripts]
+.\Edit-D2REffect.ps1 apply recipe.json -OutDir <mod folder>
+```
+
+`show -Json` gives the full description (layers, properties, constants, curves) to read
+programmatically; `apply` prints the manifest as JSON and exits 1 with a one-line reason when
+an edit does not fit (unknown layer, wrong value type ...). The recipe format, with every
+edit kind (`property`, `replace-texture`, `constant`, `curve`, `attribute`) and the
+`textures` made from PNG files, is in the docstring of `EffectEdit.py`. A recipe saved by
+the GUI gives the same bytes when applied from the command line.
+
+Edits address the PC copy of an effect (the file also holds Switch, PS4 and PS5 copies, often
+with fewer layers); `replace-texture` changes all copies.
+
+Checked 2026-11-13: GUI driven in a browser (open, texture pick, PNG import, constant edit,
+code view, undo, save), and the saved recipe re-applied from the command line byte for byte.
+Not yet checked in the game: an effect saved by the editor (the same kind of file, made by a
+script, does load and show).
+
 ## Loader log reader (what the game itself complained about)
 
 `Get-D2RLoaderLog.ps1` / `.bat` (wrapper) -> `LoaderLog.py`
