@@ -1,0 +1,63 @@
+{
+  "name": "Arcane wind effects (Sorceress: Wind, Arcane and Poison mod)",
+  "blockFormats": {},
+  "looks": [
+    {
+      "name": "gust",
+      "tag": "swA",
+      "source": "expansion_overseer_missile",
+      "color": {
+        "hue": 265,
+        "minSat": 0.45
+      }
+    },
+    {
+      "name": "blast",
+      "tag": "swB",
+      "source": "blue_nova_b",
+      "color": {
+        "hue": 265,
+        "minSat": 0.45
+      }
+    },
+    {
+      "name": "breath",
+      "tag": "swC",
+      "source": "expansion_arctic_blast_ice",
+      "color": {
+        "hue": 265,
+        "minSat": 0.45
+      }
+    },
+    {
+      "name": "twister",
+      "tag": "swD",
+      "source": "expansion_twister",
+      "color": {
+        "hue": 265,
+        "minSat": 0.45
+      }
+    },
+    {
+      "name": "firetwister",
+      "tag": "swE",
+      "source": "firetwister",
+      "color": {
+        "hue": 265,
+        "minSat": 0.45
+      }
+    },
+    {
+      "name": "tornado",
+      "tag": "swF",
+      "source": "expansion_tornado",
+      "color": {
+        "hue": 265,
+        "minSat": 0.45
+      }
+    }
+  ],
+  "skipFolders": [
+    "distortion"
+  ]
+}

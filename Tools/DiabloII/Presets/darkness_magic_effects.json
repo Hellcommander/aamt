@@ -1,0 +1,19 @@
+{
+  "name": "Darkness Magic effects (Darkness Magic Necromancer mod)",
+  "blockFormats": {},
+  "looks": [
+    { "name": "unholybolt", "tag": "dmA", "source": "unholy_bolt", "color": { "hue": 275, "minSat": 0.6  } },
+    { "name": "maidenvenom", "tag": "dmB", "source": "andariel_spell", "color": { "hue": 165, "minSat": 0.5, "value": 0.85  } },
+    { "name": "pestilenturn", "tag": "dmF", "source": "expansion_catapultpoisonbomb", "color": { "hue": 58, "minSat": 0.6  } },
+    { "name": "urncloud", "tag": "dmG", "source": "poison_smoke_puff", "color": { "hue": 58, "minSat": 0.6  } },
+    { "name": "darkmending", "tag": "dmH", "source": "expansion_overseer_missile", "color": { "hue": 205, "minSat": 0.4  } },
+    { "name": "boneskull", "tag": "dmI", "source": "bone_spirit", "color": { "hue": 40, "sat": 0.5  } },
+    { "name": "boneshard", "tag": "dmJ", "source": "teeth_missile", "color": { "hue": 40, "sat": 0.5  } },
+    { "name": "crawlinghex", "tag": "dmK", "source": "finger_mage_spider", "color": { "hue": 295, "minSat": 0.6  } },
+    { "name": "miasma", "tag": "dmL", "source": "poison_smoke_puff", "color": { "hue": 300, "minSat": 0.6, "value": 0.9  } },
+    { "name": "sanguineskull", "tag": "dmM", "source": "vampire_missile", "color": { "hue": 355, "minSat": 0.8, "value": 0.85  } }
+  ],
+  "skipFolders": [
+    "distortion"
+  ]
+}

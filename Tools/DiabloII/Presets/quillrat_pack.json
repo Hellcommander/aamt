@@ -1,0 +1,26 @@
+{
+  "name": "Quill Rat pack (Quill Rat Druid mod)",
+  "props": {
+    "qr_bone_spine": {
+      "model": "hd/vfx/meshes/lit_mesh/bonewall/model_source/fx_mesh_bone_tusk",
+      "textures": [
+        "hd/vfx/meshes/lit_mesh/bonewall/texture_source/bonewall_props_alb.texture",
+        "hd/vfx/meshes/lit_mesh/bonewall/texture_source/bonewall_props_nrm.texture",
+        "hd/vfx/meshes/lit_mesh/bonewall/texture_source/bonewall_props_orm.texture"
+      ]
+    }
+  },
+  "variants": [
+    { "name": "qr_giant_quillrat", "donor": "quillrat2", "scale": 1.9 },
+    { "name": "qr_pack_quillrat", "donor": "quillrat2", "scale": 0.8 },
+    {
+      "name": "qr_quill_bear", "donor": "quillrat2",
+      "scale": { "x": 2.3, "y": 2.0, "z": 2.1 },
+      "attach": [
+        { "prop": "qr_bone_spine", "bone": "L_leg_01_bind_jnt", "scale": 0.45, "burst": { "count": 12, "scaleJitter": 0.5 } },
+        { "prop": "qr_bone_spine", "bone": "R_leg_01_bind_jnt", "scale": 0.45, "burst": { "count": 12, "scaleJitter": 0.5 } }
+      ]
+    }
+  ],
+  "auditOnly": ["quillbear1"]
+}

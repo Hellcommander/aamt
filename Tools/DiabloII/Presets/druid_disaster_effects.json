@@ -1,0 +1,15 @@
+{
+  "name": "Natural Disasters effects (Druid: Venom Calling and Natural Disasters mod)",
+  "blockFormats": {},
+  "looks": [
+    { "name": "stoneshard", "tag": "dnA", "source": "expansion_fire_spikes", "color": { "hue": 32, "sat": 0.35, "value": 0.85 } },
+    { "name": "stoneground", "tag": "dnB", "source": "expansion_fire_spikes_ground", "color": { "hue": 32, "sat": 0.35, "value": 0.85 } },
+    { "name": "stoneburst", "tag": "dnC", "source": "expansion_fire_spike_explode", "color": { "hue": 34, "sat": 0.4, "value": 0.9 } },
+    { "name": "quakedust", "tag": "dnD", "source": "blue_nova_b", "color": { "hue": 36, "sat": 0.45, "value": 0.9 } },
+    { "name": "floodwater", "tag": "dnE", "source": "icebolt", "color": { "hue": 205, "minSat": 0.7, "value": 0.9 } },
+    { "name": "deluge", "tag": "dnF", "source": "frost_nova", "color": { "hue": 208, "minSat": 0.7, "value": 0.9 } }
+  ],
+  "skipFolders": [
+    "distortion"
+  ]
+}

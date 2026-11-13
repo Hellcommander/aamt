@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>D2R Effect Editor</title>
+<style>
+:root { --bg:#15161a; --panel:#1e2026; --panel2:#262932; --line:#343844; --text:#e6e7ea; --dim:#9aa0ad; --accent:#8fb4ff; --warn:#ffb86b; --bad:#ff7a7a; --good:#7fd69b; }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.45 "Segoe UI", system-ui, sans-serif; display: flex; flex-direction: column; }
+header, footer { background: var(--panel); border-bottom: 1px solid var(--line); padding: 8px 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+footer { border-bottom: 0; border-top: 1px solid var(--line); }
+header h1 { font-size: 14px; margin: 0 8px 0 0; font-weight: 600; white-space: nowrap; }
+input, select, button, textarea { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 4px 7px; }
+input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); }
+button { cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: #2c4a86; border-color: #3d63b0; }
+button.small { padding: 1px 6px; font-size: 12px; }
+label { color: var(--dim); display: inline-flex; gap: 6px; align-items: center; }
+#status { margin-left: auto; color: var(--dim); max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#status.bad { color: var(--bad); } #status.good { color: var(--good); }
+.search { position: relative; }
+#q { width: 340px; }
+#results { position: absolute; top: 100%; left: 0; z-index: 20; width: 640px; max-height: 60vh; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 4px; display: none; }
+#results div { padding: 3px 8px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#results div:hover { background: var(--panel2); }
+#results .dir { color: var(--dim); }
+main { flex: 1; min-height: 0; display: grid; grid-template-columns: 230px minmax(380px, 1fr) minmax(330px, 0.8fr); }
+main > * { overflow: auto; padding: 10px 12px; }
+#left { background: var(--panel); border-right: 1px solid var(--line); }
+#right { background: var(--panel); border-left: 1px solid var(--line); }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 14px 0 6px; font-weight: 600; }
+h2:first-child { margin-top: 0; }
+.layer { padding: 5px 8px; border-radius: 4px; cursor: pointer; display: flex; justify-content: space-between; gap: 6px; }
+.layer:hover { background: var(--panel2); }
+.layer.on { background: #2b3550; }
+.layer small, .muted { color: var(--dim); }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+#right .card { background: var(--panel2); }
+.card h3 { margin: 0 0 8px; font-size: 13px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.chip { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-radius: 10px; padding: 0 7px; }
+.group { margin: 8px 0 2px; color: var(--accent); font-size: 12px; }
+.row { display: grid; grid-template-columns: minmax(120px, 190px) 1fr; gap: 8px; align-items: center; padding: 2px 0; }
+.row .name { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row.changed .name { color: var(--warn); }
+tr.changed td { color: var(--warn); }
+.tex { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.tex img { width: 44px; height: 44px; object-fit: contain; background: #000 linear-gradient(45deg, #222 25%, transparent 25%, transparent 75%, #222 75%) 0 0/12px 12px; border: 1px solid var(--line); border-radius: 3px; flex: none; }
+.tex span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.nums { display: flex; gap: 4px; flex-wrap: wrap; }
+.nums input { width: 78px; }
+#preview { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+#preview canvas { background: #07080a; border: 1px solid var(--line); border-radius: 6px; width: 256px; height: 256px; image-rendering: auto; }
+#preview p { margin: 0; max-width: 330px; color: var(--dim); }
+pre { background: #0d0e11; border: 1px solid var(--line); border-radius: 4px; padding: 8px; overflow: auto; max-height: 340px; font: 12px/1.4 Consolas, monospace; white-space: pre; }
+table { border-collapse: collapse; width: 100%; }
+td, th { padding: 2px 4px; text-align: left; vertical-align: middle; }
+th { color: var(--dim); font-weight: 500; font-size: 12px; }
+td input { width: 74px; }
+.curve canvas { width: 100%; height: 90px; background: #0d0e11; border: 1px solid var(--line); border-radius: 4px; display: block; margin: 6px 0; }
+#modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 50; }
+#modal .box { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; width: min(980px, 94vw); max-height: 88vh; display: flex; flex-direction: column; }
+#modal .head { padding: 10px 12px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+#modal .body { padding: 12px; overflow: auto; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 8px; }
+.pick { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 5px; cursor: pointer; text-align: center; }
+.pick:hover { border-color: var(--accent); }
+.pick img { width: 96px; height: 96px; object-fit: contain; background: #000; display: block; margin: 0 auto 4px; }
+.pick div { font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+textarea { width: 100%; min-height: 320px; font: 12px/1.4 Consolas, monospace; }
+.empty { color: var(--dim); padding: 30px; text-align: center; }
+@media (max-width: 1000px) { main { grid-template-columns: 190px 1fr; } #right { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>D2R Effect Editor</h1>
+  <div class="search">
+    <input id="q" placeholder="Find an effect: mephisto, tornado, poison nova ..." autocomplete="off">
+    <div id="results"></div>
+  </div>
+  <label>Saved <select id="recipes"><option value="">open a saved recipe...</option></select></label>
+  <span id="status">Search for an effect to begin.</span>
+</header>
+<main>
+  <aside id="left"><div class="empty">No effect open.</div></aside>
+  <section id="centre"><div class="empty">Pick an effect from the search box. Its layers appear on the left; a layer's textures and settings appear here, its scripts and curves on the right.</div></section>
+  <aside id="right"></aside>
+</main>
+<footer>
+  <label>Save as <input id="outPath" size="52" placeholder="data/hd/vfx/particles/custom/name.particles"></label>
+  <label>New textures in <input id="texDir" size="30" value="data/hd/vfx/textures/custom/"></label>
+  <label>Recipe name <input id="recipeName" size="16"></label>
+  <button id="save" class="primary">Save</button>
+  <button id="undo">Undo</button>
+  <button id="showRecipe">Recipe</button>
+  <span class="muted" id="outInfo"></span>
+</footer>
+<div id="modal"><div class="box"><div class="head" id="modalHead"></div><div class="body" id="modalBody"></div></div></div>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const el = (tag, attrs = {}, kids = []) => {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === 'class') e.className = v; else if (k === 'text') e.textContent = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v);
+  }
+  for (const kid of [].concat(kids)) if (kid != null) e.append(kid);
+  return e;
+};
+const state = { recipe: null, base: null, desc: null, layer: 0, history: [], code: {} };
+const PREVIEW = 192;
+
+function status(text, kind = '') { const s = $('status'); s.textContent = text; s.className = kind; s.title = text; }
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+const texUrl = (path, size = 96) => `/api/texture?size=${size}&path=${encodeURIComponent(path)}`;
+const baseName = (p) => String(p).split('/').pop().replace(/\.[a-z]+$/i, '');
+const sameValue = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+// ---------------------------------------------------------------- open / refresh
+async function openEffect(source, recipe) {
+  status('Opening ' + source + ' ...');
+  const fresh = recipe || { source, output: 'data/hd/vfx/particles/custom/' + baseName(source) + '_edit.particles', textures: [], edits: [] };
+  try {
+    state.base = await api('/api/describe', { recipe: { source: fresh.source } });
+    state.recipe = fresh; state.history = []; state.layer = 0; state.code = {};
+    const first = state.base.layers.findIndex((l) => l.renderers.length);
+    if (first >= 0) state.layer = first;
+    $('outPath').value = fresh.output || '';
+    if (!recipe) $('recipeName').value = baseName(fresh.output);
+    await refresh();
+    status(`${baseName(source)}: ${state.desc.layers.length} layers, ${state.desc.objects} objects. Edits change the PC copy.`);
+  } catch (e) { status(e.message, 'bad'); }
+}
+async function refresh() {
+  state.desc = await api('/api/describe', { recipe: state.recipe });
+  state.code = {};
+  render();
+}
+async function addEdit(edit, key) {
+  const before = JSON.stringify(state.recipe);
+  const keyOf = (e) => [e.op, e.layer, e.renderer, e.name, e.script, e.index, e.sampler, e.from].join('|');
+  const k = keyOf(edit);
+  const edits = state.recipe.edits.filter((e) => keyOf(e) !== k);
+  edits.push(edit);
+  state.recipe.edits = edits;
+  try {
+    await refresh();
+    state.history.push(before);
+    status(`${state.recipe.edits.length} edit(s), not saved yet.`);
+  } catch (e) {
+    state.recipe = JSON.parse(before);
+    status(e.message, 'bad');
+    render();
+  }
+}
+async function undo() {
+  if (!state.history.length) return status('Nothing to undo.');
+  state.recipe = JSON.parse(state.history.pop());
+  try { await refresh(); status(`${state.recipe.edits.length} edit(s).`); } catch (e) { status(e.message, 'bad'); }
+}
+
+// ---------------------------------------------------------------- render
+function render() {
+  if (!state.desc) return;
+  renderLeft(); renderCentre(); renderRight();
+}
+function baseLayer() { return state.base.layers[state.layer]; }
+function renderLeft() {
+  const left = $('left'); left.replaceChildren();
+  left.append(el('h2', { text: 'Layers' }));
+  state.desc.layers.forEach((l) => {
+    const kinds = l.renderers.map((r) => r.kind).join(', ') || 'no renderer';
+    const depth = l.parent == null ? 0 : 1;
+    left.append(el('div', { class: 'layer' + (l.index === state.layer ? ' on' : ''), style: `margin-left:${depth * 10}px`, onclick: () => { state.layer = l.index; render(); } },
+      [el('span', { text: l.name || '#' + l.index }), el('small', { text: kinds })]));
+  });
+  if (state.desc.attributes.length) {
+    left.append(el('h2', { text: 'Attributes' }));
+    state.desc.attributes.forEach((a, i) => {
+      const was = state.base.attributes[i] || {};
+      const input = el('input', { type: 'number', step: 'any', value: a.default ? a.default[0] : 0, style: 'width:80px' });
+      input.addEventListener('change', () => addEdit({ op: 'attribute', name: a.name, default: [Number(input.value)] }));
+      left.append(el('div', { class: 'row' + (sameValue(was.default, a.default) ? '' : ' changed'), style: 'grid-template-columns: 1fr auto' }, [el('span', { class: 'name', text: a.name }), input]));
+    });
+  }
+  left.append(el('h2', { text: 'Whole effect' }));
+  left.append(el('button', { class: 'small', text: 'Preview all layers', onclick: () => drawPreview(null) }));
+}
+function renderCentre() {
+  const c = $('centre'); c.replaceChildren();
+  const layer = state.desc.layers[state.layer];
+  if (!layer) return;
+  const canvas = el('canvas', { width: PREVIEW, height: PREVIEW, id: 'pv' });
+  const note = el('p', { id: 'pvNote', text: '' });
+  c.append(el('div', { class: 'card' }, [el('h3', { text: `Layer "${layer.name || '#' + layer.index}"` }), el('div', { id: 'preview' }, [canvas, note])]));
+  if (!layer.renderers.length) c.append(el('div', { class: 'muted', text: 'This layer draws nothing itself; it only runs scripts (for example, it spawns the other layers).' }));
+  layer.renderers.forEach((r) => c.append(rendererCard(layer, r)));
+  drawPreview(layer);
+}
+function rendererCard(layer, r) {
+  const baseR = (baseLayer().renderers[r.index] || { properties: [] });
+  const baseProp = (name) => (baseR.properties.find((p) => p.name === name) || {}).value;
+  const card = el('div', { class: 'card' });
+  const features = r.properties.filter((p) => p.type === 'feature' && p.value).map((p) => p.name);
+  card.append(el('h3', {}, [el('span', { text: `Renderer ${r.index}: ${r.kind}` }), el('span', { class: 'chip', text: r.material }), ...features.slice(0, 14).map((f) => el('span', { class: 'chip', text: f }))]));
+  let group = '';
+  const showUnset = state.showUnset;
+  r.properties.forEach((p) => {
+    if (p.type === 'feature') return;
+    const isPath = ['texture', 'mesh', 'atlas'].includes(p.type);
+    if (p.value == null && !showUnset && !isPath) return;
+    const g = p.name.includes('.') ? p.name.split('.')[0] : 'General';
+    if (g !== group) { group = g; card.append(el('div', { class: 'group', text: g })); }
+    const changed = !sameValue(baseProp(p.name), p.value);
+    const edit = (value) => addEdit({ op: 'property', layer: '#' + layer.index, renderer: r.index, name: p.name, value });
+    let control;
+    if (p.type === 'texture') {
+      control = el('div', { class: 'tex' }, [
+        p.value ? el('img', { src: texUrl(p.value), loading: 'lazy', alt: '' }) : null,
+        el('span', { text: p.value ? baseName(p.value) : '(none)', title: p.value || '' }),
+        el('button', { class: 'small', text: 'Change', onclick: () => pickTexture(p.value, edit) }),
+      ]);
+    } else if (isPath) {
+      const input = el('input', { value: p.value || '', style: 'width:100%' });
+      input.addEventListener('change', () => edit(input.value));
+      control = input;
+    } else {
+      const count = p.type === 'int4' || p.type === 'float4' ? 4 : 1;
+      const vals = p.value || [0, 0, 0, 0];
+      const inputs = [];
+      for (let i = 0; i < count; i++) {
+        const input = el('input', { type: 'number', step: p.type.startsWith('float') ? 'any' : '1', value: vals[i] });
+        input.addEventListener('change', () => edit(inputs.map((x) => Number(x.value))));
+        inputs.push(input);
+      }
+      control = el('div', { class: 'nums' }, inputs);
+    }
+    card.append(el('div', { class: 'row' + (changed ? ' changed' : '') }, [el('span', { class: 'name', text: p.name.split('.').pop(), title: p.name + ' (' + p.type + ')' }), control]));
+  });
+  card.append(el('button', { class: 'small', style: 'margin-top:8px', text: showUnset ? 'Hide unset settings' : 'Show unset settings', onclick: () => { state.showUnset = !showUnset; renderCentre(); } }));
+  return card;
+}
+function renderRight() {
+  const right = $('right'); right.replaceChildren();
+  const layer = state.desc.layers[state.layer];
+  if (!layer) return;
+  right.append(el('h2', { text: 'Scripts' }));
+  if (!layer.scripts.length) right.append(el('div', { class: 'muted', text: 'No scripts.' }));
+  layer.scripts.forEach((s) => {
+    const baseS = (baseLayer().scripts[s.index] || { constants: [] });
+    const card = el('div', { class: 'card' });
+    const calls = s.functions.filter(Boolean).map((f) => f.split('_')[0]);
+    card.append(el('h3', {}, [el('span', { text: `${s.role}` }), el('span', { class: 'chip', text: s.instructions + ' instructions' })]));
+    if (calls.length) card.append(el('div', { class: 'muted', text: 'calls ' + calls.join(', ') }));
+    if (s.constants.length) {
+      const table = el('table', {}, [el('tr', {}, [el('th', { text: '#' }), el('th', { text: 'type' }), el('th', { text: 'value' })])]);
+      s.constants.forEach((c) => {
+        const isInt = /^[ib]/.test(c.type);
+        const inputs = c.value.map((v) => el('input', { type: typeof v === 'string' ? 'text' : 'number', step: isInt ? '1' : 'any', value: v }));
+        const was = (baseS.constants[c.index] || {}).value;
+        inputs.forEach((input) => input.addEventListener('change', () => {
+          const edit = { op: 'constant', layer: '#' + layer.index, script: s.index, index: c.index, value: inputs.map((x) => Number(x.value)) };
+          if (edit.value.some((v) => Number.isNaN(v))) return status('That constant is not a plain number; leave it as it is.', 'bad');
+          if (isInt) edit.as = 'int';
+          addEdit(edit);
+        }));
+        table.append(el('tr', { class: sameValue(was, c.value) ? '' : 'changed' }, [el('td', { text: c.index, class: 'muted' }), el('td', { text: c.type, class: 'muted' }), el('td', {}, el('div', { class: 'nums' }, inputs))]));
+      });
+      card.append(table);
+    }
+    const key = layer.index + ':' + s.index;
+    const pre = el('pre', { style: 'display:none' });
+    card.append(el('button', { class: 'small', style: 'margin-top:6px', text: 'Show code', onclick: async (ev) => {
+      if (pre.style.display === 'none') {
+        if (!state.code[key]) {
+          const d = await api('/api/describe', { recipe: state.recipe, scripts: true });
+          d.layers.forEach((l) => l.scripts.forEach((x) => { state.code[l.index + ':' + x.index] = x.listing; }));
+        }
+        pre.textContent = state.code[key]; pre.style.display = ''; ev.target.textContent = 'Hide code';
+      } else { pre.style.display = 'none'; ev.target.textContent = 'Show code'; }
+    } }));
+    card.append(pre);
+    right.append(card);
+  });
+  right.append(el('h2', { text: 'Samplers' }));
+  if (!layer.samplers.length) right.append(el('div', { class: 'muted', text: 'No samplers.' }));
+  layer.samplers.forEach((x) => right.append(x.kind === 'curve' ? curveCard(layer, x) : el('div', { class: 'card' }, el('h3', {}, [el('span', { text: x.name || 'sampler ' + x.index }), el('span', { class: 'chip', text: x.kind })]))));
+}
+function curveCard(layer, x) {
+  const card = el('div', { class: 'card curve' });
+  const per = x.times.length ? x.values.length / x.times.length : 1;
+  card.append(el('h3', {}, [el('span', { text: x.name || 'curve ' + x.index }), el('span', { class: 'chip', text: `curve, ${x.times.length} keys` + (per > 1 ? ` x ${per}` : '') })]));
+  const canvas = el('canvas', { width: 360, height: 90 });
+  card.append(canvas);
+  const table = el('table', {}, [el('tr', {}, [el('th', { text: 'time' }), el('th', { text: per > 1 ? 'values' : 'value' }), el('th', {})])]);
+  const rows = x.times.map((t, i) => ({ t, v: x.values.slice(i * per, i * per + per) }));
+  const commit = (list, keepTangents) => {
+    list.sort((a, b) => a.t - b.t);
+    const edit = { op: 'curve', layer: '#' + layer.index, sampler: x.index, times: list.map((r) => r.t), values: list.flatMap((r) => r.v) };
+    edit.tangents = keepTangents ? x.tangents : new Array(edit.values.length * 2).fill(0);
+    addEdit(edit);
+  };
+  rows.forEach((row, i) => {
+    const t = el('input', { type: 'number', step: 'any', value: row.t });
+    const vs = row.v.map((v) => el('input', { type: 'number', step: 'any', value: v }));
+    const read = () => rows.map((r, k) => (k === i ? { t: Number(t.value), v: vs.map((n) => Number(n.value)) } : r));
+    [t, ...vs].forEach((input) => input.addEventListener('change', () => commit(read(), true)));
+    table.append(el('tr', {}, [el('td', {}, t), el('td', {}, el('div', { class: 'nums' }, vs)), el('td', {}, rows.length > 2 ? el('button', { class: 'small', text: 'x', title: 'remove this key', onclick: () => commit(rows.filter((_, k) => k !== i), false) }) : null)]));
+  });
+  card.append(table);
+  card.append(el('button', { class: 'small', text: 'Add key', onclick: () => {
+    const last = rows[rows.length - 1] || { t: 0, v: new Array(per).fill(0) };
+    const prev = rows[rows.length - 2] || last;
+    commit(rows.concat([{ t: (last.t + prev.t) / 2 || 0.5, v: last.v.map((v, k) => (v + prev.v[k]) / 2) }]), false);
+  } }));
+  requestAnimationFrame(() => plotCurve(canvas, rows, per));
+  return card;
+}
+function plotCurve(canvas, rows, per) {
+  const g = canvas.getContext('2d'); const W = canvas.width, H = canvas.height;
+  g.clearRect(0, 0, W, H);
+  if (!rows.length) return;
+  const all = rows.flatMap((r) => r.v); const lo = Math.min(0, ...all), hi = Math.max(1e-6, ...all);
+  const t0 = rows[0].t, t1 = rows[rows.length - 1].t || 1;
+  const X = (t) => 6 + (W - 12) * (t1 > t0 ? (t - t0) / (t1 - t0) : 0), Y = (v) => H - 6 - (H - 12) * (v - lo) / (hi - lo || 1);
+  const colours = ['#ff8a8a', '#8fe08f', '#8fb4ff', '#e6e7ea'];
+  for (let k = 0; k < per; k++) {
+    g.strokeStyle = per === 1 ? '#8fb4ff' : colours[k % 4]; g.lineWidth = 1.5; g.beginPath();
+    rows.forEach((r, i) => (i ? g.lineTo(X(r.t), Y(r.v[k])) : g.moveTo(X(r.t), Y(r.v[k]))));
+    g.stroke();
+    g.fillStyle = g.strokeStyle; rows.forEach((r) => g.fillRect(X(r.t) - 2, Y(r.v[k]) - 2, 4, 4));
+  }
+}
+
+// ---------------------------------------------------------------- preview
+const texCache = {};
+function texPixels(path) {
+  if (!path || /\/(white|default_alphamap)\.texture$/i.test(path)) return Promise.resolve(null);
+  const edited = state.recipe.textures.some((t) => t.texture === path);
+  const key = path + (edited ? '?' + Date.now() : '');
+  if (texCache[key]) return texCache[key];
+  texCache[key] = new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = c.height = PREVIEW;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0, PREVIEW, PREVIEW);
+      resolve(g.getImageData(0, 0, PREVIEW, PREVIEW).data);
+    };
+    img.onerror = () => resolve(null);
+    img.src = texUrl(path, PREVIEW);
+  });
+  return texCache[key];
+}
+async function rendererLight(r) {
+  const get = (n) => (r.properties.find((p) => p.name === n) || {}).value;
+  const [B, T, M, A, G] = await Promise.all(['Blend.TextureBase', 'Blend.TextureBlend', 'BlendMask.Mask', 'AlphaMask.Mask', 'GradientRemap.GradientMap'].map((n) => texPixels(get(n))));
+  if (!B && !T && !M && !A) return null;
+  const out = new Float32Array(PREVIEW * PREVIEW * 3);
+  const lum = (d, i) => (d ? Math.max(d[i], d[i + 1], d[i + 2]) / 255 * (d[i + 3] / 255) : 1);
+  for (let p = 0, i = 0; p < PREVIEW * PREVIEW; p++, i += 4) {
+    let v = lum(B, i);
+    if (T) v = Math.min(1, v * lum(T, i) * (B ? 1.6 : 1));
+    const mask = lum(M, i) * lum(A, i);
+    let cr = 1, cg = 1, cb = 1;
+    if (G) {
+      const gx = Math.min(PREVIEW - 1, Math.floor(v * (PREVIEW - 1))), gi = (Math.floor(PREVIEW / 2) * PREVIEW + gx) * 4;
+      cr = G[gi] / 255; cg = G[gi + 1] / 255; cb = G[gi + 2] / 255;
+    } else if (B) {
+      const m = Math.max(B[i], B[i + 1], B[i + 2], 1); cr = B[i] / m; cg = B[i + 1] / m; cb = B[i + 2] / m;
+    }
+    const a = v * mask;
+    out[p * 3] = cr * a; out[p * 3 + 1] = cg * a; out[p * 3 + 2] = cb * a;
+  }
+  return out;
+}
+async function drawPreview(layer) {
+  const canvas = $('pv'); if (!canvas) return;
+  const g = canvas.getContext('2d');
+  const layers = layer ? [layer] : state.desc.layers;
+  const sum = new Float32Array(PREVIEW * PREVIEW * 3);
+  let drawn = 0; const skipped = [];
+  for (const l of layers) for (const r of l.renderers) {
+    if (r.kind !== 'billboard' && r.kind !== 'ribbon') { skipped.push(r.kind); continue; }
+    const light = await rendererLight(r);
+    if (!light) continue;
+    for (let i = 0; i < sum.length; i++) sum[i] += light[i];
+    drawn++;
+  }
+  // Faint layers are brightened so their shape can be seen (the game adds exposure of its own).
+  let peak = 0; for (let i = 0; i < sum.length; i++) if (sum[i] > peak) peak = sum[i];
+  const gain = peak > 0 && peak < 0.9 ? 0.9 / peak : 1;
+  const img = g.createImageData(PREVIEW, PREVIEW);
+  for (let p = 0; p < PREVIEW * PREVIEW; p++) {
+    img.data[p * 4] = Math.min(255, 7 + sum[p * 3] * gain * 255); img.data[p * 4 + 1] = Math.min(255, 8 + sum[p * 3 + 1] * gain * 255);
+    img.data[p * 4 + 2] = Math.min(255, 10 + sum[p * 3 + 2] * gain * 255); img.data[p * 4 + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  const note = $('pvNote');
+  if (note) {
+    note.textContent = (layer ? '' : 'All layers. ') + (drawn ? 'Approximate still picture: the base texture times the blend texture, cut by the masks and coloured by the gradient map. Movement, distortion, particle count, size and timing are not shown.' : 'Nothing to draw here as a picture.')
+      + (gain > 1.05 ? ` Brightened ${gain.toFixed(1)}x.` : '') + (skipped.length ? ` Not drawn: ${[...new Set(skipped)].join(', ')}.` : '');
+  }
+}
+
+// ---------------------------------------------------------------- texture picker
+function modal(head, body) { const keep = (x) => [].concat(x).filter((n) => n != null); $('modalHead').replaceChildren(...keep(head)); $('modalBody').replaceChildren(...keep(body)); $('modal').style.display = 'flex'; }
+function closeModal() { $('modal').style.display = 'none'; }
+function pickTexture(current, done) {
+  const grid = el('div', { class: 'grid' });
+  const search = el('input', { placeholder: 'Search the game\'s effect textures: noise, mask, gradient, fire ...', style: 'flex:1; min-width:260px' });
+  const file = el('input', { type: 'file', accept: 'image/png,image/*' });
+  const name = el('input', { placeholder: 'texture name', size: 16 });
+  const choose = (path) => { closeModal(); done(path); };
+  const load = async () => {
+    grid.replaceChildren(el('div', { class: 'muted', text: 'Searching ...' }));
+    try {
+      const list = await api('/api/textures?q=' + encodeURIComponent(search.value));
+      grid.replaceChildren(...list.map((p) => el('div', { class: 'pick', title: p, onclick: () => choose(p) }, [el('img', { src: texUrl(p, 96), loading: 'lazy', alt: '' }), el('div', { text: baseName(p) })])));
+      if (!list.length) grid.replaceChildren(el('div', { class: 'muted', text: 'No texture matches.' }));
+    } catch (e) { grid.replaceChildren(el('div', { class: 'muted', text: e.message })); }
+  };
+  let timer; search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(load, 250); });
+  file.addEventListener('change', () => { if (file.files[0] && !name.value) name.value = file.files[0].name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9_-]/g, '_'); });
+  const importBtn = el('button', { class: 'primary', text: 'Use this image', onclick: () => {
+    if (!file.files[0]) return status('Choose an image file first.', 'bad');
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const res = await api('/api/import', { name: name.value, data: reader.result });
+        let dir = $('texDir').value.trim(); if (!dir.endsWith('/')) dir += '/';
+        const texture = dir + name.value + '.texture';
+        state.recipe.textures = state.recipe.textures.filter((t) => t.texture !== texture).concat([{ png: res.png, texture }]);
+        choose(texture);
+      } catch (e) { status(e.message, 'bad'); }
+    };
+    reader.readAsDataURL(file.files[0]);
+  } });
+  const own = state.recipe.textures.map((t) => el('div', { class: 'pick', title: t.texture, onclick: () => choose(t.texture) }, [el('img', { src: texUrl(t.texture, 96) + '&t=' + Date.now(), alt: '' }), el('div', { text: baseName(t.texture) })]));
+  modal([el('strong', { text: 'Choose a texture' }), search, el('button', { text: 'Close', onclick: closeModal })],
+    [el('div', { class: 'card' }, [el('div', { class: 'group', text: 'Your own image (PNG; white on transparent works best for glows and masks)' }), el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap; align-items:center' }, [file, name, importBtn])]),
+      own.length ? el('div', { class: 'group', text: 'Images already in this recipe' }) : null, own.length ? el('div', { class: 'grid', style: 'margin-bottom:10px' }, own) : null,
+      el('div', { class: 'group', text: 'Game textures' + (current ? ' (now: ' + baseName(current) + ')' : '') }), grid]);
+  search.value = current ? baseName(current).split('_').slice(0, 3).join('_').toLowerCase() : '';
+  load(); search.focus();
+}
+
+// ---------------------------------------------------------------- save / recipe
+async function save() {
+  if (!state.recipe) return status('Open an effect first.', 'bad');
+  state.recipe.output = $('outPath').value.trim();
+  if (!/^data\/hd\/.+\.particles$/i.test(state.recipe.output)) return status('"Save as" must look like data/hd/vfx/particles/<folder>/<name>.particles', 'bad');
+  if (state.recipe.output.toLowerCase() === state.recipe.source.toLowerCase()) return status('Choose a different name than the game\'s own file.', 'bad');
+  try {
+    const res = await api('/api/save', { recipe: state.recipe, name: $('recipeName').value.trim() });
+    status(`Saved ${res.bytes} bytes and the recipe.`, 'good');
+    modal([el('strong', { text: 'Saved' }), el('button', { text: 'Close', onclick: closeModal })],
+      [el('p', { text: 'Recipe: ' + res.recipe }), el('p', { class: 'muted', text: 'For the mod script: point the missile\'s HD definition at the new particle file and list these under its dependencies.' }), el('pre', { text: JSON.stringify(res.manifest, null, 2) })]);
+    loadInfo();
+  } catch (e) { status(e.message, 'bad'); }
+}
+function showRecipe() {
+  if (!state.recipe) return status('Open an effect first.', 'bad');
+  const area = el('textarea', {}); area.value = JSON.stringify(state.recipe, null, 1);
+  modal([el('strong', { text: 'Recipe (what the command line applies)' }), el('button', { text: 'Apply this text', onclick: async () => {
+    try { const r = JSON.parse(area.value); closeModal(); await openEffect(r.source, r); } catch (e) { status(e.message, 'bad'); }
+  } }), el('button', { text: 'Close', onclick: closeModal })], [area]);
+}
+async function loadInfo() {
+  try {
+    const info = await api('/api/info');
+    $('outInfo').textContent = 'into ' + info.out;
+    const sel = $('recipes'); sel.replaceChildren(el('option', { value: '', text: 'open a saved recipe...' }), ...info.recipes.map((r) => el('option', { value: r, text: r })));
+  } catch (e) { status(e.message, 'bad'); }
+}
+
+// ---------------------------------------------------------------- wiring
+let searchTimer;
+$('q').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async () => {
+    const box = $('results');
+    if (!$('q').value.trim()) { box.style.display = 'none'; return; }
+    try {
+      const list = await api('/api/effects?q=' + encodeURIComponent($('q').value));
+      box.replaceChildren(...list.slice(0, 200).map((p) => {
+        const parts = p.split('/'); const file = parts.pop();
+        return el('div', { title: p, onclick: () => { box.style.display = 'none'; openEffect(p); } }, [el('span', { class: 'dir', text: parts.slice(4).join('/') + '/' }), file]);
+      }));
+      if (!list.length) box.replaceChildren(el('div', { class: 'dir', text: 'No effect matches.' }));
+      box.style.display = 'block';
+    } catch (e) { status(e.message, 'bad'); }
+  }, 250);
+});
+document.addEventListener('click', (ev) => { if (!ev.target.closest('.search')) $('results').style.display = 'none'; });
+$('modal').addEventListener('click', (ev) => { if (ev.target === $('modal')) closeModal(); });
+$('recipes').addEventListener('change', async () => {
+  const name = $('recipes').value; if (!name) return;
+  try { const r = await api('/api/recipe?name=' + encodeURIComponent(name)); $('recipeName').value = name; await openEffect(r.source, r); } catch (e) { status(e.message, 'bad'); }
+  $('recipes').value = '';
+});
+$('save').addEventListener('click', save);
+$('undo').addEventListener('click', undo);
+$('showRecipe').addEventListener('click', showRecipe);
+loadInfo();
+const start = new URLSearchParams(location.search).get('open');
+if (start) openEffect(start);
+</script>
+</body>
+</html>
