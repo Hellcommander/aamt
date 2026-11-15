@@ -691,6 +691,30 @@ Notes:
     overwrite).
   - Test without D2RMM: `node ConvertDataModCheck.js <mod> <cache> <out> '{"loadorderCells":"earlier"}' <earlier folder>`
     (files in `<earlier folder>` stand for what mods above left; `CHECK_MODLIST` fakes the mod list).
+- **My mod list** and **Options** (sections in the converted mod's D2RMM settings) come from a rules
+  file: `--modlist-rules <json>` (default `<D2RMM>\mods\modlist-rules.json` when it exists, `none` =
+  no section; format and notes in `modlist-rules.example.json`). Each rule becomes a checkbox;
+  `mods` names the converted mods it is for (none = all), and only the parts that touch something
+  the mod has are kept (`convert.json` `modListRules`). Rerun Update after editing the file.
+  - A *My mod list* rule is off by default and acts only when ticked **and** a mod in `when` is
+    enabled in D2RMM (`"above": true`: only when it comes before the converted mod). Actions:
+    `earlier` (table/string paths where mods above keep their values, as *Conflicts: earlier* for
+    those paths only), `skip` (regex on the mod's file/table paths, e.g. a whole
+    `hd\global\ui\panel\inventory` folder copy), `switches` (switch ids turned off, e.g. a plugin the
+    partner mod replaces). The install log says per ticked rule whether it was used and why not.
+  - An *Options* rule (`"option": true`) is a part of the mod itself: on by default, no `when`, and
+    its actions apply when it is switched **off**. `props` takes item property codes off every item
+    (uniques, sets, runewords: later properties move up; set bonus slots keep their place; an affix
+    or automagic row left with nothing stops spawning). VanillaDeluxe's *Spell Multishot* takes
+    `r3ni-multishot` off (the `R3niSpellProcs` plugin stays for its other procs).
+  - Harness test of ticked rules: config `'{"listClassless":true}'`, `CHECK_MODLIST` with the partner
+    mod above, and an `<earlier folder>` holding the partner's changed table.
+- A download that is a folder holding the mod as a packed `.mpq` (Frankenstein's
+  `FMMP-Experimental-R67\FMMP-Experimental-R67.mpq`) is staged by Update into `converter-work` (the
+  `.mpq` unpacked, with the `d2rloader` folder beside it); the download stays as it is.
+- A plugin an installed D2RMM package already ships with exactly the same files is left out of
+  mod.js (`convert.json` `loaderProvidedByPackage`), e.g. Frankenstein's plugins, which its own
+  package `d2rloader\FMMP-Experimental-R67` ships patched to run under `-mod D2RMM`.
 
   `Update-D2RConvertedMod.ps1 -MatchTrim $false -Duplicates order -Deleted leave` overrides them.
 

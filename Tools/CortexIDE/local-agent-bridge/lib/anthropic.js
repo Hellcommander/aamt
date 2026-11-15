@@ -143,12 +143,19 @@ function parseArgs(a) {
   }
 }
 
+/** A loop message's images ({mime, data}) → Messages API image blocks. */
+function imageBlocks(m) {
+  const imgs = m && Array.isArray(m.images) ? m.images : [];
+  return imgs.filter((i) => i && i.data && i.mime).map((i) => ({ type: "image", source: { type: "base64", media_type: i.mime, data: i.data } }));
+}
+
 /**
  * OpenAI-shaped loop messages → Messages API { system, messages }.
  * - consecutive same-role messages are merged (all tool results of a round share one user turn)
  * - every tool_use gets a tool_result; a stray tool_result becomes text
  * - an assistant turn replays the blocks Claude produced (thinking included) when `replayThinking`;
  *   otherwise it is rebuilt from its text and tool_calls
+ * - `images` on a user or tool message become image blocks (inside the tool_result for tools)
  */
 function toMessages(messages, { replayThinking = true } = {}) {
   const system = [];
@@ -171,15 +178,17 @@ function toMessages(messages, { replayThinking = true } = {}) {
       continue;
     }
     if (m.role === "tool") {
+      // Images ride inside the tool_result (the Messages API takes text + image blocks there).
+      const imgs = imageBlocks(m);
       if (pending.has(m.tool_call_id)) {
         pending.delete(m.tool_call_id);
-        push("user", [{ type: "tool_result", tool_use_id: m.tool_call_id, content: nonEmpty(m.content) }]);
-      } else push("user", [{ type: "text", text: "[" + (m.name || "tool") + " result]\n" + nonEmpty(m.content) }]);
+        push("user", [{ type: "tool_result", tool_use_id: m.tool_call_id, content: imgs.length ? [{ type: "text", text: nonEmpty(m.content) }, ...imgs] : nonEmpty(m.content) }]);
+      } else push("user", [{ type: "text", text: "[" + (m.name || "tool") + " result]\n" + nonEmpty(m.content) }, ...imgs]);
       continue;
     }
     settle();
     if (m.role === "user") {
-      push("user", [{ type: "text", text: nonEmpty(m.content) }]);
+      push("user", [{ type: "text", text: nonEmpty(m.content) }, ...imageBlocks(m)]);
       continue;
     }
     if (m.role !== "assistant") continue;

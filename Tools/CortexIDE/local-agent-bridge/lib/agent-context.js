@@ -9,14 +9,49 @@ const path = require("path");
 
 const CHARS_PER_TOKEN = 3.3;
 
+/** Prompt tokens one image costs (Claude bills ~w*h/750; local VL models are in the same range). */
+const { imageTokens } = require("./file-analyze");
+
 function estimateTokens(messages) {
   let chars = 0;
+  let img = 0;
   for (const m of messages) {
     chars += 12;
     if (m.content) chars += String(m.content).length;
     if (m.tool_calls) chars += JSON.stringify(m.tool_calls).length;
+    if (Array.isArray(m.images)) for (const i of m.images) img += imageTokens(i);
   }
-  return Math.ceil(chars / CHARS_PER_TOKEN);
+  return Math.ceil(chars / CHARS_PER_TOKEN) + img;
+}
+
+/**
+ * Remove the images of messages[from..to) (exclusive), leaving a note so the model can ask again.
+ * `keep` (a Set of indexes) is spared. Returns how many images were dropped.
+ */
+function dropImages(messages, from, to, keep) {
+  let n = 0;
+  for (let i = from; i < to && i < messages.length; i++) {
+    const m = messages[i];
+    if (!m || !Array.isArray(m.images) || !m.images.length || (keep && keep.has(i))) continue;
+    const names = m.images.map((x) => x.path || "image").join(", ");
+    n += m.images.length;
+    delete m.images;
+    m.content = String(m.content == null ? "" : m.content) + "\n[image removed to save context: " + names + " — call ReadImage again if you still need to see it]";
+  }
+  return n;
+}
+
+/** Keep only the newest `max` images in the conversation (images are the heaviest content). */
+function limitImages(messages, max) {
+  let seen = 0;
+  let n = 0;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i];
+    if (!m || !Array.isArray(m.images) || !m.images.length) continue;
+    seen += m.images.length;
+    if (seen > max) n += dropImages(messages, i, i + 1);
+  }
+  return n;
 }
 
 function short(s, n) {
@@ -112,7 +147,8 @@ function compact(messages, budget, progress, { firstUser = 1, keepRecent = 8 } =
   if (estimateTokens(messages) <= budget) return 0;
   const recentStart = Math.max(firstUser + 1, messages.length - keepRecent);
 
-  // Level 1: old tool output → head + pointer to re-read.
+  // Level 1: old images and old tool output → a note / head + pointer to re-read.
+  dropImages(messages, firstUser + 1, recentStart);
   for (let i = firstUser + 1; i < recentStart; i++) {
     const m = messages[i];
     if (m.role === "tool" && String(m.content || "").length > 500 && !m._compacted) {
@@ -138,7 +174,9 @@ function compact(messages, budget, progress, { firstUser = 1, keepRecent = 8 } =
   }
   if (estimateTokens(messages) <= budget) return 2;
 
-  // Level 3: hard-trim whatever is still large in the recent window.
+  // Level 3: hard-trim whatever is still large in the recent window (images too, except the newest
+  // message's and the ones the user attached to the task).
+  dropImages(messages, firstUser + 1, messages.length - 1);
   for (let i = firstUser + 1; i < messages.length; i++) {
     const m = messages[i];
     const lim = m.role === "tool" ? 1500 : 2500;
@@ -158,4 +196,4 @@ function compact(messages, budget, progress, { firstUser = 1, keepRecent = 8 } =
   return 4;
 }
 
-module.exports = { Progress, compact, estimateTokens, short };
+module.exports = { Progress, compact, estimateTokens, imageTokens, dropImages, limitImages, short };

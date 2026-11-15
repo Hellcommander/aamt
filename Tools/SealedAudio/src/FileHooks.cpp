@@ -103,14 +103,26 @@ namespace SealedAudio::Hooks
 			return {};
 		}
 
-		bool IsSoundish(const std::string& rel)
+		std::string FoldPath(std::string s)
 		{
-			std::string s = rel;
 			for (char& c : s) {
 				if (c == '/') c = '\\';
 				else if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
 			}
-			return s.rfind("sound\\", 0) == 0 || s.rfind("music\\", 0) == 0;
+			return s;
+		}
+
+		std::vector<std::string> g_probePrefixes{ "sound\\", "music\\" };   // folded, each ending in a backslash
+
+		bool IsSoundish(const std::string& rel)
+		{
+			const std::string s = FoldPath(rel);
+			for (const std::string& pre : g_probePrefixes) {
+				if (s.rfind(pre, 0) == 0) {
+					return true;
+				}
+			}
+			return false;
 		}
 
 		void Probe(const char* api, const std::string& rel, const char* result)
@@ -994,11 +1006,78 @@ namespace SealedAudio::Hooks
 			}
 			return patched;
 		}
+
+		// kernel32's file exports are stubs, "jmp qword ptr [rip+disp32]" (FF 25, or 48 FF 25), through its own import slots
+		// into KernelBase. Code that resolved them with GetProcAddress, as packed executables do, holds the stub's address,
+		// so redirecting the slot reaches every such caller. The slot's old value is the real implementation and becomes the
+		// original for the hook unconditionally: an original taken earlier from another import table may be the stub itself,
+		// and calling it would come straight back here.
+		int PatchSystemStubs(const std::vector<Patch>& patches)
+		{
+			HMODULE k32 = ::GetModuleHandleW(L"kernel32.dll");
+			if (!k32) {
+				return 0;
+			}
+			int patched = 0;
+			for (const Patch& p : patches) {
+				auto* code = reinterpret_cast<const std::uint8_t*>(::GetProcAddress(k32, p.name));
+				if (!code) {
+					continue;
+				}
+				std::size_t dispAt = 0, length = 0;
+				if (code[0] == 0xFF && code[1] == 0x25) {
+					dispAt = 2; length = 6;
+				} else if (code[0] == 0x48 && code[1] == 0xFF && code[2] == 0x25) {
+					dispAt = 3; length = 7;
+				} else {
+					Log::Info("kernel32!%s is not a jump stub; callers that resolved it at run time are not reached", p.name);
+					continue;
+				}
+				std::int32_t disp = 0;
+				std::memcpy(&disp, code + dispAt, sizeof(disp));
+				// 64-bit: the operand is RIP-relative; 32-bit: an absolute address of the slot
+#if defined(_WIN64)
+				auto** slot = reinterpret_cast<void**>(const_cast<std::uint8_t*>(code) + length + disp);
+#else
+				auto** slot = reinterpret_cast<void**>(static_cast<std::uintptr_t>(static_cast<std::uint32_t>(disp)));
+#endif
+				if (*slot == p.hook) {
+					continue;
+				}
+				DWORD old = 0;
+				if (!::VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &old)) {
+					Log::Warn("could not unprotect the kernel32 slot of %s", p.name);
+					continue;
+				}
+				*p.original = *slot;
+				InterlockedExchangePointer(slot, p.hook);
+				::VirtualProtect(slot, sizeof(void*), old, &old);
+				patched++;
+			}
+			Log::Info("redirected %d kernel32 file stubs (callers that resolved them at run time)", patched);
+			return patched;
+		}
 	}
 
 	int Install(const Options& options)
 	{
 		g_options = options;
+		{
+			g_probePrefixes.clear();
+			const std::string list = Narrow(options.probePrefixes);
+			std::size_t start = 0;
+			while (start <= list.size()) {
+				std::size_t end = list.find(';', start);
+				if (end == std::string::npos) end = list.size();
+				std::string pre = FoldPath(list.substr(start, end - start));
+				while (!pre.empty() && pre.front() == '\\') pre.erase(pre.begin());
+				if (!pre.empty()) {
+					if (pre.back() != '\\') pre.push_back('\\');
+					g_probePrefixes.push_back(pre);
+				}
+				start = end + 1;
+			}
+		}
 		HMODULE game = ::GetModuleHandleW(nullptr);
 		const std::vector<Patch> patches = {
 			{ "CreateFileW", (void*)&h_CreateFileW, (void**)&o_CreateFileW },
@@ -1047,6 +1126,7 @@ namespace SealedAudio::Hooks
 		g_options.logImports = false;           // the executable's import list is enough
 		PatchNewModules();
 		g_options.logImports = savedLog;
+		const int stubs = options.patchSystem ? PatchSystemStubs(patches) : 0;
 		// anything the game does not import still needs a real function behind our test entry points
 		if (!o_CreateFileW) o_CreateFileW = ::CreateFileW;
 		if (!o_CreateFileA) o_CreateFileA = ::CreateFileA;
@@ -1076,7 +1156,7 @@ namespace SealedAudio::Hooks
 		if (!o_TerminateProcess) o_TerminateProcess = ::TerminateProcess;
 		if (!o_FindFirstFileW) o_FindFirstFileW = ::FindFirstFileW;
 		if (!o_FindFirstFileExW) o_FindFirstFileExW = ::FindFirstFileExW;
-		return n;
+		return n + stubs;
 	}
 
 	int PatchExitHooksEverywhere()

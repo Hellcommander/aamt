@@ -115,7 +115,7 @@ test("notifications get no reply", async () => {
 test("tools/list", async () => {
   const r = await call(nd, "tools/list", {});
   assert.deepStrictEqual(r.result.tools.map((t) => t.name).sort(), [
-    "import_cursor_chat", "list_canvases", "list_imported_chats", "list_skills", "match_skills", "read_canvas", "read_skill",
+    "import_cursor_chat", "list_canvases", "list_imported_chats", "list_running_chats", "list_skills", "match_skills", "read_canvas", "read_skill", "steer_chat",
   ]);
   for (const t of r.result.tools) assert.strictEqual(t.inputSchema.type, "object", t.name);
 });
@@ -170,5 +170,5 @@ test("Content-Length framed client gets framed replies", async () => {
   assert.strictEqual(r.result.protocolVersion, "2024-11-05");
   const list = JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" });
   lsp.child.stdin.write("Content-Length: " + Buffer.byteLength(list) + "\r\n\r\n" + list);
-  assert.strictEqual((await nextFramed(lsp)).result.tools.length, 7);
+  assert.strictEqual((await nextFramed(lsp)).result.tools.length, 9);
 });

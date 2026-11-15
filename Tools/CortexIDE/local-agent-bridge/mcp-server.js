@@ -3,6 +3,15 @@
 const { scanSkills, scanCanvases, matchSkills } = require("./lib/scan");
 const { importChatFile, listImported } = require("./lib/import-chat");
 
+// Report the packaged version so the MCP client sees the same number as the extension.
+const VERSION = (() => {
+  try {
+    return require("./package.json").version || "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+})();
+
 // MCP stdio is newline-delimited JSON. Older builds of this server used LSP-style
 // Content-Length framing, which MCP clients never parse (-32001 request timed out).
 // Reply in whichever framing the client used so both keep working.
@@ -99,9 +108,49 @@ const TOOLS = [
     description: "List chats imported into .cortexide/imported-chats.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
+  {
+    name: "list_running_chats",
+    description: "List Local Agent Bridge chats that are working right now in any open CortexIDE window (id, title, model, workspace).",
+    inputSchema: {
+      type: "object",
+      properties: { workspace: { type: "string", description: "Only chats of this workspace folder (optional)" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "steer_chat",
+    description: "Send a message to a running Local Agent Bridge chat. mode steer (default) folds it into the running turn at its next step, queue runs it after the turn, now stops the turn and runs it next. chat is an id, id prefix or title fragment; it may be left out when exactly one chat is running.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        chat: { type: "string", description: "Chat id, id prefix or part of its title" },
+        text: { type: "string", description: "The message" },
+        mode: { type: "string", enum: ["steer", "queue", "now"] },
+      },
+      required: ["text"],
+    },
+  },
 ];
 
+/** Chat history root; AGENT_BRIDGE_HISTORY overrides it (tests, a moved history folder). */
+const historyRoot = () => process.env.AGENT_BRIDGE_HISTORY || undefined;
+
 function handleTool(name, args) {
+  if (name === "list_running_chats") {
+    const running = require("./lib/steer").listRunning({ root: historyRoot(), workspace: args.workspace || undefined });
+    return { content: [{ type: "text", text: running.length ? JSON.stringify(running, null, 2) : "No chat is running." }] };
+  }
+  if (name === "steer_chat") {
+    const steer = require("./lib/steer");
+    try {
+      const r = steer.sendExternal({ root: historyRoot(), id: args.chat, text: args.text, mode: args.mode || "steer", from: "MCP" });
+      const mode = steer.modeFor(args.text, args.mode || "steer");
+      const how = mode === "steer" ? "it is taken in at the chat's next step" : mode === "queue" ? "it runs after the current turn" : "the running turn stops and this runs next";
+      return { content: [{ type: "text", text: "Sent to “" + (r.title || r.id) + "” (" + r.id + "): " + how + "." }] };
+    } catch (e) {
+      return { content: [{ type: "text", text: String(e && e.message ? e.message : e) }], isError: true };
+    }
+  }
   const { skills, canvases } = load();
   if (name === "list_skills") {
     return {
@@ -165,7 +214,7 @@ function handleMessage(msg) {
     sendResult(msg.id, {
       protocolVersion: asked || "2024-11-05",
       capabilities: { tools: {} },
-      serverInfo: { name: "local-agent-bridge", version: "2.6.0" },
+      serverInfo: { name: "local-agent-bridge", version: VERSION },
     });
   } else if (msg.method === "tools/list") {
     sendResult(msg.id, { tools: TOOLS });

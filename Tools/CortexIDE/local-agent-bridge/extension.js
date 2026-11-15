@@ -121,19 +121,32 @@ async function doSync(context, getState, setState) {
     vscode.window.showWarningMessage("Local Agent Bridge: open a folder so skills can sync into .cortexide/skills.");
     return state;
   }
+  // Register the MCP server first: it is what other chats need, and it must not depend on every
+  // folder being writable (a read-only root used to abort the sync and leave a stale server path).
+  const mcpPath = path.join(home(), ".cortexide", "mcp.json");
+  const failed = [];
+  try {
+    mergeMcp(mcpPath, context.extensionPath, roots);
+  } catch (e) {
+    failed.push(`${mcpPath}: ${e.message || e}`);
+  }
   let last;
   const skipped = [];
   for (const root of roots) {
-    last = syncWorkspace(root, state.skills, state.canvases, { maxSkills: cfg().get("maxSkills", 64) });
+    try {
+      last = syncWorkspace(root, state.skills, state.canvases, { maxSkills: cfg().get("maxSkills", 64) });
+    } catch (e) {
+      // e.g. C:\Program Files\... or a locked Temp folder: skip it, keep syncing the rest.
+      failed.push(`${root}: ${e.code || e.message || e}`);
+      continue;
+    }
     for (const s of last.skippedSkills || []) skipped.push(`${s.name} (${path.join(root, ".cortexide", "skills", s.name)})`);
   }
   if (skipped.length) {
     console.warn("Local Agent Bridge: kept native skills, bridged copies skipped: " + skipped.join(", "));
   }
-  const extDir = context.extensionPath;
-  const mcpPath = path.join(home(), ".cortexide", "mcp.json");
-  mergeMcp(mcpPath, extDir, roots);
-  return { ...state, last, skipped };
+  if (failed.length) console.warn("Local Agent Bridge: sync skipped: " + failed.join("; "));
+  return { ...state, last, skipped, failed };
 }
 
 /** @param {string|string[]} workspaceRoots  every open root; mcp-server.js splits the env var on ";" */
@@ -141,7 +154,8 @@ function mergeMcp(mcpPath, extDir, workspaceRoots) {
   let json = { mcpServers: {} };
   if (exists(mcpPath)) {
     try {
-      json = JSON.parse(fs.readFileSync(mcpPath, "utf8"));
+      // Strip a UTF-8 BOM: PowerShell 5.1 (Set-Content -Encoding UTF8) writes one and JSON.parse rejects it.
+      json = JSON.parse(fs.readFileSync(mcpPath, "utf8").replace(/^\uFEFF/, ""));
     } catch {
       json = { mcpServers: {} };
     }
@@ -195,11 +209,19 @@ function activate(context) {
   context.subscriptions.push(agentStatus);
 
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.openAgent", () => agent.focus()));
+  // Opened from another window's sidebar tree ("Start a chat here"): open the Agent with a new chat.
+  setTimeout(() => agent.takeHandoff().catch(() => {}), 1500);
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentPickModel", () => agent.pickModel()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentNewChat", () => agent.newChat()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentStop", () => agent.stop()));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentHistory", () => agent.showHistory()));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentRunOnModels", () => agent.runOnModelsFromComposer()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentUndo", () => agent.undoTurn()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentProgress", () => agent.openProgress()));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentIndexes", () => agent.openIndexes()));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentLimits", () => agent.command("limits")));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentCompress", () => agent.command("compress")));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentSteer", () => agent.command("steer")));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.setClaudeApiKey", () => agent.setClaudeApiKey()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.signIn", () => agent.command("signin")));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.signOut", () => agent.command("signout")));
@@ -215,8 +237,11 @@ function activate(context) {
     const kept = result.skipped && result.skipped.length
       ? ` Skipped ${result.skipped.length} bridged skill(s) whose name matches a native .cortexide/skills folder: ${result.skipped.map((s) => s.split(" (")[0]).join(", ")}.`
       : "";
+    const off = result.failed && result.failed.length
+      ? ` Not writable, skipped: ${result.failed.map((f) => f.split(": ")[0]).join(", ")}.`
+      : "";
     vscode.window.showInformationMessage(
-      `Local Agent Bridge: ${result.skills.length} skills, ${result.canvases.length} canvases.${kept} Reload CortexIDE chat if MCP was just added.`
+      `Local Agent Bridge: ${result.skills.length} skills, ${result.canvases.length} canvases.${kept}${off} Reload CortexIDE chat if MCP was just added.`
     );
   }));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.showCatalog", async () => {

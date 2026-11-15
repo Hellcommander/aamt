@@ -29,6 +29,9 @@ access-gated. See `Tools/Qud/QudLab/Fetch-PrivatePack.ps1`.
 | `Tools/Logs/pixelorama/pxo_src` | Do **not** vendor. Install Pixelorama. | MIT (Orama Interactive) | Install to `D:\tools\Orama Interactive\Pixelorama` |
 | `Tools/Transcendence/_x64_workspace` | Official TranscendenceDev tree | Kronosaur (non-commercial; keep notice) | `Prepare-X64Workspace.py --api-root <official>` |
 | `Tools/ReferenceAssets` | Optional art/reference packs | Each pack's own file | Copy locally; never required to run tools |
+| `Tools/Shared/third_party/node/node_modules/rea-agents` | https://www.npmjs.com/package/rea-agents (REA, Reverse Engineer Anything; source https://github.com/morluto/rea) and its npm dependencies | MIT (dependencies MIT / ISC / Apache-2.0 / BSD / BlueOak) | `Fetch-ThirdParty.ps1 -AgentBridge`; started as an MCP server by the agent bridge at run time, never bundled into the `.vsix` |
+| `Tools/Shared/third_party/node/node_modules/pdfjs-dist` | https://github.com/mozilla/pdf.js (npm `pdfjs-dist`) | Apache-2.0 (Mozilla) | `Fetch-ThirdParty.ps1 -AgentBridge`; imported by the agent bridge's `AnalyzeFile` at run time, never bundled |
+| 7-Zip (installed program, outside the repo) | https://www.7-zip.org | LGPL-2.1 + unRAR restriction | Install it yourself; the agent bridge only runs `7z.exe` as a separate process (no code linked or copied) |
 | `Tools/CortexIDE/local-agent-bridge/media/react*.production.min.js` | React 18.3.1 UMD builds (https://unpkg.com/react@18.3.1, `react-dom@18.3.1`) | MIT (Meta) | `Tools/CortexIDE/local-agent-bridge/Build-Vsix.ps1` (SHA-256 pinned; shipped inside the built `.vsix`) |
 
 MPL-2.0 (TES5Edit) is file-level copyleft. Do not copy `.pas` definitions into
@@ -96,6 +99,12 @@ The public repo stays ~22 MB; local workspaces can be tens of GB. Do not commit:
 - Soulash workshop fix snapshots under `SkillCreator/workshop_patches/`
 
 Regenerate with the tools on your machine.
+
+## Design credits (ideas only, no code copied)
+
+| AAMT files | Inspired by | License | What was taken |
+|---|---|---|---|
+| `Tools/CortexIDE/local-agent-bridge/lib/permissions.js`, `agents.js`, `commands.js`, `instructions.js`, `tool-output.js` | opencode, https://github.com/anomalyco/opencode | MIT, Copyright (c) 2025 opencode | Design of permission rules (last match wins, allow / ask / deny), named build / plan / explore agents and Markdown agent files, Markdown slash commands (`$ARGUMENTS`, `$1`, `` !`cmd` ``), `AGENTS.md` instruction loading, saving cut tool output to a file. Written from opencode's documentation; each file names opencode in its header. Not affiliated with or endorsed by opencode. |
 
 ## Notices already in-tree
 

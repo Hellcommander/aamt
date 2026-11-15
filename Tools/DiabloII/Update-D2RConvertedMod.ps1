@@ -38,19 +38,13 @@ param(
     [ValidateSet('overwrite', 'keep')][string]$Files
 )
 $ErrorActionPreference = 'Stop'
-if (-not $GamePath) { $GamePath = 'D:\games\Steam\steamapps\common\Diablo II Resurrected' }
-if (-not (Test-Path (Join-Path $GamePath 'D2R.exe'))) { throw 'Pass -GamePath (or set D2R_PATH) to the folder that contains D2R.exe.' }
 if ($Source -and $Mod.Count -gt 1) { throw '-Source goes with one -Mod.' }
+. (Join-Path $PSScriptRoot 'D2RToolPaths.ps1')
+$GamePath = Resolve-D2RGamePath $GamePath
+$D2RMM = Resolve-D2RMMPath $D2RMM $GamePath
+$python = Resolve-D2RPython
 
-$python = 'python'
-$ini = Join-Path (Split-Path $PSScriptRoot -Parent) 'TranscendenceTools.ini'
-if (Test-Path $ini) {
-    $line = Select-String -Path $ini -Pattern '^PythonPath=' | Select-Object -First 1
-    if ($line) { $python = $line.Line.Split('=', 2)[1].Trim() }
-}
-
-$arguments = @((Join-Path $PSScriptRoot 'ModConverter.py'), '--game', $GamePath)
-if ($D2RMM) { $arguments += @('--d2rmm', $D2RMM) }
+$arguments = @((Join-Path $PSScriptRoot 'ModConverter.py'), '--game', $GamePath, '--d2rmm', $D2RMM)
 foreach ($m in $Mod) { $arguments += @('--update', $m) }
 if ($Source) { $arguments += @('--source', $Source) }
 if ($null -ne $MatchTrim) { $arguments += $(if ($MatchTrim) { '--match-trim' } else { '--no-match-trim' }) }

@@ -14,17 +14,12 @@ param(
     [switch]$NoBrowser
 )
 $ErrorActionPreference = 'Stop'
-if (-not $GamePath -or -not (Test-Path $GamePath)) { throw 'Pass -GamePath (or set D2R_PATH) to the folder that contains D2R.exe.' }
+. (Join-Path $PSScriptRoot 'D2RToolPaths.ps1')
+$GamePath = Resolve-D2RGamePath $GamePath
+$D2RMM = Resolve-D2RMMPath $D2RMM $GamePath
+$python = Resolve-D2RPython
 
-$python = 'python'
-$ini = Join-Path (Split-Path $PSScriptRoot -Parent) 'TranscendenceTools.ini'
-if (Test-Path $ini) {
-    $line = Select-String -Path $ini -Pattern '^PythonPath=' | Select-Object -First 1
-    if ($line) { $python = $line.Line.Split('=', 2)[1].Trim() }
-}
-
-$arguments = @((Join-Path $PSScriptRoot 'ModConverter.py'), '--game', $GamePath, '--port', $Port)
-if ($D2RMM) { $arguments += @('--d2rmm', $D2RMM) }
+$arguments = @((Join-Path $PSScriptRoot 'ModConverter.py'), '--game', $GamePath, '--d2rmm', $D2RMM, '--port', $Port)
 if ($NoBrowser) { $arguments += '--no-browser' }
 & $python @arguments
 exit $LASTEXITCODE

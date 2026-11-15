@@ -11,6 +11,7 @@ const { test, after, EXT } = require("./harness");
 const llm = require(path.join(EXT, "lib", "llm"));
 const { runAgent, SUBAGENT_RULES } = require(path.join(EXT, "lib", "agent"));
 const { ToolContext } = require(path.join(EXT, "lib", "agent-tools"));
+const agentsLib = require(path.join(EXT, "lib", "agents"));
 
 const realChat = llm.chat;
 after(() => {
@@ -71,6 +72,53 @@ test("independent reads run in parallel, then edit and complete", async () => {
   assert.strictEqual(fs.readFileSync(path.join(ws, "a.js"), "utf8"), "const a = 3;\n");
 });
 
+/** A steering queue the way the panel hands it to runAgent. */
+function steering() {
+  const q = new (require(path.join(EXT, "lib", "steer")).SteerQueue)();
+  return { q, steer: { has: () => q.hasSteer(), take: () => q.takeSteer() } };
+}
+
+test("steering sent during a round reaches the model at its next step and extends the task", async () => {
+  const { q, steer } = steering();
+  const s = script([
+    () => {
+      q.push("also make b equal 5", "steer", { from: "other window" });
+      return say("Reading.", call("Read", { path: "b.js" }));
+    },
+    ({ messages }) => {
+      const last = messages[messages.length - 1];
+      assert.strictEqual(last.role, "user", "steering follows the tool result as a user message");
+      assert.ok(/New message from the user while you were working \(sent from other window\)/.test(last.content), last.content);
+      assert.ok(last.content.endsWith("also make b equal 5"));
+      return say("", call("attempt_completion", { summary: "noted" }));
+    },
+  ]);
+  const { r, events } = await run("read b.js", { steer });
+  s.done();
+  assert.strictEqual(r.text, "noted");
+  assert.deepStrictEqual(r.steered, [{ text: "also make b equal 5", from: "other window" }]);
+  assert.ok(events.some((e) => e.type === "steered" && e.text === "also make b equal 5"));
+  assert.strictEqual(q.size, 0);
+});
+
+test("a completion is held back while a steering message waits, then the model answers it", async () => {
+  const { q, steer } = steering();
+  const s = script([
+    () => {
+      q.push("wait, also explain why", "steer");
+      return say("", call("attempt_completion", { summary: "first answer" }));
+    },
+    ({ messages }) => {
+      assert.ok(messages.some((m) => m.role === "user" && /also explain why/.test(String(m.content))), "the steer reached the model");
+      return say("", call("attempt_completion", { summary: "answer with the why" }));
+    },
+  ]);
+  const { r } = await run("say hi", { steer });
+  s.done();
+  assert.strictEqual(r.text, "answer with the why");
+  assert.strictEqual(r.steered.length, 1);
+});
+
 test("completion is refused while the todo list has open items", async () => {
   const s = script([
     () => say("Planning.", call("TodoWrite", { todos: [{ content: "Look", status: "in_progress" }, { content: "Report", status: "pending" }] })),
@@ -126,6 +174,88 @@ test("a sub-agent cannot edit even if it asks to", async () => {
   await run("tell me about b", {});
   s.done();
   assert.strictEqual(fs.readFileSync(path.join(ws, "b.js"), "utf8"), "const b = 2;\n");
+});
+
+test("Plan agent: no edit tools offered, an edit call is refused, a text plan is accepted", async () => {
+  const before = fs.readFileSync(path.join(ws, "a.js"), "utf8");
+  const s = script([
+    ({ messages, tools }) => {
+      const names = tools.map((t) => t.function.name);
+      assert.ok(!names.some((n) => ["StrReplace", "MultiEdit", "Write", "Delete"].includes(n)), names.join(","));
+      assert.ok(names.includes("Read") && names.includes("Shell"));
+      assert.ok(messages[0].content.includes("You are in Plan mode"));
+      return say("", call("Write", { path: "a.js", contents: "hacked" }));
+    },
+    ({ messages }) => {
+      const res = messages.filter((m) => m.role === "tool").pop();
+      assert.ok(/Write is not available here/.test(res.content), res.content);
+      return say("Plan: 1. change a in a.js to 3. 2. run node check.js.");
+    },
+  ]);
+  const { r } = await run("change a to 3", { agent: agentsLib.BUILTIN.plan });
+  s.done();
+  assert.ok(r.text.startsWith("Plan:"), "a read-only agent is not pushed to edit");
+  assert.strictEqual(fs.readFileSync(path.join(ws, "a.js"), "utf8"), before);
+});
+
+test("a permission prompt answered Deny reaches the model; the file stays as it was", async () => {
+  const asked = [];
+  const tools = new ToolContext({
+    roots: [ws],
+    rgPath: "missing-rg",
+    rules: [{ action: "edit", resource: "*", effect: "ask" }],
+    confirmPermission: async (req) => {
+      asked.push(req);
+      return "reject";
+    },
+  });
+  const s = script([
+    () => say("", call("Read", { path: "b.js" })),
+    () => say("", call("StrReplace", { path: "b.js", old_string: "= 2", new_string: "= 5" })),
+    ({ messages }) => {
+      const res = messages.filter((m) => m.role === "tool").pop();
+      assert.ok(/the user denied StrReplace/.test(res.content), res.content);
+      return say("The edit to b.js was refused, so b is still 2.");
+    },
+  ]);
+  const { r } = await run("look at b.js and tell me b", { tools });
+  s.done();
+  assert.strictEqual(asked.length, 1);
+  assert.strictEqual(asked[0].action, "edit");
+  assert.ok(/refused/.test(r.text));
+  assert.strictEqual(fs.readFileSync(path.join(ws, "b.js"), "utf8"), "const b = 2;\n");
+});
+
+test("Task runs a named sub-agent with its own prompt and tools; an unknown name lists the choices", async () => {
+  const reviewer = { name: "reviewer", mode: "subagent", description: "Reviews code", prompt: "Review strictly.", allowTools: new Set(["read"]), denyTools: new Set(), rules: [], steps: 0 };
+  const list = [...Object.values(agentsLib.BUILTIN), reviewer];
+  const s = script([
+    ({ messages }) => {
+      assert.ok(/Sub-agents for the Task tool[\s\S]*- reviewer: Reviews code/.test(messages[0].content));
+      return say("", call("Task", { prompt: "Review a.js", agent: "nobody" }));
+    },
+    ({ messages }) => {
+      const res = messages.filter((m) => m.role === "tool").pop();
+      assert.ok(/no sub-agent named nobody\. Available: .*reviewer/.test(res.content), res.content);
+      return say("", call("Task", { prompt: "Review a.js", agent: "reviewer" }));
+    },
+    ({ messages, tools }) => {
+      assert.ok(messages[0].content.includes("Review strictly."));
+      const names = tools.map((t) => t.function.name);
+      assert.ok(names.includes("Read") && !names.includes("Grep") && !names.includes("Shell") && !names.includes("Write"), names.join(","));
+      return say("", call("Read", { path: "a.js" }));
+    },
+    () => say("a.js looks fine."),
+    ({ messages }) => {
+      const res = messages.filter((m) => m.role === "tool").pop();
+      assert.ok(/a\.js looks fine/.test(res.content), res.content);
+      return say("", call("attempt_completion", { summary: "reviewed" }));
+    },
+  ]);
+  const { r, events } = await run("review a.js", { agents: list });
+  s.done();
+  assert.strictEqual(r.text, "reviewed");
+  assert.ok(events.some((e) => e.type === "tool" && e.name === "Task"));
 });
 
 test("allowTask false hides the Task tool", async () => {

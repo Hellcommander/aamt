@@ -38,6 +38,20 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Run a native command and return its exit code. The CortexIDE CLI (Electron) and node may write
+# warnings to stderr, which 'Stop' would turn into terminating errors; only the exit code counts.
+function Invoke-Native([string]$Exe, [string[]]$Arguments) {
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Exe @Arguments 2>&1 | ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { Write-Host $_.Exception.Message } else { Write-Host $_ } }
+        return $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
 $id = 'arend.local-agent-bridge'
 $legacyId = 'arend.cursor-agent-bridge'
 $customDir = [bool]$ExtensionsDir
@@ -83,10 +97,12 @@ if (Test-Path -LiteralPath $ExtensionsDir) {
 }
 
 # 2. Remove the pre-rename extension.
-$installed = & $CortexIDE @cliArgs --list-extensions
+$ErrorActionPreference = 'Continue'
+$installed = @(& $CortexIDE @cliArgs --list-extensions 2>$null | Where-Object { $_ -is [string] })
+$ErrorActionPreference = 'Stop'
 if ($installed -contains $legacyId) {
-    & $CortexIDE @cliArgs --uninstall-extension $legacyId
-    if ($LASTEXITCODE) { throw "Uninstalling $legacyId failed (exit $LASTEXITCODE)." }
+    $code = Invoke-Native $CortexIDE ($cliArgs + @('--uninstall-extension', $legacyId))
+    if ($code) { throw "Uninstalling $legacyId failed (exit $code)." }
 }
 
 # 3. Drop the stale MCP entry (node keeps the file's JSON layout the way the extension writes it).
@@ -94,19 +110,19 @@ if (-not $customDir) {
     $mcp = Join-Path $env:USERPROFILE '.cortexide\mcp.json'
     if (Test-Path -LiteralPath $mcp) {
         # Single quotes only: Windows PowerShell 5.1 mangles double quotes in native arguments.
-        $js = "const fs = require('fs'); const f = process.argv[1]; const j = JSON.parse(fs.readFileSync(f, 'utf8'));" +
+        $js = "const fs = require('fs'); const f = process.argv[1]; const j = JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''));" +
               " const old = j.mcpServers && j.mcpServers['cursor-bridge'];" +
               " if (old && /cursor-agent-bridge/i.test(JSON.stringify(old.args || []))) {" +
               " delete j.mcpServers['cursor-bridge']; fs.writeFileSync(f, JSON.stringify(j, null, 2), 'utf8');" +
               " console.log('Removed cursor-bridge from ' + f); }"
-        node -e $js $mcp
-        if ($LASTEXITCODE) { throw "Updating $mcp failed." }
+        $code = Invoke-Native 'node' @('-e', $js, $mcp)
+        if ($code) { throw "Updating $mcp failed (exit $code)." }
     }
 }
 
 # 4. Install and confirm.
-& $CortexIDE @cliArgs --install-extension $Vsix --force
-if ($LASTEXITCODE) { throw "Install failed (exit $LASTEXITCODE)." }
+$code = Invoke-Native $CortexIDE ($cliArgs + @('--install-extension', $Vsix, '--force'))
+if ($code) { throw "Install failed (exit $code)." }
 
 $registry = Join-Path $ExtensionsDir 'extensions.json'
 $list = Get-Content -LiteralPath $registry -Raw | ConvertFrom-Json

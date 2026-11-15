@@ -484,7 +484,8 @@ class App:
             version = p.get('version') or mod_version(src, settings.get('version'))
             job.log('%s: %d files, version %s' % (src, nfiles, version))
             staging = work / 'out'
-            self.run_tool([tool_python(), str(HERE / 'MergeCompiledMod.py'), str(src), str(staging), '--name', name], job)
+            self.run_tool([tool_python(), str(HERE / 'MergeCompiledMod.py'), str(src), str(staging), '--name', name,
+                           '--game', str(self.game)], job)
             self.backup(target, job)
             shutil.move(str(staging / (name + '.mpq')), str(target / (name + '.mpq')))
             want = {'name': p.get('name') or settings.get('name'), 'author': p.get('author') or settings.get('author'),
@@ -705,9 +706,11 @@ def main():
     if not args.game or not Path(args.game).is_dir():
         raise SystemExit('Pass --game (or set D2R_PATH) to the folder that contains D2R.exe.')
     game = Path(args.game)
-    d2rmm = Path(args.d2rmm) if args.d2rmm else find_d2rmm(game)
+    d2rmm = Path(args.d2rmm) if args.d2rmm else (Path(os.environ['D2RMM_PATH']) if os.environ.get('D2RMM_PATH')
+                                                 else find_d2rmm(game))
     if not d2rmm or not (d2rmm / 'mods').is_dir():
-        raise SystemExit("D2RMM's folder not found: pass --d2rmm <folder with mods\\>")
+        raise SystemExit("D2RMM's folder not found: pass --d2rmm <folder with mods\\> (or set D2RMM_PATH)")
+    ConvertDataMod.use_d2rmm_casclib(d2rmm)  # also for the tools it runs (they inherit the environment)
     app = App(game, d2rmm)
     if args.update:
         options = {k: v for k, v in (('matchTrim', args.match_trim), ('duplicates', args.duplicates),

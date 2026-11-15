@@ -1,0 +1,47 @@
+THIRD-PARTY NOTICES - D2R Mod Converter
+
+This package contains only original code by Gregory Armstrong (Arendeth), under
+LICENSE.txt. No third-party code is included. The programs and libraries below
+are used at run time from your own installs; they are listed here for credit
+and so you know their terms. None of them is redistributed in this zip.
+
+-------------------------------------------------------------------------------
+CascLib - reads the game's CASC archive
+  https://github.com/ladislav-zezula/CascLib
+  MIT License, Copyright (c) 2014 Ladislav Zezula
+  Loaded from D2RMM's own tools\CascLib.dll (or the path in D2R_CASCLIB).
+
+D2RMM - the mod manager that installs converted mods
+  https://www.nexusmods.com/diablo2resurrected/mods/169
+  https://github.com/olegbl/d2rmm
+  MIT License, Copyright (c) 2022 Oleg Lokhvitsky
+
+D2RMM Custom (D2RLoader edition) - only for mods with D2RLoader plugins
+  https://github.com/yinyin333333/d2rmm
+  MIT License (fork of D2RMM, Copyright (c) 2022 Oleg Lokhvitsky)
+
+Python - runs the converter
+  https://www.python.org/   Python Software Foundation License
+
+numpy - only for mods made of compiled .bin tables
+  https://numpy.org/   BSD 3-Clause License
+
+Node.js - runs the check of each converted mod.js
+  https://nodejs.org/   MIT License
+
+7-Zip - only for .7z / .rar downloads, run as a separate program
+  https://www.7-zip.org/   GNU LGPL (with unRAR restriction for RAR code)
+
+-------------------------------------------------------------------------------
+MPQ format
+  MpqArchive.py was written from the published description of the MPQ archive
+  format. It contains no StormLib or other third-party code.
+
+D2RLoader plugins
+  Plugin DLLs found in a mod are copied from that mod as they are. They keep
+  their own authors' licenses; the converter adds no terms to them.
+
+Diablo II: Resurrected
+  Game data belongs to Blizzard Entertainment. Diablo is a trademark of
+  Blizzard Entertainment, Inc. This project is not affiliated with or endorsed
+  by Blizzard Entertainment.

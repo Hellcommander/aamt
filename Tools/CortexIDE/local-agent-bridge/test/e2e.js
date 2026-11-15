@@ -71,16 +71,21 @@ const stub = install({ workspace: ws, settings });
   } catch (e) {
     testOut = "FAILED: " + e.message.split("\n")[0];
   }
-  const progress = path.join(ws, ".cortexide", "agent", "progress.md");
+  // Since 2.7 each chat is its own folder in the history cache (USERPROFILE\.cortexide\agent\projects\…),
+  // and since 2.7.1 its progress.md lives there too.
+  const st = provider.store();
+  const conv = st.get(provider.activeId);
+  const progress = st.progressFile(conv.id);
   console.log("math.js fixed: " + fixed + " | node test.js: " + testOut + " | progress.md: " + fs.existsSync(progress));
   if (fs.existsSync(progress)) console.log(fs.readFileSync(progress, "utf8"));
-  const conv = stub.workspaceState.get("localAgentBridge.agent.conversation");
-  console.log("persisted log rows: " + conv.log.length + ", history turns: " + conv.history.length);
+  console.log("sub-index files: " + Object.values(st.subIndex(conv.id).files).map((f) => path.basename(f.path)).join(", ") + " | claims left: " + Object.keys(st.claims || {}).length);
+  console.log("history cache: " + st.dir + " | chats: " + st.list().length);
+  console.log("chat '" + conv.title + "' model=" + (conv.model || "(default)") + " status=" + conv.status + " | log rows: " + conv.log.length + ", history turns: " + conv.history.length);
 
   if (process.env.IMPORT_FILE) {
     await stub.commands.get("localAgentBridge.continueImportedChat")(process.env.IMPORT_FILE);
-    const c2 = stub.workspaceState.get("localAgentBridge.agent.conversation");
-    console.log("import: history=" + c2.history.length + " log=" + c2.log.length + " notes=" + c2.progress.notes.length);
+    const c2 = st.get(provider.activeId);
+    console.log("import (chat " + (c2.id === conv.id ? "REUSED" : "new") + ", " + st.list().length + " chats): history=" + c2.history.length + " log=" + c2.log.length + " notes=" + c2.progress.notes.length);
   }
   fs.rmSync(ws, { recursive: true, force: true });
   fs.rmSync(home, { recursive: true, force: true });

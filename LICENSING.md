@@ -36,6 +36,16 @@ Running these tools does not place AAMT's MIT license (or Qud Lab's proprietary
 license) on the files you produce. You choose the license for your mods. You
 still must respect the **game's** EULA and any third-party assets you ingested.
 
+## Released tool packages
+
+**D2R Mod Converter** (`Tools/DiabloII/Release/ModConverter/`, packed for Nexus Mods) ships
+under MIT with an extra **output exception** (`LICENSE.txt` in that folder): the `mod.js` and
+other files the converter writes into a converted mod may be used under any terms, without
+keeping the MIT notice. `PERMISSIONS.md` there gives the plain-language version and the Nexus
+permission settings; `THIRD-PARTY-NOTICES.txt` credits CascLib, D2RMM, Python, numpy, Node.js
+and 7-Zip, none of which is bundled. Keep that package free of GPL-derived code (for example the
+BitKnit port used by `Granny.py`) and of converted mods or game files.
+
 ## Qud Lab dual license
 
 Open components (CLI UX, Unity shell UI, AI adapters, templates, public stubs)

@@ -19,17 +19,43 @@ lvlprest Name). The mod's .bin tables are left out (the game would load them ove
 import argparse
 import collections
 import json
+import os
 import re
 import shutil
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import BinTables as B  # noqa: E402
+try:
+    import BinTables as B  # noqa: E402
+except ModuleNotFoundError as e:
+    if e.name != 'numpy':
+        raise
+    sys.exit('Mods made of compiled tables (.bin) need numpy. Install it with:\n'
+             f'  "{sys.executable}" -m pip install numpy\nthen run the update or conversion again.')
 
 REFS = ['skills', 'missiles', 'states', 'itemstatcost', 'properties', 'propertygroups', 'monstats', 'skilldesc',
         'itemtypes', 'weapons', 'armor', 'misc', 'uniqueitems', 'setitems', 'playerclass', 'overlay', 'pettype',
         'monprop', 'sounds', 'levels', 'treasureclassex', 'superuniques', 'events']
+
+
+def fill_cache(game, casclib=None, echo=print):
+    """Puts the game's tables (.txt and .bin) and string files the merge reads into the cache
+    (BinTables.VANILLA) when they are not there yet, straight from the game archive."""
+    from d2r_casc import D2RArchive, check_cache
+    if check_cache(str(B.VANILLA), str(game)):
+        echo('game was patched since the cache was filled: fetching its files again')
+    pat = re.compile(r'^(global/excel/(base/)?[^/]+\.(txt|bin)|local/lng/strings/[^/]+\.json)$')
+    with D2RArchive(str(game), casclib) as archive:
+        todo = [n for n in archive.list() if pat.match(n) and not (B.VANILLA / n).exists()]
+        for n in todo:
+            data = archive.read(n)
+            if data is None:
+                continue
+            f = B.VANILLA / n
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_bytes(data)
+    echo('game files fetched into the cache: %d' % len(todo))
 
 
 def _kinds(t, game, log):
@@ -95,6 +121,9 @@ def merge(src, out_mpq, echo=print):
     if not excel_in.is_dir():
         raise SystemExit('%s: no data\\global\\excel' % src)
 
+    if not any(game.path(p.stem.lower(), '.bin') for p in excel_in.glob('*.bin')):
+        raise SystemExit('none of the game\'s compiled tables are in %s: pass --game <D2R folder> (or set D2R_PATH) '
+                         'so they are fetched' % B.VANILLA)
     changed = []
     for p in sorted(excel_in.glob('*.bin')):
         t = p.stem.lower()
@@ -237,8 +266,13 @@ def main():
     ap.add_argument('src', help='the extracted mod (a folder with data\\)')
     ap.add_argument('out', help='the mod folder to write <name>.mpq and merge-report.json into')
     ap.add_argument('--name', help='archive folder name (default: the source folder name without .mpq)')
+    ap.add_argument('--game', default=os.environ.get('D2R_PATH'),
+                    help='the folder with D2R.exe: game tables missing from the cache are fetched from it')
+    ap.add_argument('--casclib', help='CascLib.dll (default: D2R_CASCLIB, else searched under the game folder)')
     args = ap.parse_args()
     src, out = Path(args.src), Path(args.out)
+    if args.game:
+        fill_cache(args.game, args.casclib)
     name = args.name or re.sub(r'(?i)(-unpacked)?(\.mpq)?$', '', src.name)
     report = merge(src, out / (name + '.mpq'))
     (out / 'merge-report.json').write_text(json.dumps(report, indent=1), encoding='utf-8')

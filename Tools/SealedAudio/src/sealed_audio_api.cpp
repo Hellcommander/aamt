@@ -15,7 +15,7 @@
 
 namespace
 {
-	constexpr const char* kVersion = "SealedAudio core 1.1.0 (MTSA1)";
+	constexpr const char* kVersion = "SealedAudio core 1.2.0 (MTSA1)";
 	std::atomic<bool>     g_initialized{ false };
 	std::wstring          g_dataDir;
 	SealedAudio::Hooks::Options g_hookOptions;
@@ -96,10 +96,15 @@ extern "C"
 		if (cfg.module_prefixes) {
 			g_hookOptions.modulePrefixes = cfg.module_prefixes;
 		}
+		g_hookOptions.patchSystem = cfg.patch_system != 0;
+		if (cfg.probe_prefixes && *cfg.probe_prefixes) {
+			g_hookOptions.probePrefixes = cfg.probe_prefixes;
+		}
 		const int hooked = Hooks::Install(g_hookOptions);
-		Log::Info("%d file imports hooked in the executable", hooked);
+		Log::Info(g_hookOptions.patchSystem ? "%d file functions hooked (executable imports and kernel32 stubs)" : "%d file imports hooked in the executable", hooked);
 		if (hooked == 0) {
-			Log::Error("the executable imports none of the file functions; sealed sounds cannot be served");
+			Log::Error(g_hookOptions.patchSystem ? "no file function could be hooked; sealed sounds cannot be served"
+			                                     : "the executable imports none of the file functions; sealed sounds cannot be served (try patch_system)");
 		}
 		return hooked;
 	}

@@ -6,6 +6,11 @@
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const fa = require("./file-analyze");
+const mcpc = require("./mcp-client");
+const perms = require("./permissions");
+const instructions = require("./instructions");
+const toolOutput = require("./tool-output");
 
 let vscode = null;
 try {
@@ -40,10 +45,19 @@ function tool(name, description, properties, required) {
 const TODO_STATUS = ["pending", "in_progress", "completed"];
 
 const TOOL_DEFS = [
-  tool("Read", "Read a text file. Lines come back numbered as '  N\\tline' (the number and tab are not part of the file). Returns up to 400 lines; pass offset (1-based line) and limit for more.", {
+  tool("Read", "Read a text file. Lines come back numbered as '  N\\tline' (the number and tab are not part of the file). Returns up to 400 lines; pass offset (1-based line) and limit for more. An image is shown to you as with ReadImage; another binary file gets an AnalyzeFile summary.", {
     path: { type: "string", description: "Absolute path, or relative to the first workspace folder" },
     offset: { type: "number" },
     limit: { type: "number" },
+  }, ["path"]),
+  tool("ReadImage", "Look at an image: a screenshot, UI mockup, texture, icon or diagram (PNG, JPEG, GIF, WebP, BMP, TGA, DDS, TIFF, ICO), from a path or an http(s) URL. The image is attached to the result so you can see it; large ones are scaled down. Use it whenever the user mentions or links an image.", {
+    path: { type: "string", description: "File path or http(s) URL of the image" },
+  }, ["path"]),
+  tool("AnalyzeFile", "Structured summary of a binary file instead of raw bytes: file type (magic bytes); .NET assemblies (references, types, methods, fields); native DLL/EXE imports and exports; ZIP/JAR/VSIX/DOCX/TAR/GZ (and 7z/RAR/XZ when 7-Zip is installed) listings; PDF text; image size; hex + strings for anything else.", {
+    path: { type: "string" },
+    pages: { type: "string", description: "PDF pages to read, e.g. \"5\", \"10-20\", \"1,3,7-\" (default: from the start until the output is full)" },
+    filter: { type: "string", description: "Only types / members / exports whose name contains this text (DLLs)" },
+    entry: { type: "string", description: "Archive entry to read (text is shown, images are attached, binaries are analysed)" },
   }, ["path"]),
   tool("LS", "List a directory (folders end with /).", { path: { type: "string" } }, ["path"]),
   tool("Glob", "Find files by glob pattern, e.g. **/*.cs or **/Mutations/*.xml. Newest files first.", {
@@ -90,6 +104,16 @@ const TOOL_DEFS = [
     path: { type: "string" },
   }, []),
   tool("WebFetch", "Fetch a URL and return its text.", { url: { type: "string" } }, ["url"]),
+  tool("McpTools", "Find tools on the connected MCP servers (e.g. REA for reverse engineering binaries, .NET assemblies, Electron apps). No arguments: list servers. server: list its tools. query: search tool names and descriptions. tool: show that tool's full argument schema; do this before McpCall.", {
+    server: { type: "string" },
+    query: { type: "string", description: "Words to look for in tool names / descriptions" },
+    tool: { type: "string", description: "Tool name whose argument schema to show" },
+  }, []),
+  tool("McpCall", "Run one tool on an MCP server. Get the tool's argument schema with McpTools(server, tool) first.", {
+    server: { type: "string" },
+    tool: { type: "string" },
+    arguments: { type: "object", description: "Arguments matching the tool's schema" },
+  }, ["server", "tool"]),
   tool("list_skills", "List the skills (SKILL.md workflows) available to follow.", {}, []),
   tool("read_skill", "Read a skill's full instructions by name before following it.", {
     name: { type: "string" },
@@ -107,6 +131,7 @@ const TOOL_DEFS = [
   tool("Task", "Send a read-only research sub-agent (Read, LS, Glob, Grep, WebFetch) to answer one question about the codebase in its own context, and get back its report. Use it for broad searches that would otherwise fill your context. Several Task calls in one reply run in parallel.", {
     description: { type: "string", description: "3-6 word label" },
     prompt: { type: "string", description: "The full question, with everything the sub-agent needs to know" },
+    agent: { type: "string", description: "Named sub-agent to run (see the list in your instructions; default explore)" },
   }, ["prompt"]),
   tool("attempt_completion", "Finish the task. Call only after the work is done and verified.", {
     summary: { type: "string", description: "What changed and how it was verified" },
@@ -115,6 +140,8 @@ const TOOL_DEFS = [
 
 const ALIASES = {
   read: "Read", read_file: "Read", readfile: "Read", open_file: "Read", view_file: "Read", cat: "Read",
+  readimage: "ReadImage", read_image: "ReadImage", view_image: "ReadImage", look_at_image: "ReadImage", image: "ReadImage", screenshot: "ReadImage",
+  analyzefile: "AnalyzeFile", analyze_file: "AnalyzeFile", inspect_file: "AnalyzeFile", file_info: "AnalyzeFile", analyze: "AnalyzeFile", inspect_binary: "AnalyzeFile",
   ls: "LS", list_dir: "LS", list_directory: "LS", list_files: "LS", listdir: "LS",
   glob: "Glob", glob_files: "Glob", glob_file_search: "Glob", file_search: "Glob", find_file: "Glob", find_files: "Glob",
   grep: "Grep", search: "Grep", grep_search: "Grep", codebase_search: "Grep", search_files: "Grep",
@@ -124,6 +151,8 @@ const ALIASES = {
   delete: "Delete", delete_file: "Delete", remove_file: "Delete",
   readlints: "ReadLints", read_lints: "ReadLints", get_diagnostics: "ReadLints", diagnostics: "ReadLints",
   webfetch: "WebFetch", web_fetch: "WebFetch", fetch: "WebFetch",
+  mcptools: "McpTools", mcp_tools: "McpTools", list_mcp_tools: "McpTools", mcp_list: "McpTools", mcp_search: "McpTools",
+  mcpcall: "McpCall", mcp_call: "McpCall", call_mcp_tool: "McpCall", mcp: "McpCall", use_mcp_tool: "McpCall",
   multiedit: "MultiEdit", multi_edit: "MultiEdit", multi_replace: "MultiEdit",
   todowrite: "TodoWrite", todo_write: "TodoWrite", todos: "TodoWrite", update_todos: "TodoWrite", plan: "TodoWrite",
   task: "Task", subagent: "Task", agent: "Task", research: "Task",
@@ -134,7 +163,9 @@ const ALIASES = {
 const NAMES = new Set(TOOL_DEFS.map((t) => t.function.name));
 const MUTATING = new Set(["Shell", "StrReplace", "MultiEdit", "Write", "Delete"]);
 /** Tools that only look: safe to run side by side in one round, and all a sub-agent gets. */
-const READ_ONLY = new Set(["Read", "LS", "Glob", "Grep", "WebFetch", "ReadLints", "list_skills", "read_skill"]);
+const READ_ONLY = new Set(["Read", "ReadImage", "AnalyzeFile", "LS", "Glob", "Grep", "WebFetch", "ReadLints", "list_skills", "read_skill", "McpTools"]);
+/** Tools that only exist when an MCP server is configured. */
+const MCP_TOOLS = new Set(["McpTools", "McpCall"]);
 
 function canonName(name) {
   const raw = String(name || "").trim();
@@ -162,8 +193,16 @@ function normArgs(name, args) {
   if (a.timeout_sec != null && a.timeout == null) a.timeout = a.timeout_sec;
   if (a.task && !a.prompt) a.prompt = a.task;
   if (a.question && !a.prompt) a.prompt = a.question;
+  if (name === "McpCall" || name === "McpTools") {
+    if (a.server_name && !a.server) a.server = a.server_name;
+    if (a.tool_name && !a.tool) a.tool = a.tool_name;
+    if (name === "McpCall" && a.name && !a.tool) a.tool = a.name;
+    if (a.args != null && a.arguments == null) a.arguments = a.args;
+    if (a.input != null && a.arguments == null) a.arguments = a.input;
+    if (name === "McpTools" && a.pattern && !a.query) a.query = a.pattern;
+  }
   // Small models often send arrays as JSON text.
-  for (const k of ["edits", "todos"]) {
+  for (const k of ["edits", "todos", "arguments"]) {
     if (typeof a[k] === "string") {
       try {
         a[k] = JSON.parse(a[k]);
@@ -215,6 +254,16 @@ class ToolContext {
    * @param {boolean} [o.requireRead] refuse edits to existing files the agent has not Read (default true)
    * @param {boolean} [o.diagnosticsAfterEdit] append new editor errors to edit results (default true)
    * @param {AbortSignal} [o.signal]
+   * @param {(abs: string, kind: string) => string} [o.claim] called before a file is changed; returns
+   *   "" when this chat may change it, or the reason another chat holds it (the edit is refused)
+   * @param {boolean} [o.vision] the model can see images (default true); otherwise ReadImage returns metadata only
+   * @param {number} [o.imageMaxEdge] long edge, in pixels, images are scaled down to (default 1568)
+   * @param {string} [o.model] model name, for messages about vision support
+   * @param {import("./mcp-client").McpHub} [o.mcp] MCP servers for McpTools / McpCall
+   * @param {"auto"|"confirm"|"off"} [o.mcpMode] McpCall runs without asking, asks first, or is refused
+   * @param {(label: string) => Promise<boolean>} [o.confirmMcp]
+   * @param {number} [o.mcpTimeoutSec] per McpCall (default 300)
+   * @param {string[]} [o.thirdParty] folders with optional libraries (pdf.js); default: each root's Tools\Shared\third_party
    */
   constructor(o) {
     this.roots = (o.roots || []).filter(Boolean);
@@ -228,12 +277,72 @@ class ToolContext {
     this.requireRead = o.requireRead !== false;
     this.diagnosticsAfterEdit = o.diagnosticsAfterEdit !== false;
     this.signal = o.signal;
+    this.claimFn = typeof o.claim === "function" ? o.claim : null;
+    this.vision = o.vision !== false;
+    this.imageMaxEdge = Math.max(256, Number(o.imageMaxEdge) || fa.DEFAULT_MAX_EDGE);
+    this.model = o.model || "";
+    this.mcp = o.mcp || null;
+    this.mcpMode = o.mcpMode || "auto";
+    this.confirmMcp = o.confirmMcp || (async () => true);
+    this.mcpTimeoutSec = Math.max(5, Number(o.mcpTimeoutSec) || 300);
+    this.thirdParty = o.thirdParty || mcpc.thirdPartyDirs("", this.roots);
     /** lower-case abs path → mtime when the agent last read (or wrote) it */
     this.reads = new Map();
     /** abs path → { before: string|null } — file contents before the agent first touched it */
     this.checkpoint = new Map();
     /** @type {{content:string,status:string}[]} */
     this.todos = [];
+    // Permission rules (lib/permissions.js): defaults, then settings, then the running agent's own.
+    this.rules = [...perms.DEFAULT_RULES, ...perms.normalize(o.rules || [])];
+    /** "Allow always" answers: turn an ask into allow, never override a deny */
+    this.approved = perms.normalize(o.approved || []);
+    /** @type {(req:{tool:string, action:string, resources:string[], suggest:string[]}) => Promise<"once"|"always"|"reject">} */
+    this.confirmPermission = o.confirmPermission || (async () => "once");
+    this.saveApproval = typeof o.saveApproval === "function" ? o.saveApproval : null;
+    /** lower-case shell commands the user approved through a permission prompt this turn (no second Run dialog) */
+    this.askedShell = new Set();
+    /** lower-case AGENTS.md paths already in the prompt or added to a Read result */
+    this.loadedInstructions = new Set((o.instructionFiles || []).map((f) => String(f).toLowerCase()));
+  }
+
+  /** Rules of the agent running a turn, appended after the settings' rules (they win on a tie). */
+  withAgentRules(rules) {
+    const extra = perms.normalize(rules || []);
+    if (extra.length) this.rules = [...this.rules, ...extra];
+  }
+
+  /**
+   * "" when the call may run, else an error result. An "ask" rule shows the prompt: Allow once,
+   * Allow always (saves the suggested pattern) or Deny.
+   */
+  async permit(name, a) {
+    const r = perms.evaluate(this.rules, name, a, { roots: this.roots, resolve: (p) => this.resolve(p), approved: this.approved });
+    if (r.effect === "allow") return "";
+    if (r.effect === "deny") {
+      return "error: " + name + " on " + (r.resources || []).join(" | ").slice(0, 300) + " is denied by the permission rule " + perms.describeRule(r.rule) + " (localAgentBridge.agent.permissions or the agent's own rules). Do something else or tell the user it is blocked.";
+    }
+    let answer = "reject";
+    try {
+      answer = await this.confirmPermission({ tool: name, action: r.action, resources: r.asked && r.asked.length ? r.asked : r.resources, suggest: r.suggest || [] });
+    } catch {
+      answer = "reject";
+    }
+    if (answer === "always") {
+      const add = (r.suggest || []).map((s) => ({ action: r.action, resource: s, effect: "allow" }));
+      this.approved.push(...add);
+      if (this.saveApproval) {
+        try {
+          this.saveApproval(add);
+        } catch {
+          /* kept for this chat */
+        }
+      }
+    }
+    if (answer === "once" || answer === "always") {
+      if (name === "Shell") this.askedShell.add(String(a.command || "").trim().toLowerCase());
+      return "";
+    }
+    return "error: the user denied " + name + " (" + (r.resources || []).join(" | ").slice(0, 200) + "). Do not retry it; continue another way or report that it was refused.";
   }
 
   markRead(abs) {
@@ -291,11 +400,23 @@ class ToolContext {
   }
 
   canRead(abs) {
-    return this.readAnywhere || this.writable.some((r) => isUnder(abs, r));
+    return this.readAnywhere || this.writable.some((r) => isUnder(abs, r)) || toolOutput.isOutputFile(abs);
   }
 
   canWrite(abs) {
     return this.writable.some((r) => isUnder(abs, r));
+  }
+
+  /** "" when this chat may change abs now, else an error result naming the chat that holds it. */
+  claimCheck(abs, kind) {
+    if (!this.claimFn) return "";
+    let why = "";
+    try {
+      why = this.claimFn(abs, kind) || "";
+    } catch {
+      return ""; // a broken index must not block editing
+    }
+    return why ? "error: " + why : "";
   }
 
   writeDenied(abs) {
@@ -322,8 +443,19 @@ function readFile(ctx, a) {
   if (!ctx.canRead(abs)) return "error: reading outside the workspace is disabled: " + abs;
   if (!fs.existsSync(abs)) return "error: not found: " + abs + nearMiss(abs);
   if (fs.statSync(abs).isDirectory()) return listDir(ctx, { path: abs });
-  const data = openDirty(abs) ? currentText(abs) : fs.readFileSync(abs, "utf8");
-  if (/\u0000/.test(data.slice(0, 8000))) return "error: " + abs + " looks like a binary file (" + fs.statSync(abs).size + " bytes)";
+  let data;
+  if (openDirty(abs)) data = currentText(abs);
+  else {
+    // Images go to the model as images; other binaries get a structured summary, not raw bytes.
+    const head = readHead(abs, 8192);
+    const det = fa.detect(head, abs);
+    if (det.kind === "image") return readImage(ctx, { path: abs });
+    if (["pdf", "archive", "exe"].includes(det.kind) || (head.includes(0) && det.format !== "utf16")) {
+      return analyze(ctx, { path: abs }).then((r) => ({ ...r, text: "(binary file: showing an AnalyzeFile summary instead of raw bytes)\n" + r.text }));
+    }
+    const buf = fs.readFileSync(abs);
+    data = det.format === "utf16" ? fa.decodeText(buf) : buf.toString("utf8");
+  }
   ctx.markRead(abs);
   const lines = data.split(/\r?\n/);
   const start = Math.max(1, Number(a.offset) || 1);
@@ -332,7 +464,153 @@ function readFile(ctx, a) {
   const end = start - 1 + slice.length;
   const more = end < lines.length ? "\n…[" + (lines.length - end) + " more lines — Read with offset " + (end + 1) + "]" : "";
   if (!slice.length) return abs + " (" + lines.length + " lines; offset " + start + " is past the end)";
-  return abs + " (lines " + start + "-" + end + " of " + lines.length + ")\n" + clip(numbered(slice, start), 40000) + more;
+  // AGENTS.md files of the sub-folders on the way to this file are added once (opencode-style).
+  const notes = instructions.nested(abs, ctx.roots, ctx.loadedInstructions).map((n) => "\n\n[Instructions from " + n.file + " — they apply to files in that folder]\n" + n.text);
+  return abs + " (lines " + start + "-" + end + " of " + lines.length + ")\n" + clip(numbered(slice, start), 40000) + more + notes.join("");
+}
+
+function readHead(abs, n) {
+  const fd = fs.openSync(abs, "r");
+  try {
+    const buf = Buffer.alloc(n);
+    const got = fs.readSync(fd, buf, 0, n, 0);
+    return buf.subarray(0, got);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/** GET a URL into memory (redirects followed, size capped). */
+function fetchBytes(u, { max = 20 * 1024 * 1024, depth = 0 } = {}) {
+  const lib = u.startsWith("https") ? require("https") : require("http");
+  return new Promise((resolve, reject) => {
+    const req = lib.get(u, { timeout: 20000, headers: { "User-Agent": "CortexIDE-Agent/2.0", Accept: "image/*,*/*;q=0.5" } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && depth < 4) {
+        res.resume();
+        resolve(fetchBytes(new URL(res.headers.location, u).toString(), { max, depth: depth + 1 }));
+        return;
+      }
+      if (res.statusCode >= 400) {
+        res.resume();
+        reject(new Error("HTTP " + res.statusCode + " for " + u));
+        return;
+      }
+      const chunks = [];
+      let size = 0;
+      res.on("data", (c) => {
+        size += c.length;
+        if (size > max) {
+          res.destroy();
+          reject(new Error(u + " is larger than " + fa.fmtBytes(max)));
+          return;
+        }
+        chunks.push(c);
+      });
+      res.on("end", () => resolve({ buf: Buffer.concat(chunks), type: String(res.headers["content-type"] || "") }));
+      res.on("error", reject);
+    });
+    req.on("error", reject);
+    req.on("timeout", () => req.destroy(new Error("timeout fetching " + u)));
+  });
+}
+
+function noVisionNote(ctx) {
+  return (
+    "This model" + (ctx.model ? " (" + ctx.model + ")" : "") + " cannot see images, so only the metadata above is available. " +
+    "Tell the user if the task needs the picture itself: a vision model (Claude, Qwen2.5-VL, llava, gemma3, llama3.2-vision…) can look at it, " +
+    "or set localAgentBridge.agent.vision to \"on\" if this model does support images."
+  );
+}
+
+/** One image from a path or URL → { text, images } (images empty when the model cannot see them). */
+async function readImage(ctx, a) {
+  const raw = String(a.path || a.url || "").trim().replace(/^["'`<]|["'`>]$/g, "");
+  if (!raw) return "error: missing path";
+  let src;
+  let label;
+  if (/^https?:\/\//i.test(raw)) {
+    let got;
+    try {
+      got = await fetchBytes(raw);
+    } catch (e) {
+      return "error: " + (e.message || e);
+    }
+    const name = raw.split(/[?#]/)[0];
+    if (fa.detect(got.buf, name).kind !== "image") return "error: " + raw + " did not return an image (" + (got.type || fa.detect(got.buf, name).label) + "). Use WebFetch for pages.";
+    src = got.buf;
+    label = raw;
+  } else {
+    const abs = ctx.resolve(raw);
+    if (!ctx.canRead(abs)) return "error: reading outside the workspace is disabled: " + abs;
+    if (!fs.existsSync(abs)) return "error: not found: " + abs + nearMiss(abs);
+    if (fs.statSync(abs).isDirectory()) return "error: " + abs + " is a folder. Glob for images in it, e.g. **/*.png";
+    const det = fa.detect(readHead(abs, 4096), abs);
+    if (det.kind !== "image") return analyze(ctx, { path: abs }).then((r) => ({ ...r, text: "(not an image: " + det.label + ")\n" + r.text }));
+    src = abs;
+    label = abs;
+  }
+  const name = typeof src === "string" ? src : label.split(/[?#]/)[0];
+  if (!ctx.vision) {
+    const r = fa.analyzeFile(src, { name });
+    return label + " · " + r.text.split("\n").slice(1).join(" · ") + "\n" + noVisionNote(ctx);
+  }
+  let img;
+  try {
+    img = await fa.prepareImage(src, { name, maxEdge: ctx.imageMaxEdge });
+  } catch (e) {
+    return "error: " + (e.message || e);
+  }
+  const size = img.origWidth && img.origHeight ? img.origWidth + "x" + img.origHeight : "unknown size";
+  const sent = img.width + "x" + img.height + " " + img.mime.replace("image/", "").toUpperCase() + ", " + fa.fmtBytes(img.bytes);
+  return {
+    text: label + " · " + img.format.toUpperCase() + " " + size + (img.detail ? " (" + img.detail + ")" : "") + " · attached to this result as " + sent + (img.note ? " (" + img.note + ")" : "") + ".",
+    images: [{ mime: img.mime, data: img.data, path: label, width: img.width, height: img.height }],
+  };
+}
+
+/** AnalyzeFile: structured summary; an image (the file itself or an archive entry) is attached. */
+async function analyze(ctx, a) {
+  const abs = ctx.resolve(a.path);
+  if (!abs) return "error: missing path";
+  if (!ctx.canRead(abs)) return "error: reading outside the workspace is disabled: " + abs;
+  if (!fs.existsSync(abs)) return "error: not found: " + abs + nearMiss(abs);
+  if (fs.statSync(abs).isDirectory()) return listDir(ctx, { path: abs });
+  let r;
+  try {
+    r = fa.analyzeFile(abs, { filter: a.filter, entry: a.entry });
+  } catch (e) {
+    return "error: " + (e.message || e);
+  }
+  let extra = "";
+  if (r.format === "pdf") {
+    // pdf.js reads compressed, font-encoded and encrypted PDFs the built-in reader cannot.
+    try {
+      const pj = await fa.pdfjsText(abs, { dirs: ctx.thirdParty, pages: a.pages });
+      if (pj) r = { ...r, text: r.text.split("\n")[0] + "\n" + pj.lines.join("\n") };
+      else if (a.pages) extra = "\n(pages ignored: pdf.js is not installed; fetch it with Tools\\Fetch-ThirdParty.ps1 -AgentBridge)";
+    } catch (e) {
+      extra = "\n(pdf.js failed: " + (e.message || e) + "; built-in reader used)";
+    }
+  } else if (fa.SEVEN_ZIP_FORMATS.has(r.format)) {
+    try {
+      const sz = await fa.sevenZipDescribe(abs, { entry: a.entry, filter: a.filter });
+      if (sz) r = { ...r, text: sz.text, image: sz.image };
+    } catch (e) {
+      extra = "\n(7-Zip failed: " + (e.message || e) + ")";
+    }
+  }
+  const text = clip(r.text + extra, 30000);
+  if (!r.image) return text;
+  if (!ctx.vision) return text + "\n" + noVisionNote(ctx);
+  try {
+    const img = await fa.prepareImage(r.image.buf || abs, { name: r.image.name, maxEdge: ctx.imageMaxEdge });
+    return {
+      text: text + "\nAttached as " + img.width + "x" + img.height + " " + img.mime.replace("image/", "").toUpperCase() + (img.note ? " (" + img.note + ")" : "") + ".",
+      images: [{ mime: img.mime, data: img.data, path: abs + (a.entry ? "!" + r.image.name : ""), width: img.width, height: img.height }],
+    };
+  } catch (e) {
+    return text + "\n(could not attach the image: " + (e.message || e) + ")";
+  }
 }
 
 function nearMiss(abs) {
@@ -436,7 +714,11 @@ async function grep(ctx, a) {
   const out = r.out.trim();
   if (!out) return "(no matches for " + pat + " in " + target + ")";
   const lines = out.split(/\r?\n/);
-  return clip((lines.length > headLimit ? lines.slice(0, headLimit).join("\n") + "\n…[" + (lines.length - headLimit) + " more lines — narrow path/glob, or use output_mode files_with_matches]" : out));
+  if (lines.length > headLimit) {
+    const saved = toolOutput.save(out, "grep");
+    return clip(lines.slice(0, headLimit).join("\n")) + "\n…[" + (lines.length - headLimit) + " more lines — narrow path/glob, or use output_mode files_with_matches" + (saved ? "; all " + lines.length + " lines are saved in " + saved : "") + "]";
+  }
+  return toolOutput.clipSaved(out, MAX_OUT, clip, "grep");
 }
 
 function walk(root, onFile, limit = 20000) {
@@ -557,7 +839,7 @@ async function shell(ctx, a) {
   const cwd = ctx.resolve(a.cwd || ctx.roots[0] || process.cwd());
   if (!fs.existsSync(cwd)) return "error: cwd not found: " + cwd;
   if (!ctx.canWrite(cwd)) return ctx.writeDenied(cwd);
-  if (ctx.shellMode === "confirm" && !(await ctx.confirmShell(cmd, cwd))) return "error: the user declined to run this command";
+  if (ctx.shellMode === "confirm" && !ctx.askedShell.has(cmd.toLowerCase()) && !(await ctx.confirmShell(cmd, cwd))) return "error: the user declined to run this command";
   // A command that starts with a quoted exe path is a parse error in PowerShell without the call operator.
   if (/^["'][^"']+\.(exe|bat|cmd|ps1)["']/i.test(cmd)) cmd = "& " + cmd;
   let exe = "bash";
@@ -572,7 +854,7 @@ async function shell(ctx, a) {
   }
   const timeoutSec = Math.min(600, Math.max(1, Number(a.timeout) || ctx.shellTimeoutSec));
   const r = await runProcess(exe, args, { cwd, timeoutSec, signal: ctx.signal });
-  return "exit " + r.code + " (cwd " + cwd + ")\n" + (clip(r.out.trim()) || "(no output)");
+  return "exit " + r.code + " (cwd " + cwd + ")\n" + (toolOutput.clipSaved(r.out.trim(), MAX_OUT, clip, "shell") || "(no output)");
 }
 
 async function saveText(abs, contents) {
@@ -731,6 +1013,9 @@ async function strReplace(ctx, a) {
   if (!abs) return "error: missing path";
   if (!ctx.canWrite(abs)) return ctx.writeDenied(abs);
   if (!fs.existsSync(abs)) return "error: not found: " + abs + " (use Write to create it)";
+  // Another running chat's file comes before "Read it first": reading would not help.
+  const held = ctx.claimCheck(abs, "edit");
+  if (held) return held;
   const unread = ctx.unread(abs);
   const stale = ctx.staleCheck(abs, { exactOk: true });
   if (stale) return stale;
@@ -749,6 +1034,8 @@ async function multiEdit(ctx, a) {
   if (!fs.existsSync(abs)) return "error: not found: " + abs + " (use Write to create it)";
   const edits = Array.isArray(a.edits) ? a.edits : [];
   if (!edits.length) return "error: edits must be a non-empty array of {old_string, new_string}";
+  const held = ctx.claimCheck(abs, "edit");
+  if (held) return held;
   const unread = ctx.unread(abs);
   const stale = ctx.staleCheck(abs, { exactOk: true });
   if (stale) return stale;
@@ -777,6 +1064,8 @@ async function writeFile(ctx, a) {
   const contents = String(a.contents == null ? "" : a.contents);
   const existed = fs.existsSync(abs);
   if (existed && fs.statSync(abs).isDirectory()) return "error: " + abs + " is a folder";
+  const held = ctx.claimCheck(abs, existed ? "write" : "create");
+  if (held) return held;
   const stale = ctx.staleCheck(abs);
   if (stale) return stale.replace("before changing it", "before overwriting it (or use StrReplace for a partial change)");
   await commit(ctx, abs, contents);
@@ -789,6 +1078,8 @@ async function deleteFile(ctx, a) {
   if (!ctx.canWrite(abs)) return ctx.writeDenied(abs);
   if (!fs.existsSync(abs)) return "error: not found: " + abs;
   if (fs.statSync(abs).isDirectory()) return "error: Delete only removes files; use Shell for folders";
+  const held = ctx.claimCheck(abs, "delete");
+  if (held) return held;
   ctx.remember(abs);
   if (vscode) await vscode.workspace.fs.delete(vscode.Uri.file(abs), { useTrash: true });
   else fs.unlinkSync(abs);
@@ -858,6 +1149,11 @@ function webFetch(a, depth = 0) {
       let size = 0;
       let cut = false;
       const finish = () => {
+        const ctype = String(res.headers["content-type"] || "");
+        if (/^image\//i.test(ctype)) {
+          resolve("HTTP " + res.statusCode + " " + u + " is an image (" + ctype + "). Call ReadImage with this URL to look at it.");
+          return;
+        }
         let text = Buffer.concat(chunks).toString("utf8");
         if (/html/i.test(res.headers["content-type"] || "")) {
           text = text
@@ -898,12 +1194,35 @@ function webFetch(a, depth = 0) {
   });
 }
 
+/**
+ * Run a tool; the result may carry images for the model.
+ * @returns {Promise<{text:string, images:{mime:string,data:string,path:string,width:number,height:number}[]}>}
+ */
+async function execToolRich(ctx, name, rawArgs) {
+  const r = await dispatch(ctx, name, rawArgs);
+  if (r && typeof r === "object") return { text: String(r.text == null ? "" : r.text), images: Array.isArray(r.images) ? r.images : [] };
+  return { text: String(r == null ? "" : r), images: [] };
+}
+
+/** Run a tool and return its text (images, if any, are described but not returned). */
 async function execTool(ctx, name, rawArgs) {
+  return (await execToolRich(ctx, name, rawArgs)).text;
+}
+
+async function dispatch(ctx, name, rawArgs) {
   const canon = canonName(name);
   const a = normArgs(canon, rawArgs);
+  if (ctx && typeof ctx.permit === "function" && canon !== "Task") {
+    const refused = await ctx.permit(canon, a);
+    if (refused) return refused;
+  }
   switch (canon) {
     case "Read":
       return readFile(ctx, a);
+    case "ReadImage":
+      return readImage(ctx, a);
+    case "AnalyzeFile":
+      return analyze(ctx, a);
     case "LS":
       return listDir(ctx, a);
     case "Glob":
@@ -928,6 +1247,10 @@ async function execTool(ctx, name, rawArgs) {
       return readLints(ctx, a);
     case "WebFetch":
       return webFetch(a);
+    case "McpTools":
+      return mcpTools(ctx, a);
+    case "McpCall":
+      return mcpCall(ctx, a);
     case "list_skills": {
       const skills = ctx.skills();
       if (!skills.length) return "(no skills found)";
@@ -944,6 +1267,140 @@ async function execTool(ctx, name, rawArgs) {
     default:
       return "error: unknown tool " + name + ". Available: " + [...NAMES].join(", ");
   }
+}
+
+const NO_MCP = "error: no MCP servers are configured. Add them in localAgentBridge.agent.mcpServers, or fetch REA with Tools\\Fetch-ThirdParty.ps1 -AgentBridge.";
+
+function mcpServerOrError(ctx, name) {
+  const s = ctx.mcp.server(name);
+  return s || "error: no MCP server named " + name + ". Servers: " + ctx.mcp.names().join(", ");
+}
+
+async function mcpTools(ctx, a) {
+  if (!ctx.mcp || !ctx.mcp.size) return NO_MCP;
+  const want = String(a.tool || "").trim();
+  const query = String(a.query || "").trim().toLowerCase();
+  if (!a.server && !want && !query) {
+    const lines = ["MCP servers (McpTools server=<name> lists its tools; query=<words> searches them):", ...ctx.mcp.summary()];
+    if (ctx.mcp.skipped.length) lines.push("Not available: " + ctx.mcp.skipped.join("; "));
+    return lines.join("\n");
+  }
+  let servers;
+  if (a.server) {
+    const s = mcpServerOrError(ctx, a.server);
+    if (typeof s === "string") return s;
+    servers = [s];
+  } else servers = ctx.mcp.names().map((n) => ctx.mcp.server(n));
+  const found = [];
+  const errors = [];
+  for (const s of servers) {
+    try {
+      for (const t of await s.listTools()) found.push({ server: s.name, t });
+    } catch (e) {
+      errors.push(s.name + ": " + (e.message || e));
+    }
+  }
+  const errText = errors.length ? "\nServers that failed to start:\n" + errors.join("\n") : "";
+  if (want) {
+    const hit = found.find((f) => f.t.name === want) || found.find((f) => f.t.name.toLowerCase() === want.toLowerCase());
+    if (!hit) {
+      const near = found.filter((f) => f.t.name.toLowerCase().includes(want.toLowerCase().replace(/[^a-z0-9]+/g, "_"))).slice(0, 10);
+      return "error: no tool named " + want + (near.length ? ". Similar: " + near.map((f) => f.server + "." + f.t.name).join(", ") : ". Use McpTools with query to search.") + errText;
+    }
+    return clip(
+      "Server: " + hit.server + "\nTool: " + mcpc.signature(hit.t) + "\n\n" + String(hit.t.description || "").trim() + "\n\nArguments (JSON schema):\n" + JSON.stringify(hit.t.inputSchema || {}, null, 1) + errText,
+      12000
+    );
+  }
+  let list = found;
+  if (query) {
+    const words = query.split(/[\s,]+/).filter(Boolean);
+    const score = (f) => {
+      const n = f.t.name.toLowerCase();
+      const d = String(f.t.description || "").toLowerCase();
+      let sc = 0;
+      for (const w of words) {
+        if (n.includes(w)) sc += 3;
+        else if (d.includes(w)) sc += 1;
+        else return 0;
+      }
+      return sc;
+    };
+    list = found.map((f) => ({ f, sc: score(f) })).filter((x) => x.sc > 0).sort((x, y) => y.sc - x.sc).map((x) => x.f);
+  }
+  if (!list.length) return (query ? "No MCP tool matches \"" + query + "\"." : "The server lists no tools.") + errText;
+  const max = 60;
+  const lines = list.slice(0, max).map((f) => "- " + (a.server ? "" : f.server + ".") + mcpc.signature(f.t) + ": " + mcpc.firstLine(f.t.description, 120));
+  if (list.length > max) lines.push("…and " + (list.length - max) + " more; narrow it with query.");
+  return clip(list.length + " tool(s)" + (a.server ? " on " + servers[0].name : "") + ". Show one's arguments with McpTools(server, tool):\n" + lines.join("\n") + errText);
+}
+
+async function mcpCall(ctx, a) {
+  if (!ctx.mcp || !ctx.mcp.size) return NO_MCP;
+  if (ctx.mcpMode === "off") return "error: MCP tool calls are turned off (localAgentBridge.agent.mcpMode).";
+  if (!a.server || !a.tool) return "error: McpCall needs server and tool. Find them with McpTools.";
+  const s = mcpServerOrError(ctx, a.server);
+  if (typeof s === "string") return s;
+  let args = a.arguments == null ? {} : a.arguments;
+  if (typeof args === "string") return "error: arguments must be a JSON object, got text that is not valid JSON.";
+  if (typeof args !== "object" || Array.isArray(args)) return "error: arguments must be a JSON object.";
+  let tools;
+  try {
+    tools = await s.listTools();
+  } catch (e) {
+    return "error: " + (e.message || e);
+  }
+  const t = tools.find((x) => x.name === a.tool) || tools.find((x) => x.name.toLowerCase() === String(a.tool).toLowerCase());
+  if (!t) return "error: " + s.name + " has no tool " + a.tool + ". Use McpTools(server: \"" + s.name + "\", query: ...) to find it.";
+  const missing = ((t.inputSchema && t.inputSchema.required) || []).filter((k) => args[k] == null);
+  if (missing.length) return "error: missing required argument(s) " + missing.join(", ") + " for " + mcpc.signature(t) + ". See McpTools(server, tool) for the schema.";
+  const label = s.name + "." + t.name + " " + clip(JSON.stringify(args), 600);
+  if (ctx.mcpMode === "confirm" && !(await ctx.confirmMcp(label))) return "error: the user declined " + s.name + "." + t.name + ".";
+  let res;
+  try {
+    res = await s.callTool(t.name, args, { signal: ctx.signal, timeoutMs: ctx.mcpTimeoutSec * 1000 });
+  } catch (e) {
+    return "error: " + (e.message || e);
+  }
+  const out = mcpc.formatResult(s.name, t.name, res);
+  let text = toolOutput.clipSaved(out.text, 30000, clip, s.name + "_" + t.name);
+  if (out.images.length && !ctx.vision) {
+    text += "\n(" + out.images.length + " image(s) returned; " + (ctx.model || "this model") + " cannot see images, so they were not attached.)";
+    return text;
+  }
+  if (out.images.length) text += "\n(" + out.images.length + " image(s) attached.)";
+  return out.images.length ? { text, images: out.images } : text;
+}
+
+/**
+ * Images linked in a prompt (paths, file:/// and http(s) URLs, markdown image links), loaded the way
+ * ReadImage loads them, so a vision model sees them with the task. Paths that do not exist are skipped.
+ * @returns {Promise<{images:object[], notes:string[]}>} notes: one line per image found (attached or why not)
+ */
+async function promptImages(ctx, text, max = 6) {
+  const images = [];
+  const notes = [];
+  for (const ref of fa.findImageRefs(text, max * 2)) {
+    if (images.length >= max) {
+      notes.push(ref + ": not attached (more than " + max + " images); use ReadImage");
+      continue;
+    }
+    if (!/^https?:\/\//i.test(ref)) {
+      const abs = ctx.resolve(ref);
+      if (!abs || !fs.existsSync(abs) || fs.statSync(abs).isDirectory()) continue;
+    }
+    let r;
+    try {
+      r = await readImage(ctx, { path: ref });
+    } catch (e) {
+      r = "error: " + (e.message || e);
+    }
+    if (r && typeof r === "object" && Array.isArray(r.images) && r.images.length) {
+      images.push(...r.images);
+      notes.push(r.text);
+    } else notes.push(String((r && r.text) || r));
+  }
+  return { images, notes };
 }
 
 function defaultRgPath(appRoot) {
@@ -963,11 +1420,15 @@ module.exports = {
   NAMES,
   MUTATING,
   READ_ONLY,
+  MCP_TOOLS,
   renderTodos,
   stripLineNumbers,
   canonName,
   normArgs,
   execTool,
+  execToolRich,
+  readImage,
+  promptImages,
   ToolContext,
   defaultRgPath,
   clip,

@@ -155,8 +155,93 @@ async function contextWindow(backend, model, { override = 0, ollamaNumCtx = 1638
   return (m && m.ctx) || providerOf(backend.provider).defaultCtx;
 }
 
+/** Model names of OpenAI-compatible / local models that take images. */
+const VISION_RE = /(^|[\/:_.-])(vl|vlm|vision|llava|bakllava|pixtral|minicpm-?v|moondream|internvl|cogvlm|idefics|smolvlm|paligemma|molmo|gemma-?3|gemma3n|llama-?3\.2-?\d*b?-?vision|llama-?4|mistral-small-3\.[1-9]|qwen2(\.5)?-?(vl|omni)|qwen3-?(vl|omni)|qvq|kimi-vl|glm-4(\.\d)?v|phi-?3\.5-vision|phi-?4-multimodal|granite-vision|gpt-4o|gpt-4\.1|gpt-5|o3|o4|claude|gemini)/i;
+const visionCache = new Map();
+
+/**
+ * Whether the model can take images. mode "on"/"off" overrides; "auto": Claude and Claude Code yes,
+ * Ollama from /api/show capabilities (or a vision projector), others from the model name.
+ */
+async function supportsVision(backend, model, mode = "auto") {
+  if (mode === "on") return true;
+  if (mode === "off") return false;
+  if (!backend) return false;
+  if (backend.provider === "anthropic" || backend.provider === "claude-code") return true;
+  const key = backend.provider + "|" + backend.baseUrl + "|" + model;
+  if (visionCache.has(key)) return visionCache.get(key);
+  let yes = VISION_RE.test(String(model || ""));
+  if (backend.provider === "ollama") {
+    try {
+      const res = await request(ollamaRoot(backend.baseUrl) + "/api/show", { method: "POST", body: { model }, timeout: 5000 });
+      const j = res.json || {};
+      if (Array.isArray(j.capabilities)) yes = j.capabilities.includes("vision");
+      else if (j.projector_info || Object.keys(j.model_info || {}).some((k) => /\.vision\./.test(k))) yes = true;
+    } catch {
+      /* keep the name guess */
+    }
+  }
+  visionCache.set(key, yes);
+  return yes;
+}
+
+function imageNote(img) {
+  return "[image" + (img.path ? ": " + img.path : "") + (img.width ? " (" + img.width + "x" + img.height + ")" : "") + "]";
+}
+
+/**
+ * Loop messages → OpenAI chat format. A user message with images becomes a content array with
+ * image_url parts. Tool messages must stay text there, so the images of a round's tool results go
+ * in one user message right after that round's results.
+ */
+function toOpenAIMessages(messages) {
+  const out = [];
+  let pending = [];
+  const flush = () => {
+    if (!pending.length) return;
+    out.push({
+      role: "user",
+      content: [{ type: "text", text: "Images from the tool results above:" }, ...pending.flatMap((img) => [{ type: "text", text: imageNote(img) }, { type: "image_url", image_url: { url: "data:" + img.mime + ";base64," + img.data } }])],
+    });
+    pending = [];
+  };
+  for (const m of messages) {
+    if (m.role !== "tool") flush();
+    const { images, blocks, ...rest } = m;
+    const imgs = Array.isArray(images) ? images : [];
+    if (m.role === "tool") {
+      out.push(rest);
+      pending.push(...imgs);
+    } else if (m.role === "user" && imgs.length) {
+      out.push({ ...rest, content: [{ type: "text", text: String(m.content == null ? "" : m.content) }, ...imgs.map((img) => ({ type: "image_url", image_url: { url: "data:" + img.mime + ";base64," + img.data } }))] });
+    } else out.push(rest);
+  }
+  flush();
+  return out;
+}
+
 function toOllamaMessages(messages) {
-  return messages.map((m) => {
+  const out = [];
+  let pending = [];
+  const flush = () => {
+    if (!pending.length) return;
+    out.push({ role: "user", content: "Images from the tool results above: " + pending.map(imageNote).join(" "), images: pending.map((i) => i.data) });
+    pending = [];
+  };
+  for (const m of messages) {
+    if (m.role !== "tool") flush();
+    const imgs = Array.isArray(m.images) ? m.images : [];
+    const conv = toOllamaMessage(m);
+    if (m.role === "tool") pending.push(...imgs);
+    else if (imgs.length) conv.images = imgs.map((i) => i.data);
+    out.push(conv);
+  }
+  flush();
+  return out;
+}
+
+function toOllamaMessage(m) {
+  return ((m) => {
     if (m.role === "assistant" && Array.isArray(m.tool_calls) && m.tool_calls.length) {
       return {
         role: "assistant",
@@ -176,7 +261,7 @@ function toOllamaMessages(messages) {
     }
     if (m.role === "tool") return { role: "tool", content: String(m.content || ""), tool_name: m.name };
     return { role: m.role, content: String(m.content == null ? "" : m.content) };
-  });
+  })(m);
 }
 
 let callSeq = 0;
@@ -244,7 +329,7 @@ async function chat({ backend, model, messages, tools, maxTokens = 2048, tempera
       },
     });
   } else {
-    const body = { model, messages, stream: true, stream_options: { include_usage: true }, temperature, max_tokens: maxTokens };
+    const body = { model, messages: toOpenAIMessages(messages), stream: true, stream_options: { include_usage: true }, temperature, max_tokens: maxTokens };
     if (tools && tools.length) {
       body.tools = tools;
       body.tool_choice = "auto";
@@ -341,6 +426,10 @@ module.exports = {
   listModels,
   pickModel,
   contextWindow,
+  supportsVision,
+  toOpenAIMessages,
+  toOllamaMessages,
+  VISION_RE,
   chat,
   qudlabKey,
   newId,

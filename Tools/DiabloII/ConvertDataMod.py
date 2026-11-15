@@ -144,8 +144,21 @@ def is_strings(r):
     return low.startswith('local/lng/') and low.endswith('.json')
 
 
+def use_d2rmm_casclib(d2rmm):
+    """Points D2R_CASCLIB (read by ModAssets.py / d2r_casc.py) at D2RMM's own tools\\CascLib.dll when it is
+    not set yet, so the game archive opens with D2RMM installed anywhere, not only inside the game folder."""
+    if os.environ.get('D2R_CASCLIB') or not d2rmm:
+        return
+    dll = Path(d2rmm) / 'tools' / 'CascLib.dll'
+    if dll.is_file():
+        os.environ['D2R_CASCLIB'] = str(dll)
+
+
 def fetch_vanilla(game, cache, paths, python):
     """Asks ModAssets.py for the game's copies; returns {path: Path or None}."""
+    from d2r_casc import check_cache
+    if check_cache(str(cache), str(game)):
+        print('  game was patched since the cache was filled: fetching its files again', file=sys.stderr)
     result = {}
     todo = []
     for p in paths:
@@ -524,6 +537,41 @@ function keyOf(row, key, patch) {
   return patch.trim ? k.trim() : k;
 }
 
+// My mod list (mod settings > My mod list, every rule off by default): fixes for particular mods.
+// A ticked rule acts only when one of its mods (`when`) is enabled in D2RMM, and with `above` only
+// when that mod comes before this one: `earlier` paths keep the cells/strings mods above changed,
+// `skip` (patterns on the paths below) leaves files/tables out, `switches` turns switches off.
+// An `option` rule (mod settings > Options) is a part of this mod: on by default, its actions apply
+// when it is switched OFF, whatever the mod list. `props`: item property codes taken off items.
+const RULES_ON = (() => {
+  const list = typeof D2RMM.getModList === 'function' ? D2RMM.getModList() || [] : [];
+  const me = list.findIndex((m) => m.id === MOD_ID);
+  const at = (id) => list.findIndex((m) => m.id === id || m.name === id);
+  return MODLIST.filter((r) => {
+    const v = typeof config === 'object' && config ? config[r.id] : undefined;
+    if (r.option) {
+      const off = v === false || v === 'false';
+      console.log(MOD_ID + ': Options > ' + r.name + ': ' + (off ? 'off' : 'on'));
+      return off;
+    }
+    if (v !== true && v !== 'true') return false;
+    const hits = r.when.filter((id) => {
+      const i = at(id);
+      return i >= 0 && (!r.above || me < 0 || i < me);
+    });
+    console.log(MOD_ID + ': My mod list > ' + r.name + ': ' + (hits.length ? 'used (' + hits.join(', ') + ')'
+      : 'not used, ' + r.when.join(' / ') + ' is not ' + (r.above ? 'above this mod' : 'in the mod list')));
+    return hits.length > 0;
+  });
+})();
+const SKIP = RULES_ON.flatMap((r) => r.skip || []).map((p) => new RegExp(p, 'i'));
+const EARLIER = new Set(RULES_ON.flatMap((r) => r.earlier || []).map((p) => p.toLowerCase()));
+const LIST_OFF = new Set(RULES_ON.flatMap((r) => r.switches || []));
+const PROPS_OFF = new Set(RULES_ON.flatMap((r) => r.props || []).map((p) => p.toLowerCase()));
+const skipped = (path) => SKIP.some((re) => re.test(path));
+// 'earlier' for paths a ticked rule names, else the Conflicts setting.
+const cellsOf = (path) => (EARLIER.has(path.toLowerCase()) ? 'earlier' : CELLS);
+
 function clash(path, what) {
   const c = (CLASHES[path] = CLASHES[path] || [0, []]);
   c[0]++;
@@ -538,7 +586,7 @@ function mergeCells(path, row, diff, before, name) {
     const cur = row[h] == null ? '' : String(row[h]);
     if (h in before && cur !== before[h] && cur !== diff[h]) {
       clash(path, name + ' ' + h);
-      if (CELLS === 'earlier') return;
+      if (cellsOf(path) === 'earlier') return;
     }
     out[h] = diff[h];
   });
@@ -685,7 +733,7 @@ function mergeEntry(path, cur, mine, before) {
     if (same(mine[f], before[f])) return; // the mod leaves this field alone
     if (!same(cur[f], before[f]) && !same(cur[f], mine[f])) {
       clash(path, cur.Key + ' ' + f);
-      if (CELLS === 'earlier') return;
+      if (cellsOf(path) === 'earlier') return;
     }
     if (f in mine) out[f] = mine[f];
     else delete out[f];
@@ -717,17 +765,73 @@ function applyStrings(path, patch) {
       return;
     }
     clash(path, e.Key + ' (added by both)');
-    if (CELLS === 'mod') list[i] = Object.assign({}, e, list[i].id !== undefined ? { id: list[i].id } : {});
+    if (cellsOf(path) === 'mod') list[i] = Object.assign({}, e, list[i].id !== undefined ? { id: list[i].id } : {});
   });
   D2RMM.writeJson(path, list);
 }
 
+// Item property columns: [code column, (match) -> its param, min and max columns].
+const PROP_COLS = [
+  [/^prop(\d+)$/, (m) => ['par', 'min', 'max'].map((s) => s + m[1])],
+  [/^aprop(\d+[ab])$/, (m) => ['apar', 'amin', 'amax'].map((s) => s + m[1])],
+  [/^PCode(\d+[ab])$/, (m) => ['PParam', 'PMin', 'PMax'].map((s) => s + m[1])],
+  [/^FCode(\d+)$/, (m) => ['FParam', 'FMin', 'FMax'].map((s) => s + m[1])],
+  [/^T1Code(\d+)$/, (m) => ['T1Param', 'T1Min', 'T1Max'].map((s) => s + m[1])],
+  [/^mod(\d+)code$/, (m) => ['param', 'min', 'max'].map((s) => 'mod' + m[1] + s)],
+  [/^((?:[bc] )?mod \d+)$/, (m) => ['param', 'min', 'max', 'chance'].map((s) => m[1] + ' ' + s)],
+  [/^(\w+Mod\d)Code$/, (m) => ['Param', 'Min', 'Max'].map((s) => m[1] + s)],
+];
+// Takes the property `codes` off every row of a table; an affix left with no property stops spawning.
+function stripProps(path, codes) {
+  const table = D2RMM.readTsv(path, { removeCarriageReturns: true });
+  const cols = table.headers
+    .map((h) => {
+      const r = PROP_COLS.find(([re]) => re.test(h));
+      return r ? [h, r[1](h.match(r[0]))] : null;
+    })
+    .filter(Boolean);
+  if (!cols.length) return 0;
+  const affix = /^(magicprefix|magicsuffix|automagic)\.txt$/i.test(path.slice(path.lastIndexOf('\\') + 1));
+  let n = 0;
+  table.rows.forEach((row) => {
+    let hit = false;
+    cols.forEach(([c, rest]) => {
+      if (!codes.has(String(row[c] == null ? '' : row[c]).trim().toLowerCase())) return;
+      [c].concat(rest).forEach((h) => {
+        if (h in row) row[h] = '';
+      });
+      hit = true;
+    });
+    if (!hit) return;
+    n++;
+    // Close the gap: the properties after a removed one move up (numbered slots; set bonus slots
+    // like aprop1a stay, their number is the bonus).
+    const slot = /\d+(?=\D*$)/; // the last number: T1Code3 -> 3
+    const families = {};
+    cols.forEach((c) => {
+      if (/\d[ab]$/.test(c[0])) return;
+      const f = c[0].replace(slot, '#');
+      (families[f] = families[f] || []).push(c);
+    });
+    Object.values(families).forEach((fam) => {
+      fam.sort((a, b) => Number(a[0].match(slot)[0]) - Number(b[0].match(slot)[0]));
+      const filled = fam.filter(([c]) => row[c]).map(([c, rest]) => [c].concat(rest).map((h) => (h in row ? row[h] : '')));
+      fam.forEach(([c, rest], i) => [c].concat(rest).forEach((h, j) => {
+        if (h in row) row[h] = i < filled.length ? filled[i][j] : '';
+      }));
+    });
+    if (affix && cols.every(([c]) => !row[c]) && row.spawnable != null && row.spawnable !== '') row.spawnable = '0';
+  });
+  if (n) D2RMM.writeTsv(path, table);
+  return n;
+}
+
 // Every entry names the switch (mod settings) it belongs to; 'core' is always installed.
-const ON = (id) => !id || id === 'core' || (config[id] !== false && config[id] !== 'false');
-const COPY_ON = COPY.filter((e) => ON(e[2]));
-const LOADER_ON = LOADER.filter((e) => ON(e[2]));
-const TABLES_ON = TABLES.filter((e) => ON(e[1])).map((e) => e[0]);
-const STRINGS_ON = STRINGS.filter((e) => ON(e[1])).map((e) => e[0]);
+const ON = (id) => !id || id === 'core' || (!LIST_OFF.has(id) && config[id] !== false && config[id] !== 'false');
+const COPY_ON = COPY.filter((e) => ON(e[2]) && !skipped(e[0]));
+const LOADER_ON = LOADER.filter((e) => ON(e[2]) && !skipped(e[0]));
+const TABLES_ON = TABLES.filter((e) => ON(e[1]) && !skipped(e[0])).map((e) => e[0]);
+const STRINGS_ON = STRINGS.filter((e) => ON(e[1]) && !skipped(e[0])).map((e) => e[0]);
 
 // 'rebuild' puts the mod's own row order first, which only holds when no mod comes before it.
 if (ROWS === 'rebuild' && typeof D2RMM.getModList === 'function') {
@@ -751,6 +855,10 @@ if (ROWS === 'keep') {
   TABLES_ON.forEach((path) => applyTable(path, readPatch(path)));
 }
 STRINGS_ON.forEach((path) => applyStrings(path, readPatch(path)));
+if (PROPS_OFF.size) {
+  const n = TABLES_ON.reduce((sum, path) => sum + stripProps(path, PROPS_OFF), 0);
+  console.log(MOD_ID + ': took ' + [...PROPS_OFF].join(', ') + ' off ' + n + ' row(s) (Options).');
+}
 D2RMM.writeTxt(SCRATCH, '');
 
 const clashed = Object.keys(CLASHES);
@@ -867,7 +975,101 @@ def load_order_ui(rows='keep', conflicts='mod', files='overwrite'):
     ]}
 
 
-def settings_ui(feature_count, loader, duplicates=None, from_source=None, load_order=None):
+def modlist_rules(path, mod_id, loader, tables, strings, copy_list, data=None):
+    """The 'My mod list' rules (a JSON list, see modlist-rules.example.json) that fit this
+    conversion: a rule's `mods` (converted mod ids; none = all) must name it, and only the parts
+    that touch something it has are kept (skip patterns matching a path, switches it has, earlier
+    paths it patches, `props` codes found in its tables under `data`); a rule left with nothing is
+    dropped. A rule with `option` needs no `when`: it is a part of the mod, on by default, that
+    applies its actions when switched off. Returns (rules, file used or None)."""
+    path = Path(path) if path else None
+    if not path or not path.is_file():
+        return [], None
+    raw = json.loads(path.read_text(encoding='utf-8-sig'))
+    raw = raw.get('rules', []) if isinstance(raw, dict) else raw
+    paths = [win(p) for p, _, _ in copy_list] + [p for p, _, _ in loader] + [win(t) for t in tables] + [win(s) for s in strings]
+    paths = [p.replace('/', '\\') for p in paths]
+    switches = {u for _, _, u in loader} | {f for _, _, f in copy_list} | {feature_of(t) for t in tables}
+    patched = {win(t).replace('/', '\\').lower() for t in list(tables) + list(strings)}
+    out = []
+    for r in raw:
+        option = isinstance(r, dict) and bool(r.get('option'))
+        if not isinstance(r, dict) or not r.get('id') or not (r.get('when') or option):
+            continue
+        if r.get('mods') and mod_id not in r['mods']:
+            continue
+        skip = [p for p in r.get('skip', []) if any(_re.search(p, x, _re.I) for x in paths)]
+        sw = [s for s in r.get('switches', []) if s in switches]
+        earlier = [p for p in r.get('earlier', []) if p.replace('/', '\\').lower() in patched]
+        props = [c for c in r.get('props', []) if data and any(
+            _re.search(r'(^|\t)' + _re.escape(c) + r'(\t|$)', (Path(data) / t).read_text(encoding='utf-8', errors='replace'),
+                       _re.I | _re.M)
+            for t in tables if (Path(data) / t).is_file())]
+        if not (skip or sw or earlier or props):
+            continue
+        rule = {'id': r['id'], 'name': r.get('name', r['id']), 'when': list(r.get('when') or []),
+                'above': bool(r.get('above'))}
+        if option:
+            rule['option'] = True
+        if props:
+            rule['props'] = props
+        if skip:
+            rule['skip'] = skip
+        if sw:
+            rule['switches'] = sw
+        if earlier:
+            rule['earlier'] = [p.replace('/', '\\') for p in earlier]
+        rule['description'] = r.get('description', '')
+        out.append(rule)
+    return out, str(path)
+
+
+def options_ui(rules):
+    """The 'Options' settings: a checkbox per option rule, on by default; off applies its actions."""
+    children = []
+    for r in rules:
+        if not r.get('option'):
+            continue
+        what = []
+        if r.get('props'):
+            what.append('takes %s off every item (affixes with nothing else left stop spawning)' % ', '.join(r['props']))
+        if r.get('switches'):
+            what.append('turns off ' + ', '.join(r['switches']))
+        if r.get('skip'):
+            what.append('leaves out %d file/table pattern(s)' % len(r['skip']))
+        if r.get('earlier'):
+            what.append('keeps the values of the mods above in ' + ', '.join(p.rsplit('\\', 1)[-1] for p in r['earlier']))
+        children.append({'id': r['id'], 'type': 'checkbox', 'name': r['name'], 'defaultValue': True,
+                         'description': (r['description'] + ' ' if r['description'] else '') +
+                         'Off: it %s. The install log says whether it is on.' % '; '.join(what)})
+    return {'id': 'options', 'type': 'section', 'name': 'Options', 'defaultExpanded': True,
+            'description': 'Parts of this mod you can switch off, all on by default (as the mod comes).',
+            'children': children} if children else None
+
+
+def modlist_ui(rules):
+    """The 'My mod list' settings: a checkbox per rule, all off by default."""
+    children = []
+    for r in rules:
+        if r.get('option'):
+            continue
+        cond = ('%s is enabled ABOVE this mod' if r['above'] else '%s is enabled') % ' or '.join(r['when'])
+        what = []
+        if r.get('earlier'):
+            what.append('keeps the values of the mods above in ' + ', '.join(p.rsplit('\\', 1)[-1] for p in r['earlier']))
+        if r.get('switches'):
+            what.append('turns off ' + ', '.join(r['switches']))
+        if r.get('skip'):
+            what.append('leaves out %d file/table pattern(s)' % len(r['skip']))
+        children.append({'id': r['id'], 'type': 'checkbox', 'name': r['name'], 'defaultValue': False,
+                         'description': (r['description'] + ' ' if r['description'] else '') +
+                         'Acts only when %s; then it %s. The install log says whether it was used.' % (cond, '; '.join(what))})
+    return {'id': 'modlist', 'type': 'section', 'name': 'My mod list', 'defaultExpanded': False,
+            'description': 'Fixes for particular mods in this mod list, all off by default. Tick the ones for mods you use.',
+            'children': children} if children else None
+
+
+def settings_ui(feature_count, loader, duplicates=None, from_source=None, load_order=None, modlist=None):
     """The converted mod's settings: a switch per feature it changes and per D2RLoader part."""
     duplicates = duplicates or {}
     from_source = from_source or {}
@@ -905,6 +1107,8 @@ def settings_ui(feature_count, loader, duplicates=None, from_source=None, load_o
                     'children': units})
     if load_order:
         out.append(load_order)
+    if modlist:
+        out.extend(m for m in (modlist if isinstance(modlist, list) else [modlist]) if m)
     return out
 
 
@@ -1029,6 +1233,9 @@ def main():
     ap.add_argument('--files', choices=('overwrite', 'keep'), default='overwrite',
                     help='default of the Load order > Files setting: a file a mod above already installed; '
                          'overwrite (default) or keep it')
+    ap.add_argument('--modlist-rules', help="'My mod list' rules (JSON) for the converted mod's settings, all off by "
+                                           'default (default: <D2RMM>\\mods\\modlist-rules.json when it exists; '
+                                           'none = no section); see modlist-rules.example.json')
     ap.add_argument('--source', help='where the mod came from (a download), kept in convert.json for updates')
     ap.add_argument('--d2rmm', help="D2RMM's folder (default: the one the mod sits in): its d2rloader packages are "
                                     'checked for plugins installed already, and --plugins packages writes there')
@@ -1064,6 +1271,7 @@ def main():
               'are copied but will not apply; decompile them to .txt first.' % (len(compiled_only), ', '.join(compiled_only[:5])),
               file=sys.stderr)
     lookup = [f for f in all_files if f.lower().endswith(('.txt', '.json'))]
+    use_d2rmm_casclib(Path(args.d2rmm) if args.d2rmm else mod.parent.parent)
     vanilla = fetch_vanilla(game, cache, lookup, args.python)
 
     patches_dir = mod / 'd2rmm' / 'patches'
@@ -1195,12 +1403,18 @@ def main():
     name = args.name or old_info.get('name') or modinfo.get('name') or mod_id
     version = args.version or old_info.get('version') or modinfo.get('version') or '1.0'
     data_rel = win(rel(data, mod))
+    rules_path = (None if (args.modlist_rules or '').lower() == 'none' else args.modlist_rules or
+                  ((Path(args.d2rmm) if args.d2rmm else mod.parent.parent) / 'mods' / 'modlist-rules.json'))
+    rules, rules_used = modlist_rules(rules_path, mod_id, loader, tables, strings, copy_list, data)
     data_block = '\n'.join([
         '// Generated by ConvertDataMod.py - do not edit by hand.',
         js_list('COPY', [[win(p), d, fid] for p, d, fid in copy_list], 'Copied as they are: [path under DATA, is a folder, switch].'),
         js_list('LOADER', [[win(p), d, u] for p, d, u in loader], 'D2RLoader files, to D2RMM\'s d2rloader output: [path in the mod folder, is a folder, switch].'),
         js_list('TABLES', [[win(t), feature_of(t)] for t in tables], 'Tables patched row by row (d2rmm\\patches\\<path>.json): [path, switch].'),
         js_list('STRINGS', [[win(s), feature_of(s)] for s in strings], 'String files merged by Key (d2rmm\\patches\\<path>.json): [path, switch].'),
+        js_list('MODLIST', [{k: v for k, v in r.items() if k != 'description'} for r in rules],
+                'My mod list rules (settings, off by default) and Options (option: on by default, acts when off): '
+                '{id, name, when, above, option, skip, switches, earlier, props}.'),
     ])
     js = (MOD_JS.replace('__NAME__', name).replace('__ORIG__', modinfo.get('name', mod_id))
           .replace('__BY__', ' by ' + args.author if args.author else '')
@@ -1226,7 +1440,8 @@ def main():
         'author': args.author or info.get('author') or 'unknown',
         'version': version,
         'config': settings_ui(feature_count, loader, duplicates, from_source,
-                              load_order_ui(args.rows, args.conflicts, args.files)),
+                              load_order_ui(args.rows, args.conflicts, args.files),
+                              [options_ui(rules), modlist_ui(rules)]),
     })
     mod_json.write_text(json.dumps(info, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
 
@@ -1247,6 +1462,7 @@ def main():
         'loaderBuiltFromSource': from_source,
         'loaderProvidedByPackage': provided,
         'features': feature_count,
+        'modListRules': {'file': rules_used, 'rules': [r['id'] for r in rules]},
         'rows': args.rows,
         'rowMatching': {'matchTrim': args.match_trim, 'duplicates': args.duplicates, 'deleted': args.deleted,
                         'matchedByContent': sum(s.get('matchedByContent', 0) for s in stats.values()),
@@ -1431,6 +1647,9 @@ def check_keep(mod, data, out, tables, cache):
 def check(mod, data, cache, tables, strings, copies, loader, rows='rebuild'):
     """Runs mod.js in a mock D2RMM and compares what it writes with the mod's own files."""
     out = Path(tempfile.gettempdir()) / 'ConvertDataModCheck' / mod.name
+    if not shutil.which('node'):
+        raise SystemExit('The check runs mod.js in Node.js, which is not installed (or not on PATH): get the LTS '
+                         'from https://nodejs.org/en/download and run again, or convert without --check.')
     proc = subprocess.run(['node', str(HERE / 'ConvertDataModCheck.js'), str(mod), str(cache), str(out)],
                           capture_output=True, text=True)
     print(proc.stdout.strip())

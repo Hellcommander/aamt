@@ -12,6 +12,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { spawn, spawnSync } = require("child_process");
+const { steerMessage } = require("./steer");
 
 const MODELS = [
   { id: "", display: "Claude Code's default model" },
@@ -93,9 +94,11 @@ function authStatus(exe) {
  * auth "login": drop API credentials so Claude Code uses its own login (claude.ai subscription).
  * auth "apiKey" / "auto": pass the bridge's Anthropic credential when there is one; a workspace id
  * rides along as an extra request header (user-scoped keys need it).
+ * maxOutputTokens > 0: a chat raised above its standard limits sets CLAUDE_CODE_MAX_OUTPUT_TOKENS.
  */
-function buildEnv({ base = process.env, cred = null, auth = "auto" } = {}) {
+function buildEnv({ base = process.env, cred = null, auth = "auto", maxOutputTokens = 0 } = {}) {
   const env = { ...base };
+  if (maxOutputTokens > 0) env.CLAUDE_CODE_MAX_OUTPUT_TOKENS = String(Math.floor(maxOutputTokens));
   if (auth === "login") {
     delete env.ANTHROPIC_API_KEY;
     delete env.ANTHROPIC_AUTH_TOKEN;
@@ -179,7 +182,12 @@ class Translator {
     if (m.parent_tool_use_id) return; // a subagent's inner traffic; its Task call is shown instead
     if (m.type === "assistant") return this.assistant(m);
     if (m.type === "user") return this.user(m);
-    if (m.type === "result") this.result = m;
+    if (m.type === "result") {
+      // A steering message Claude Code ran as a turn of its own ends with a second result: the
+      // earlier answer is kept as a note, the last one is the turn's answer.
+      if (this.result && this.result.result) this.emit({ type: "thought", text: String(this.result.result) });
+      this.result = m;
+    }
   }
 
   system(m) {
@@ -287,8 +295,10 @@ class Translator {
  * @param {(ev:object)=>void} [o.onEvent]
  * @param {(file:string)=>void} [o.onRead]  absolute path, when Claude Code reads a file (snapshot it here)
  * @param {(file:string)=>void} [o.onEdit]  absolute path, when an edit tool call is announced
+ * @param {{take:()=>{text:string,from?:string}[], onPush:(fn:Function)=>Function}} [o.steer]
+ *   messages the user sends while the turn runs: written to Claude Code's input while it is open
  * @param {AbortSignal} [o.signal]
- * @returns {Promise<{text:string, sessionId:string, costUsd:number, toolsUsed:number}>}
+ * @returns {Promise<{text:string, sessionId:string, costUsd:number, toolsUsed:number, steered:object[]}>}
  */
 function run(o) {
   return new Promise((resolve, reject) => {
@@ -304,11 +314,33 @@ function run(o) {
     let buf = "";
     let stopped = false;
     let settled = false;
+    let inputOpen = true; // Claude Code still reads user messages from stdin
+    const steered = [];
+    let unsub = null;
     const done = (fn, v) => {
       if (settled) return;
       settled = true;
       if (o.signal) o.signal.removeEventListener("abort", onAbort);
+      if (unsub) unsub();
+      if (v && typeof v === "object" && !(v instanceof Error)) v.steered = steered;
       fn(v);
+    };
+    const userLine = (text) => JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: String(text || "") }] }, parent_tool_use_id: null }) + "\n";
+    /** Pass waiting steering messages to Claude Code; after its input closed they stay queued for the next turn. */
+    const pump = () => {
+      if (!inputOpen || !o.steer || settled) return;
+      const items = (o.steer.take() || []).filter((i) => i && String(i.text || "").trim());
+      if (!items.length) return;
+      try {
+        child.stdin.write(userLine(steerMessage(items)));
+      } catch {
+        return;
+      }
+      for (const i of items) {
+        steered.push({ text: i.text, from: i.from || "" });
+        emit({ type: "steered", text: i.text, from: i.from || "" });
+      }
+      emit({ type: "status", text: "Steered: passed " + (items.length > 1 ? items.length + " new messages" : "your new message") + " to Claude Code" });
     };
     const onAbort = () => {
       stopped = true;
@@ -337,6 +369,7 @@ function run(o) {
         emit({ type: "status", text: "Claude Code event ignored: " + (e.message || e) });
       }
       if (m.type === "result") {
+        inputOpen = false;
         try {
           child.stdin.end(); // one turn per process; the session id carries the conversation
         } catch {
@@ -366,7 +399,11 @@ function run(o) {
       }
     });
     child.stdin.on("error", () => {});
-    child.stdin.write(JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text: String(o.prompt || "") }] }, parent_tool_use_id: null }) + "\n");
+    child.stdin.write(userLine(o.prompt));
+    if (o.steer) {
+      unsub = o.steer.onPush(() => setImmediate(pump));
+      pump();
+    }
   });
 }
 

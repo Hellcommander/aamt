@@ -19,6 +19,8 @@
 //   --out <folder>       save every file the mods wrote there (compare two runs byte for byte)
 //   --python <exe>       python to run ModAssets.py with (default "python")
 //   --keep-going         like D2RMM: a mod that throws is rolled back and the next mod runs
+//   --trace <file>       record every table cell, string field and file each mod changes, and write
+//                        (JSON) which of them a later mod overwrote: the features a mod order loses
 //
 // Exit code 0 = no problems, 1 = problems, 2 = a mod script threw (with --keep-going: after
 // every mod ran; the failed ones are listed).
@@ -48,6 +50,7 @@ for (let i = 2; i < process.argv.length; i++) {
   else if (a === '--dump') opt.dump = process.argv[i + 1] === 'base' ? next() : 'main';
   else if (a === '--python') opt.python = next();
   else if (a === '--keep-going') opt.keepGoing = true;
+  else if (a === '--trace') opt.trace = next();
   else opt.mods.push(a);
 }
 if (!opt.game || !fs.existsSync(opt.game)) {
@@ -169,7 +172,7 @@ function written(v) {
   }
   return typeof v === 'string' ? v : JSON.parse(JSON.stringify(v));
 }
-const write = (p, v) => { touch(norm(p)); files[norm(p)] = written(v); record.written.add(norm(p)); };
+const write = (p, v) => { touch(norm(p)); files[norm(p)] = written(v); record.written.add(norm(p)); if (txn) txn.wrote.add(norm(p)); };
 let nextId = 90000;
 let currentMod = null;
 function walk(dir, out, rel) {
@@ -201,6 +204,7 @@ const D2RMM = {
       // Like D2RMM: without overwrite a file that is already there stays.
       if (!overwrite && (files[key] !== undefined || record.copied[key])) return;
       touch(key);
+      if (txn) txn.wrote.add(key);
       record.copied[key] = path.join(from, rel);
       delete files[key];
     });
@@ -212,6 +216,104 @@ const D2RMM = {
   getModList: () => modList.map((m, i) => ({ id: m.id, name: m.name, version: m.version, installed: i < modIndex && !failedMods.has(i), config: m.config })),
   error: (m) => { throw new Error(m); },
 };
+// --trace: every unit a mod changes (a table cell, a row's presence, a string's field, a layout's
+// top-level entry, a whole other file) with the value it left there, in install order.
+const traced = new Map(); // "file\u0000unit" -> [[mod index, value], ...]
+const traceNames = [];
+const PARSED = (k) => /^global\/excel\/.*\.txt$/.test(k) ? 'tsv'
+  : /^local\/lng\/strings[^/]*\/.*\.json$/.test(k) || /^global\/ui\/layouts\/.*\.json$/.test(k) || k === 'hd/missiles/missiles.json' || k === 'hd/character/monsters.json' ? 'json' : null;
+const digest = (text) => require('crypto').createHash('sha1').update(text).digest('hex').slice(0, 12);
+// What a file holds given its parsed content (or undefined) and the mod file copied there (or undefined).
+function stateOf(key, content, copiedFrom) {
+  const kind = PARSED(key);
+  if (content === undefined && copiedFrom) {
+    if (!kind) return { whole: `copy of ${copiedFrom}` };
+    const text = fs.readFileSync(copiedFrom, kind === 'tsv' ? 'latin1' : 'utf8').replace(/^\uFEFF/, '');
+    try {
+      content = kind === 'tsv' ? parseTsv(text) : parseJsonc(text);
+    } catch (e) {
+      return { whole: `copy of ${copiedFrom}` };
+    }
+  }
+  if (content === undefined) content = kind ? vanilla(key, kind) : null;
+  if (content === null || content === undefined) return { units: new Map() };
+  if (typeof content === 'string' || !kind) return { whole: digest(typeof content === 'string' ? content : JSON.stringify(content)) };
+  const units = new Map();
+  if (Array.isArray(content.headers) && Array.isArray(content.rows)) {
+    const seen = {};
+    const id = content.headers[0];
+    content.rows.forEach((r) => {
+      const name = lower(r[id]);
+      const row = `${name}#${(seen[name] = (seen[name] || 0) + 1)}`;
+      units.set(`${row}\u0001*`, 'row');
+      content.headers.forEach((h) => { if (h && r[h] !== undefined && r[h] !== '') units.set(`${row}\u0001${h}`, String(r[h])); });
+    });
+  } else if (Array.isArray(content)) {
+    content.forEach((e, i) => {
+      if (!e || typeof e !== 'object') return;
+      const k = e.Key !== undefined ? `Key ${e.Key}` : `#${i}`;
+      Object.keys(e).forEach((f) => { if (f !== 'id') units.set(`${k}\u0001${f}`, JSON.stringify(e[f])); });
+    });
+  } else {
+    Object.keys(content).forEach((k) => units.set(k, JSON.stringify(content[k])));
+  }
+  return { units };
+}
+function diffInto(file, before, after, modIndexValue) {
+  const add = (unit, value) => {
+    const k = `${file}\u0000${unit}`;
+    if (!traced.has(k)) traced.set(k, []);
+    traced.get(k).push([modIndexValue, value]);
+  };
+  if (after.whole !== undefined || before.whole !== undefined) {
+    if (after.whole !== before.whole) add('(whole file)', after.whole === undefined ? 'parsed' : after.whole);
+    return;
+  }
+  after.units.forEach((v, u) => { if (before.units.get(u) !== v) add(u, v); });
+  before.units.forEach((v, u) => { if (!after.units.has(u)) add(u, null); });
+}
+function traceMod(index, name, t) {
+  traceNames[index] = name;
+  t.files.forEach((pre, key) => {
+    if (!t.wrote.has(key)) return;
+    const preCopied = t.copied.has(key) ? t.copied.get(key) : record.copied[key];
+    const before = stateOf(key, pre, pre === undefined ? preCopied : undefined);
+    const after = stateOf(key, files[key], files[key] === undefined ? record.copied[key] : undefined);
+    diffInto(key, before, after, index);
+  });
+}
+function traceReport() {
+  const finals = new Map(); // file -> final state
+  const losses = new Map(); // "loser\u0000winner\u0000file" -> { count, examples }
+  let units = 0;
+  traced.forEach((setters, k) => {
+    if (setters.length < 2) return;
+    const [file, unit] = k.split('\u0000');
+    if (!finals.has(file)) finals.set(file, stateOf(file, files[file], files[file] === undefined ? record.copied[file] : undefined));
+    const fin = finals.get(file);
+    const finalValue = unit === '(whole file)' ? fin.whole : fin.units ? (fin.units.has(unit) ? fin.units.get(unit) : null) : null;
+    setters.forEach(([m, v], i) => {
+      if (i === setters.length - 1 || v === finalValue || (unit === '(whole file)' && v === 'parsed')) return;
+      // The last mod after this one that set the unit to what it ends as.
+      const later = setters.slice(i + 1).filter(([, w]) => w === finalValue || unit === '(whole file)');
+      const winner = later.length ? later[later.length - 1][0] : setters[setters.length - 1][0];
+      if (winner === m) return;
+      units++;
+      const lk = `${m}\u0000${winner}\u0000${file}`;
+      if (!losses.has(lk)) losses.set(lk, { count: 0, examples: [] });
+      const l = losses.get(lk);
+      l.count++;
+      if (l.examples.length < 8) l.examples.push({ unit: unit.replace('\u0001', ' / '), lost: v, final: finalValue });
+    });
+  });
+  const list = [...losses.entries()].map(([lk, l]) => {
+    const [m, w, file] = lk.split('\u0000');
+    return { lost: traceNames[m], to: traceNames[w], lostIndex: Number(m), toIndex: Number(w), file, count: l.count, examples: l.examples };
+  }).sort((a, b) => a.lostIndex - b.lostIndex || b.count - a.count);
+  fs.writeFileSync(opt.trace, `${JSON.stringify({ mods: traceNames, changedUnits: traced.size, overwrittenUnits: units, losses: list }, null, 1)}\n`);
+  console.log(`trace: ${traced.size} changed units, ${units} overwritten by a later mod (${list.length} mod/file pairs), written to ${opt.trace}`);
+}
+
 // A mod's options as D2RMM hands them over: mod.json defaults, then config.json, then --config.
 function modConfig(dir, meta) {
   const config = {};
@@ -263,8 +365,9 @@ for (const [index, dir] of opt.mods.entries()) {
       source = require('module').stripTypeScriptTypes(fs.readFileSync(file, 'utf8'));
     }
     const code = `(function(){${source}\n})()`;
-    if (opt.keepGoing) txn = { files: new Map(), copied: new Map(), written: new Set(record.written), nextId };
+    if (opt.keepGoing || opt.trace) txn = { files: new Map(), copied: new Map(), written: new Set(record.written), nextId, wrote: new Set() };
     vm.runInNewContext(code, { D2RMM, config, console }, { filename: file });
+    if (opt.trace) traceMod(index, meta.name, txn);
     txn = null;
   } catch (e) {
     console.log(`${meta.name}: the script threw: ${e.stack || e}`);
@@ -601,6 +704,7 @@ if (opt.manifest) {
   fs.writeFileSync(opt.manifest, `${JSON.stringify(manifest, null, 2)}\n`);
   console.log(`manifest written to ${opt.manifest}`);
 }
+if (opt.trace) traceReport();
 if (opt.out) {
   // Every file the mods wrote, as they left it (tables as TSV, JSON pretty-printed), so two runs
   // can be compared byte for byte, e.g. before and after a refactor.

@@ -22,17 +22,14 @@ param(
     # defaults of the converted mod's Load order settings in D2RMM
     [ValidateSet('mod', 'earlier')][string]$Conflicts = 'mod',
     [ValidateSet('overwrite', 'keep')][string]$Files = 'overwrite',
+    # D2RMM's folder (default: the one -Mod sits in, <D2RMM>\mods\<mod>)
+    [string]$D2RMM,
     [switch]$Check
 )
 $ErrorActionPreference = 'Stop'
-if (-not $GamePath -or -not (Test-Path $GamePath)) { throw 'Pass -GamePath (or set D2R_PATH) to the folder that contains D2R.exe.' }
-
-$python = 'python'
-$ini = Join-Path (Split-Path $PSScriptRoot -Parent) 'TranscendenceTools.ini'
-if (Test-Path $ini) {
-    $line = Select-String -Path $ini -Pattern '^PythonPath=' | Select-Object -First 1
-    if ($line) { $python = $line.Line.Split('=', 2)[1].Trim() }
-}
+. (Join-Path $PSScriptRoot 'D2RToolPaths.ps1')
+$GamePath = Resolve-D2RGamePath $GamePath
+$python = Resolve-D2RPython
 
 if ($Archive) {
     if (-not (Test-Path $Archive -PathType Leaf)) { throw "-Archive must be an .mpq file: $Archive" }
@@ -51,6 +48,7 @@ if ($Author) { $arguments += @('--author', $Author) }
 if ($Name) { $arguments += @('--name', $Name) }
 if ($Version) { $arguments += @('--version', $Version) }
 if ($Cache) { $arguments += @('--cache', $Cache) }
+if ($D2RMM) { $arguments += @('--d2rmm', $D2RMM) }
 $arguments += @('--rows', $Rows, '--conflicts', $Conflicts, '--files', $Files)
 if ($Check) { $arguments += '--check' }
 & $python @arguments

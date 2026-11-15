@@ -2,7 +2,7 @@
   "name": "local-agent-bridge",
   "displayName": "Local Agent Bridge",
   "description": "CortexIDE coding agent on local models (vLLM / Ollama), Claude (Anthropic API) or the Claude Code engine, with file, search and shell tools, SKILL.md skills, .canvas.tsx canvases, and chat import (including Cursor exports).",
-  "version": "2.6.0",
+  "version": "2.15.2",
   "publisher": "arend",
   "engines": {
     "vscode": "^1.80.0"
@@ -44,6 +44,18 @@
         "category": "Local Agent Bridge"
       },
       {
+        "command": "localAgentBridge.agentHistory",
+        "title": "Agent: Chat History",
+        "icon": "$(history)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.agentRunOnModels",
+        "title": "Agent: Run Prompt on Several Models",
+        "icon": "$(split-horizontal)",
+        "category": "Local Agent Bridge"
+      },
+      {
         "command": "localAgentBridge.agentStop",
         "title": "Agent: Stop",
         "icon": "$(debug-stop)",
@@ -57,7 +69,27 @@
       },
       {
         "command": "localAgentBridge.agentProgress",
-        "title": "Agent: Open Progress Index",
+        "title": "Agent: Open Progress Index (this chat)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.agentIndexes",
+        "title": "Agent: Open Session Indexes (master / folder / chat)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.agentLimits",
+        "title": "Agent: Set Chat Limits (output tokens, rounds, effort for this chat)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.agentCompress",
+        "title": "Agent: Compress Chat History (/compress)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.agentSteer",
+        "title": "Agent: Steer Running Chat…",
         "category": "Local Agent Bridge"
       },
       {
@@ -187,6 +219,11 @@
           "command": "localAgentBridge.agentNewChat",
           "when": "view == localAgentBridge.agent",
           "group": "navigation@3"
+        },
+        {
+          "command": "localAgentBridge.agentHistory",
+          "when": "view == localAgentBridge.agent",
+          "group": "navigation@4"
         }
       ],
       "chat/title": [
@@ -593,6 +630,158 @@
           "type": "boolean",
           "default": true,
           "description": "Offer the Task tool: a read-only research sub-agent with its own context (uses extra model calls)."
+        },
+        "localAgentBridge.agent.historyDir": {
+          "type": "string",
+          "default": "",
+          "description": "Folder for the chat history cache (one folder per workspace, one file per chat, like ~/.claude/projects). Empty = %USERPROFILE%\\.cortexide\\agent."
+        },
+        "localAgentBridge.agent.historyLimit": {
+          "type": "number",
+          "default": 200,
+          "minimum": 10,
+          "description": "Chats kept per workspace. Past this, the oldest chats that are not pinned, open as a tab or running are deleted."
+        },
+        "localAgentBridge.agent.maxParallel": {
+          "type": "number",
+          "default": 4,
+          "minimum": 0,
+          "description": "How many chats may run at the same time (each on its own model). 0 = no limit. Parallel chats share the workspace, so edits to the same files can collide."
+        },
+        "localAgentBridge.agent.vision": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "on",
+            "off"
+          ],
+          "enumDescriptions": [
+            "Claude: yes. Ollama: from the model's capabilities. Others: from the model name (qwen2.5-vl, llava, gemma3, pixtral…)",
+            "Always send images (the model must support them, or the request fails)",
+            "Never send images; ReadImage returns size and format only"
+          ],
+          "default": "auto",
+          "description": "Whether the agent sends images to the model: images linked in your message, and the ones ReadImage / AnalyzeFile open."
+        },
+        "localAgentBridge.agent.imageMaxEdge": {
+          "type": "number",
+          "default": 1568,
+          "minimum": 256,
+          "maximum": 8000,
+          "description": "Images are scaled down to this long edge (pixels) before they go to the model. Smaller = fewer tokens."
+        },
+        "localAgentBridge.agent.maxImages": {
+          "type": "number",
+          "default": 6,
+          "minimum": 1,
+          "maximum": 20,
+          "description": "Newest images kept in a chat's conversation (and linked images attached per message). Older ones are replaced by a note the model can follow up with ReadImage."
+        },
+        "localAgentBridge.agent.mcpServers": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "MCP servers (stdio) the agent can use through its `McpTools` / `McpCall` tools, in the same format as `~/.cursor/mcp.json` and `~/.claude.json`: `{ \"name\": { \"command\": \"npx\", \"args\": [\"-y\", \"pkg\"], \"env\": {}, \"description\": \"...\" } }`. `\"disabled\": true` turns off one, including an imported or auto-detected one. Not used by the Claude Code engine."
+        },
+        "localAgentBridge.agent.mcpImport": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["cursor", "claude"] },
+          "default": [],
+          "markdownDescription": "Also use the MCP servers configured for Cursor (`~/.cursor/mcp.json`) and / or Claude Code (`~/.claude.json`). `mcpServers` entries win on a name clash."
+        },
+        "localAgentBridge.agent.mcpAutoRea": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Add REA (Reverse Engineer Anything, MIT) as MCP server `rea` when `Tools\\Fetch-ThirdParty.ps1 -AgentBridge` has installed it under `thirdPartyDir` or a workspace's `Tools\\Shared\\third_party`. Needs Node 22.19+ on PATH (or `mcpNodePath`)."
+        },
+        "localAgentBridge.agent.mcpNodePath": {
+          "type": "string",
+          "default": "",
+          "description": "node executable used to run REA (empty = node on PATH)."
+        },
+        "localAgentBridge.agent.mcpMode": {
+          "type": "string",
+          "enum": ["auto", "confirm", "off"],
+          "default": "auto",
+          "description": "McpCall: run MCP tools without asking, ask before each call, or refuse them (McpTools listing still works)."
+        },
+        "localAgentBridge.agent.mcpTimeoutSec": {
+          "type": "number",
+          "default": 300,
+          "minimum": 5,
+          "maximum": 3600,
+          "description": "Seconds one MCP tool call may take before it is abandoned."
+        },
+        "localAgentBridge.agent.thirdPartyDir": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Folder with optional third-party libraries fetched by `Tools\\Fetch-ThirdParty.ps1 -AgentBridge` (REA, pdf.js). Empty = each workspace's `Tools\\Shared\\third_party`. They are loaded at run time, never bundled into the VSIX."
+        },
+        "localAgentBridge.agent.defaultSessionLimits": {
+          "type": "string",
+          "enum": [
+            "standard",
+            "extended",
+            "max"
+          ],
+          "enumDescriptions": [
+            "The maxOutputTokens / claudeMaxOutputTokens, maxRounds and claudeEffort settings",
+            "Local 8192 / Claude 32000 output tokens, 80 rounds, Claude effort at least high",
+            "Local 16384 / Claude 64000 output tokens, 150 rounds, Claude effort at least xhigh"
+          ],
+          "default": "standard",
+          "description": "Output limits new chats start with. Each chat can be changed on its own with “Agent: Set Chat Limits” or the panel menu. Presets only raise the settings; outputs are capped to the model's limit (Claude) or half the context window (local models)."
+        },
+        "localAgentBridge.agent.compressRecentTurns": {
+          "type": "integer",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 20,
+          "markdownDescription": "`/compress [focus]` (alias `/compact`) replaces a chat's history with a summary written by the chat's model. This many of the latest turns go to the summariser in full (prompts, tool calls with results, answers, changed files) and are summarised in detail; older turns are shortened and summarised briefly."
+        },
+        "localAgentBridge.agent.steerDefault": {
+          "type": "string",
+          "enum": [
+            "steer",
+            "queue"
+          ],
+          "enumDescriptions": [
+            "Enter while a chat works steers it: the message is taken into the running turn at its next step, and the task goes on with it",
+            "Enter while a chat works queues the message: it runs as the next turn when this one ends"
+          ],
+          "default": "steer",
+          "markdownDescription": "What **Enter** does while a chat is working. **Alt+Enter** does the other one, and **Ctrl+Shift+Enter** stops the turn and sends the message. Messages that arrive too late to steer run as the next turn. After **Stop**, or a failed turn, nothing runs by itself: waiting messages go back into the input box. `/compress` sent while a chat works runs as soon as the turn ends (with **Ctrl+Shift+Enter**: stops the turn and compresses at once). **Agent: Steer Running Chat…** reaches running chats in other windows too."
+        },
+        "localAgentBridge.agent.instructions": {
+          "type": "array",
+          "default": [],
+          "items": { "type": "string" },
+          "markdownDescription": "Extra instruction files added to the agent's system prompt after `AGENTS.md` / `CLAUDE.md` / `.cursorrules` and `alwaysApply` rules in `.cursor/rules`. Paths or globs in the last segment (`docs/agent/*.md`); relative ones are looked up in each workspace folder, `~` is your home folder. URLs are skipped. (Design follows opencode's `instructions`.)"
+        },
+        "localAgentBridge.agent.permissions": {
+          "type": ["array", "object"],
+          "default": [],
+          "markdownDescription": "Permission rules for agent tool calls; the **last** matching rule wins (as in opencode). List form: `[{ \"action\": \"shell\", \"resource\": \"git push *\", \"effect\": \"ask\" }]` or strings like `\"shell:git push *=deny\"`. Map form: `{ \"edit\": \"ask\", \"shell\": { \"rm *\": \"deny\" } }`. Actions: `read`, `edit`, `glob`, `grep`, `shell`, `webfetch`, `subagent`, `mcp`, `skill`, `*`. Effects: `allow`, `ask`, `deny`. Chained shell commands are checked part by part. Reading `.env` files asks by default. Does not apply to the Claude Code backend."
+        },
+        "localAgentBridge.agent.panels": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "required": [
+              "label"
+            ],
+            "properties": {
+              "label": { "type": "string", "description": "Name shown in the empty chat" },
+              "icon": { "type": "string", "description": "One character or emoji shown before the label" },
+              "hint": { "type": "string", "description": "Tooltip" },
+              "command": { "type": "string", "description": "Command id to run, e.g. one contributed by another extension" },
+              "args": { "description": "Argument(s) passed to the command" },
+              "url": { "type": "string", "description": "Address opened in the browser panel beside the editor" },
+              "file": { "type": "string", "description": "File to open; .canvas.tsx files open in the canvas preview" },
+              "prompt": { "type": "string", "description": "Text put into the input box" }
+            }
+          },
+          "markdownDescription": "Extra panels listed in an empty Agent chat, under **Panels**, beside Open Tabs, Changes, Browser, Terminal, Files, Canvas and Side Chat. Each entry has a `label` and one of `command` (with `args`), `url`, `file` or `prompt`. Example: `{ \"label\": \"Storybook\", \"icon\": \"📚\", \"url\": \"http://localhost:6006\" }`."
         }
       }
     }

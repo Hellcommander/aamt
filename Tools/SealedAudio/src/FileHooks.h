@@ -27,6 +27,10 @@ namespace SealedAudio::Hooks
 		std::wstring dataDir;                           // absolute data folder (lower-cased inside); modules under it are plugins
 		int          patchModules{ 1 };                 // 0 executable only; 1 + extender/plugins; 2 every module under the game folder
 		std::wstring modulePrefixes{ L"skse;sfse;f4se;nvse;obse" };   // script-extender runtime dlls, by name prefix
+		// Also redirect kernel32's own export stubs (jmp [slot] into KernelBase): catches code that resolved the file
+		// functions at run time (packed executables such as Diablo II Resurrected), process-wide. Off by default.
+		bool         patchSystem{ false };
+		std::wstring probePrefixes{ L"sound;music" };   // data-relative folders whose opens count as sound probes
 	};
 
 	struct Counters
@@ -40,7 +44,7 @@ namespace SealedAudio::Hooks
 
 	// Patches the import tables of the game executable and of every other module loaded from the game's folder (script
 	// extender plugins read their own sound files through the same Win32 functions, so sealed sounds must reach them too).
-	// Returns how many imports were hooked in the executable (0 means nothing works).
+	// Returns how many imports were hooked in the executable, plus the kernel32 stubs with patchSystem (0 means nothing works).
 	int Install(const Options& options);
 
 	// Patches modules loaded since Install (the script extender loads plugins in order; this runs again once all are in).

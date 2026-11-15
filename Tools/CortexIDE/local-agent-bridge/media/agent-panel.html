@@ -27,6 +27,73 @@
   .icon{flex:none;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;border-radius:var(--radius);font-size:15px;line-height:1}
   .icon:hover,.icon[aria-expanded="true"]{background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.2))}
 
+  /* ---- chat tabs (open chats; each runs on its own model) ---- */
+  #tabs{display:flex;gap:4px;padding:5px 10px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:thin}
+  #tabs:empty{display:none}
+  .tab{flex:none;display:flex;align-items:center;gap:5px;max-width:170px;font-size:11px;background:transparent;border:1px solid var(--line);border-radius:12px;padding:2px 4px 2px 8px;color:var(--muted)}
+  .tab:hover{color:var(--vscode-foreground);border-color:var(--accent)}
+  .tab.on{color:var(--vscode-foreground);background:var(--vscode-input-background);border-color:var(--accent)}
+  .tab .tt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tab.unread .tt,.hrow.unread .ht{font-weight:700}
+  .tab .x{flex:none;width:16px;height:16px;line-height:15px;text-align:center;border-radius:50%;opacity:.6}
+  .tab .x:hover{opacity:1;background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.25))}
+  .sd{flex:none;width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.55}
+  .sd.running{background:var(--vscode-progressBar-background,#0e70c0);opacity:1;animation:pulse 1s ease-in-out infinite}
+  .sd.done{background:var(--vscode-testing-iconPassed,#3fb950);opacity:1}
+  .sd.error{background:var(--vscode-errorForeground,#f85149);opacity:1}
+  .sd.stopped{background:var(--vscode-editorWarning-foreground,#cca700);opacity:1}
+
+  /* ---- history drawer ---- */
+  #hist{display:none;position:absolute;left:0;right:0;top:44px;bottom:0;z-index:15;flex-direction:column;background:var(--vscode-sideBar-background);border-top:1px solid var(--line)}
+  #hist.on{display:flex}
+  #histhd{display:flex;gap:6px;align-items:center;padding:8px 10px 4px}
+  #histq{flex:1;min-width:0;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,var(--line));border-radius:4px;padding:4px 7px;font:inherit}
+  #histlist{flex:1;overflow:auto;padding:0 6px 10px}
+  .hsec{padding:9px 6px 3px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .hrow{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:4px;cursor:pointer;outline:none}
+  .hrow:hover,.hrow:focus{background:var(--vscode-list-hoverBackground)}
+  .hrow.on{background:var(--vscode-list-inactiveSelectionBackground,var(--vscode-list-hoverBackground))}
+  .hmain{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+  .ht{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hm{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hacts{display:none;gap:2px}
+  .hrow:hover .hacts,.hrow:focus .hacts,.hrow:focus-within .hacts{display:flex}
+  .hacts button{width:22px;height:22px;border:0;background:transparent;border-radius:4px;padding:0}
+  .hacts button:hover{background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.25))}
+  .pinned{color:var(--vscode-editorWarning-foreground,#cca700)}
+  #histempty{padding:16px;color:var(--muted);text-align:center}
+  /* sidebar tree: Pinned, then one branch per workspace folder (as Cursor's per-repository list) */
+  .hsec{display:flex;align-items:center;gap:6px}
+  .hsec span{flex:1}
+  .hfold{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:4px;cursor:pointer;outline:none;margin-top:2px}
+  .hfold:hover,.hfold:focus{background:var(--vscode-list-hoverBackground)}
+  .hfold .car{flex:none;width:10px;font-size:9px;color:var(--muted);text-align:center}
+  .hfold .fi{flex:none;width:14px;height:11px;border:1.5px solid var(--muted);border-radius:2px;position:relative;opacity:.8}
+  .hfold .fi:before{content:"";position:absolute;left:-1.5px;top:-4px;width:6px;height:3px;border:1.5px solid var(--muted);border-bottom:0;border-radius:2px 2px 0 0}
+  .hfold.here .fi{border-color:var(--accent)}.hfold.here .fi:before{border-color:var(--accent)}
+  .hfold .fn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hfold.gone .fn{color:var(--muted);text-decoration:line-through}
+  .hfold .fc{flex:none;font-size:11px;color:var(--muted)}
+  .hfold .hacts{display:none}
+  .hfold:hover .hacts,.hfold:focus .hacts{display:flex}
+  .branch{margin-left:11px;padding-left:5px;border-left:1px solid var(--line)}
+  .branch .branch{margin-left:9px}
+  .hrow.tree{padding:3px 6px;gap:7px}
+  .hrow.tree .ht{flex:1;min-width:0}
+  .hage{flex:none;font-size:11px;color:var(--muted)}
+  .hrow:hover .hage,.hrow:focus .hage,.hrow:focus-within .hage{display:none}
+  .hsub{flex:none;max-width:40%;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hrow:hover .hsub{display:none}
+  .hgrp{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;cursor:pointer;outline:none;color:var(--muted)}
+  .hgrp:hover,.hgrp:focus{background:var(--vscode-list-hoverBackground);color:var(--vscode-foreground)}
+  .hgrp .car{flex:none;width:10px;font-size:9px;text-align:center}
+  .hgrp .ht{flex:1;min-width:0}
+  .hmore{padding:3px 6px;font-size:12px;color:var(--muted);cursor:pointer;border-radius:4px;outline:none}
+  .hmore:hover,.hmore:focus{color:var(--vscode-foreground);background:var(--vscode-list-hoverBackground)}
+  .hnone{padding:3px 6px;font-size:12px;color:var(--muted)}
+  .hstart{cursor:pointer;border-radius:4px;outline:none}
+  .hstart:hover,.hstart:focus{color:var(--vscode-textLink-foreground);background:var(--vscode-list-hoverBackground)}
+
   /* ---- problem banner ---- */
   #banner{display:none;margin:8px 10px 0;padding:8px 10px;border:1px solid var(--vscode-inputValidation-errorBorder,#be1100);background:var(--vscode-inputValidation-errorBackground,rgba(190,17,0,.15));border-radius:var(--radius);font-size:12px;line-height:1.45}
   #banner.on{display:block}
@@ -41,6 +108,15 @@
   #menu button span{flex:1}
   #menu button small{color:var(--muted);font-size:11px}
   #menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+  /* right-click menu on a file named in the chat */
+  #ctx{display:none;position:fixed;z-index:30;min-width:200px;max-width:calc(100% - 8px);padding:4px;background:var(--vscode-menu-background,var(--vscode-editorWidget-background));color:var(--vscode-menu-foreground,inherit);border:1px solid var(--vscode-menu-border,var(--line));border-radius:var(--radius);box-shadow:0 4px 14px rgba(0,0,0,.35)}
+  #ctx.on{display:block}
+  #ctx .sec{padding:4px 8px 3px;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--vscode-editor-font-family)}
+  #ctx button{display:flex;width:100%;gap:8px;align-items:baseline;text-align:left;background:transparent;border:0;border-radius:4px;padding:4px 8px}
+  #ctx button:hover,#ctx button:focus{background:var(--vscode-menu-selectionBackground,var(--vscode-list-hoverBackground));color:var(--vscode-menu-selectionForeground,inherit);outline:none}
+  #ctx button span{flex:1}
+  #ctx button small{color:var(--muted);font-size:11px}
+  #ctx hr{border:0;border-top:1px solid var(--line);margin:4px 0}
 
   /* ---- find bar ---- */
   #find{display:none;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line)}
@@ -129,18 +205,63 @@
   .btn2:disabled{opacity:.5;cursor:default}
   #stop{display:none;background:var(--vscode-errorForeground,#c33);color:#fff}
   .busy #stop{display:inline-block}.busy #go{display:none}
+  /* steering: while a chat works, a typed message steers it, queues, or stops and sends */
+  #steer,#queue,#now{display:none}
+  .busy.typed #steer,.busy.typed #queue,.busy.typed #now{display:inline-block}
+  #pend{display:none;margin:0 10px 6px;padding:5px 8px;border:1px dashed var(--line);border-radius:var(--radius);font-size:12px;max-height:9em;overflow:auto}
+  #pend.on{display:block}
+  #pend .p{display:flex;gap:6px;align-items:center;line-height:1.7}
+  #pend .pm{flex:none;font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);border:1px solid var(--line);border-radius:8px;padding:0 6px}
+  #pend .pt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #pend button{flex:none;background:transparent;border:0;color:var(--vscode-textLink-foreground);font-size:11px;padding:0 3px}
+  #pend button:hover{text-decoration:underline}
+  .row.user.steered{border-left:2px solid var(--accent);padding-left:8px}
+  .row.user.steered .who::after{content:" · steered while working";font-weight:normal;color:var(--muted)}
   #hint{font-size:11px;color:var(--muted)}
+
+  /* ---- panels: what an empty chat shows (as Cursor's side panel) ---- */
+  #welcome{padding:10px 4px}
+  #welcome .psec{font-size:12px;color:var(--muted);margin:14px 0 4px 6px}
+  #welcome .psec:first-child{margin-top:4px}
+  #welcome .pi{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:transparent;border:0;border-radius:4px;padding:4px 6px;color:var(--vscode-foreground);font-size:13px}
+  #welcome .pi:hover,#welcome .pi:focus{background:var(--vscode-list-hoverBackground);outline:none}
+  #welcome .pic{flex:none;width:16px;text-align:center;color:var(--muted)}
+  #welcome .pl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #welcome .pi small{flex:none;color:var(--muted);font-size:11px}
+  #welcome .ptip{margin:18px 6px 0;font-size:11px;color:var(--muted);line-height:1.5}
+
+  /* ---- attachments, the + / @ menu, drops ---- */
+  #att{display:none;flex-wrap:wrap;gap:4px}
+  #att.on{display:flex}
+  #att .a{display:flex;align-items:center;gap:4px;max-width:100%;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:1px 2px 1px 6px}
+  #att .a span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:22em}
+  #att .a button{background:transparent;border:0;color:inherit;padding:0 4px;opacity:.7}
+  #att .a button:hover{opacity:1}
+  #plus{flex:none}
+  .chip.mode{border-color:var(--accent);color:var(--vscode-foreground)}
+  #pick{display:none;border:1px solid var(--line);border-radius:var(--radius);background:var(--vscode-editorWidget-background,var(--vscode-sideBar-background));max-height:50vh;overflow:auto;font-size:13px}
+  #pick.on{display:block}
+  #pickq{width:100%;box-sizing:border-box;background:transparent;color:var(--vscode-input-foreground);border:0;border-bottom:1px solid var(--line);padding:6px 8px;font:inherit}
+  #pickq:focus{outline:none}
+  #picklist .pg{font-size:11px;color:var(--muted);padding:6px 8px 2px}
+  #picklist button{display:flex;gap:8px;align-items:baseline;width:100%;text-align:left;background:transparent;border:0;padding:4px 8px;color:var(--vscode-foreground)}
+  #picklist button b{font-weight:600;flex:none}
+  #picklist button small{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #picklist button.sel{background:var(--vscode-list-activeSelectionBackground,var(--vscode-list-hoverBackground));color:var(--vscode-list-activeSelectionForeground,inherit)}
+  #drop{display:none;position:fixed;inset:4px;z-index:20;align-items:center;justify-content:center;text-align:center;padding:20px;background:var(--vscode-sideBar-background);opacity:.92;border:2px dashed var(--accent);border-radius:6px;font-size:13px;pointer-events:none}
+  #drop.on{display:flex}
 </style>
 </head>
 <body>
 <div id="wrap">
   <div id="top">
+    <button class="icon" id="histbtn" type="button" title="Chats: pinned, this workspace and every other workspace folder (Ctrl+H)" aria-expanded="false">☰</button>
     <button id="backend" type="button" title="Change backend and model">
       <span id="dot"></span>
       <span id="bk"><span id="bkname">Connecting…</span><span id="bkdetail">looking for a model backend</span></span>
       <span class="chev">▾</span>
     </button>
-    <button class="icon" id="new" type="button" title="New chat">＋</button>
+    <button class="icon" id="new" type="button" title="New chat (running chats keep going)">＋</button>
     <button class="icon" id="more" type="button" title="Menu: settings, import, find, undo" aria-haspopup="true" aria-expanded="false">⋯</button>
   </div>
   <div id="menu" role="menu">
@@ -148,16 +269,23 @@
     <button data-cmd="signin" id="m-signin"><span>Sign in with Claude…</span><small>opens browser</small></button>
     <button data-cmd="signout" id="m-signout" class="hide"><span>Sign out</span><small id="m-who"></small></button>
     <div class="sec">Model</div>
-    <button data-cmd="model"><span>Backend &amp; model…</span></button>
+    <button data-cmd="model"><span>Backend &amp; model for this chat…</span></button>
+    <button data-cmd="multi"><span>Run prompt on several models…</span><small>one chat each</small></button>
     <button data-cmd="effort"><span>Reasoning effort…</span><small id="m-effort"></small></button>
+    <button data-cmd="limits"><span>Output limits for this chat…</span><small id="m-limits">standard</small></button>
+    <button data-cmd="compress"><span>Compress chat history</span><small>/compress</small></button>
+    <button data-cmd="steer"><span>Steer a running chat…</span><small>any window</small></button>
     <button data-cmd="key"><span>Claude API key…</span></button>
     <div class="sec">Safety</div>
     <button data-cmd="perms"><span>Permissions &amp; shell…</span><small id="m-shell"></small></button>
     <button data-cmd="undo"><span>Undo last turn's edits</span></button>
     <div class="sec">Chat</div>
+    <button data-cmd="history"><span>Chat history</span><small>Ctrl+H</small></button>
+    <button data-cmd="rename"><span>Rename this chat…</span></button>
     <button data-cmd="find"><span>Find in chat</span><small>Ctrl+F</small></button>
     <button data-cmd="import"><span>Import a chat…</span></button>
-    <button data-cmd="progress"><span>Open progress index</span></button>
+    <button data-cmd="progress"><span>Open this chat's progress</span></button>
+    <button data-cmd="indexes"><span>Session indexes…</span><small>master · folder · chat</small></button>
     <button data-cmd="new"><span>New chat</span></button>
     <div class="sec">Skills</div>
     <button data-cmd="skills"><span>Skills &amp; canvases catalog</span></button>
@@ -172,26 +300,44 @@
     <button class="btn2" data-cmd="settings">Open settings</button>
     <button class="btn2" data-cmd="retry">Retry</button>
   </div></div>
+  <div id="ctx" role="menu" aria-label="File"></div>
+  <div id="tabs"></div>
+  <div id="hist" role="dialog" aria-label="Chat history">
+    <div id="histhd"><input id="histq" type="text" placeholder="Search chats (titles, models, messages)…"/><button class="btn2" type="button" data-cmd="new">＋ New</button><button class="icon" id="histx" type="button" title="Close">✕</button></div>
+    <div id="histlist"></div>
+  </div>
   <div id="find"><input id="findq" type="text" placeholder="Find in this chat…"/><span id="findn"></span><button class="icon" id="findx" type="button" title="Close">✕</button></div>
   <div id="log"></div>
   <button id="down" type="button" title="Jump to latest">↓</button>
   <div id="todos"></div>
+  <div id="pend" aria-label="Messages waiting for the running chat"></div>
   <div id="live"></div>
+  <div id="drop"><div><b>Drop to attach</b><br/><small>files, folders and images · hold <kbd>Shift</kbd> when dragging from VS Code's Explorer or tabs</small></div></div>
   <form id="f">
-    <textarea id="q" placeholder="Ask the agent to do something in this workspace…"></textarea>
+    <div id="pick" role="dialog" aria-label="Add context, attach, change mode"><input id="pickq" type="text" placeholder="Search modes, context, chats, skills…"/><div id="picklist" role="listbox"></div></div>
+    <div id="att" aria-label="Attached to the next message"></div>
+    <textarea id="q" placeholder="Ask the agent to do something in this workspace… (/compress [focus] summarises this chat)"></textarea>
     <div class="bar">
+      <button class="icon" id="plus" type="button" title="Add context, attach files, change mode (type @)">＋</button>
       <div id="chips"></div>
+      <button id="queue" class="btn2" type="button" title="Run this as the next turn when the current one ends">Queue</button>
+      <button id="now" class="btn2" type="button" title="Stop the current turn, then send this (Ctrl+Shift+Enter)">Stop &amp; send</button>
+      <button id="steer" class="btn" type="button" title="Take this into the running turn at its next step; the task goes on">Steer</button>
       <button id="stop" class="btn" type="button">Stop</button>
       <button id="go" class="btn" type="submit">Send</button>
     </div>
-    <div id="hint"><kbd>Enter</kbd> send · <kbd>Shift+Enter</kbd> new line · edits save to disk, each turn can be undone</div>
+    <div id="hint"></div>
   </form>
 </div>
 <script>
+/*@file-ref*/
+/*@composer*/
 const vs = acquireVsCodeApi();
 const $ = (id) => document.getElementById(id);
 const log = $("log"), q = $("q"), live = $("live"), menu = $("menu");
 let info = {}, headerOk = null;
+/* the chat on screen, every chat in this workspace, and the last full-text search result */
+let sid = "", sessions = [], found = null, searchTimer = 0;
 
 function esc(s){ return String(s).replace(/[&<>]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
 function md(s){
@@ -209,27 +355,241 @@ function base(p){ const parts = String(p).split(/[\\/]/); return parts[parts.len
 function atBottom(){ return log.scrollHeight - log.scrollTop - log.clientHeight < 60; }
 function stick(was){ if (was) log.scrollTop = log.scrollHeight; $("down").classList.toggle("on", !atBottom()); }
 function cmd(id){ vs.postMessage({ type: "cmd", id }); }
+/* actions the panel handles itself, else the extension's command() */
+function act(id){
+  if (id === "find") openFind(true);
+  else if (id === "new"){ openHistory(false); vs.postMessage({ type: "new" }); }
+  else if (id === "history") openHistory(!$("hist").classList.contains("on"));
+  else if (id === "multi") vs.postMessage({ type: "multi", text: q.value });
+  else if (id === "rename") vs.postMessage({ type: "rename", id: sid });
+  else cmd(id);
+}
 
-/* ---- welcome ---- */
+/* ---- chats: tabs and history ---- */
+function modelLabel(e){
+  if (e.provider === "claude-code") return "Claude Code" + (e.model ? " · " + e.model : "");
+  return e.model || (e.provider && e.provider !== "auto" ? e.provider : "auto");
+}
+function ago(ts){
+  const s = (Date.now() - ts) / 1000;
+  if (s < 60) return "now"; if (s < 3600) return Math.floor(s / 60) + "m"; if (s < 86400) return Math.floor(s / 3600) + "h";
+  const d = Math.floor(s / 86400); return d < 7 ? d + "d" : new Date(ts).toLocaleDateString();
+}
+function dayGroup(e){
+  if (e.pinned) return "Pinned";
+  const d = new Date(); d.setHours(0, 0, 0, 0); const t = d.getTime();
+  return e.updated >= t ? "Today" : e.updated >= t - 864e5 ? "Yesterday" : e.updated >= t - 6 * 864e5 ? "Previous 7 days" : "Older";
+}
+function dot(st){ const s = document.createElement("span"); s.className = "sd " + (st || "idle"); s.title = st || "idle"; return s; }
+function paintTabs(){
+  const box = $("tabs");
+  box.innerHTML = "";
+  const open = sessions.filter((e) => e.open || e.id === sid || e.status === "running").sort((a, b) => (a.created || 0) - (b.created || 0));
+  if (open.length < 2) return; // one chat needs no tab strip
+  for (const e of open){
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tab" + (e.id === sid ? " on" : "") + (e.unread ? " unread" : "");
+    b.title = e.title + "\n" + modelLabel(e) + " · " + (e.status || "idle") + "\nMiddle-click or × closes the tab; the chat stays in history.";
+    b.appendChild(dot(e.status));
+    const t = document.createElement("span"); t.className = "tt"; t.textContent = e.title; b.appendChild(t);
+    const x = document.createElement("span"); x.className = "x"; x.textContent = "×"; x.title = "Close tab (keeps the chat in history)";
+    x.onclick = (ev) => { ev.stopPropagation(); vs.postMessage({ type: "close", id: e.id }); };
+    b.appendChild(x);
+    b.onclick = () => { if (e.id !== sid) vs.postMessage({ type: "switch", id: e.id }); };
+    b.onauxclick = (ev) => { if (ev.button === 1) vs.postMessage({ type: "close", id: e.id }); };
+    box.appendChild(b);
+    if (e.id === sid) setTimeout(() => b.scrollIntoView({ block: "nearest", inline: "nearest" }), 0);
+  }
+}
+function histButton(text, title, fn, cls){
+  const b = document.createElement("button"); b.type = "button"; b.textContent = text; b.title = title; if (cls) b.className = cls;
+  b.onclick = (ev) => { ev.stopPropagation(); fn(); };
+  return b;
+}
+/* Cursor-style ages: now, 5m, 3h, 2d, 3w, 2mo, 1y */
+function age(ts){
+  const s = Math.max(0, (Date.now() - ts) / 1000);
+  if (s < 60) return "now"; if (s < 3600) return Math.floor(s / 60) + "m"; if (s < 86400) return Math.floor(s / 3600) + "h";
+  const d = s / 86400; if (d < 7) return Math.floor(d) + "d"; if (d < 30) return Math.floor(d / 7) + "w"; if (d < 365) return Math.floor(d / 30) + "mo"; return Math.floor(d / 365) + "y";
+}
+/* the tree: every workspace folder with chats ("tree" message), folded state kept across reloads */
+let tree = [];
+const ui = Object.assign({ open: {}, shut: {}, more: {}, grp: {} }, (vs.getState() || {}).tree || {});
+function keepUi(){ vs.setState(Object.assign({}, vs.getState() || {}, { tree: ui })); }
+const SHOW = 5; // chats per folder before "More"
+function el(tag, cls, text){ const d = document.createElement(tag); if (cls) d.className = cls; if (text != null) d.textContent = text; return d; }
+function chatRow(e, w, opts = {}){
+  const here = !!w.here;
+  const r = el("div", "hrow tree" + (here && e.id === sid ? " on" : "") + (e.unread ? " unread" : ""));
+  r.tabIndex = 0;
+  r.title = e.title + "\n" + modelLabel(e) + " · " + (e.turns ? e.turns + " turn" + (e.turns === 1 ? "" : "s") : "empty") + " · " + (e.status || "idle") + (here ? "" : "\nIn " + (w.workspace || w.name) + ": click to open that folder, continue the chat here, or read it.");
+  r.appendChild(dot(e.status));
+  if (e.pinned && !opts.inPinned) r.appendChild(el("span", "pinned", "★"));
+  r.appendChild(el("span", "ht", e.title));
+  if (opts.folder) r.appendChild(el("span", "hsub", w.name));
+  r.appendChild(el("span", "hage", age(e.updated || Date.now())));
+  const acts = el("div", "hacts");
+  if (here){
+    acts.appendChild(histButton(e.pinned ? "★" : "☆", e.pinned ? "Unpin" : "Pin to the top", () => vs.postMessage({ type: "pin", id: e.id }), e.pinned ? "pinned" : ""));
+    acts.appendChild(histButton("✎", "Rename", () => vs.postMessage({ type: "rename", id: e.id })));
+    acts.appendChild(histButton("🗑", "Delete from history", () => vs.postMessage({ type: "delete", id: e.id })));
+  } else {
+    acts.appendChild(histButton(e.pinned ? "★" : "☆", e.pinned ? "Unpin" : "Pin to the top", () => vs.postMessage({ type: "pinForeign", slug: w.slug, id: e.id }), e.pinned ? "pinned" : ""));
+  }
+  r.appendChild(acts);
+  const open = () => {
+    if (!here){ vs.postMessage({ type: "foreign", slug: w.slug, id: e.id }); return; }
+    openHistory(false); if (e.id !== sid) vs.postMessage({ type: "switch", id: e.id });
+  };
+  r.onclick = open;
+  r.onkeydown = (ev) => { if (ev.key === "Enter") open(); else if (ev.key === "Delete" && here) vs.postMessage({ type: "delete", id: e.id }); };
+  return r;
+}
+/* top-level nodes of one folder: single chats, and multi-model runs (same group) as a sub-branch */
+function nodesOf(chats){
+  const byGroup = new Map();
+  for (const e of chats) if (e.group){ if (!byGroup.has(e.group)) byGroup.set(e.group, []); byGroup.get(e.group).push(e); }
+  const out = [], done = new Set();
+  for (const e of chats){
+    const g = e.group && byGroup.get(e.group);
+    if (g && g.length > 1){ if (!done.has(e.group)){ done.add(e.group); out.push({ group: e.group, chats: g }); } }
+    else out.push({ chat: e });
+  }
+  return out;
+}
+function paintHistory(){
+  const list = $("histlist");
+  list.innerHTML = "";
+  const needle = $("histq").value.trim().toLowerCase();
+  const deep = found && found.q.toLowerCase() === needle ? new Set(found.ids) : null;
+  // This window's folder is drawn from the live list; the others from the master index.
+  let folders = tree.map((w) => (w.here ? Object.assign({}, w, { chats: sessions }) : w));
+  if (!folders.some((w) => w.here)) folders.unshift({ slug: "", name: "This workspace", workspace: "", here: true, current: true, exists: true, chats: sessions });
+  const hit = (e, w) => !needle || (e.title + " " + modelLabel(e) + " " + w.name).toLowerCase().includes(needle) || (w.here && deep && deep.has(e.id));
+  let shown = 0;
+  // Pinned: every workspace's pinned chats, newest first
+  const pins = [];
+  for (const w of folders) for (const e of w.chats || []) if (e.pinned && hit(e, w)) pins.push({ e, w });
+  pins.sort((a, b) => (b.e.updated || 0) - (a.e.updated || 0));
+  if (pins.length){
+    list.appendChild(el("div", "hsec", "Pinned"));
+    for (const p of pins){ list.appendChild(chatRow(p.e, p.w, { inPinned: true, folder: !p.w.here })); shown++; }
+  }
+  const sec = el("div", "hsec"); sec.appendChild(el("span", "", "Workspaces"));
+  const exp = histButton("⊟", "Collapse every folder but this one", () => { ui.open = {}; ui.shut = {}; keepUi(); paintHistory(); });
+  exp.className = "icon"; exp.style.width = exp.style.height = "20px"; exp.style.fontSize = "12px"; sec.appendChild(exp);
+  list.appendChild(sec);
+  for (const w of folders){
+    const chats = (w.chats || []).filter((e) => !e.pinned && hit(e, w));
+    if (needle && !chats.length && !w.name.toLowerCase().includes(needle)) continue;
+    const key = w.slug || "_here";
+    const isOpen = needle ? true : w.here || w.current ? !ui.shut[key] : !!ui.open[key];
+    const f = el("div", "hfold" + (w.here ? " here" : "") + (w.exists === false ? " gone" : ""));
+    f.tabIndex = 0;
+    f.title = (w.workspace || w.name) + (w.here ? "\nThis window's folder" : w.exists === false ? "\nThe folder no longer exists" : "\nAnother workspace folder: its chats open there");
+    f.setAttribute("aria-expanded", String(isOpen));
+    f.appendChild(el("span", "car", isOpen ? "▾" : "▸"));
+    f.appendChild(el("span", "fi"));
+    f.appendChild(el("span", "fn", w.name));
+    const run = (w.chats || []).filter((e) => e.status === "running").length;
+    if (run) f.appendChild(dot("running"));
+    f.appendChild(el("span", "fc", String((w.chats || []).length || "")));
+    const startHere = () => { if (w.here) openHistory(false); vs.postMessage({ type: "newIn", path: w.workspace || "", here: !!w.here }); };
+    if (w.here || (w.workspace && w.exists !== false)){
+      const a = el("div", "hacts");
+      a.appendChild(histButton("＋", w.here ? "New chat in this folder" : "Start a new chat in this folder (opens it)", startHere));
+      if (!w.here) a.appendChild(histButton("↗", "Open this folder in a new window", () => vs.postMessage({ type: "openFolder", path: w.workspace })));
+      f.appendChild(a);
+    }
+    const toggle = () => { if (w.here || w.current){ if (isOpen) ui.shut[key] = 1; else delete ui.shut[key]; } else { if (isOpen) delete ui.open[key]; else ui.open[key] = 1; } keepUi(); paintHistory(); };
+    f.onclick = toggle;
+    f.onkeydown = (ev) => { if (ev.key === "Enter" || (ev.key === "ArrowRight" && !isOpen) || (ev.key === "ArrowLeft" && isOpen)){ ev.preventDefault(); toggle(); setTimeout(() => { const n = [...list.querySelectorAll(".hfold")].find((x) => x.title === f.title); if (n) n.focus(); }, 0); } };
+    list.appendChild(f);
+    if (!isOpen) continue;
+    const br = el("div", "branch");
+    list.appendChild(br);
+    if (!chats.length){
+      if (needle || (!w.here && (!w.workspace || w.exists === false))){ br.appendChild(el("div", "hnone", needle ? "No match" : "No agents yet")); continue; }
+      // An empty folder offers to start one, as Cursor's agent list does.
+      const n = el("div", "hnone hstart", "＋ Start a chat here"); n.tabIndex = 0;
+      n.title = w.here ? "New chat in this folder" : "Open “" + w.name + "” and start a new chat there";
+      n.onclick = startHere; n.onkeydown = (ev) => { if (ev.key === "Enter") startHere(); };
+      br.appendChild(n); continue;
+    }
+    const nodes = nodesOf(chats);
+    const all = needle || ui.more[key];
+    for (const n of all ? nodes : nodes.slice(0, SHOW)){
+      if (n.chat){ br.appendChild(chatRow(n.chat, w)); shown++; continue; }
+      // a "Run prompt on several models" run: one branch, one chat per model
+      const gk = key + "/" + n.group, gOpen = needle || !ui.grp[gk];
+      const g = el("div", "hgrp"); g.tabIndex = 0;
+      g.title = n.chats.length + " chats from one prompt, one per model";
+      g.appendChild(el("span", "car", gOpen ? "▾" : "▸"));
+      g.appendChild(el("span", "ht", n.chats[0].title + " · " + n.chats.length + " models"));
+      if (n.chats.some((e) => e.status === "running")) g.appendChild(dot("running"));
+      g.appendChild(el("span", "hage", age(Math.max(...n.chats.map((e) => e.updated || 0)))));
+      const gt = () => { if (gOpen) ui.grp[gk] = 1; else delete ui.grp[gk]; keepUi(); paintHistory(); };
+      g.onclick = gt; g.onkeydown = (ev) => { if (ev.key === "Enter") gt(); };
+      br.appendChild(g);
+      if (!gOpen) continue;
+      const sub = el("div", "branch");
+      for (const e of n.chats){ const r = chatRow(e, w); r.querySelector(".ht").textContent = modelLabel(e); r.querySelector(".ht").title = e.title; sub.appendChild(r); shown++; }
+      br.appendChild(sub);
+    }
+    if (!needle && nodes.length > SHOW){
+      const m = el("div", "hmore", ui.more[key] ? "Less" : "More (" + (nodes.length - SHOW) + ")"); m.tabIndex = 0;
+      const mt = () => { if (ui.more[key]) delete ui.more[key]; else ui.more[key] = 1; keepUi(); paintHistory(); };
+      m.onclick = mt; m.onkeydown = (ev) => { if (ev.key === "Enter") mt(); };
+      br.appendChild(m);
+    }
+  }
+  if (needle && !shown){ const d = el("div", "", "No chat matches “" + needle + "”."); d.id = "histempty"; list.appendChild(d); }
+}
+function openHistory(on){
+  $("hist").classList.toggle("on", on);
+  $("histbtn").setAttribute("aria-expanded", String(on));
+  if (on){ closeMenu(); paintHistory(); vs.postMessage({ type: "tree" }); $("histq").focus(); $("histq").select(); }
+}
+
+/* ---- panels: an empty chat shows the open tabs and this workspace's panels, as Cursor does ---- */
+let panels = { tabs: [], canvases: [], custom: [], ws: "", changes: 0 };
 function welcome(){
-  if (log.children.length) return;
-  const w = document.createElement("div");
-  w.id = "welcome";
-  w.innerHTML =
-    "<h2>Agent</h2><p>A coding agent that reads, searches, edits and runs commands in this workspace.</p>" +
-    '<div class="card" id="w-account"><h3>Account</h3><div class="steps">' +
-    '<div class="step"><span id="w-who">Sign in with your Claude account<small>Your browser opens to claude.ai. The password never passes through this panel; Claude Code keeps the login.</small></span><button class="btn" id="w-signin" data-cmd="signin">Sign in</button></div>' +
-    "</div></div>" +
-    '<div class="card"><h3>Set up</h3><div class="steps">' +
-    '<div class="step"><span>Backend &amp; model<small id="w-backend">not connected</small></span><button class="btn2" data-cmd="model">Change</button></div>' +
-    '<div class="step"><span>Claude API key<small>only for the Claude backends</small></span><button class="btn2" data-cmd="key">Set</button></div>' +
-    '<div class="step"><span>Permissions &amp; shell<small id="w-shell"></small></span><button class="btn2" data-cmd="perms">Change</button></div>' +
-    "</div></div>" +
-    '<div class="card"><h3>Try</h3>' +
-    ["Explain what the active file does and how it is used.", "Find the cause of the failing test and fix it, then run the tests.", "Review my uncommitted changes and point out bugs.", "Add a unit test for the selected code."].map((t) => '<button class="try" type="button">' + esc(t) + "</button>").join("") +
-    "</div>" +
-    '<div class="card"><h3>Where things are</h3><p style="margin:0">The bar at the top shows the model in use: click it to switch. <b>⋯</b> holds settings, import, find, undo and skills. Select code in an editor and right-click → <b>Ask Agent About Selection</b>. Changed files appear in a card with <b>Undo</b> after each turn.</p></div>';
-  log.appendChild(w);
+  if ([...log.children].some((c) => c.id !== "welcome")) return;
+  let w = $("welcome");
+  if (!w){ w = document.createElement("div"); w.id = "welcome"; log.appendChild(w); }
+  w.innerHTML = "";
+  const sec = (t) => w.appendChild(el("div", "psec", t));
+  const item = (icon, label, hint, msg, title, file) => {
+    const b = el("button", "pi"); b.type = "button";
+    b.appendChild(el("span", "pic", icon)); b.appendChild(el("span", "pl", label));
+    if (hint) b.appendChild(el("small", "", hint));
+    b.title = title || label;
+    if (file) b.dataset.path = file; // right-click: the file menu
+    b.onclick = () => (typeof msg === "function" ? msg() : vs.postMessage(Object.assign({ type: "panel" }, msg)));
+    w.appendChild(b);
+  };
+  if (panels.tabs.length){
+    sec("Open Tabs");
+    for (const t of panels.tabs.slice(0, 8)) item(/^https?:/.test(t.uri) ? "◎" : "▤", t.label, (t.dirty ? "● " : "") + (t.active ? "active" : ""), { id: "tab", uri: t.uri }, (t.path || t.uri) + "\nClick to show it · right-click for more", t.path);
+    if (panels.tabs.length > 8) item("…", (panels.tabs.length - 8) + " more", "attach all", () => attachKind("tabs"), "Attach every open file to the next message");
+  }
+  sec("On " + (panels.ws || "this workspace"));
+  item("±", "Changes", panels.changes ? String(panels.changes) : "", { id: "changes" }, "Source control: uncommitted changes");
+  item("◎", "Browser", "", { id: "browser" }, "Open a page (e.g. your dev server) in the browser panel");
+  item("▸", "Terminal", "", { id: "terminal" }, "Show the terminal");
+  item("▤", "Files", "", { id: "files" }, "Show the Explorer");
+  item("✎", "Canvas", panels.canvases.length ? String(panels.canvases.length) : "new", { id: "canvas" }, panels.canvases.length ? "Open a canvas (.canvas.tsx)" : "Ask the agent to make a canvas with the canvas skill");
+  item("◌", "Side Chat", "", { id: "side" }, "A new chat beside this one (running chats keep going)");
+  if (panels.canvases.length){
+    sec("Canvases");
+    for (const c of panels.canvases.slice(0, 8)) item("✎", c.name, "", { id: "openCanvas", file: c.file }, c.file, c.file);
+  }
+  if (panels.custom.length){
+    sec("Panels");
+    for (const p of panels.custom) item(p.icon || "◆", p.label, p.hint, { id: "custom", index: p.index }, p.label + "\n(localAgentBridge.agent.panels)");
+  }
+  w.appendChild(el("p", "ptip", "Drop files, folders or images here (hold Shift when dragging from VS Code) or paste a screenshot to attach it. ＋ or @ adds context and switches mode: Plan, Debug, Multitask, Ask. Add your own panels with the localAgentBridge.agent.panels setting."));
   paintInfo();
 }
 function dropWelcome(){ const w = $("welcome"); if (w) w.remove(); }
@@ -250,7 +610,8 @@ function changesCard(row){
   hd.appendChild(title); hd.appendChild(undo); box.appendChild(hd);
   for (const f of row.files){
     const a = document.createElement("a");
-    a.title = f.path + " — click to see the diff";
+    a.title = f.path + " — click to see the diff, right-click for more";
+    a.dataset.path = f.path; a.dataset.cp = row.id;
     a.onclick = () => vs.postMessage({ type: "diff", id: row.id, path: f.path });
     const n = document.createElement("span"); n.textContent = base(f.path);
     const k = document.createElement("span"); k.className = "k"; k.textContent = f.kind === "modified" ? "" : f.kind;
@@ -275,13 +636,15 @@ function add(row){
     s.querySelector(".nm").textContent = row.name;
     s.querySelector(".lb").textContent = row.label || "";
     s.title = row.name + (row.label ? " " + row.label : "");
+    if (row.label && window.FileRef && FileRef.whole(row.label)){ s.dataset.path = row.label; s.title += "\nRight-click to open the file"; }
     const pre = document.createElement("pre");
     pre.textContent = row.text || "";
     el.appendChild(s); el.appendChild(pre);
   } else {
     el = document.createElement("div");
     el.className = "row " + row.cls;
-    if (WHO[row.cls]){ const w = document.createElement("div"); w.className = "who"; w.textContent = WHO[row.cls]; el.appendChild(w); }
+      if (row.steered){ el.classList.add("steered"); if (row.from) el.title = "Sent from " + row.from; }
+  if (WHO[row.cls]){ const w = document.createElement("div"); w.className = "who"; w.textContent = WHO[row.cls]; el.appendChild(w); }
     const b = document.createElement("div"); b.className = "body";
     if (row.cls === "assistant" || row.cls === "thought") b.innerHTML = md(row.text || "");
     else b.textContent = row.text || "";
@@ -329,10 +692,22 @@ function paintDot(){ $("dot").className = document.body.classList.contains("busy
 function paintInfo(){
   const chips = $("chips");
   chips.innerHTML = "";
-  const chip = (text, id, title) => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = text; b.title = title; b.onclick = () => cmd(id); chips.appendChild(b); };
+  if (chatMode !== "agent" && Composer.MODES[chatMode]){
+    const m = el("button", "chip mode", Composer.MODES[chatMode].label + " ✕"); m.type = "button";
+    m.title = Composer.MODES[chatMode].hint + ". Sent with each message. Click to go back to Agent.";
+    m.onclick = () => setMode("agent");
+    chips.appendChild(m);
+  }
+  const chip = (text, id, title) => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = text; b.title = title; b.onclick = () => act(id); chips.appendChild(b); };
+  if (info.model) chip("⇄ " + info.model, "model", "Model for this chat. Every chat keeps its own, so chats on different models can run at once. Click to change.");
+  if (info.running > 0) chip(info.running + " running", "history", "Chats working right now. Click for the chat history.");
   if (info.shell) chip("shell: " + info.shell, "perms", "Whether the agent may run commands. Click to change.");
   if (info.mode) chip("mode: " + info.mode, "perms", "Claude Code permission mode. Click to change.");
-  if (info.effort) chip("effort: " + info.effort, "effort", "Claude reasoning effort. Click to change.");
+  if (info.effort) {
+    if (info.effortFrom) chip("effort: " + info.effort + " (" + info.effortFrom + ")", "limits", "Claude reasoning effort for this chat, set by its " + info.effortFrom + " limits (the claudeEffort setting is " + (info.effortSetting || "default") + " and applies to chats on Standard). Click to change this chat's limits.");
+    else chip("effort: " + info.effort, "effort", "Claude reasoning effort (the claudeEffort setting). Click to change.");
+  }
+  if (info.limits) chip("↥ " + info.limits, "limits", "This chat's raised output limits (output tokens per reply, tool rounds per turn). Other chats keep theirs. Click to change.");
   const acct = info.account || {};
   const who = acct.loggedIn ? acct.email || "signed in" : "";
   if (acct.loggedIn) chip("● " + who, "signout", "Signed in to Claude Code" + (acct.plan ? " (" + acct.plan + ")" : "") + ". Click to sign out.");
@@ -349,11 +724,12 @@ function paintInfo(){
       ww.innerHTML = "Sign in with your Claude account<small>Needs the Claude Code CLI, which was not found. Sign in will point you to the installer.</small>";
     }
   }
-  $("m-effort").textContent = info.effort || "";
+  $("m-effort").textContent = info.effort ? (info.effortFrom ? "setting " + (info.effortSetting || "default") + " · chat " + info.effort : info.effort) : "";
+  $("m-limits").textContent = info.limitsPreset || "standard";
   $("m-shell").textContent = info.shell ? "shell " + info.shell : "";
   const ws = $("w-shell"); if (ws) ws.textContent = info.shell ? "shell commands: " + info.shell + (info.mode ? " · mode: " + info.mode : "") : "";
 }
-function busy(on){ document.body.classList.toggle("busy", !!on); if (!on) live.textContent = ""; paintDot(); }
+function busy(on){ document.body.classList.toggle("busy", !!on); if (!on) live.textContent = ""; paintDot(); if (typeof paintHint === "function") paintHint(); }
 
 /* ---- find ---- */
 function applyFind(){
@@ -372,35 +748,315 @@ function openFind(on){
   if (on){ $("findq").focus(); $("findq").select(); } else { $("findq").value = ""; applyFind(); q.focus(); }
 }
 
+/* ---- right-click (and Ctrl+click) on a file named in the chat ---- */
+const ctx = $("ctx");
+/** The text line under the pointer and the pointer's offset in it. */
+function caretLine(x, y){
+  let node = null, off = 0;
+  if (document.caretRangeFromPoint){ const r = document.caretRangeFromPoint(x, y); if (r){ node = r.startContainer; off = r.startOffset; } }
+  else if (document.caretPositionFromPoint){ const p = document.caretPositionFromPoint(x, y); if (p){ node = p.offsetNode; off = p.offset; } }
+  if (!node || node.nodeType !== 3) return null;
+  const t = node.textContent, a = t.lastIndexOf("\n", off - 1) + 1, b = t.indexOf("\n", off);
+  return { text: t.slice(a, b < 0 ? t.length : b), off: off - a };
+}
+/** The file at the pointer: a changed-file row, a tool row, a selected or `code` path, or a path in the text / a tool's output line. */
+function refAt(e, useSel){
+  if (!window.FileRef || !e.target.closest) return null;
+  const tagged = e.target.closest("[data-path]");
+  if (tagged) return Object.assign({ line: 0, col: 0 }, FileRef.whole(tagged.dataset.path) || { path: tagged.dataset.path }, { cp: tagged.dataset.cp || "" });
+  if (!e.target.closest("#log, #todos")) return null;
+  const s = window.getSelection();
+  const sel = s ? String(s).trim() : "";
+  if (useSel && sel && sel.length < 400 && s.containsNode(e.target, true)){ const r = FileRef.whole(sel); if (r) return r; }
+  const code = e.target.closest("code");
+  if (code){ const r = FileRef.whole(code.textContent); if (r) return r; }
+  const c = caretLine(e.clientX, e.clientY);
+  return c ? FileRef.find(c.text, c.off) : null;
+}
+function fileMsg(action, r){ vs.postMessage({ type: "file", action, path: r.path, line: r.line || 0, col: r.col || 0, id: r.cp || "" }); }
+function closeCtx(){ ctx.classList.remove("on"); }
+function openCtx(x, y, r, sel){
+  ctx.innerHTML = "";
+  const item = (label, hint, fn) => {
+    const b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "menuitem");
+    const l = document.createElement("span"); l.textContent = label; const k = document.createElement("small"); k.textContent = hint || "";
+    b.appendChild(l); b.appendChild(k);
+    b.onclick = (ev) => { ev.stopPropagation(); closeCtx(); fn(); };
+    ctx.appendChild(b);
+  };
+  const hr = () => ctx.appendChild(document.createElement("hr"));
+  const h = document.createElement("div"); h.className = "sec"; h.textContent = r.path + (r.line ? ":" + r.line : ""); h.title = r.path; ctx.appendChild(h);
+  item("Open " + base(r.path), r.line ? "at line " + r.line : "Ctrl+click", () => fileMsg("open", r));
+  item("Open to the side", "", () => fileMsg("side", r));
+  if (r.cp) item("Show diff", "before agent ↔ now", () => fileMsg("diff", r));
+  hr();
+  item("Reveal in Explorer view", "", () => fileMsg("reveal", r));
+  item(/Mac/.test(navigator.platform) ? "Reveal in Finder" : /Win/.test(navigator.platform) ? "Reveal in File Explorer" : "Open containing folder", "", () => fileMsg("os", r));
+  hr();
+  item("Copy path", "", () => fileMsg("copy", r));
+  item("Copy relative path", "", () => fileMsg("copyRel", r));
+  if (sel) item("Copy selection", "Ctrl+C", () => vs.postMessage({ type: "copy", text: sel }));
+  ctx.classList.add("on");
+  ctx.style.left = Math.max(4, Math.min(x, window.innerWidth - ctx.offsetWidth - 4)) + "px";
+  ctx.style.top = Math.max(4, Math.min(y, window.innerHeight - ctx.offsetHeight - 4)) + "px";
+  ctx.querySelector("button").focus();
+}
+document.addEventListener("contextmenu", (e) => {
+  closeCtx();
+  if (e.target.closest && e.target.closest("textarea, input")) return; // keep the native cut/copy/paste menu there
+  const r = refAt(e, true);
+  if (!r) return; // no file here: the usual menu
+  e.preventDefault(); closeMenu();
+  const s = window.getSelection();
+  openCtx(e.clientX, e.clientY, r, s ? String(s) : "");
+});
+ctx.addEventListener("keydown", (e) => {
+  const items = [...ctx.querySelectorAll("button")], i = items.indexOf(document.activeElement);
+  if (e.key === "ArrowDown" || e.key === "ArrowUp"){ e.preventDefault(); items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus(); }
+  else if (e.key === "Tab"){ e.preventDefault(); closeCtx(); }
+});
+// Ctrl+click (Cmd+click) opens the file, as in the editor and terminal.
+log.addEventListener("click", (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return;
+  const r = refAt(e, false);
+  if (!r) return;
+  e.preventDefault(); e.stopPropagation(); fileMsg("open", r);
+}, true);
+log.addEventListener("scroll", closeCtx);
+window.addEventListener("blur", closeCtx);
+window.addEventListener("resize", closeCtx);
+
 /* ---- wiring ---- */
 function closeMenu(){ menu.classList.remove("on"); $("more").setAttribute("aria-expanded", "false"); }
 $("more").onclick = (e) => { e.stopPropagation(); const on = !menu.classList.contains("on"); menu.classList.toggle("on", on); $("more").setAttribute("aria-expanded", String(on)); if (on) menu.querySelector("button").focus(); };
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-cmd]");
-  if (b){ const id = b.dataset.cmd; closeMenu(); if (id === "find") openFind(true); else if (id === "new") vs.postMessage({ type: "new" }); else cmd(id); return; }
+  if (b){ const id = b.dataset.cmd; closeMenu(); act(id); return; }
   if (e.target.classList.contains("try")){ q.value = e.target.textContent; q.focus(); return; }
   if (e.target.classList.contains("copy")){ const pre = e.target.parentElement.querySelector("pre"); vs.postMessage({ type: "copy", text: pre.textContent }); e.target.textContent = "Copied"; setTimeout(() => (e.target.textContent = "Copy"), 1200); return; }
   if (!menu.contains(e.target)) closeMenu();
+  if (!ctx.contains(e.target)) closeCtx();
 });
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape"){ closeMenu(); if ($("find").classList.contains("on")) openFind(false); }
+  if (e.key === "Escape" && ctx.classList.contains("on")){ closeCtx(); return; }
+  if (e.key === "Escape"){ closeMenu(); if ($("hist").classList.contains("on")) openHistory(false); else if ($("find").classList.contains("on")) openFind(false); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f"){ e.preventDefault(); openFind(true); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "h"){ e.preventDefault(); act("history"); }
 });
 $("backend").onclick = () => cmd("model");
-$("new").onclick = () => vs.postMessage({ type: "new" });
+$("new").onclick = () => act("new");
+$("histbtn").onclick = (e) => { e.stopPropagation(); act("history"); };
+$("histx").onclick = () => openHistory(false);
+$("histq").addEventListener("input", () => {
+  paintHistory();
+  clearTimeout(searchTimer);
+  const needle = $("histq").value.trim();
+  if (needle.length > 1) searchTimer = setTimeout(() => vs.postMessage({ type: "search", q: needle }), 250);
+});
+$("histq").addEventListener("keydown", (e) => { if (e.key === "ArrowDown"){ const r = $("histlist").querySelector("[tabindex]"); if (r){ e.preventDefault(); r.focus(); } } });
+// Up/Down walk the tree (folders, run groups, chats, More)
+$("histlist").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+  const all = [...$("histlist").querySelectorAll("[tabindex]")];
+  const i = all.indexOf(document.activeElement);
+  if (i < 0) return;
+  e.preventDefault();
+  const n = all[i + (e.key === "ArrowDown" ? 1 : -1)];
+  if (n) n.focus(); else if (e.key === "ArrowUp") $("histq").focus();
+});
 $("findq").addEventListener("input", applyFind);
 $("findx").onclick = () => openFind(false);
 $("down").onclick = () => { log.scrollTop = log.scrollHeight; $("down").classList.remove("on"); };
 log.addEventListener("scroll", () => $("down").classList.toggle("on", !atBottom()));
-$("f").addEventListener("submit", (e) => { e.preventDefault(); const t = q.value.trim(); if (!t) return; add({ cls: "user", text: t }); q.value = ""; busy(true); vs.postMessage({ type: "send", text: t }); });
-q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); $("f").requestSubmit(); } });
-$("stop").onclick = () => vs.postMessage({ type: "stop" });
+const working = () => document.body.classList.contains("busy");
+const steerMode = () => (info.steerDefault === "queue" ? "queue" : "steer");
+/* send while idle; while working: steer (into the running turn), queue (next turn) or now (stop & send) */
+function sendAs(mode){
+  const raw = q.value.trim(); if (!raw && !att.length) return;
+  // A /command goes as typed; anything else carries the mode and the attachments.
+  const t = /^\//.test(raw) && !att.length ? raw : Composer.compose(raw, chatMode, att);
+  q.value = ""; att = []; paintAtt(); typed();
+  if (!working()){ busy(true); vs.postMessage({ type: "send", text: t, sid }); return; }
+  vs.postMessage({ type: "send", text: t, sid, mode: mode || steerMode() });
+}
+function typed(){ document.body.classList.toggle("typed", !!q.value.trim() || att.length > 0); paintHint(); }
+
+/* ---- composer: attachments, mode, the ＋ / @ menu, drop and paste ---- */
+let att = [];
+let chatMode = (vs.getState() || {}).mode || "agent";
+function setMode(k){ chatMode = Composer.MODES[k] ? k : "agent"; vs.setState(Object.assign({}, vs.getState() || {}, { mode: chatMode })); paintInfo(); }
+function paintAtt(){
+  const box = $("att"); box.innerHTML = "";
+  box.classList.toggle("on", att.length > 0);
+  att.forEach((a, i) => {
+    const c = el("div", "a");
+    c.appendChild(el("span", "", (a.path ? (Composer.IMAGE.test(a.path) ? "▣ " : "▤ ") + base(a.path) : "≡ " + a.label)));
+    c.title = a.path ? a.path + (Composer.IMAGE.test(a.path) ? "\nImage: sent to models that can see images" : "") : a.label + "\n" + String(a.text || "").slice(0, 400);
+    if (a.path) c.dataset.path = a.path;
+    const x = el("button", "", "✕"); x.type = "button"; x.title = "Remove";
+    x.onclick = () => { att.splice(i, 1); paintAtt(); typed(); };
+    c.appendChild(x); box.appendChild(c);
+  });
+}
+function addAtt(items){
+  for (const it of items || []){
+    const dup = it.path ? att.some((a) => a.path === it.path) : att.some((a) => a.label === it.label && a.text === it.text);
+    if (!dup) att.push(it);
+  }
+  paintAtt(); typed(); q.focus();
+}
+function attachKind(kind, extra){ vs.postMessage(Object.assign({ type: "attach", kind }, extra || {})); }
+let pickSel = 0, pickShown = [], pickAt = -1;
+function pickItems(){
+  const L = [];
+  for (const k of Object.keys(Composer.MODES)) L.push({ g: "Modes", b: Composer.MODES[k].label, s: (chatMode === k ? "✓ " : "") + Composer.MODES[k].hint, fn: () => setMode(k) });
+  L.push({ g: "Context", b: "Attach", s: "files or folders from disk…", fn: () => attachKind("pick") });
+  L.push({ g: "Context", b: "Files", s: "search the workspace…", fn: () => attachKind("files") });
+  L.push({ g: "Context", b: "Active file", s: "or its selection", fn: () => attachKind("active") });
+  L.push({ g: "Context", b: "Open tabs", s: "every open file", fn: () => attachKind("tabs") });
+  L.push({ g: "Context", b: "Changes", s: "files with uncommitted changes", fn: () => attachKind("changes") });
+  L.push({ g: "Context", b: "Problems", s: "errors and warnings", fn: () => attachKind("problems") });
+  for (const c of panels.canvases) L.push({ g: "Canvases", b: c.name, s: "attach the canvas source", fn: () => addAtt([{ path: c.file }]) });
+  for (const s of sessions.filter((x) => x.id !== sid).slice(0, 20)) L.push({ g: "Chats", b: s.title || "Chat", s: "attach its transcript · " + modelLabel(s), fn: () => attachKind("chat", { id: s.id }) });
+  // Custom commands (.cortexide/commands/*.md) put "/name " in the box; agents put "@name ".
+  const putIn = (t) => { q.value = t + q.value.replace(/^\s+/, ""); typed(); q.focus(); q.setSelectionRange(t.length, t.length); };
+  for (const c of panels.commands || []) L.push({ g: "Commands", b: "/" + c.name, s: (c.hint ? c.hint + " · " : "") + (c.description || ""), fn: () => putIn("/" + c.name + " ") });
+  for (const a of panels.agents || []) L.push({ g: "Agents", b: "@" + a.name, s: (a.mode === "subagent" ? "sub-agent · " : "") + (a.description || ""), fn: () => putIn("@" + a.name + " ") });
+  L.push({ g: "Tools", b: "Commands", s: "list custom /commands", fn: () => { putIn("/commands"); } });
+  L.push({ g: "Tools", b: "Skills", s: "skills & canvases catalog", fn: () => cmd("skills") });
+  L.push({ g: "Tools", b: "MCP", s: "MCP servers (settings)", fn: () => cmd("mcp") });
+  L.push({ g: "Tools", b: "Compress", s: "summarise this chat (/compress)", fn: () => act("compress") });
+  L.push({ g: "Tools", b: "Several models", s: "run this prompt on several models", fn: () => act("multi") });
+  return L;
+}
+function openPick(on, fromAt){
+  $("pick").classList.toggle("on", on);
+  $("plus").setAttribute("aria-expanded", String(on));
+  if (on){ pickAt = fromAt ? q.selectionStart - 1 : -1; pickSel = 0; $("pickq").value = ""; paintPick(); $("pickq").focus(); }
+  else { pickAt = -1; q.focus(); }
+}
+function paintPick(){
+  const n = $("pickq").value.trim().toLowerCase();
+  const list = $("picklist"); list.innerHTML = "";
+  pickShown = pickItems().filter((i) => !n || (i.b + " " + i.s + " " + i.g).toLowerCase().includes(n));
+  pickSel = Math.min(pickSel, Math.max(0, pickShown.length - 1));
+  let g = "";
+  pickShown.forEach((it, i) => {
+    if (it.g !== g){ g = it.g; list.appendChild(el("div", "pg", g)); }
+    const b = el("button", i === pickSel ? "sel" : ""); b.type = "button"; b.setAttribute("role", "option");
+    b.appendChild(el("b", "", it.b)); b.appendChild(el("small", "", it.s));
+    b.onmousedown = (e) => e.preventDefault();
+    b.onclick = (e) => { e.stopPropagation(); runPick(i); };
+    list.appendChild(b);
+  });
+  if (!pickShown.length) list.appendChild(el("div", "pg", "Nothing matches"));
+}
+function runPick(i){
+  const it = pickShown[i]; if (!it) return;
+  if (pickAt >= 0 && q.value[pickAt] === "@"){ q.value = q.value.slice(0, pickAt) + q.value.slice(pickAt + 1); typed(); }
+  openPick(false);
+  it.fn();
+}
+$("pickq").addEventListener("input", () => { pickSel = 0; paintPick(); });
+$("pickq").addEventListener("keydown", (e) => {
+  if (e.key === "ArrowDown" || e.key === "ArrowUp"){
+    e.preventDefault();
+    if (pickShown.length) pickSel = (pickSel + (e.key === "ArrowDown" ? 1 : pickShown.length - 1)) % pickShown.length;
+    paintPick();
+    const s = $("picklist").querySelector(".sel"); if (s && s.scrollIntoView) s.scrollIntoView({ block: "nearest" });
+  } else if (e.key === "Enter"){ e.preventDefault(); runPick(pickSel); }
+  else if (e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); openPick(false); }
+});
+$("plus").onclick = (e) => { e.stopPropagation(); openPick(!$("pick").classList.contains("on"), false); };
+document.addEventListener("click", (e) => { if ($("pick").classList.contains("on") && !$("pick").contains(e.target) && e.target.id !== "plus") openPick(false); });
+// @ at the start of a word opens the menu, as in Cursor
+q.addEventListener("input", (e) => {
+  if (e.data !== "@") return;
+  const i = q.selectionStart - 1;
+  if (i === 0 || /\s/.test(q.value[i - 1])) openPick(true, true);
+});
+/* drop: files from VS Code (hold Shift) or the OS; images and other files without a path are saved first */
+let dragDepth = 0;
+const carriesFiles = (dt) => !!dt && [...(dt.types || [])].some((t) => /^(Files|application\/vnd\.code\.uri-list|text\/uri-list|resourceurls|codeeditors)$/i.test(t));
+document.addEventListener("dragenter", (e) => { if (!carriesFiles(e.dataTransfer)) return; e.preventDefault(); dragDepth++; $("drop").classList.add("on"); });
+document.addEventListener("dragover", (e) => { if (!carriesFiles(e.dataTransfer)) return; e.preventDefault(); e.dataTransfer.dropEffect = "copy"; });
+document.addEventListener("dragleave", () => { if (--dragDepth <= 0){ dragDepth = 0; $("drop").classList.remove("on"); } });
+document.addEventListener("drop", (e) => {
+  dragDepth = 0; $("drop").classList.remove("on");
+  const dt = e.dataTransfer; if (!dt) return;
+  const uris = Composer.dropUris((t) => { try { return dt.getData(t) || ""; } catch { return ""; } });
+  if (uris.length){ e.preventDefault(); attachKind("uris", { uris }); return; }
+  if (dt.files && dt.files.length){ e.preventDefault(); sendFiles(dt.files); }
+  // plain text dropped on the input box: the browser inserts it
+});
+function sendFiles(files){
+  for (const f of files){
+    if (f.size > 25 * 1024 * 1024){ add({ cls: "err", text: f.name + " is larger than 25 MB: attach it from disk instead (＋ → Attach)." }); continue; }
+    const r = new FileReader();
+    r.onload = () => attachKind("data", { name: f.name || "pasted." + ((f.type || "").split("/")[1] || "bin"), data: String(r.result) });
+    r.readAsDataURL(f);
+  }
+}
+// paste a screenshot (or a copied file) into the input box
+q.addEventListener("paste", (e) => {
+  const files = [...((e.clipboardData && e.clipboardData.files) || [])];
+  if (!files.length) return;
+  e.preventDefault(); sendFiles(files);
+});
+function paintHint(){
+  const h = $("hint");
+  if (!working()){ h.innerHTML = "<kbd>Enter</kbd> send · <kbd>Shift+Enter</kbd> new line · edits save to disk, each turn can be undone"; return; }
+  const def = steerMode(), other = def === "queue" ? "steer" : "queue";
+  h.innerHTML = "Working — you can still type. <kbd>Enter</kbd> " + def + " · <kbd>Alt+Enter</kbd> " + other + " · <kbd>Ctrl+Shift+Enter</kbd> stop &amp; send";
+}
+let pend = [];
+function paintPend(){
+  const box = $("pend"); box.innerHTML = "";
+  box.classList.toggle("on", pend.length > 0);
+  const LABEL = { steer: "next step", queue: "queued", now: "stop & send" };
+  for (const p of pend){
+    const r = el("div", "p");
+    r.appendChild(el("span", "pm", p.command && p.mode === "queue" ? "after this turn" : LABEL[p.mode] || p.mode));
+    const t = el("span", "pt", p.text); t.title = p.text + (p.from ? "\n(from " + p.from + ")" : ""); r.appendChild(t);
+    const b = (label, title, fn) => { const x = el("button", "", label); x.type = "button"; x.title = title; x.onclick = fn; r.appendChild(x); };
+    if (p.mode === "queue" && !p.command) b("steer now", "Take it into the running turn at its next step instead", () => vs.postMessage({ type: "requeue", sid, id: p.id, mode: "steer" }));
+    if (p.mode !== "now") b("stop & send", "Stop the running turn, then send this", () => vs.postMessage({ type: "requeue", sid, id: p.id, mode: "now" }));
+    b("✎", "Take it back into the input box", () => vs.postMessage({ type: "unqueue", sid, id: p.id }));
+    box.appendChild(r);
+  }
+}
+$("f").addEventListener("submit", (e) => { e.preventDefault(); sendAs(""); });
+q.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || e.shiftKey && !(e.ctrlKey || e.metaKey) || e.isComposing) return;
+  e.preventDefault();
+  if (working() && (e.ctrlKey || e.metaKey) && e.shiftKey) sendAs("now");
+  else if (working() && e.altKey) sendAs(steerMode() === "queue" ? "steer" : "queue");
+  else sendAs("");
+});
+q.addEventListener("input", typed);
+$("steer").onclick = () => sendAs("steer");
+$("queue").onclick = () => sendAs("queue");
+$("now").onclick = () => sendAs("now");
+$("stop").onclick = () => vs.postMessage({ type: "stop", sid });
 
 window.addEventListener("message", (e) => {
   const m = e.data || {};
+  // Events of a chat that is not on screen: its log is kept by the extension; the tab dot shows its state.
+  if (m.sid && m.sid !== sid && m.type !== "restore") return;
   if (m.type === "header") header(m);
-  else if (m.type === "info"){ info = m; paintInfo(); }
-  else if (m.type === "restore"){ log.innerHTML = ""; (m.log || []).forEach(add); todos(m.todos); welcome(); log.scrollTop = log.scrollHeight; }
+  else if (m.type === "info"){ info = m; paintInfo(); paintHint(); }
+  else if (m.type === "restore"){ sid = m.sid || ""; log.innerHTML = ""; live.textContent = ""; (m.log || []).forEach(add); todos(m.todos); welcome(); busy(!!m.busy); pend = m.pending || []; paintPend(); log.scrollTop = log.scrollHeight; paintTabs(); }
+  else if (m.type === "pending"){ pend = m.items || []; paintPend(); }
+  else if (m.type === "panels"){ panels = Object.assign({ tabs: [], canvases: [], custom: [], commands: [], agents: [] }, m); welcome(); }
+  else if (m.type === "attached") addAtt(m.items);
+  else if (m.type === "steered") add({ cls: "user", text: m.text, steered: true, from: m.from });
+  else if (m.type === "unsent"){ const cur = q.value.trim(); q.value = cur ? m.text + "\n\n" + cur : m.text; typed(); q.focus(); }
+  else if (m.type === "sessions"){ sessions = m.items || []; if (m.active) sid = m.active; info.running = m.running || 0; paintTabs(); paintInfo(); if ($("hist").classList.contains("on")) paintHistory(); }
+  else if (m.type === "found"){ found = { q: m.q, ids: m.ids || [] }; if ($("hist").classList.contains("on")) paintHistory(); }
+  else if (m.type === "tree"){ tree = m.items || []; if ($("hist").classList.contains("on")) paintHistory(); }
+  else if (m.type === "history") openHistory(!!m.open);
+  else if (m.type === "wantMulti") act("multi");
+  else if (m.type === "user") add({ cls: "user", text: m.text });
   else if (m.type === "todos") todos(m.todos);
   else if (m.type === "changes") add({ cls: "changes", id: m.id, files: m.files });
   else if (m.type === "undone"){ const card = log.querySelector('.changes[data-id="' + m.id + '"]'); if (card){ card.querySelector("button").disabled = true; const s = card.querySelector(".hd span"); s.textContent = "Reverted · " + s.textContent; } }
@@ -414,6 +1070,7 @@ window.addEventListener("message", (e) => {
   else if (m.type === "seed"){ q.value = m.text; q.focus(); }
 });
 welcome();
+paintHint();
 vs.postMessage({ type: "ready" });
 </script>
 </body>
