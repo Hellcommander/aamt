@@ -11,7 +11,7 @@ from pathlib import Path
 
 import osfui_gen as gen
 
-DATA = Path(r"F:\SteamLibrary\steamapps\common\Starfield\Data")
+DATA = Path(r"D:\games\Steam\steamapps\common\Starfield\Data")
 PLUGINS = DATA / "SFSE" / "Plugins"
 SPECS = Path(__file__).resolve().parent / "specs"
 

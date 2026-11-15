@@ -1,0 +1,3199 @@
+{
+  "name": "Quill Rat pack (Quill Rat Druid mod)",
+  "props": {
+    "qr_bone_spine": {
+      "model": "hd/vfx/meshes/lit_mesh/bonewall/model_source/fx_mesh_bone_tusk",
+      "textures": [
+        "hd/vfx/meshes/lit_mesh/bonewall/texture_source/bonewall_props_alb.texture",
+        "hd/vfx/meshes/lit_mesh/bonewall/texture_source/bonewall_props_nrm.texture",
+        "hd/vfx/meshes/lit_mesh/bonewall/texture_source/bonewall_props_orm.texture"
+      ]
+    }
+  },
+  "variants": [
+    {
+      "name": "qr_giant_quillrat",
+      "donor": "quillrat2",
+      "scale": 1.9
+    },
+    {
+      "name": "qr_pack_quillrat",
+      "donor": "quillrat2",
+      "scale": 0.8
+    },
+    {
+      "name": "qr_quill_bear",
+      "donor": "quillrat2",
+      "scale": {
+        "sprite": "s7"
+      },
+      "reshape": {
+        "quills": {
+          "prefix": "spike_",
+          "length": 1.55,
+          "thickness": 1.7,
+          "first": 20,
+          "last": 62
+        },
+        "bulk": {
+          "bones": [
+            "spine_",
+            "pelvis",
+            "neck",
+            "R_shoulder",
+            "L_shoulder"
+          ],
+          "x": 1.35,
+          "y": 1.22,
+          "z": 1.05,
+          "pivot": [
+            0,
+            2.2,
+            0.6
+          ]
+        }
+      },
+      "animations": [
+        {
+          "name": "run",
+          "base": "walk",
+          "duration": 0.45,
+          "edits": [
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  7
+                ],
+                [
+                  1,
+                  7
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -9
+                ],
+                [
+                  1,
+                  -9
+                ]
+              ]
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0.0,
+                    0
+                  ]
+                ],
+                [
+                  0.25,
+                  [
+                    0,
+                    0.14,
+                    0
+                  ]
+                ],
+                [
+                  0.5,
+                  [
+                    0,
+                    0.0,
+                    0
+                  ]
+                ],
+                [
+                  0.75,
+                  [
+                    0,
+                    0.14,
+                    0
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0.0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  0.92
+                ],
+                [
+                  1,
+                  0.92
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "cast",
+          "base": "neutral",
+          "duration": 0.8,
+          "edits": [
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -34
+                ],
+                [
+                  0.6,
+                  -34
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  20
+                ],
+                [
+                  0.6,
+                  20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "R_upr_arm_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -28
+                ],
+                [
+                  0.6,
+                  -20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "L_upr_arm_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -28
+                ],
+                [
+                  0.6,
+                  -20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  14
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.3,
+                  1.0
+                ],
+                [
+                  0.5,
+                  1.32
+                ],
+                [
+                  0.7,
+                  1.2
+                ],
+                [
+                  1,
+                  1.0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "skill1",
+          "base": "neutral",
+          "duration": 0.7,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.3,
+                  [
+                    0,
+                    -0.32,
+                    -0.1
+                  ]
+                ],
+                [
+                  0.55,
+                  [
+                    0,
+                    0.1,
+                    0.05
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.3,
+                  10
+                ],
+                [
+                  0.55,
+                  -8
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "spine_02_bind_jnt",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 4,
+                "amplitude": 7
+              }
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.3,
+                  0.9
+                ],
+                [
+                  0.5,
+                  1.5
+                ],
+                [
+                  0.75,
+                  1.25
+                ],
+                [
+                  1,
+                  1.0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "skill2",
+          "base": "neutral",
+          "duration": 0.75,
+          "edits": [
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  -30
+                ],
+                [
+                  0.58,
+                  12
+                ],
+                [
+                  0.75,
+                  4
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "R_upr_arm_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  -40
+                ],
+                [
+                  0.58,
+                  10
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "L_upr_arm_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  -40
+                ],
+                [
+                  0.58,
+                  10
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  16
+                ],
+                [
+                  0.58,
+                  -10
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.58,
+                  [
+                    0,
+                    -0.18,
+                    0.1
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.55,
+                  1.0
+                ],
+                [
+                  0.65,
+                  1.3
+                ],
+                [
+                  1,
+                  1.0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "block",
+          "base": "neutral",
+          "duration": 0.4,
+          "to": 0.4,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.4,
+                  [
+                    0,
+                    -0.3,
+                    -0.15
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  14
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  18
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.4,
+                  1.35
+                ],
+                [
+                  1,
+                  1.0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "charge",
+          "mode": "S3",
+          "loop": true,
+          "base": "walk",
+          "duration": 0.45,
+          "edits": [
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  11
+                ],
+                [
+                  1,
+                  11
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  24
+                ],
+                [
+                  1,
+                  24
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -14
+                ],
+                [
+                  1,
+                  -14
+                ]
+              ]
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    -0.1,
+                    0
+                  ]
+                ],
+                [
+                  0.25,
+                  [
+                    0,
+                    0.1,
+                    0
+                  ]
+                ],
+                [
+                  0.5,
+                  [
+                    0,
+                    -0.1,
+                    0
+                  ]
+                ],
+                [
+                  0.75,
+                  [
+                    0,
+                    0.1,
+                    0
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    -0.1,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 62
+              },
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  112
+                ],
+                [
+                  1,
+                  112
+                ]
+              ]
+            },
+            {
+              "rotate": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 19
+              },
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  66
+                ],
+                [
+                  1,
+                  66
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.15
+                ],
+                [
+                  1,
+                  1.15
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "skill4",
+          "base": "neutral",
+          "duration": 0.9,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.2,
+                  [
+                    0,
+                    -0.14,
+                    -0.08
+                  ]
+                ],
+                [
+                  0.75,
+                  [
+                    0,
+                    -0.1,
+                    -0.05
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "spine_03_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.25,
+                  -12
+                ],
+                [
+                  0.75,
+                  -10
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.15,
+                  10
+                ],
+                [
+                  0.35,
+                  -30
+                ],
+                [
+                  0.75,
+                  -26
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "head_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -14
+                ],
+                [
+                  0.75,
+                  -12
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 6,
+                "amplitude": 2.5
+              }
+            },
+            {
+              "rotate": "jaw_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.3,
+                  0
+                ],
+                [
+                  0.4,
+                  24
+                ],
+                [
+                  0.75,
+                  22
+                ],
+                [
+                  0.9,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 2,
+                "amplitude": 22
+              }
+            },
+            {
+              "rotate": "tail_03_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 2,
+                "amplitude": 16
+              }
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 19
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.3,
+                  1.0
+                ],
+                [
+                  0.42,
+                  1.4
+                ],
+                [
+                  0.6,
+                  1.15
+                ],
+                [
+                  1,
+                  1.0
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 49
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.4,
+                  1.0
+                ],
+                [
+                  0.54,
+                  1.4
+                ],
+                [
+                  0.72,
+                  1.15
+                ],
+                [
+                  1,
+                  1.0
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 50,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.5,
+                  1.0
+                ],
+                [
+                  0.66,
+                  1.4
+                ],
+                [
+                  0.84,
+                  1.15
+                ],
+                [
+                  1,
+                  1.0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "combo",
+          "mode": "SQ",
+          "parts": [
+            {
+              "base": "attack1",
+              "duration": 0.42,
+              "edits": [
+                {
+                  "rotate": "spine_02_bind_jnt",
+                  "axis": [
+                    0,
+                    1,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.5,
+                      14
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "base": "attack1",
+              "duration": 0.42,
+              "edits": [
+                {
+                  "rotate": "spine_02_bind_jnt",
+                  "axis": [
+                    0,
+                    1,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.5,
+                      -14
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "base": "neutral",
+              "duration": 0.6,
+              "edits": [
+                {
+                  "rotate": "spine_01_bind_jnt",
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      -30
+                    ],
+                    [
+                      0.6,
+                      12
+                    ],
+                    [
+                      0.8,
+                      4
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "rotate": "R_upr_arm_bind_jnt",
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      -40
+                    ],
+                    [
+                      0.6,
+                      10
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "rotate": "L_upr_arm_bind_jnt",
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      -40
+                    ],
+                    [
+                      0.6,
+                      10
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "scale": {
+                    "prefix": "spike_",
+                    "first": 1,
+                    "last": 62
+                  },
+                  "factor": [
+                    [
+                      0,
+                      1.0
+                    ],
+                    [
+                      0.55,
+                      1.0
+                    ],
+                    [
+                      0.68,
+                      1.35
+                    ],
+                    [
+                      1,
+                      1.0
+                    ]
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leap_windup",
+          "base": "neutral",
+          "duration": 0.3,
+          "to": 0.3,
+          "edits": [
+            {
+              "rotate": [
+                "R_leg_01_bind_jnt",
+                "L_leg_01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  -35
+                ],
+                [
+                  1,
+                  -35
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "R_leg_02_bind_jnt",
+                "L_leg_02_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  55
+                ],
+                [
+                  1,
+                  55
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "R_leg_03_bind_jnt",
+                "L_leg_03_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  -25
+                ],
+                [
+                  1,
+                  -25
+                ]
+              ]
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.8,
+                  [
+                    0,
+                    -0.3,
+                    -0.1
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    -0.3,
+                    -0.1
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  18
+                ],
+                [
+                  1,
+                  18
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "R_upr_arm_bind_jnt",
+                "L_upr_arm_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  20
+                ],
+                [
+                  1,
+                  20
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  16
+                ],
+                [
+                  1,
+                  16
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  10
+                ],
+                [
+                  1,
+                  10
+                ]
+              ]
+            },
+            {
+              "rotate": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 62
+              },
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  -45
+                ],
+                [
+                  1,
+                  -45
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.8,
+                  0.85
+                ],
+                [
+                  1,
+                  0.85
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leap_air",
+          "base": "neutral",
+          "duration": 0.4,
+          "to": 0.4,
+          "edits": [
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -10
+                ],
+                [
+                  1,
+                  -10
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  6
+                ],
+                [
+                  1,
+                  6
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "R_upr_arm_bind_jnt",
+                "L_upr_arm_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -35
+                ],
+                [
+                  1,
+                  -35
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "R_leg_01_bind_jnt",
+                "L_leg_01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  40
+                ],
+                [
+                  1,
+                  40
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -12
+                ],
+                [
+                  1,
+                  -12
+                ]
+              ]
+            },
+            {
+              "rotate": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 62
+              },
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -40
+                ],
+                [
+                  1,
+                  -40
+                ]
+              ]
+            },
+            {
+              "rotate": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 19
+              },
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -20
+                ],
+                [
+                  1,
+                  -20
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.08
+                ],
+                [
+                  1,
+                  1.08
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leap_land",
+          "base": "neutral",
+          "duration": 0.35,
+          "to": 0.35,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.3,
+                  [
+                    0,
+                    -0.36,
+                    0.05
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -6
+                ],
+                [
+                  0.3,
+                  12
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "R_upr_arm_bind_jnt",
+                "L_upr_arm_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -20
+                ],
+                [
+                  0.3,
+                  8
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.3,
+                  12
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 62
+              },
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -30
+                ],
+                [
+                  0.35,
+                  18
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.35,
+                  1.4
+                ],
+                [
+                  0.7,
+                  1.12
+                ],
+                [
+                  1,
+                  1.0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leap_land_attack",
+          "base": "neutral",
+          "duration": 0.4,
+          "to": 0.4,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.35,
+                  [
+                    0,
+                    -0.3,
+                    0.12
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -18
+                ],
+                [
+                  0.35,
+                  16
+                ],
+                [
+                  0.75,
+                  10
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "R_upr_arm_bind_jnt",
+                "L_upr_arm_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -45
+                ],
+                [
+                  0.35,
+                  14
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  22
+                ],
+                [
+                  0.75,
+                  18
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 62
+              },
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -30
+                ],
+                [
+                  0.3,
+                  30
+                ],
+                [
+                  0.5,
+                  105
+                ],
+                [
+                  0.8,
+                  105
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 19
+              },
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.5,
+                  60
+                ],
+                [
+                  0.8,
+                  60
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.5,
+                  1.2
+                ],
+                [
+                  0.8,
+                  1.2
+                ],
+                [
+                  1,
+                  1.0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "base": "neutral",
+          "duration": 0.5,
+          "to": 0.5,
+          "edits": [
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  -16
+                ],
+                [
+                  0.65,
+                  10
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "spine_02_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  14
+                ],
+                [
+                  0.65,
+                  -14
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "R_upr_arm_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  -55
+                ],
+                [
+                  0.65,
+                  30
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "L_upr_arm_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  10
+                ],
+                [
+                  0.65,
+                  -5
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  -10
+                ],
+                [
+                  0.65,
+                  12
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 62
+              },
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  -15
+                ],
+                [
+                  0.65,
+                  15
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.6,
+                  1.15
+                ],
+                [
+                  1,
+                  1.0
+                ]
+              ]
+            }
+          ],
+          "name": "throw"
+        },
+        {
+          "name": "double_throw",
+          "parts": [
+            {
+              "base": "neutral",
+              "duration": 0.32,
+              "to": 0.32,
+              "edits": [
+                {
+                  "rotate": "spine_01_bind_jnt",
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      -16
+                    ],
+                    [
+                      0.65,
+                      10
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "rotate": "spine_02_bind_jnt",
+                  "axis": [
+                    0,
+                    1,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      14
+                    ],
+                    [
+                      0.65,
+                      -14
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "rotate": "R_upr_arm_bind_jnt",
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      -55
+                    ],
+                    [
+                      0.65,
+                      30
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "rotate": "L_upr_arm_bind_jnt",
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      10
+                    ],
+                    [
+                      0.65,
+                      -5
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "rotate": "neck_bind_jnt",
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      -10
+                    ],
+                    [
+                      0.65,
+                      12
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "rotate": {
+                    "prefix": "spike_",
+                    "first": 20,
+                    "last": 62
+                  },
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      -15
+                    ],
+                    [
+                      0.65,
+                      15
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "scale": {
+                    "prefix": "spike_",
+                    "first": 1,
+                    "last": 62
+                  },
+                  "factor": [
+                    [
+                      0,
+                      1.0
+                    ],
+                    [
+                      0.6,
+                      1.15
+                    ],
+                    [
+                      1,
+                      1.0
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "base": "neutral",
+              "duration": 0.32,
+              "to": 0.32,
+              "edits": [
+                {
+                  "rotate": "spine_01_bind_jnt",
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      -16
+                    ],
+                    [
+                      0.65,
+                      10
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "rotate": "spine_02_bind_jnt",
+                  "axis": [
+                    0,
+                    1,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      -14
+                    ],
+                    [
+                      0.65,
+                      14
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "rotate": "L_upr_arm_bind_jnt",
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      -55
+                    ],
+                    [
+                      0.65,
+                      30
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "rotate": "R_upr_arm_bind_jnt",
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      10
+                    ],
+                    [
+                      0.65,
+                      -5
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "rotate": "neck_bind_jnt",
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      -10
+                    ],
+                    [
+                      0.65,
+                      12
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "rotate": {
+                    "prefix": "spike_",
+                    "first": 20,
+                    "last": 62
+                  },
+                  "axis": [
+                    1,
+                    0,
+                    0
+                  ],
+                  "degrees": [
+                    [
+                      0,
+                      0
+                    ],
+                    [
+                      0.4,
+                      -15
+                    ],
+                    [
+                      0.65,
+                      15
+                    ],
+                    [
+                      1,
+                      0
+                    ]
+                  ]
+                },
+                {
+                  "scale": {
+                    "prefix": "spike_",
+                    "first": 1,
+                    "last": 62
+                  },
+                  "factor": [
+                    [
+                      0,
+                      1.0
+                    ],
+                    [
+                      0.6,
+                      1.15
+                    ],
+                    [
+                      1,
+                      1.0
+                    ]
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "spin",
+          "base": "neutral",
+          "duration": 0.5,
+          "edits": [
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.25,
+                  90
+                ],
+                [
+                  0.5,
+                  180
+                ],
+                [
+                  0.75,
+                  270
+                ],
+                [
+                  1,
+                  360
+                ]
+              ]
+            },
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  8
+                ],
+                [
+                  1,
+                  8
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -25
+                ],
+                [
+                  1,
+                  -25
+                ]
+              ]
+            },
+            {
+              "rotate": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 62
+              },
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -20
+                ],
+                [
+                  1,
+                  -20
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.35
+                ],
+                [
+                  1,
+                  1.35
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 19
+              },
+              "factor": [
+                [
+                  0,
+                  1.25
+                ],
+                [
+                  1,
+                  1.25
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "teleport",
+          "base": "neutral",
+          "duration": 0.45,
+          "to": 0.45,
+          "edits": [
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.45,
+                  14
+                ],
+                [
+                  0.7,
+                  -12
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.45,
+                  18
+                ],
+                [
+                  0.7,
+                  -16
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "R_upr_arm_bind_jnt",
+                "L_upr_arm_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.45,
+                  15
+                ],
+                [
+                  0.7,
+                  -25
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.45,
+                  20
+                ],
+                [
+                  0.7,
+                  -20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": {
+                "prefix": "spike_",
+                "first": 20,
+                "last": 62
+              },
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.45,
+                  -45
+                ],
+                [
+                  0.7,
+                  25
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.45,
+                  0.8
+                ],
+                [
+                  0.62,
+                  1.45
+                ],
+                [
+                  1,
+                  1.0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "kick",
+          "base": "neutral",
+          "duration": 0.45,
+          "to": 0.45,
+          "edits": [
+            {
+              "rotate": "spine_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -12
+                ],
+                [
+                  0.55,
+                  14
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "spine_02_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  10
+                ],
+                [
+                  0.55,
+                  -6
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "R_upr_arm_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -60
+                ],
+                [
+                  0.52,
+                  38
+                ],
+                [
+                  0.75,
+                  20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "R_lwr_arm_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  35
+                ],
+                [
+                  0.52,
+                  -10
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "L_upr_arm_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  8
+                ],
+                [
+                  0.55,
+                  -6
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -8
+                ],
+                [
+                  0.55,
+                  14
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "scale": {
+                "prefix": "spike_",
+                "first": 1,
+                "last": 62
+              },
+              "factor": [
+                [
+                  0,
+                  1.0
+                ],
+                [
+                  0.5,
+                  1.0
+                ],
+                [
+                  0.6,
+                  1.12
+                ],
+                [
+                  1,
+                  1.0
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "auditOnly": [
+    "quillbear1"
+  ],
+  "notes": "qr_quill_bear: the Spike Fiend's own mesh, reshaped (back quills 1.55x longer and 1.7x thicker, torso heavier), plus a bone tusk on every fourth back quill joint. Quill joints are spike_01..62_jnt; back joints 20-62 point their quill along local -X and the tusk prop is long along +Z, so y -90 stands it up. Seen in the game on 2026-11-13: body and tusks are drawn and animate. The new model path is listed in hd/model_lod_desc.bin, which the pipeline writes; without it the body is invisible. 2026-11-13: the tusk props on the bear were removed at the user's request (the \"attach\" list is gone; the qr_bone_spine prop is still defined above if it is wanted again)."
+}

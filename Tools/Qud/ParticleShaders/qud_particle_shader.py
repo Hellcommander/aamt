@@ -289,7 +289,19 @@ def hlsl_for(e: dict, spec: dict) -> str:
 // deterministic function of its index and the library's clock. Plays by name "{name}"; see ShaderEffects.fragment.xml.
 Shader "{shader_path}"
 {{
-    Properties {{ _MainTex ("Screen", 2D) = "white" {{}} }}
+    // Tunables live here, not as initialised globals: Unity ignores initialisers on shader uniforms (they read 0), so
+    // a default only reaches the material through Properties. Presets and ShaderFX.Set still override them.
+    Properties
+    {{
+        _MainTex ("Screen", 2D) = "white" {{}}
+        _Count ("Particles in flight", Float) = {f(e['count'])}
+        _Scale ("Size multiplier", Float) = 1.0
+        _Speed ("Speed multiplier", Float) = 1.0
+        _Gravity ("Gravity (screen heights per s^2, + is down)", Float) = {f(e['gravity'])}
+        _Seed ("Seed", Float) = {f(e['seed'])}
+        _Tint ("Birth colour override (alpha > 0)", Color) = (0, 0, 0, 0)
+        _Tint2 ("Death colour override (alpha > 0)", Color) = (0, 0, 0, 0)
+    }}
     SubShader
     {{
         ZTest Always Cull Off ZWrite Off
@@ -303,15 +315,15 @@ Shader "{shader_path}"
 
             #define MAXP {MAX_PARTICLES}
 
-            // Tunables with the spec's values baked in. Override from C# with ShaderFX.Set("_Count", 24f) or from a
-            // preset with <float Name="_Count" Value="24" /> / <color Name="_Tint" Value="#ff8800" />.
-            float _Count = {f(e['count'])};      // particles in flight (max MAXP)
-            float _Scale = 1.0;                  // size multiplier
-            float _Speed = 1.0;                  // speed multiplier
-            float _Gravity = {f(e['gravity'])};  // screen heights per s^2, + is down
-            float _Seed = {f(e['seed'])};
-            float4 _Tint = float4(0, 0, 0, 0);   // alpha > 0 replaces the birth colour
-            float4 _Tint2 = float4(0, 0, 0, 0);  // alpha > 0 replaces the death colour
+            // Tunables; their defaults (the spec's values) are in Properties above. Override from C# with
+            // ShaderFX.Set("_Count", 24f) or from a preset with <float Name="_Count" Value="24" /> / <color Name="_Tint" Value="#ff8800" />.
+            float _Count;      // particles in flight (max MAXP)
+            float _Scale;      // size multiplier
+            float _Speed;      // speed multiplier
+            float _Gravity;    // screen heights per s^2, + is down
+            float _Seed;
+            float4 _Tint;      // alpha > 0 replaces the birth colour
+            float4 _Tint2;     // alpha > 0 replaces the death colour
 
             float prand(float i, float k) {{ return hash(float2(i * 1.6180339 + _Seed * 7.13, k * 3.71 + 0.5)); }}
 

@@ -85,5 +85,41 @@
   "name": "grand smog homunculus",
   "subdir": "npc",
   "subject": "huge hulking giant made of churning green-grey smog clouds around a large glowing brass boiler heart, pipes on its shoulders, glowing violet eyes"
+ },
+ {
+  "short_name": "SMOG_ARCANE_OOZE_HORROR",
+  "name": "arcane ooze horror",
+  "subdir": "npc",
+  "subject": "squat amorphous slime horror of glowing teal-violet arcane ooze, drooping pseudopods, several mismatched eyes, flecks of brass scrap suspended inside it"
+ },
+ {
+  "short_name": "SMOG_DEMONIC_STEAM_SERVANT",
+  "name": "demonic steam servant",
+  "subdir": "npc",
+  "subject": "horned demonic construct of riveted brass plates with a red-hot boiler in its chest, steam venting from shoulder pipes, clawed gauntlets, glowing ember-red eyes"
+ },
+ {
+  "short_name": "DEVILS_FLUE",
+  "name": "The Devil's Flue",
+  "subdir": "object",
+  "subject": "vertical soot-black iron chimney-pipe staff with brass bands, capped by a dull smoky gem, thin green smoke curling from the top, mage weapon"
+ },
+ {
+  "short_name": "KETTLEWHISTLE",
+  "name": "Kettlewhistle",
+  "subdir": "object",
+  "subject": "short vertical polished copper staff topped with a small kettle spout and whistle, a thin jet of white steam from the spout, simple apprentice mage weapon"
+ },
+ {
+  "short_name": "FOUNDRY_GAUGE",
+  "name": "Gauge of the Sunken Foundry",
+  "subdir": "object",
+  "subject": "vertical steel pipe staff crowned with a large round brass pressure gauge with a glass face and red needle, verdigris stains, blue-grey steel, mage weapon"
+ },
+ {
+  "short_name": "TRINITY_MANIFOLD",
+  "name": "Trinity Manifold",
+  "subdir": "object",
+  "subject": "vertical staff of three braided metal pipes, one glowing orange, one glowing blue, one dark violet, meeting at a bright white gem chamber at the top, mage weapon"
  }
 ]

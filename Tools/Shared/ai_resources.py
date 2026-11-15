@@ -48,7 +48,7 @@ _SHARED = Path(__file__).resolve().parent
 if str(_SHARED) not in sys.path:
     sys.path.insert(0, str(_SHARED))
 
-STAGES = ("image", "mesh", "animate", "particles", "material", "pixels", "layering", "compress", "audio")
+STAGES = ("image", "mesh", "animate", "particles", "refart", "material", "pixels", "layering", "compress", "audio")
 
 
 # --------------------------------------------------------------------------
@@ -293,11 +293,28 @@ def _particles_status() -> Dict[str, Any]:
     }
 
 
+def _refart_status() -> Dict[str, Any]:
+    from refart_client import status
+
+    s = status()
+    core = ("sdxl", "ip_adapter", "controlnet_union_promax", "grounding_dino", "sam2")
+    return {
+        "stage": "refart",
+        "name": "SDXL + IP-Adapter/ControlNet references, FLUX.1 Kontext edits, DINO+SAM2 layer split",
+        "ready": bool(s.get("venv")) and all(s.get(k) for k in core),
+        "kind": "venv",
+        "gpu": True,
+        **s,
+        "note": "see Shared/REFART.md (Kontext edits need kontext_gguf + flux_parts)",
+    }
+
+
 _PROBES: Dict[str, Callable[[], Dict[str, Any]]] = {
     "image": _image_status,
     "mesh": _mesh_status,
     "animate": _animate_status,
     "particles": _particles_status,
+    "refart": _refart_status,
     "material": _material_status,
     "pixels": _pixels_status,
     "layering": _layering_status,
@@ -451,6 +468,15 @@ def make_particles(recipes: List[Dict[str, Any]], out_dir: Path, **kwargs: Any) 
     from particle_client import make_particles as run
 
     return run(recipes, Path(out_dir), **kwargs)
+
+
+def make_ref_art(cmd: str, **kwargs: Any) -> Any:
+    """Reference-image art (refart venv): cmd is generate | edit | inpaint | segment | layers | overlay, kwargs are
+    the CLI flags (see refart_client.py / REFART.md). generate keeps a character from --ref images (IP-Adapter),
+    edit follows an instruction and keeps the rest (FLUX.1 Kontext), layers splits a picture into named parts."""
+    from refart_client import run
+
+    return run(cmd, **kwargs)
 
 
 def _mesh_edit(*args: str) -> Any:

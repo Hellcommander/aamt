@@ -87,6 +87,52 @@ function request(url, { method = "GET", body, timeout = 300000, apiKey, headers:
           });
           return;
         }
+        if (onEvent && res.statusCode === 200 && /ndjson/i.test(ct)) {
+          // Ollama streams one JSON object per line.
+          let buf = "";
+          let events = 0;
+          let failed = false;
+          const line = (l) => {
+            if (!l.trim()) return;
+            let obj;
+            try {
+              obj = JSON.parse(l);
+            } catch {
+              return;
+            }
+            events++;
+            onEvent("message", obj);
+          };
+          const fail = (e) => {
+            failed = true;
+            reject(e);
+            res.destroy();
+          };
+          res.setEncoding("utf8");
+          res.on("data", (chunk) => {
+            buf += chunk;
+            let at;
+            try {
+              while ((at = buf.indexOf("\n")) >= 0) {
+                const l = buf.slice(0, at);
+                buf = buf.slice(at + 1);
+                line(l);
+              }
+            } catch (e) {
+              fail(e);
+            }
+          });
+          res.on("end", () => {
+            if (failed) return;
+            try {
+              line(buf);
+            } catch (e) {
+              return fail(e);
+            }
+            resolve({ status: 200, json: null, raw: "", headers: res.headers, events });
+          });
+          return;
+        }
         const chunks = [];
         res.on("data", (c) => chunks.push(c));
         res.on("end", () => {

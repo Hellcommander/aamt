@@ -91,6 +91,12 @@ int RunMigrate(string[] a)
             case "--no-backup":
                 opts.Backup = false;
                 break;
+            case "--no-text-guard":
+                opts.TextGuard = false;
+                break;
+            case "--no-compile-guard":
+                opts.CompileGuard = false;
+                break;
             case "--report":
                 reportPath = IsolatedBootstrap.RequireValue(a, ref i, "--report");
                 break;
@@ -335,6 +341,12 @@ int RunResolveCs0618(string[] a)
                 break;
             case "--no-backup":
                 opts.Backup = false;
+                break;
+            case "--no-text-guard":
+                opts.TextGuard = false;
+                break;
+            case "--no-compile-guard":
+                opts.CompileGuard = false;
                 break;
             case "--report":
                 reportPath = IsolatedBootstrap.RequireValue(a, ref i, "--report");
@@ -939,7 +951,12 @@ static void PrintUsage()
           ApiMigrator.Cli migrate [--path <dir> [<dir>...]] [--mod <name>] [--apply] [--no-backup]
                                    [--report <file>] [--dump <file>] [--rules <file>]
                                    [--include-workshop] [--compact]
+                                   [--no-text-guard] [--no-compile-guard]
               Scans for obsolete API usage and applies curated auto-fixes.
+              With --apply two guards are on by default: a C# rewrite that changes string-literal text
+              or unbalances brackets is not written, and each mod is compiled before and after, with
+              its files restored if the rewrite added a compile error. Turn them off with
+              --no-text-guard / --no-compile-guard (resolve-cs0618 has the same two guards).
               Dry-run by default; pass --apply to write changes (with .bak backups).
               --compact prints a short agent digest (auto-fixes + remaining hits) instead of
               a verbose scan log — use this for local LLMs that cannot run AI suggest tools.
@@ -994,7 +1011,7 @@ static void PrintUsage()
 
           ApiMigrator.Cli resolve-cs0618 --mod <folder> [--compile|--no-compile] [--from-log <file>]
                                          [--apply] [--no-backup] [--managed <dir>] [--report <file>]
-                                         [--no-version-sync]
+                                         [--no-version-sync] [--no-text-guard] [--no-compile-guard]
               Harvests CS0618 obsolete warnings WITHOUT launching the game: optionally compiles
               the mod against Managed (seconds), and/or parses a pasted compiler/MODWARN log.
               Then runs curated auto-fixes on affected files and reports remaining manual hits.

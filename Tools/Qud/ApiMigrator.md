@@ -540,6 +540,49 @@ fail or confuse Steam file watches.
 Dry-run reports **Auto-fixes that WOULD be applied**; `-Apply` / `--apply` writes them. Advice-only
 hits remain in the report with Code + Advice blocks.
 
+### GameText call sites (`GameTextCallSiteFixer`) — 2026-11-12 changes
+
+- **One template per message.** Each pass rewrites one call, so a concatenated message used to come out as
+  one `StartReplace()` builder per word. A final pass (`MergeAdjacentReplacers`) folds neighbouring fragments
+  and plain string literals into a single template, and maps two objects onto subject/object:
+  `actor.Does("coat") + " " + weapon.t() + " with " + liquid + "."` becomes
+  `"=subject.Does:coat= =object.the.name= with ".StartReplace().SetSubject(actor).SetObject(weapon).ToString() + liquid + "."`.
+  Literals containing `=` and anything that is not a literal stay outside; three different objects, or an
+  unowned `=verb:x=`, are left unmerged.
+- **`go.the + go.ShortDisplayNameSingle`** now becomes `=object.the.name:single=`. Before, the match stopped
+  at `ShortDisplayName` and left `…ToString()Single` behind, which does not compile.
+- **`Poss("word")`** keeps its capital: `=subject.Poss:word=` (it was written as lowercase `poss`).
+- **`.a` / `.A` are only rewritten next to text** (a string literal, the same object's name, or an
+  interpolation hole), and no pronoun property is rewritten inside arithmetic or a comparison. There is no
+  type information, and `px[i].a <= 0.05f` (a colour's alpha) used to be turned into a text replacer.
+- **`resolve-cs0618 --mod X --from-log <log>`** now only touches files under mod X (a bare name resolves under
+  the Mods root). Before, it processed every file the log named, in every mod.
+
+### Apply guards (`ApplyGuard.cs`) — on by default with `--apply`
+
+Added 2026-11-12 after a run over real mods found rewrites that compiled but changed message text, and
+rewrites that no longer compiled. Each cause was fixed in its rule; the guards are for the next one.
+
+- **Text guard** (per `.cs` file, no compiler): a rewrite is not written if it leaves `()`, `{}` or `[]`
+  unbalanced, or if any piece of string-literal text with four or more letters or digits is no longer in the
+  file (text moved into an XML sidecar written in the same run counts as kept). The log line starts with
+  `GUARD: not writing <file>:` and names the string. Off: `--no-text-guard`.
+- **Compile guard** (per mod, needs `dotnet` and the .NET Framework 4.8 targeting pack): the mod is compiled
+  before its first file is written and again at the end. If the second compile has an error the first did
+  not, every file written to that mod is restored and the errors are logged. A mod that cannot be compiled
+  at all beforehand is left untouched. A mod is the nearest folder with a `manifest.json`. Off:
+  `--no-compile-guard`.
+- Both apply to `migrate --apply` and `resolve-cs0618 --apply`.
+- The compile project (`ModCompiler`) now targets net48 with the game's own mscorlib and, for the guard and
+  the CS0618 harvest, references the other mods' assemblies in `ModAssemblies`. The old netstandard2.1
+  project failed on every file ("Predefined type 'System.Object' is not defined"), so `--compile` found
+  almost no warnings and could not have detected a broken rewrite.
+- Other fixes from the same run: the nullable-annotation cleaner skips string literals and comments and
+  keeps `Version?` wherever `using XRL;` or `namespace XRL…` is in scope; `t(Single: true)` keeps `:single`;
+  `Grammar.MakeAndList` / `MakeOrList` on string lists are rewritten to `Translator.…(list, true)` from the
+  compiler's reported position (`Cs0618PositionFixer`), since a text scan cannot tell the obsolete overload
+  from the GameObject one.
+
 ## CLI usage
 
 ### `ApiMigrator.Cli` (dotnet)

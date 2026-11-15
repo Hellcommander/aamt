@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- written by tx_testbot.py for each run -->
+<TranscendenceModule>
+<Globals>
+(block Nil
+(setq txBotMode "ship")
+(setq txBotShip 0xE127300D)
+(setq txBotSurvive 15)
+(setq txBotImmortal True)
+(setq txBotFocus (list (list 0xE1270000 0xE127FFFF) (list 0xD7897000 0xD78970FF)))
+(setq txBotExpect (list 0xE1271000 0xD7897000))
+(setq txBotHops 3)
+)
+</Globals>
+</TranscendenceModule>

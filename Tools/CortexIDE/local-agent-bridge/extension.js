@@ -198,8 +198,11 @@ function activate(context) {
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentPickModel", () => agent.pickModel()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentNewChat", () => agent.newChat()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentStop", () => agent.stop()));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentUndo", () => agent.undoTurn()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentProgress", () => agent.openProgress()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.setClaudeApiKey", () => agent.setClaudeApiKey()));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.signIn", () => agent.command("signin")));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.signOut", () => agent.command("signout")));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.askAgentAboutSelection", async () => {
     const ed = vscode.window.activeTextEditor;
     if (!ed) return agent.focus();

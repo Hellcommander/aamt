@@ -1,0 +1,3876 @@
+{
+  "name": "Wild Boar (Druid Wild Boar mod): the HD farm pig reshaped into a great wild boar as a shapeshift form",
+  "notes": [
+    "Donor: the Act 1/3 town critter `pig` (65 bones, clips neutral, walk, fidget_01, fidget_02 only), so every other clip is authored here. Skeleton: +Y up, +Z forward (snout at z 4.2), +X the boar's left. Rotations about model axes: +X pitches the nose down (and a leg's foot backward), +Y turns the head to the boar's left, +Z rolls it onto its right side. jaw_bind_jnt opens the mouth with +X.",
+    "Shape (bind-pose model units): heavier, higher forequarters with a bristle crest from the neck to the middle of the back, a leaner belly and narrower rump, a longer wedge-shaped head with a tapering snout, small upright ears, thinner legs. Bones are not moved by a reshape, so props on bones are placed against the reshaped mesh (dev\\body_workbench.py tusks writes the attach entries).",
+    "Tusks: the bonewall's curved bone tusk (`fx_mesh_bone_tusk`, seen rendering as a prop on the Quill Bear on 2026-11-13) on jaw_bind_jnt at both mouth corners, rising and curling back and out.",
+    "retexture: the pig albedo recoloured dark brown-grey at a path of the same length.",
+    "Clips: neutral and walk are the stock ones (the pig stands and walks on the ground at the right height). Everything else is authored from a held neutral pose (\"at\": 0) or the walk.",
+    "modelIndexIncludes: QuillRatDruid's and DruidGiantRaven's models are carried in this mod's model index (install this mod after both; rebuild the index when either changes its models)."
+  ],
+  "modelIndexIncludes": [
+    "../QuillRatDruid",
+    "../DruidGiantRaven"
+  ],
+  "props": {
+    "wb_boar_tusk": {
+      "model": "hd/vfx/meshes/lit_mesh/bonewall/model_source/fx_mesh_bone_tusk",
+      "textures": [
+        "hd/vfx/meshes/lit_mesh/bonewall/texture_source/bonewall_props_alb.texture",
+        "hd/vfx/meshes/lit_mesh/bonewall/texture_source/bonewall_props_nrm.texture",
+        "hd/vfx/meshes/lit_mesh/bonewall/texture_source/bonewall_props_orm.texture"
+      ]
+    }
+  },
+  "variants": [
+    {
+      "name": "wb_wild_boar",
+      "donor": "pig",
+      "scale": 1.45,
+      "reshape": {
+        "bulk": [
+          {
+            "name": "forequarters",
+            "bones": [
+              "spine_03",
+              "spine_04",
+              "L_front_leg01",
+              "R_front_leg01"
+            ],
+            "x": 1.22,
+            "y": 1.16,
+            "z": 1.05,
+            "pivot": [
+              0,
+              2.35,
+              0.9
+            ]
+          },
+          {
+            "name": "belly",
+            "bones": [
+              "spine_02"
+            ],
+            "x": 0.92,
+            "y": 0.94,
+            "z": 1.0,
+            "pivot": [
+              0,
+              2.6,
+              -0.8
+            ]
+          },
+          {
+            "name": "rump",
+            "bones": [
+              "pelvis",
+              "spine_01",
+              "L_back_leg01",
+              "R_back_leg01",
+              "tail_01"
+            ],
+            "x": 0.84,
+            "y": 0.9,
+            "z": 0.95,
+            "pivot": [
+              0,
+              2.7,
+              -2.2
+            ]
+          },
+          {
+            "name": "head",
+            "bones": [
+              "neck",
+              "head",
+              "jaw",
+              "nose_jnt",
+              "L_low",
+              "R_low",
+              "low_lip",
+              "L_mid",
+              "R_mid",
+              "L_upr",
+              "R_upr",
+              "upr_lip",
+              "L_noseTip",
+              "R_noseTip",
+              "tongue",
+              "L_eye",
+              "R_eye",
+              "L_low_eyelid",
+              "R_low_eyelid",
+              "L_upr_eyelid",
+              "R_upr_eyelid"
+            ],
+            "x": 1.06,
+            "y": 1.06,
+            "z": 1.18,
+            "pivot": [
+              0,
+              2.7,
+              2.2
+            ]
+          },
+          {
+            "name": "left ear",
+            "bones": [
+              "L_ear"
+            ],
+            "x": 0.7,
+            "y": 0.75,
+            "z": 0.7,
+            "pivot": [
+              0.51,
+              3.2,
+              2.73
+            ]
+          },
+          {
+            "name": "right ear",
+            "bones": [
+              "R_ear"
+            ],
+            "x": 0.7,
+            "y": 0.75,
+            "z": 0.7,
+            "pivot": [
+              -0.51,
+              3.2,
+              2.73
+            ]
+          },
+          {
+            "name": "left foreleg",
+            "bones": [
+              "L_front_leg02",
+              "L_front_leg03",
+              "L_front_leg04",
+              "L_front_leg05"
+            ],
+            "x": 0.82,
+            "y": 1.0,
+            "z": 0.82,
+            "pivot": [
+              0.48,
+              1.2,
+              1.45
+            ]
+          },
+          {
+            "name": "right foreleg",
+            "bones": [
+              "R_front_leg02",
+              "R_front_leg03",
+              "R_front_leg04",
+              "R_front_leg05"
+            ],
+            "x": 0.82,
+            "y": 1.0,
+            "z": 0.82,
+            "pivot": [
+              -0.48,
+              1.2,
+              1.45
+            ]
+          },
+          {
+            "name": "left hind leg",
+            "bones": [
+              "L_back_leg02",
+              "L_back_leg03",
+              "L_back_leg04"
+            ],
+            "x": 0.82,
+            "y": 1.0,
+            "z": 0.82,
+            "pivot": [
+              0.53,
+              1.2,
+              -2.4
+            ]
+          },
+          {
+            "name": "right hind leg",
+            "bones": [
+              "R_back_leg02",
+              "R_back_leg03",
+              "R_back_leg04"
+            ],
+            "x": 0.82,
+            "y": 1.0,
+            "z": 0.82,
+            "pivot": [
+              -0.53,
+              1.2,
+              -2.4
+            ]
+          },
+          {
+            "name": "tail",
+            "bones": [
+              "tail_02",
+              "tail_03",
+              "tail_04",
+              "tail_05"
+            ],
+            "x": 0.7,
+            "y": 1.0,
+            "z": 0.7,
+            "pivot": [
+              0,
+              2.8,
+              -3.1
+            ]
+          }
+        ],
+        "shape": [
+          {
+            "name": "snout wedge",
+            "bones": [
+              "head",
+              "jaw",
+              "nose_jnt",
+              "L_low",
+              "R_low",
+              "low_lip",
+              "L_mid",
+              "R_mid",
+              "L_upr",
+              "R_upr",
+              "upr_lip",
+              "L_noseTip",
+              "R_noseTip"
+            ],
+            "axis": [
+              0,
+              0,
+              1
+            ],
+            "from": 3.0,
+            "to": 4.3,
+            "y": 0.82,
+            "x": 0.9,
+            "pivot": [
+              0,
+              2.42,
+              3.9
+            ]
+          },
+          {
+            "name": "brow slope",
+            "bones": [
+              "head",
+              "neck"
+            ],
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "from": 2.85,
+            "to": 3.25,
+            "within": [
+              {
+                "axis": [
+                  0,
+                  0,
+                  1
+                ],
+                "center": 2.6,
+                "width": 0.9
+              },
+              {
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "center": 0,
+                "width": 0.6
+              }
+            ],
+            "offset": [
+              0,
+              0.12,
+              0.05
+            ]
+          },
+          {
+            "name": "crest",
+            "bones": [
+              "neck",
+              "spine_04",
+              "spine_03",
+              "spine_02"
+            ],
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "from": 2.95,
+            "to": 3.45,
+            "power": 1.5,
+            "within": [
+              {
+                "axis": [
+                  1,
+                  0,
+                  0
+                ],
+                "center": 0,
+                "width": 0.45
+              },
+              {
+                "axis": [
+                  0,
+                  0,
+                  1
+                ],
+                "center": 1.3,
+                "width": 2.4
+              }
+            ],
+            "offset": [
+              0,
+              0.42,
+              -0.04
+            ]
+          },
+          {
+            "name": "hump",
+            "bones": [
+              "spine_04",
+              "spine_03",
+              "L_front_leg01",
+              "R_front_leg01"
+            ],
+            "axis": [
+              0,
+              1,
+              0
+            ],
+            "from": 2.6,
+            "to": 3.4,
+            "within": [
+              {
+                "axis": [
+                  0,
+                  0,
+                  1
+                ],
+                "center": 1.2,
+                "width": 1.4
+              }
+            ],
+            "offset": [
+              0,
+              0.18,
+              0
+            ]
+          }
+        ]
+      },
+      "retexture": [
+        {
+          "from": "data/hd/character/enemy/pig/textures/pig_alb.texture",
+          "to": "data/hd/character/enemy/wb_wild_boar/boaralb.texture",
+          "format": "bc3",
+          "recolor": {
+            "hue": 24,
+            "minSat": 0.3,
+            "value": 0.42
+          }
+        }
+      ],
+      "attach": [
+        {
+          "prop": "wb_boar_tusk",
+          "bone": "jaw_bind_jnt",
+          "translation": {
+            "x": 1.176,
+            "y": 0.3283,
+            "z": 0.2874
+          },
+          "rotation": {
+            "x": 106.24,
+            "y": -12.52,
+            "z": -113.63
+          },
+          "scale": 0.25
+        },
+        {
+          "prop": "wb_boar_tusk",
+          "bone": "jaw_bind_jnt",
+          "translation": {
+            "x": 1.176,
+            "y": -0.3283,
+            "z": 0.2874
+          },
+          "rotation": {
+            "x": 106.24,
+            "y": 12.52,
+            "z": -66.37
+          },
+          "scale": 0.25
+        }
+      ],
+      "animations": [
+        {
+          "name": "run",
+          "base": "walk",
+          "duration": 0.5,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ],
+              "wave": {
+                "cycles": 2,
+                "amplitude": [
+                  0,
+                  0.08,
+                  0
+                ],
+                "fade": false
+              }
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  4
+                ],
+                [
+                  1,
+                  4
+                ]
+              ],
+              "wave": {
+                "cycles": 2,
+                "amplitude": 3,
+                "fade": false,
+                "phase": 90
+              }
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  6
+                ],
+                [
+                  1,
+                  6
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "death",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 1.1,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.25,
+                  [
+                    0,
+                    -0.25,
+                    0.1
+                  ]
+                ],
+                [
+                  0.65,
+                  [
+                    0.25,
+                    -1.3,
+                    0
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0.35,
+                    -2.05,
+                    0.0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.25,
+                  5
+                ],
+                [
+                  0.65,
+                  55
+                ],
+                [
+                  1,
+                  86
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  -12
+                ],
+                [
+                  1,
+                  15
+                ]
+              ]
+            },
+            {
+              "rotate": "jaw_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  25
+                ],
+                [
+                  1,
+                  15
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg01_bind_jnt",
+                "R_front_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  -25
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg01_bind_jnt",
+                "R_back_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  20
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  25
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "dead",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 1.0,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0.35,
+                    -2.05,
+                    0.0
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0.35,
+                    -2.05,
+                    0.0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  86
+                ],
+                [
+                  1,
+                  86
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  15
+                ],
+                [
+                  1,
+                  15
+                ]
+              ]
+            },
+            {
+              "rotate": "jaw_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  15
+                ],
+                [
+                  1,
+                  15
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg01_bind_jnt",
+                "R_front_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -25
+                ],
+                [
+                  1,
+                  -25
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg01_bind_jnt",
+                "R_back_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  20
+                ],
+                [
+                  1,
+                  20
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  25
+                ],
+                [
+                  1,
+                  25
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "gethit",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.3,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.35,
+                  [
+                    0,
+                    0.06,
+                    -0.25
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -6
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -14
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "block",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.3,
+          "edits": [
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  18
+                ],
+                [
+                  0.7,
+                  18
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.35,
+                  [
+                    0,
+                    -0.12,
+                    -0.12
+                  ]
+                ],
+                [
+                  0.7,
+                  [
+                    0,
+                    -0.12,
+                    -0.12
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg01_bind_jnt",
+                "R_front_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -12
+                ],
+                [
+                  0.7,
+                  -12
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "attack",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.5,
+          "edits": [
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  22
+                ],
+                [
+                  0.55,
+                  -28
+                ],
+                [
+                  0.75,
+                  -10
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -8
+                ],
+                [
+                  0.55,
+                  14
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "head_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  8
+                ],
+                [
+                  0.55,
+                  -12
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "jaw_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  12
+                ],
+                [
+                  0.55,
+                  25
+                ],
+                [
+                  0.75,
+                  8
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.35,
+                  [
+                    0,
+                    -0.08,
+                    -0.15
+                  ]
+                ],
+                [
+                  0.55,
+                  [
+                    0,
+                    0.05,
+                    0.45
+                  ]
+                ],
+                [
+                  0.8,
+                  [
+                    0,
+                    0,
+                    0.15
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  4
+                ],
+                [
+                  0.55,
+                  -6
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg01_bind_jnt",
+                "R_front_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  10
+                ],
+                [
+                  0.55,
+                  -15
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "cast",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.6,
+          "edits": [
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.45,
+                  -26
+                ],
+                [
+                  0.75,
+                  -12
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "jaw_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.45,
+                  28
+                ],
+                [
+                  0.75,
+                  10
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.45,
+                  -5
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "L_front_leg01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.3,
+                  -40
+                ],
+                [
+                  0.5,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "L_front_leg02_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.3,
+                  45
+                ],
+                [
+                  0.5,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 2,
+                "amplitude": 20
+              }
+            }
+          ]
+        },
+        {
+          "name": "gore",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.6,
+          "edits": [
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.3,
+                  32
+                ],
+                [
+                  0.55,
+                  -42
+                ],
+                [
+                  0.8,
+                  -15
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "head_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.3,
+                  10
+                ],
+                [
+                  0.55,
+                  -15
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "jaw_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.55,
+                  30
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.3,
+                  [
+                    0,
+                    -0.2,
+                    -0.2
+                  ]
+                ],
+                [
+                  0.55,
+                  [
+                    0,
+                    0.15,
+                    0.6
+                  ]
+                ],
+                [
+                  0.8,
+                  [
+                    0,
+                    0.05,
+                    0.2
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.3,
+                  6
+                ],
+                [
+                  0.55,
+                  -12
+                ],
+                [
+                  0.8,
+                  -4
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg01_bind_jnt",
+                "R_back_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.3,
+                  -6
+                ],
+                [
+                  0.55,
+                  12
+                ],
+                [
+                  0.8,
+                  4
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg01_bind_jnt",
+                "R_front_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.3,
+                  12
+                ],
+                [
+                  0.55,
+                  -20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "thrash",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.6,
+          "edits": [
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 2,
+                "amplitude": 38
+              }
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.15,
+                  18
+                ],
+                [
+                  0.85,
+                  18
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "head_bind_jnt",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 2,
+                "amplitude": 15,
+                "phase": 30
+              }
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 2,
+                "amplitude": -10
+              }
+            },
+            {
+              "rotate": "jaw_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.2,
+                  15
+                ],
+                [
+                  0.8,
+                  15
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "root",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.6,
+          "edits": [
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.25,
+                  38
+                ],
+                [
+                  0.75,
+                  38
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "head_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.25,
+                  15
+                ],
+                [
+                  0.75,
+                  15
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.25,
+                  [
+                    0,
+                    -0.2,
+                    0
+                  ]
+                ],
+                [
+                  0.75,
+                  [
+                    0,
+                    -0.2,
+                    0
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ],
+              "wave": {
+                "cycles": 3,
+                "amplitude": [
+                  0,
+                  0,
+                  0.18
+                ]
+              }
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 3,
+                "amplitude": 10
+              }
+            },
+            {
+              "rotate": "L_front_leg01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 3,
+                "amplitude": 15
+              }
+            },
+            {
+              "rotate": "R_front_leg01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 3,
+                "amplitude": -15
+              }
+            }
+          ]
+        },
+        {
+          "name": "wallow",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.7,
+          "edits": [
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 4,
+                "amplitude": 14
+              }
+            },
+            {
+              "rotate": "spine_02_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 4,
+                "amplitude": 8,
+                "phase": 60
+              }
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 4,
+                "amplitude": -18
+              }
+            },
+            {
+              "rotate": [
+                "L_ear01_bind_jnt",
+                "R_ear01_bind_jnt"
+              ],
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 6,
+                "amplitude": 20
+              }
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 6,
+                "amplitude": 30
+              }
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.5,
+                  [
+                    0,
+                    -0.1,
+                    0
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "groundgore",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.55,
+          "edits": [
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -12
+                ],
+                [
+                  0.55,
+                  48
+                ],
+                [
+                  0.8,
+                  40
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "head_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.55,
+                  18
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.35,
+                  [
+                    0,
+                    0.12,
+                    -0.1
+                  ]
+                ],
+                [
+                  0.55,
+                  [
+                    0,
+                    -0.35,
+                    0.25
+                  ]
+                ],
+                [
+                  0.8,
+                  [
+                    0,
+                    -0.3,
+                    0.2
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -6
+                ],
+                [
+                  0.55,
+                  10
+                ],
+                [
+                  0.8,
+                  8
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg01_bind_jnt",
+                "R_back_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  6
+                ],
+                [
+                  0.55,
+                  -10
+                ],
+                [
+                  0.8,
+                  -8
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg01_bind_jnt",
+                "R_front_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.55,
+                  12
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "stomp",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.7,
+          "edits": [
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  -26
+                ],
+                [
+                  0.55,
+                  6
+                ],
+                [
+                  0.75,
+                  2
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.4,
+                  [
+                    0,
+                    -0.25,
+                    -0.2
+                  ]
+                ],
+                [
+                  0.55,
+                  [
+                    0,
+                    -0.3,
+                    0.15
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg01_bind_jnt",
+                "R_back_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  26
+                ],
+                [
+                  0.55,
+                  -6
+                ],
+                [
+                  0.75,
+                  -2
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg01_bind_jnt",
+                "R_front_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  -30
+                ],
+                [
+                  0.55,
+                  8
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg02_bind_jnt",
+                "R_front_leg02_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  40
+                ],
+                [
+                  0.55,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.4,
+                  -10
+                ],
+                [
+                  0.55,
+                  20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "stampede",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.8,
+          "edits": [
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -30
+                ],
+                [
+                  0.7,
+                  -30
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.35,
+                  [
+                    0,
+                    -0.28,
+                    -0.2
+                  ]
+                ],
+                [
+                  0.7,
+                  [
+                    0,
+                    -0.28,
+                    -0.2
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg01_bind_jnt",
+                "R_back_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  30
+                ],
+                [
+                  0.7,
+                  30
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "L_front_leg01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -35
+                ],
+                [
+                  0.7,
+                  -35
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 3,
+                "amplitude": 18
+              }
+            },
+            {
+              "rotate": "R_front_leg01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -35
+                ],
+                [
+                  0.7,
+                  -35
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 3,
+                "amplitude": -18
+              }
+            },
+            {
+              "rotate": [
+                "L_front_leg02_bind_jnt",
+                "R_front_leg02_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  40
+                ],
+                [
+                  0.7,
+                  40
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  -30
+                ],
+                [
+                  0.7,
+                  -30
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "jaw_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  35
+                ],
+                [
+                  0.7,
+                  35
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_ear01_bind_jnt",
+                "R_ear01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.35,
+                  25
+                ],
+                [
+                  0.7,
+                  25
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "charge",
+          "base": "walk",
+          "duration": 0.45,
+          "edits": [
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  24
+                ],
+                [
+                  1,
+                  24
+                ]
+              ]
+            },
+            {
+              "rotate": "head_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  8
+                ],
+                [
+                  1,
+                  8
+                ]
+              ]
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  2
+                ],
+                [
+                  1,
+                  2
+                ]
+              ],
+              "wave": {
+                "cycles": 2,
+                "amplitude": 2,
+                "fade": false,
+                "phase": 90
+              }
+            },
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0.04,
+                    0
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0.04,
+                    0
+                  ]
+                ]
+              ],
+              "wave": {
+                "cycles": 2,
+                "amplitude": [
+                  0,
+                  0.06,
+                  0
+                ],
+                "fade": false
+              }
+            },
+            {
+              "rotate": [
+                "L_ear01_bind_jnt",
+                "R_ear01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  30
+                ],
+                [
+                  1,
+                  30
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -30
+                ],
+                [
+                  1,
+                  -30
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "spin",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.4,
+          "edits": [
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  360
+                ]
+              ],
+              "ease": "linear"
+            }
+          ]
+        },
+        {
+          "name": "throw",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.45,
+          "edits": [
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.38,
+                  -30
+                ],
+                [
+                  0.55,
+                  32
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.38,
+                  10
+                ],
+                [
+                  0.55,
+                  -15
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.38,
+                  -12
+                ],
+                [
+                  0.55,
+                  14
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "jaw_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.5,
+                  20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leap_windup",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.3,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  0.8,
+                  [
+                    0,
+                    -0.4,
+                    -0.15
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    -0.4,
+                    -0.15
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  -6
+                ],
+                [
+                  1,
+                  -6
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg01_bind_jnt",
+                "R_front_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  -15
+                ],
+                [
+                  1,
+                  -15
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg02_bind_jnt",
+                "R_front_leg02_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  30
+                ],
+                [
+                  1,
+                  30
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg01_bind_jnt",
+                "R_back_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  -20
+                ],
+                [
+                  1,
+                  -20
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg02_bind_jnt",
+                "R_back_leg02_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  30
+                ],
+                [
+                  1,
+                  30
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.8,
+                  15
+                ],
+                [
+                  1,
+                  15
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leap_air",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.4,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    1.3,
+                    0.2
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    1.3,
+                    0.2
+                  ]
+                ]
+              ],
+              "wave": {
+                "cycles": 1,
+                "amplitude": [
+                  0,
+                  0.05,
+                  0
+                ],
+                "fade": false
+              }
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -8
+                ],
+                [
+                  1,
+                  -8
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg01_bind_jnt",
+                "R_front_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -45
+                ],
+                [
+                  1,
+                  -45
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg02_bind_jnt",
+                "R_front_leg02_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  35
+                ],
+                [
+                  1,
+                  35
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg01_bind_jnt",
+                "R_back_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  45
+                ],
+                [
+                  1,
+                  45
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg02_bind_jnt",
+                "R_back_leg02_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -10
+                ],
+                [
+                  1,
+                  -10
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -8
+                ],
+                [
+                  1,
+                  -8
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -25
+                ],
+                [
+                  1,
+                  -25
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_ear01_bind_jnt",
+                "R_ear01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  20
+                ],
+                [
+                  1,
+                  20
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leap_land",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.3,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    1.3,
+                    0.2
+                  ]
+                ],
+                [
+                  0.4,
+                  [
+                    0,
+                    -0.3,
+                    0.15
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -8
+                ],
+                [
+                  0.4,
+                  8
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg01_bind_jnt",
+                "R_front_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -45
+                ],
+                [
+                  0.4,
+                  -5
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg02_bind_jnt",
+                "R_front_leg02_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  35
+                ],
+                [
+                  0.4,
+                  15
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg01_bind_jnt",
+                "R_back_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  45
+                ],
+                [
+                  0.4,
+                  -10
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg02_bind_jnt",
+                "R_back_leg02_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -10
+                ],
+                [
+                  0.4,
+                  20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -8
+                ],
+                [
+                  0.4,
+                  15
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -25
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_ear01_bind_jnt",
+                "R_ear01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leap_strike",
+          "base": "neutral",
+          "at": 0,
+          "fps": 60,
+          "duration": 0.35,
+          "edits": [
+            {
+              "move": "pelvis_bind_jnt",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    1.3,
+                    0.2
+                  ]
+                ],
+                [
+                  0.45,
+                  [
+                    0,
+                    0.5,
+                    0.6
+                  ]
+                ],
+                [
+                  0.65,
+                  [
+                    0,
+                    -0.2,
+                    0.7
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            },
+            {
+              "rotate": "pelvis_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -8
+                ],
+                [
+                  0.45,
+                  12
+                ],
+                [
+                  0.65,
+                  6
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "neck_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -8
+                ],
+                [
+                  0.45,
+                  30
+                ],
+                [
+                  0.65,
+                  -25
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "jaw_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  0.65,
+                  30
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg01_bind_jnt",
+                "R_front_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -45
+                ],
+                [
+                  0.45,
+                  -20
+                ],
+                [
+                  0.65,
+                  5
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_front_leg02_bind_jnt",
+                "R_front_leg02_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  35
+                ],
+                [
+                  0.45,
+                  20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg01_bind_jnt",
+                "R_back_leg01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  45
+                ],
+                [
+                  0.45,
+                  20
+                ],
+                [
+                  0.65,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_back_leg02_bind_jnt",
+                "R_back_leg02_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -10
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": "tail_01_bind_jnt",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -25
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            },
+            {
+              "rotate": [
+                "L_ear01_bind_jnt",
+                "R_ear01_bind_jnt"
+              ],
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  20
+                ],
+                [
+                  1,
+                  0
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,198 @@
+{
+  "mod": "Arendeth_SifrahForkExtended",
+  "modFolder": "Arendeth_SifrahFork_Extended",
+  "bundle": "arendeth_sifrah_board",
+  "prefab": "SifrahBoard",
+  "kind": "sifrah_board",
+  "theme": "qud-dark",
+  "reference": [1600, 900],
+  "root": {
+    "name": "SifrahBoard", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "backdrop", "raycast": true,
+    "children": [
+      {
+        "name": "Window", "type": "panel", "rect": {"anchors": [0.05, 0.05, 0.95, 0.95]}, "fill": "frame", "raycast": true,
+        "border": {"color": "border", "thickness": 2},
+        "children": [
+          {"name": "TitleBand", "type": "panel", "rect": {"top": [0, 48, 2]}, "fill": "status"},
+          {"name": "ContextIconSlot", "type": "panel", "rect": {"size": [28, 40], "anchor": [0, 1], "pivot": [0, 1], "pos": [16, -4]},
+           "children": [
+             {"name": "ContextIcon", "type": "image", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "textBright", "preserveAspect": true}
+           ]},
+          {"name": "TitleText", "type": "text", "rect": {"top": [6, 38, 60]},
+           "text": {"sample": "Sifrah - fusion-powered chrome pyramid", "size": "header", "color": "textBright", "align": "center"}},
+          {"name": "TitleRule", "type": "panel", "rect": {"top": [48, 2, 2]}, "fill": "accent"},
+          {"name": "StatusText", "type": "text", "rect": {"top": [54, 24, 24]},
+           "text": {"sample": "Turn 2/5     Solved 1/4     Chosen this turn 2/3", "size": "small", "color": "text", "align": "center"}},
+
+          {"name": "GuideBand", "type": "panel", "rect": {"top": [82, 38, 16]}, "fill": "panelAlt",
+           "border": {"color": "borderSoft", "thickness": 1},
+           "children": [
+             {"name": "GuideText", "type": "text", "rect": {"stretch": [12, 4, 12, 4]},
+              "text": {"sample": "Choose an option for power coupling (1 more to fill).", "size": "normal", "color": "textBright", "align": "center"}}
+           ]},
+
+          {
+            "name": "Body", "type": "panel", "rect": {"stretch": [16, 96, 16, 130]},
+            "children": [
+              {
+                "name": "SlotPanel", "type": "panel", "rect": {"anchors": [0, 0, 0.345, 1]}, "fill": "panel", "border": {"color": "border", "thickness": 1},
+                "children": [
+                  {"name": "SlotCaption", "type": "text", "rect": {"top": [4, 22, 10]},
+                   "text": {"sample": "REQUIREMENTS", "size": "xsmall", "color": "textMuted", "align": "left"}},
+                  {
+                    "name": "SlotScroll", "type": "scroll", "rect": {"stretch": [4, 4, 4, 28]},
+                    "element": {"flexibleHeight": 1, "minHeight": 120},
+                    "scroll": {"horizontal": false, "vertical": true, "sensitivity": 20, "inertia": false, "viewport": "SlotViewport", "content": "SlotContent"},
+                    "children": [
+                      {
+                        "name": "SlotViewport", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "transparent", "raycast": true, "mask": true,
+                        "children": [
+                          {
+                            "name": "SlotContent", "type": "panel", "rect": {"topStretch": true}, "fitter": "vertical",
+                            "layout": {"type": "vertical", "spacing": 3, "padding": [4, 4, 4, 4], "controlWidth": true, "controlHeight": true, "expandWidth": true, "expandHeight": false},
+                            "preview": {"repeat": "RowTemplate", "count": 5, "selected": 1, "activate": ["Pinned"]},
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "TokenPanel", "type": "panel", "rect": {"anchors": [0.355, 0, 0.70, 1]}, "fill": "panel", "border": {"color": "border", "thickness": 1},
+                "children": [
+                  {"name": "TokenCaption", "type": "text", "rect": {"top": [4, 22, 10]},
+                   "text": {"sample": "OPTIONS FOR POWER COUPLING", "size": "xsmall", "color": "textMuted", "align": "left"}},
+                  {
+                    "name": "TokenScroll", "type": "scroll", "rect": {"stretch": [4, 4, 4, 28]},
+                    "element": {"flexibleHeight": 1, "minHeight": 120},
+                    "scroll": {"horizontal": false, "vertical": true, "sensitivity": 20, "inertia": false, "viewport": "TokenViewport", "content": "TokenContent"},
+                    "children": [
+                      {
+                        "name": "TokenViewport", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "transparent", "raycast": true, "mask": true,
+                        "children": [
+                          {
+                            "name": "TokenContent", "type": "panel", "rect": {"topStretch": true}, "fitter": "vertical",
+                            "layout": {"type": "vertical", "spacing": 3, "padding": [4, 4, 4, 4], "controlWidth": true, "controlHeight": true, "expandWidth": true, "expandHeight": false},
+                            "preview": {"repeat": "RowTemplate", "count": 9, "selected": 2, "activate": ["Selection"]},
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "SidePanel", "type": "panel", "rect": {"anchors": [0.71, 0, 1, 1]},
+                "children": [
+                  {
+                    "name": "ChancePanel", "type": "panel", "rect": {"anchors": [0, 0.70, 1, 1]}, "fill": "panel", "border": {"color": "border", "thickness": 1},
+                    "children": [
+                      {"name": "ChanceCaption", "type": "text", "rect": {"top": [4, 22, 10]},
+                       "text": {"sample": "CHANCES IF YOU STOPPED NOW", "size": "xsmall", "color": "textMuted", "align": "left"}},
+                      {"name": "ChanceText", "type": "text", "rect": {"stretch": [12, 6, 12, 30]},
+                       "text": {"sample": "Exceptional success  4%\nSuccess  31%\nPartial success  40%\nFailure  20%\nCritical failure  5%", "size": "normal", "color": "text", "valign": "top"}}
+                    ]
+                  },
+                  {
+                    "name": "DetailPanel", "type": "panel", "rect": {"anchors": [0, 0, 1, 0.685]}, "fill": "panel", "border": {"color": "border", "thickness": 1},
+                    "children": [
+                      {"name": "DetailCaption", "type": "text", "rect": {"top": [4, 22, 10]},
+                       "text": {"sample": "NOTES", "size": "xsmall", "color": "textMuted", "align": "left"}},
+                      {
+                        "name": "DetailScroll", "type": "scroll", "rect": {"stretch": [4, 4, 4, 28]},
+                        "scroll": {"horizontal": false, "vertical": true, "sensitivity": 25, "inertia": false, "viewport": "DetailViewport", "content": "DetailContent"},
+                        "children": [
+                          {
+                            "name": "DetailViewport", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "transparent", "raycast": true, "mask": true,
+                            "children": [
+                              {
+                                "name": "DetailContent", "type": "panel", "rect": {"topStretch": true}, "fitter": "vertical",
+                                "layout": {"type": "vertical", "padding": [12, 12, 8, 10], "controlWidth": true, "controlHeight": true, "expandWidth": true, "expandHeight": false},
+                                "children": [
+                                  {"name": "DetailText", "type": "text",
+                                   "text": {"sample": "copper wire\n\nNeeded. It missed elsewhere without being ruled out, so it is the answer to a requirement that is still open - maybe this one.\n\nLAST TURN\nTurn 1:\nframe: scrap metal was right\npower coupling: copper wire is wrong here, right elsewhere\nlens: glass shard answers nothing", "size": "normal", "color": "text", "valign": "top"}}
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+
+          {"name": "LegendText", "type": "text", "rect": {"bottom": [66, 22, 16]},
+           "text": {"sample": "green right answer   yellow wrong here, but the answer to another requirement   red answers nothing", "size": "small", "color": "text", "align": "center"}},
+
+          {
+            "name": "Footer", "type": "panel", "rect": {"bottom": [10, 52, 16]},
+            "children": [
+              {
+                "name": "HotkeyBar", "type": "scroll", "rect": {"anchors": [0, 0, 0.74, 1]},
+                "element": {"flexibleWidth": 1},
+                "scroll": {"horizontal": false, "vertical": false, "inertia": false, "content": "HotkeyContent", "horizontalOnly": true},
+                "children": [
+                  {
+                    "name": "HotkeyContent", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]},
+                    "layout": {"type": "horizontal", "spacing": 28, "padding": [8, 8, 4, 4], "alignment": "MiddleLeft", "controlWidth": true, "controlHeight": true, "expandWidth": false, "expandHeight": false},
+                    "children": [
+                      {"name": "PreviewKey1", "type": "text", "text": {"sample": "[Enter] Choose", "size": "small", "color": "text"}},
+                      {"name": "PreviewKey2", "type": "text", "text": {"sample": "[z] Complete turn", "size": "small", "color": "text"}},
+                      {"name": "PreviewKey3", "type": "text", "text": {"sample": "[Del] Clear choice", "size": "small", "color": "text"}},
+                      {"name": "PreviewKey4", "type": "text", "text": {"sample": "[F1] Help", "size": "small", "color": "text"}},
+                      {"name": "PreviewKey5", "type": "text", "text": {"sample": "[Esc] Stop", "size": "small", "color": "text"}}
+                    ]
+                  }
+                ]
+              },
+              {"name": "HintText", "type": "text", "rect": {"anchors": [0.74, 0, 1, 1]},
+               "text": {"sample": "1-9 requirement    a-z option    arrows move", "size": "small", "color": "textMuted", "align": "right"}}
+            ]
+          }
+        ]
+      },
+
+      {
+        "name": "Templates", "type": "template", "rect": {"stretch": [0, 0, 0, 0]}, "active": false,
+        "children": [
+          {
+            "name": "RowTemplate", "type": "panel", "rect": {"size": [480, 34], "anchor": [0, 1], "pivot": [0, 1]}, "fill": "transparent", "raycast": true,
+            "element": {"minHeight": 32, "flexibleWidth": 1},
+            "layout": {"type": "horizontal", "spacing": 8, "padding": [12, 8, 4, 4], "alignment": "MiddleLeft", "controlWidth": true, "controlHeight": true, "expandWidth": false, "expandHeight": false},
+            "children": [
+              {"name": "Pinned", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "#FFFFFF12", "element": {"ignoreLayout": true}, "active": false,
+               "border": {"color": "border", "thickness": 1}},
+              {"name": "Selection", "type": "panel", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "select", "element": {"ignoreLayout": true}, "active": false,
+               "children": [
+                 {"name": "SelectionEdge", "type": "panel", "rect": {"right": [0, 3]}, "fill": "selectEdge"}
+               ]},
+              {"name": "StateEdge", "type": "panel", "rect": {"left": [0, 5]}, "fill": "textMuted", "element": {"ignoreLayout": true}},
+              {"name": "HotkeySlot", "type": "panel", "element": {"preferredWidth": 16, "minWidth": 16},
+               "children": [
+                 {"name": "HotkeyText", "type": "text", "rect": {"stretch": [0, 0, 0, 0]}, "text": {"sample": "a", "size": "normal", "color": "accent"}}
+               ]},
+              {"name": "IconSlot", "type": "panel", "element": {"preferredWidth": 22, "minWidth": 22, "preferredHeight": 30},
+               "children": [
+                 {"name": "Icon", "type": "image", "rect": {"stretch": [0, 0, 0, 0]}, "fill": "textBright", "preserveAspect": true}
+               ]},
+              {
+                "name": "TextColumn", "type": "panel", "element": {"flexibleWidth": 1},
+                "layout": {"type": "vertical", "spacing": 0, "controlWidth": true, "controlHeight": true, "expandWidth": true, "expandHeight": false},
+                "children": [
+                  {"name": "LabelText", "type": "text", "rect": {"topStretch": true}, "text": {"sample": "power coupling: copper wire", "size": "normal", "color": "text"}},
+                  {"name": "SecondaryText", "type": "text", "rect": {"topStretch": true}, "text": {"sample": "tried: glass shard, scrap metal   3 options still possible", "size": "small", "color": "textMuted"}}
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

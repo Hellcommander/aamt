@@ -1,0 +1,455 @@
+{
+ "mod": "Arendeth_PoisonCrafter",
+ "modFolder": "Arendeth_PoisonCrafter",
+ "bundle": "pc_fx",
+ "shaderPath": "Hidden/PoisonCrafter",
+ "presetPrefix": "PC_",
+ "wrapper": "PoisonCrafterShaderFX.Play",
+ "effects": [
+  {
+   "name": "LiquidBurst",
+   "anchor": "focus",
+   "emitter": {
+    "shape": "point"
+   },
+   "mode": "burst",
+   "count": 72,
+   "life": [
+    0.5,
+    1.1
+   ],
+   "stagger": 0.06,
+   "direction": "radial",
+   "spread": 360,
+   "speed": [
+    0.05,
+    0.14
+   ],
+   "gravity": 0.12,
+   "drag": 2.2,
+   "wobble": 0.002,
+   "shape": "dot",
+   "size": [
+    0.0028,
+    0.0058
+   ],
+   "endSize": 0.6,
+   "colors": [
+    "#8fe05a",
+    "#2f6a1a"
+   ],
+   "glow": 1.0,
+   "blend": "alpha",
+   "fadeIn": 0.04,
+   "fadeOut": 0.45,
+   "preset": {
+    "seconds": 1.4,
+    "amount": 1.2,
+    "fadeIn": 0.0,
+    "fadeOut": 0.4,
+    "refire": 0
+   }
+  },
+  {
+   "name": "SplashDrops",
+   "anchor": "focus",
+   "emitter": {
+    "shape": "disc",
+    "radius": 0.012
+   },
+   "mode": "burst",
+   "count": 36,
+   "life": [
+    0.4,
+    0.9
+   ],
+   "stagger": 0.05,
+   "direction": 90,
+   "spread": 150,
+   "speed": [
+    0.03,
+    0.08
+   ],
+   "gravity": 0.16,
+   "drag": 1.6,
+   "shape": "dot",
+   "size": [
+    0.0024,
+    0.0048
+   ],
+   "endSize": 0.7,
+   "colors": [
+    "#8fe05a",
+    "#2f6a1a"
+   ],
+   "glow": 1.0,
+   "blend": "alpha",
+   "fadeIn": 0.04,
+   "fadeOut": 0.4,
+   "preset": {
+    "seconds": 1.1,
+    "amount": 1.1,
+    "fadeIn": 0.0,
+    "fadeOut": 0.35,
+    "refire": 0
+   }
+  },
+  {
+   "name": "CoatDrip",
+   "anchor": "focus",
+   "emitter": {
+    "shape": "disc",
+    "radius": 0.012
+   },
+   "mode": "continuous",
+   "count": 10,
+   "life": [
+    0.6,
+    1.0
+   ],
+   "direction": 270,
+   "spread": 20,
+   "speed": [
+    0.004,
+    0.012
+   ],
+   "gravity": 0.06,
+   "drag": 0.5,
+   "shape": "spark",
+   "stretch": 2,
+   "size": [
+    0.0018,
+    0.0032
+   ],
+   "colors": [
+    "#8fe05a",
+    "#3f7a2a"
+   ],
+   "glow": 0.9,
+   "blend": "alpha",
+   "fadeIn": 0.15,
+   "fadeOut": 0.35,
+   "preset": {
+    "seconds": 1.2,
+    "amount": 1.0,
+    "fadeIn": 0.15,
+    "fadeOut": 0.4
+   }
+  },
+  {
+   "name": "IchorBubbles",
+   "anchor": "focus",
+   "emitter": {
+    "shape": "disc",
+    "radius": 0.014
+   },
+   "mode": "continuous",
+   "count": 18,
+   "life": [
+    0.8,
+    1.6
+   ],
+   "direction": 90,
+   "spread": 30,
+   "speed": [
+    0.008,
+    0.022
+   ],
+   "gravity": -0.01,
+   "drag": 0.4,
+   "wobble": 0.004,
+   "shape": "ring",
+   "size": [
+    0.002,
+    0.0042
+   ],
+   "endSize": 1.3,
+   "colors": [
+    "#b6f57a",
+    "#3f7a2a"
+   ],
+   "glow": 0.9,
+   "blend": "add",
+   "fadeIn": 0.2,
+   "fadeOut": 0.4,
+   "flicker": 0.15,
+   "preset": {
+    "seconds": 1.6,
+    "amount": 1.0,
+    "fadeIn": 0.2,
+    "fadeOut": 0.5
+   }
+  },
+  {
+   "name": "ToxinPuff",
+   "anchor": "focus",
+   "emitter": {
+    "shape": "disc",
+    "radius": 0.01
+   },
+   "mode": "burst",
+   "count": 30,
+   "life": [
+    0.6,
+    1.2
+   ],
+   "stagger": 0.12,
+   "direction": 90,
+   "spread": 120,
+   "speed": [
+    0.012,
+    0.03
+   ],
+   "gravity": -0.03,
+   "drag": 1.4,
+   "wobble": 0.003,
+   "shape": "dot",
+   "size": [
+    0.0036,
+    0.0072
+   ],
+   "endSize": 1.8,
+   "colors": [
+    "#9be35a",
+    "#2f5a1a"
+   ],
+   "glow": 0.8,
+   "blend": "alpha",
+   "fadeIn": 0.08,
+   "fadeOut": 0.5,
+   "preset": {
+    "seconds": 1.3,
+    "amount": 1.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.45,
+    "refire": 0
+   }
+  },
+  {
+   "name": "CausticSizzle",
+   "anchor": "focus",
+   "emitter": {
+    "shape": "disc",
+    "radius": 0.01
+   },
+   "mode": "burst",
+   "count": 40,
+   "life": [
+    0.25,
+    0.6
+   ],
+   "stagger": 0.35,
+   "direction": 90,
+   "spread": 140,
+   "speed": [
+    0.03,
+    0.07
+   ],
+   "gravity": 0.1,
+   "drag": 1.8,
+   "shape": "spark",
+   "stretch": 2.0,
+   "size": [
+    0.0016,
+    0.003
+   ],
+   "endSize": 0.5,
+   "colors": [
+    "#f4ff7a",
+    "#7a8a10"
+   ],
+   "glow": 1.2,
+   "blend": "add",
+   "fadeIn": 0.02,
+   "fadeOut": 0.4,
+   "flicker": 0.5,
+   "preset": {
+    "seconds": 1.0,
+    "amount": 1.1,
+    "fadeIn": 0.0,
+    "fadeOut": 0.3,
+    "refire": 0
+   }
+  },
+  {
+   "name": "ParalyticCrackle",
+   "anchor": "focus",
+   "emitter": {
+    "shape": "ring",
+    "radius": 0.02
+   },
+   "mode": "burst",
+   "count": 32,
+   "life": [
+    0.3,
+    0.7
+   ],
+   "stagger": 0.5,
+   "direction": "radial",
+   "spread": 360,
+   "speed": [
+    0.003,
+    0.008
+   ],
+   "swirl": 6.0,
+   "wobble": 0.002,
+   "shape": "streak",
+   "stretch": 2.5,
+   "size": [
+    0.0022,
+    0.004
+   ],
+   "endSize": 0.6,
+   "colors": [
+    "#c8f6ff",
+    "#3a7fa0"
+   ],
+   "glow": 1.5,
+   "blend": "add",
+   "fadeIn": 0.02,
+   "fadeOut": 0.35,
+   "flicker": 0.8,
+   "preset": {
+    "seconds": 1.0,
+    "amount": 1.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.3,
+    "refire": 0
+   }
+  },
+  {
+   "name": "RimeBloom",
+   "anchor": "focus",
+   "emitter": {
+    "shape": "ring",
+    "radius": 0.03
+   },
+   "mode": "burst",
+   "count": 36,
+   "life": [
+    0.6,
+    1.1
+   ],
+   "stagger": 0.1,
+   "direction": "inward",
+   "spread": 20,
+   "speed": [
+    0.015,
+    0.028
+   ],
+   "drag": 2.0,
+   "shape": "glyph",
+   "size": [
+    0.0024,
+    0.004
+   ],
+   "endSize": 0.4,
+   "colors": [
+    "#eaf8ff",
+    "#6fb0e0"
+   ],
+   "glow": 1.3,
+   "blend": "alpha",
+   "fadeIn": 0.05,
+   "fadeOut": 0.45,
+   "flicker": 0.2,
+   "preset": {
+    "seconds": 1.2,
+    "amount": 1.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.4,
+    "refire": 0
+   }
+  },
+  {
+   "name": "MindRipple",
+   "anchor": "focus",
+   "emitter": {
+    "shape": "point"
+   },
+   "mode": "burst",
+   "count": 5,
+   "life": [
+    0.7,
+    1.2
+   ],
+   "stagger": 0.6,
+   "direction": "radial",
+   "spread": 360,
+   "speed": [
+    0.0005,
+    0.001
+   ],
+   "swirl": 1.5,
+   "shape": "ring",
+   "size": [
+    0.008,
+    0.012
+   ],
+   "endSize": 3.2,
+   "colors": [
+    "#d59bff",
+    "#3a1060"
+   ],
+   "glow": 1.0,
+   "blend": "add",
+   "fadeIn": 0.05,
+   "fadeOut": 0.6,
+   "distort": 0.002,
+   "preset": {
+    "seconds": 1.4,
+    "amount": 0.9,
+    "fadeIn": 0.0,
+    "fadeOut": 0.5,
+    "refire": 0
+   }
+  },
+  {
+   "name": "SyphonMotes",
+   "anchor": "focus",
+   "emitter": {
+    "shape": "disc",
+    "radius": 0.012
+   },
+   "mode": "burst",
+   "count": 34,
+   "life": [
+    0.6,
+    1.2
+   ],
+   "stagger": 0.4,
+   "direction": "radial",
+   "spread": 360,
+   "speed": [
+    0.012,
+    0.028
+   ],
+   "gravity": -0.02,
+   "drag": 1.0,
+   "swirl": 1.2,
+   "wobble": 0.002,
+   "shape": "dot",
+   "size": [
+    0.0022,
+    0.004
+   ],
+   "endSize": 0.5,
+   "colors": [
+    "#ff3a4a",
+    "#4a0010"
+   ],
+   "glow": 1.5,
+   "blend": "add",
+   "fadeIn": 0.05,
+   "fadeOut": 0.4,
+   "flicker": 0.2,
+   "preset": {
+    "seconds": 1.3,
+    "amount": 1.0,
+    "fadeIn": 0.0,
+    "fadeOut": 0.4,
+    "refire": 0
+   }
+  }
+ ]
+}

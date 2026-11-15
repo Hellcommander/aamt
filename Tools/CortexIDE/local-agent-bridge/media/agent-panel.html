@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline';"/>
+<title>Agent</title>
+<style>
+  :root{--gap:8px;--radius:6px;--muted:var(--vscode-descriptionForeground);--line:var(--vscode-panel-border,rgba(128,128,128,.35));--accent:var(--vscode-focusBorder);--link:var(--vscode-textLink-foreground)}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;padding:0;background:var(--vscode-sideBar-background);color:var(--vscode-foreground);font-family:var(--vscode-font-family);font-size:var(--vscode-font-size)}
+  button{font:inherit;color:inherit;cursor:pointer}
+  #wrap{display:flex;flex-direction:column;height:100%;position:relative}
+
+  /* ---- top bar ---- */
+  #top{display:flex;align-items:center;gap:6px;padding:8px 10px 6px;border-bottom:1px solid var(--line)}
+  #backend{flex:1;min-width:0;display:flex;align-items:center;gap:8px;text-align:left;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border,var(--line));border-radius:var(--radius);padding:5px 8px}
+  #backend:hover{border-color:var(--accent)}
+  #dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--muted)}
+  #dot.ok{background:var(--vscode-testing-iconPassed,#3fb950)}
+  #dot.bad{background:var(--vscode-errorForeground,#f85149)}
+  #dot.busy{background:var(--vscode-progressBar-background,#0e70c0);animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  #bk{min-width:0;flex:1;display:flex;flex-direction:column;line-height:1.25}
+  #bkname{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #bkdetail{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #backend .chev{flex:none;color:var(--muted)}
+  .icon{flex:none;width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;border-radius:var(--radius);font-size:15px;line-height:1}
+  .icon:hover,.icon[aria-expanded="true"]{background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.2))}
+
+  /* ---- problem banner ---- */
+  #banner{display:none;margin:8px 10px 0;padding:8px 10px;border:1px solid var(--vscode-inputValidation-errorBorder,#be1100);background:var(--vscode-inputValidation-errorBackground,rgba(190,17,0,.15));border-radius:var(--radius);font-size:12px;line-height:1.45}
+  #banner.on{display:block}
+  #banner .acts{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+
+  /* ---- menu ---- */
+  #menu{display:none;position:absolute;right:8px;top:44px;z-index:20;min-width:230px;max-width:calc(100% - 16px);padding:4px;background:var(--vscode-menu-background,var(--vscode-editorWidget-background));color:var(--vscode-menu-foreground,inherit);border:1px solid var(--vscode-menu-border,var(--line));border-radius:var(--radius);box-shadow:0 4px 14px rgba(0,0,0,.35)}
+  #menu.on{display:block}
+  #menu .sec{padding:6px 8px 2px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  #menu button{display:flex;width:100%;gap:8px;align-items:baseline;text-align:left;background:transparent;border:0;border-radius:4px;padding:5px 8px}
+  #menu button:hover,#menu button:focus{background:var(--vscode-menu-selectionBackground,var(--vscode-list-hoverBackground));color:var(--vscode-menu-selectionForeground,inherit);outline:none}
+  #menu button span{flex:1}
+  #menu button small{color:var(--muted);font-size:11px}
+  #menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+
+  /* ---- find bar ---- */
+  #find{display:none;align-items:center;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line)}
+  #find.on{display:flex}
+  #findq{flex:1;min-width:0;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,var(--line));border-radius:4px;padding:3px 6px;font:inherit}
+  #findn{font-size:11px;color:var(--muted);white-space:nowrap}
+
+  /* ---- log ---- */
+  #log{flex:1;overflow:auto;padding:10px}
+  .row{margin:0 0 12px}
+  .who{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+  .body{white-space:pre-wrap;word-break:break-word;line-height:1.5}
+  .user .body{background:var(--vscode-input-background);border:1px solid var(--vscode-input-border,var(--line));border-radius:var(--radius);padding:7px 9px}
+  .assistant .body{border-left:2px solid var(--accent);padding-left:9px}
+  .thought{margin-bottom:6px}
+  .thought .body{color:var(--muted)}
+  .sys{margin-bottom:6px}
+  .sys .body{color:var(--muted);font-size:11px}
+  .err .body{color:var(--vscode-errorForeground);border:1px solid var(--vscode-inputValidation-errorBorder,#be1100);border-radius:var(--radius);padding:7px 9px}
+  .hide{display:none!important}
+  mark{background:var(--vscode-editor-findMatchHighlightBackground,rgba(234,92,0,.33));color:inherit}
+  details.tool{margin:0 0 4px;font-size:12px;border:1px solid transparent;border-radius:4px}
+  details.tool[open]{border-color:var(--line);margin-bottom:8px}
+  details.tool summary{display:flex;gap:6px;align-items:baseline;cursor:pointer;list-style:none;padding:2px 6px;border-radius:4px}
+  details.tool summary:hover{background:var(--vscode-list-hoverBackground)}
+  details.tool summary::-webkit-details-marker{display:none}
+  .tool .st{flex:none;width:1em;color:var(--vscode-testing-iconPassed,#3fb950)}
+  .tool.bad .st{color:var(--vscode-errorForeground)}
+  .tool .nm{flex:none;font-weight:600}
+  .tool .lb{flex:1;min-width:0;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--vscode-editor-font-family)}
+  pre{background:var(--vscode-textCodeBlock-background);padding:7px;border-radius:4px;overflow:auto;max-height:22em;white-space:pre;margin:5px 0;font-family:var(--vscode-editor-font-family);font-size:12px;position:relative}
+  details.tool pre{margin:4px 6px 6px}
+  code{font-family:var(--vscode-editor-font-family);background:var(--vscode-textCodeBlock-background);padding:0 3px;border-radius:3px}
+  .codewrap{position:relative}
+  .copy{position:absolute;top:4px;right:4px;font-size:10px;padding:1px 6px;border-radius:3px;border:1px solid var(--line);background:var(--vscode-sideBar-background);opacity:0}
+  .codewrap:hover .copy{opacity:1}
+  .body h4{margin:8px 0 2px;font-size:1em}
+  .li{display:block;padding-left:1.1em;text-indent:-1.1em}
+
+  /* ---- changed files card ---- */
+  .changes{margin:0 0 12px;padding:8px 10px;border:1px solid var(--line);border-radius:var(--radius);font-size:12px}
+  .changes .hd{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+  .changes .hd span{flex:1;font-weight:600}
+  .changes a{display:flex;gap:6px;color:var(--link);cursor:pointer;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:1px 0}
+  .changes a:hover{text-decoration:underline}
+  .changes .add{color:var(--vscode-gitDecoration-addedResourceForeground,#3a3)}
+  .changes .del{color:var(--vscode-gitDecoration-deletedResourceForeground,#c33)}
+  .k{color:var(--muted)}
+
+  /* ---- welcome ---- */
+  #welcome{padding:6px 2px}
+  #welcome h2{margin:4px 0 2px;font-size:1.15em}
+  #welcome p{margin:0 0 10px;color:var(--muted);line-height:1.45}
+  .card{border:1px solid var(--line);border-radius:var(--radius);padding:9px 10px;margin:0 0 8px}
+  .card h3{margin:0 0 6px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+  .steps{display:flex;flex-direction:column;gap:5px}
+  .step{display:flex;gap:8px;align-items:center}
+  .step span{flex:1;min-width:0}
+  .step small{display:block;color:var(--muted)}
+  .try{display:block;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:4px;padding:4px 6px;color:var(--link)}
+  .try:hover{background:var(--vscode-list-hoverBackground)}
+  kbd{font-family:var(--vscode-editor-font-family);font-size:11px;border:1px solid var(--line);border-radius:3px;padding:0 4px}
+
+  /* ---- plan ---- */
+  #todos{display:none;margin:0 10px 6px;padding:7px 9px;border:1px solid var(--line);border-radius:var(--radius);font-size:12px;max-height:11em;overflow:auto}
+  #todos.on{display:block}
+  #todos .t{display:flex;gap:6px;line-height:1.55}
+  #todos .t.completed{color:var(--muted);text-decoration:line-through}
+  #todos .t.in_progress{font-weight:600}
+
+  /* ---- composer ---- */
+  #live{font-size:11px;color:var(--muted);padding:0 10px 4px;min-height:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #down{display:none;position:absolute;right:14px;bottom:150px;z-index:5;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--vscode-editorWidget-background,var(--vscode-sideBar-background))}
+  #down.on{display:block}
+  form{display:flex;flex-direction:column;gap:6px;padding:8px 10px 10px;border-top:1px solid var(--line)}
+  textarea{min-height:64px;max-height:40vh;resize:vertical;background:var(--vscode-input-background);color:var(--vscode-input-foreground);border:1px solid var(--vscode-input-border,var(--line));border-radius:var(--radius);padding:7px 8px;font:inherit;line-height:1.45}
+  textarea:focus{outline:1px solid var(--accent);outline-offset:-1px}
+  .bar{display:flex;gap:6px;align-items:center}
+  #chips{flex:1;min-width:0;display:flex;gap:4px;overflow:hidden}
+  .chip{flex:none;font-size:11px;color:var(--muted);background:transparent;border:1px solid var(--line);border-radius:10px;padding:1px 8px;white-space:nowrap}
+  .chip:hover{color:var(--vscode-foreground);border-color:var(--accent)}
+  .btn{background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:0;border-radius:4px;padding:5px 14px}
+  .btn:hover{background:var(--vscode-button-hoverBackground)}
+  .btn2{background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground);border:0;border-radius:4px;padding:3px 9px;font-size:12px}
+  .btn2:hover{background:var(--vscode-button-secondaryHoverBackground)}
+  .btn2:disabled{opacity:.5;cursor:default}
+  #stop{display:none;background:var(--vscode-errorForeground,#c33);color:#fff}
+  .busy #stop{display:inline-block}.busy #go{display:none}
+  #hint{font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="top">
+    <button id="backend" type="button" title="Change backend and model">
+      <span id="dot"></span>
+      <span id="bk"><span id="bkname">Connecting…</span><span id="bkdetail">looking for a model backend</span></span>
+      <span class="chev">▾</span>
+    </button>
+    <button class="icon" id="new" type="button" title="New chat">＋</button>
+    <button class="icon" id="more" type="button" title="Menu: settings, import, find, undo" aria-haspopup="true" aria-expanded="false">⋯</button>
+  </div>
+  <div id="menu" role="menu">
+    <div class="sec">Account</div>
+    <button data-cmd="signin" id="m-signin"><span>Sign in with Claude…</span><small>opens browser</small></button>
+    <button data-cmd="signout" id="m-signout" class="hide"><span>Sign out</span><small id="m-who"></small></button>
+    <div class="sec">Model</div>
+    <button data-cmd="model"><span>Backend &amp; model…</span></button>
+    <button data-cmd="effort"><span>Reasoning effort…</span><small id="m-effort"></small></button>
+    <button data-cmd="key"><span>Claude API key…</span></button>
+    <div class="sec">Safety</div>
+    <button data-cmd="perms"><span>Permissions &amp; shell…</span><small id="m-shell"></small></button>
+    <button data-cmd="undo"><span>Undo last turn's edits</span></button>
+    <div class="sec">Chat</div>
+    <button data-cmd="find"><span>Find in chat</span><small>Ctrl+F</small></button>
+    <button data-cmd="import"><span>Import a chat…</span></button>
+    <button data-cmd="progress"><span>Open progress index</span></button>
+    <button data-cmd="new"><span>New chat</span></button>
+    <div class="sec">Skills</div>
+    <button data-cmd="skills"><span>Skills &amp; canvases catalog</span></button>
+    <button data-cmd="sync"><span>Sync skills now</span></button>
+    <hr/>
+    <button data-cmd="settings"><span>All settings…</span></button>
+  </div>
+  <div id="banner"><div id="bannertext"></div><div class="acts">
+    <button class="btn2" data-cmd="signin">Sign in with Claude</button>
+    <button class="btn2" data-cmd="model">Choose backend</button>
+    <button class="btn2" data-cmd="key">Set Claude API key</button>
+    <button class="btn2" data-cmd="settings">Open settings</button>
+    <button class="btn2" data-cmd="retry">Retry</button>
+  </div></div>
+  <div id="find"><input id="findq" type="text" placeholder="Find in this chat…"/><span id="findn"></span><button class="icon" id="findx" type="button" title="Close">✕</button></div>
+  <div id="log"></div>
+  <button id="down" type="button" title="Jump to latest">↓</button>
+  <div id="todos"></div>
+  <div id="live"></div>
+  <form id="f">
+    <textarea id="q" placeholder="Ask the agent to do something in this workspace…"></textarea>
+    <div class="bar">
+      <div id="chips"></div>
+      <button id="stop" class="btn" type="button">Stop</button>
+      <button id="go" class="btn" type="submit">Send</button>
+    </div>
+    <div id="hint"><kbd>Enter</kbd> send · <kbd>Shift+Enter</kbd> new line · edits save to disk, each turn can be undone</div>
+  </form>
+</div>
+<script>
+const vs = acquireVsCodeApi();
+const $ = (id) => document.getElementById(id);
+const log = $("log"), q = $("q"), live = $("live"), menu = $("menu");
+let info = {}, headerOk = null;
+
+function esc(s){ return String(s).replace(/[&<>]/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+function md(s){
+  const blocks = [];
+  let t = esc(s).replace(/```[\w.+-]*\n?([\s\S]*?)```/g, (_, c) => { blocks.push(c); return "\u0000" + (blocks.length - 1) + "\u0000"; });
+  t = t.replace(/`([^`\n]+)`/g, "<code>$1</code>");
+  t = t.replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>");
+  t = t.replace(/^#{1,4} +(.+)$/gm, "<h4>$1</h4>");
+  t = t.replace(/^\s*[-*] +(.+)$/gm, '<span class="li">• $1</span>');
+  t = t.replace(/^\s*(\d+)\. +(.+)$/gm, '<span class="li">$1. $2</span>');
+  t = t.replace(/(<\/span>|<\/h4>)\n/g, "$1"); // block elements already break the line
+  return t.replace(/\n?\u0000(\d+)\u0000\n?/g, (_, i) => '<div class="codewrap"><button class="copy" type="button">Copy</button><pre>' + blocks[+i] + "</pre></div>");
+}
+function base(p){ const parts = String(p).split(/[\\/]/); return parts[parts.length - 1]; }
+function atBottom(){ return log.scrollHeight - log.scrollTop - log.clientHeight < 60; }
+function stick(was){ if (was) log.scrollTop = log.scrollHeight; $("down").classList.toggle("on", !atBottom()); }
+function cmd(id){ vs.postMessage({ type: "cmd", id }); }
+
+/* ---- welcome ---- */
+function welcome(){
+  if (log.children.length) return;
+  const w = document.createElement("div");
+  w.id = "welcome";
+  w.innerHTML =
+    "<h2>Agent</h2><p>A coding agent that reads, searches, edits and runs commands in this workspace.</p>" +
+    '<div class="card" id="w-account"><h3>Account</h3><div class="steps">' +
+    '<div class="step"><span id="w-who">Sign in with your Claude account<small>Your browser opens to claude.ai. The password never passes through this panel; Claude Code keeps the login.</small></span><button class="btn" id="w-signin" data-cmd="signin">Sign in</button></div>' +
+    "</div></div>" +
+    '<div class="card"><h3>Set up</h3><div class="steps">' +
+    '<div class="step"><span>Backend &amp; model<small id="w-backend">not connected</small></span><button class="btn2" data-cmd="model">Change</button></div>' +
+    '<div class="step"><span>Claude API key<small>only for the Claude backends</small></span><button class="btn2" data-cmd="key">Set</button></div>' +
+    '<div class="step"><span>Permissions &amp; shell<small id="w-shell"></small></span><button class="btn2" data-cmd="perms">Change</button></div>' +
+    "</div></div>" +
+    '<div class="card"><h3>Try</h3>' +
+    ["Explain what the active file does and how it is used.", "Find the cause of the failing test and fix it, then run the tests.", "Review my uncommitted changes and point out bugs.", "Add a unit test for the selected code."].map((t) => '<button class="try" type="button">' + esc(t) + "</button>").join("") +
+    "</div>" +
+    '<div class="card"><h3>Where things are</h3><p style="margin:0">The bar at the top shows the model in use: click it to switch. <b>⋯</b> holds settings, import, find, undo and skills. Select code in an editor and right-click → <b>Ask Agent About Selection</b>. Changed files appear in a card with <b>Undo</b> after each turn.</p></div>';
+  log.appendChild(w);
+  paintInfo();
+}
+function dropWelcome(){ const w = $("welcome"); if (w) w.remove(); }
+
+/* ---- rows ---- */
+function changesCard(row){
+  const box = document.createElement("div");
+  box.className = "changes";
+  box.dataset.id = row.id;
+  const hd = document.createElement("div"); hd.className = "hd";
+  const title = document.createElement("span");
+  title.textContent = (row.undone ? "Reverted · " : "") + "Changed " + row.files.length + " file" + (row.files.length === 1 ? "" : "s");
+  const undo = document.createElement("button");
+  undo.className = "btn2"; undo.type = "button"; undo.textContent = "Undo";
+  undo.title = "Put these files back as they were before this turn";
+  undo.disabled = !!row.undone;
+  undo.onclick = () => vs.postMessage({ type: "undo", id: row.id });
+  hd.appendChild(title); hd.appendChild(undo); box.appendChild(hd);
+  for (const f of row.files){
+    const a = document.createElement("a");
+    a.title = f.path + " — click to see the diff";
+    a.onclick = () => vs.postMessage({ type: "diff", id: row.id, path: f.path });
+    const n = document.createElement("span"); n.textContent = base(f.path);
+    const k = document.createElement("span"); k.className = "k"; k.textContent = f.kind === "modified" ? "" : f.kind;
+    const ad = document.createElement("span"); ad.className = "add"; ad.textContent = f.add ? "+" + f.add : "";
+    const de = document.createElement("span"); de.className = "del"; de.textContent = f.del ? "−" + f.del : "";
+    a.appendChild(n); a.appendChild(k); a.appendChild(ad); a.appendChild(de);
+    box.appendChild(a);
+  }
+  return box;
+}
+const WHO = { user: "You", assistant: "Agent", err: "Problem" };
+function add(row){
+  dropWelcome();
+  const was = atBottom();
+  let el;
+  if (row.cls === "changes") el = changesCard(row);
+  else if (row.cls === "tool"){
+    el = document.createElement("details");
+    el.className = "tool" + (row.ok === false ? " bad" : "");
+    const s = document.createElement("summary");
+    s.innerHTML = '<span class="st">' + (row.ok === false ? "✗" : "✓") + '</span><span class="nm"></span><span class="lb"></span>';
+    s.querySelector(".nm").textContent = row.name;
+    s.querySelector(".lb").textContent = row.label || "";
+    s.title = row.name + (row.label ? " " + row.label : "");
+    const pre = document.createElement("pre");
+    pre.textContent = row.text || "";
+    el.appendChild(s); el.appendChild(pre);
+  } else {
+    el = document.createElement("div");
+    el.className = "row " + row.cls;
+    if (WHO[row.cls]){ const w = document.createElement("div"); w.className = "who"; w.textContent = WHO[row.cls]; el.appendChild(w); }
+    const b = document.createElement("div"); b.className = "body";
+    if (row.cls === "assistant" || row.cls === "thought") b.innerHTML = md(row.text || "");
+    else b.textContent = row.text || "";
+    el.appendChild(b);
+  }
+  log.appendChild(el);
+  if ($("find").classList.contains("on")) applyFind();
+  stick(was || row.cls === "user");
+}
+function todos(list){
+  const box = $("todos");
+  box.innerHTML = "";
+  list = list || [];
+  box.className = list.length ? "on" : "";
+  const done = list.filter((t) => t.status === "completed").length;
+  if (list.length){ const h = document.createElement("div"); h.className = "k"; h.textContent = "Plan · " + done + "/" + list.length + " done"; box.appendChild(h); }
+  for (const t of list){
+    const d = document.createElement("div");
+    d.className = "t " + t.status;
+    d.textContent = (t.status === "completed" ? "☑ " : t.status === "in_progress" ? "▶ " : "☐ ") + t.content;
+    box.appendChild(d);
+  }
+}
+
+/* ---- header, banner, chips ---- */
+function header(m){
+  headerOk = !!m.ok;
+  const parts = String(m.text || "").split(" · ");
+  const banner = $("banner");
+  if (m.ok){
+    $("bkname").textContent = parts.slice(0, 2).join(" · ");
+    $("bkdetail").textContent = parts.slice(2).join(" · ") || "ready";
+    banner.classList.remove("on");
+  } else {
+    $("bkname").textContent = "No backend connected";
+    $("bkdetail").textContent = "click to choose one";
+    $("bannertext").textContent = parts.slice(1).join(" · ") || m.text || "No model backend reachable.";
+    banner.classList.add("on");
+  }
+  $("backend").title = (m.title ? m.title + "\n" : "") + "Click to change backend and model";
+  paintDot();
+  const wb = $("w-backend"); if (wb) wb.textContent = m.ok ? m.text : "not connected";
+}
+function paintDot(){ $("dot").className = document.body.classList.contains("busy") ? "busy" : headerOk == null ? "" : headerOk ? "ok" : "bad"; }
+function paintInfo(){
+  const chips = $("chips");
+  chips.innerHTML = "";
+  const chip = (text, id, title) => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = text; b.title = title; b.onclick = () => cmd(id); chips.appendChild(b); };
+  if (info.shell) chip("shell: " + info.shell, "perms", "Whether the agent may run commands. Click to change.");
+  if (info.mode) chip("mode: " + info.mode, "perms", "Claude Code permission mode. Click to change.");
+  if (info.effort) chip("effort: " + info.effort, "effort", "Claude reasoning effort. Click to change.");
+  const acct = info.account || {};
+  const who = acct.loggedIn ? acct.email || "signed in" : "";
+  if (acct.loggedIn) chip("● " + who, "signout", "Signed in to Claude Code" + (acct.plan ? " (" + acct.plan + ")" : "") + ". Click to sign out.");
+  $("m-signin").classList.toggle("hide", !!acct.loggedIn);
+  $("m-signout").classList.toggle("hide", !acct.loggedIn);
+  $("m-who").textContent = who;
+  const ww = $("w-who");
+  if (ww){
+    const btn = $("w-signin");
+    if (acct.loggedIn){
+      ww.innerHTML = "Signed in" + (acct.email ? " as <b>" + esc(acct.email) + "</b>" : "") + "<small>" + esc(acct.plan || "Claude Code login") + (info.provider === "claude-code" ? " · in use" : " · pick Claude Code under Backend &amp; model to use it") + "</small>";
+      btn.textContent = "Sign out"; btn.dataset.cmd = "signout"; btn.className = "btn2";
+    } else if (acct.cli === false){
+      ww.innerHTML = "Sign in with your Claude account<small>Needs the Claude Code CLI, which was not found. Sign in will point you to the installer.</small>";
+    }
+  }
+  $("m-effort").textContent = info.effort || "";
+  $("m-shell").textContent = info.shell ? "shell " + info.shell : "";
+  const ws = $("w-shell"); if (ws) ws.textContent = info.shell ? "shell commands: " + info.shell + (info.mode ? " · mode: " + info.mode : "") : "";
+}
+function busy(on){ document.body.classList.toggle("busy", !!on); if (!on) live.textContent = ""; paintDot(); }
+
+/* ---- find ---- */
+function applyFind(){
+  const needle = $("findq").value.trim().toLowerCase();
+  let hits = 0;
+  for (const el of log.children){
+    if (el.id === "welcome") continue;
+    const match = !needle || el.textContent.toLowerCase().includes(needle);
+    el.classList.toggle("hide", !match);
+    if (needle && match) hits++;
+  }
+  $("findn").textContent = needle ? hits + " match" + (hits === 1 ? "" : "es") : "";
+}
+function openFind(on){
+  $("find").classList.toggle("on", on);
+  if (on){ $("findq").focus(); $("findq").select(); } else { $("findq").value = ""; applyFind(); q.focus(); }
+}
+
+/* ---- wiring ---- */
+function closeMenu(){ menu.classList.remove("on"); $("more").setAttribute("aria-expanded", "false"); }
+$("more").onclick = (e) => { e.stopPropagation(); const on = !menu.classList.contains("on"); menu.classList.toggle("on", on); $("more").setAttribute("aria-expanded", String(on)); if (on) menu.querySelector("button").focus(); };
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-cmd]");
+  if (b){ const id = b.dataset.cmd; closeMenu(); if (id === "find") openFind(true); else if (id === "new") vs.postMessage({ type: "new" }); else cmd(id); return; }
+  if (e.target.classList.contains("try")){ q.value = e.target.textContent; q.focus(); return; }
+  if (e.target.classList.contains("copy")){ const pre = e.target.parentElement.querySelector("pre"); vs.postMessage({ type: "copy", text: pre.textContent }); e.target.textContent = "Copied"; setTimeout(() => (e.target.textContent = "Copy"), 1200); return; }
+  if (!menu.contains(e.target)) closeMenu();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape"){ closeMenu(); if ($("find").classList.contains("on")) openFind(false); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f"){ e.preventDefault(); openFind(true); }
+});
+$("backend").onclick = () => cmd("model");
+$("new").onclick = () => vs.postMessage({ type: "new" });
+$("findq").addEventListener("input", applyFind);
+$("findx").onclick = () => openFind(false);
+$("down").onclick = () => { log.scrollTop = log.scrollHeight; $("down").classList.remove("on"); };
+log.addEventListener("scroll", () => $("down").classList.toggle("on", !atBottom()));
+$("f").addEventListener("submit", (e) => { e.preventDefault(); const t = q.value.trim(); if (!t) return; add({ cls: "user", text: t }); q.value = ""; busy(true); vs.postMessage({ type: "send", text: t }); });
+q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); $("f").requestSubmit(); } });
+$("stop").onclick = () => vs.postMessage({ type: "stop" });
+
+window.addEventListener("message", (e) => {
+  const m = e.data || {};
+  if (m.type === "header") header(m);
+  else if (m.type === "info"){ info = m; paintInfo(); }
+  else if (m.type === "restore"){ log.innerHTML = ""; (m.log || []).forEach(add); todos(m.todos); welcome(); log.scrollTop = log.scrollHeight; }
+  else if (m.type === "todos") todos(m.todos);
+  else if (m.type === "changes") add({ cls: "changes", id: m.id, files: m.files });
+  else if (m.type === "undone"){ const card = log.querySelector('.changes[data-id="' + m.id + '"]'); if (card){ card.querySelector("button").disabled = true; const s = card.querySelector(".hd span"); s.textContent = "Reverted · " + s.textContent; } }
+  else if (m.type === "busy") busy(true);
+  else if (m.type === "idle") busy(false);
+  else if (m.type === "status"){ if (m.transient) live.textContent = m.text; else add({ cls: "sys", text: m.text }); }
+  else if (m.type === "thought") add({ cls: "thought", text: m.text });
+  else if (m.type === "tool"){ if (m.status === "start") live.textContent = "→ " + m.name + " " + (m.label || ""); else add({ cls: "tool", name: m.name, label: m.label, ok: m.ok, text: m.result }); }
+  else if (m.type === "assistant") add({ cls: "assistant", text: m.text });
+  else if (m.type === "error"){ add({ cls: "err", text: m.text }); busy(false); }
+  else if (m.type === "seed"){ q.value = m.text; q.focus(); }
+});
+welcome();
+vs.postMessage({ type: "ready" });
+</script>
+</body>
+</html>

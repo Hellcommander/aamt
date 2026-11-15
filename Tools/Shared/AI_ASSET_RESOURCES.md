@@ -1,6 +1,6 @@
 # Shared AI asset-generation resources
 
-Eight machine-wide resources any game toolset can use. Each owns one stage, and
+Nine machine-wide resources any game toolset can use. Each owns one stage, and
 they are deliberately not interchangeable — each is strong exactly where the
 others are weak.
 
@@ -11,6 +11,7 @@ others are weak.
 | fast mesh | Stable Fast 3D | own venv (`sf3d_client.py`) | seconds per mesh; **only for background props and simple compact objects** (guessed backs, fused thin limbs) |
 | `animate` | UniRig + Wan2.2-TI2V-5B + CoTracker3 | own venvs (`anim_client.py`) | mesh → skinned .glb with idle/move/attack/hit/death/special fitted to generated video of that mesh. See [ANIMATION.md](ANIMATION.md) |
 | `particles` | SD3.5 + Wan2.2-TI2V-5B + BiRefNet | animation venv (`particle_client.py`) | description → flipbook / sprite-sheet particle texture with alpha + an emitter layer. See [PARTICLES.md](PARTICLES.md) |
+| `refart` | SDXL + IP-Adapter / ControlNet Union, FLUX.1 Kontext, Grounding DINO + SAM 2.1 | own venv (`refart_client.py`) | keep a character across pictures, instruction edits, masked repaint, split a picture into layers by naming parts. See [REFART.md](REFART.md) |
 | `material` | Material Maker | CLI | seamless tileable PBR base maps |
 | `pixels` | Pixelorama | CLI + visible GUI | pixel-art .pxo inspect/export; `see` screenshots the editor |
 | `layering` | Ucupaint | Blender add-on | compositing/masking onto a mesh's UVs |

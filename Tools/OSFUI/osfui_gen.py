@@ -54,7 +54,7 @@ import webbrowser
 from pathlib import Path
 
 TOOL_DIR = Path(__file__).resolve().parent
-DEFAULT_DATA = Path(r"F:\SteamLibrary\steamapps\common\Starfield\Data")
+DEFAULT_DATA = Path(r"D:\games\Steam\steamapps\common\Starfield\Data")
 
 # --- the recovered contract ---------------------------------------------------
 
@@ -164,10 +164,14 @@ def _numeric_range(kind: str, value: float) -> dict:
     if magnitude == 0:
         return {"min": 0.0, "max": 1.0, "step": 0.01}
     if magnitude <= 1:
-        return {"min": 0.0, "max": 1.0, "step": 0.01}
-    if magnitude <= 100:
-        return {"min": 0.0, "max": round(magnitude * 4, 2), "step": 0.1}
-    return {"min": 0.0, "max": round(magnitude * 4, 2), "step": 1.0}
+        span, step = 1.0, 0.01
+    elif magnitude <= 100:
+        span, step = round(magnitude * 4, 2), 0.1
+    else:
+        span, step = round(magnitude * 4, 2), 1.0
+    # Negative defaults (pitch offsets, angles, dB) need a symmetric range or
+    # the default itself falls outside the slider.
+    return {"min": 0.0 if value >= 0 else -span, "max": span, "step": step}
 
 
 def _humanize(key: str) -> str:
@@ -189,10 +193,11 @@ def parse_ini(path: Path) -> list[dict]:
     re-authoring it by hand would guarantee drift.
     """
     sections: list[dict] = []
+    by_name: dict[str, dict] = {}
     current: dict | None = None
     pending: list[str] = []
 
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+    for lineno, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
         stripped = line.strip()
         if not stripped:
             pending.clear()
@@ -205,8 +210,15 @@ def parse_ini(path: Path) -> list[dict]:
             continue
         match = re.match(r"^\[(.+?)\]$", stripped)
         if match:
-            current = {"section": match.group(1).strip(), "keys": []}
-            sections.append(current)
+            name = match.group(1).strip()
+            # A repeated [Section] (e.g. left behind by a merge or replay) is
+            # one section to the game; fold it into the first so the page
+            # does not get two groups with the same id.
+            current = by_name.get(name.lower())
+            if current is None:
+                current = {"section": name, "keys": []}
+                by_name[name.lower()] = current
+                sections.append(current)
             pending.clear()
             continue
         if "=" in stripped and current is not None:
@@ -214,7 +226,9 @@ def parse_ini(path: Path) -> list[dict]:
             key = key.strip()
             raw = raw.split(";", 1)[0].strip()
             if key:
-                current["keys"].append({"key": key, "raw": raw, "comment": " ".join(pending)})
+                current["keys"].append(
+                    {"key": key, "raw": raw, "comment": " ".join(pending), "line": lineno}
+                )
             pending.clear()
 
     return [s for s in sections if s["keys"]]
@@ -239,12 +253,24 @@ def spec_from_ini(
     groups = []
     for section in parse_ini(ini_path):
         settings = []
+        seen: dict[str, int] = {}
         for entry in section["keys"]:
             key, raw = entry["key"], entry["raw"]
             name, hinted = _split_ini_key(key)
+            osf_key = _osf_key(section["section"], name)
+            # OSF UI saves by key, so a second copy could never be edited or
+            # written back. Keep the first and say where the other one is.
+            first = seen.setdefault(osf_key.lower(), entry["line"])
+            if first != entry["line"]:
+                print(
+                    f"[warn] {ini_path.name}:{entry['line']}: duplicate key {osf_key} "
+                    f"(first at line {first}); skipped",
+                    file=sys.stderr,
+                )
+                continue
             kind = _ini_type(name, raw, hinted)
             setting: dict = {
-                "key": _osf_key(section["section"], name),
+                "key": osf_key,
                 "label": name if " " in name else _humanize(name),
                 "type": kind,
             }

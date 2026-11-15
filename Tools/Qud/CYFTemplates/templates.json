@@ -1,0 +1,483 @@
+{
+ "note": "Key colours (roles) of CYFTemplates/<style>/<plan>.png. Paint with these colours; a bake maps each to the fighter's colour for that role and keeps the alpha. Other colours are used as they are.",
+ "tileSize": [
+  16,
+  24
+ ],
+ "frames": 8,
+ "styles": [
+  "cat",
+  "plain",
+  "canine",
+  "equine",
+  "avian",
+  "reptile",
+  "insect",
+  "fish",
+  "robot",
+  "skull",
+  "fungal",
+  "plant"
+ ],
+ "plans": [
+  "quadruped",
+  "biped",
+  "serpent",
+  "fish",
+  "blob",
+  "radial",
+  "robot",
+  "tree",
+  "flower",
+  "fungus",
+  "cactus",
+  "chair",
+  "table",
+  "door",
+  "vessel"
+ ],
+ "rows": [
+  "base",
+  "wings",
+  "gas_toxic",
+  "gas_mind",
+  "gas_steam",
+  "shadow",
+  "speed",
+  "levitate",
+  "webs",
+  "tail",
+  "roots",
+  "humps",
+  "quills",
+  "legs",
+  "arms2",
+  "arms",
+  "fin",
+  "astral",
+  "carapace",
+  "scales",
+  "leaves",
+  "fur",
+  "feathers",
+  "muscle",
+  "slime",
+  "heart",
+  "antenna",
+  "apron",
+  "brood",
+  "tentacles",
+  "tentacles2",
+  "conjoined",
+  "conjoined2",
+  "claws",
+  "hooks",
+  "foot_paws",
+  "tendril",
+  "stinger",
+  "head1",
+  "head2",
+  "head3",
+  "head4",
+  "albino",
+  "albino_head",
+  "ears",
+  "horns",
+  "horns2",
+  "horns3",
+  "horns4",
+  "unihorn",
+  "unihorn2",
+  "unihorn3",
+  "unihorn4",
+  "antlers",
+  "antlers2",
+  "antlers3",
+  "antlers4",
+  "casque",
+  "casque2",
+  "casque3",
+  "casque4",
+  "beak",
+  "gills",
+  "fangs",
+  "tongue",
+  "glow_eyes",
+  "third_eye",
+  "spectacles",
+  "blink",
+  "breath",
+  "halo",
+  "psi",
+  "flames",
+  "frost",
+  "sparks",
+  "light",
+  "regen",
+  "orbit",
+  "force",
+  "vortex"
+ ],
+ "roles": {
+  "albino": [
+   242,
+   36,
+   36
+  ],
+  "albino_eye": [
+   24,
+   63,
+   158
+  ],
+  "antenna": [
+   187,
+   242,
+   109
+  ],
+  "antenna_tip": [
+   158,
+   71,
+   147
+  ],
+  "apron": [
+   36,
+   242,
+   208
+  ],
+  "beak": [
+   158,
+   96,
+   24
+  ],
+  "belly": [
+   142,
+   109,
+   242
+  ],
+  "body": [
+   75,
+   158,
+   71
+  ],
+  "breath": [
+   242,
+   36,
+   105
+  ],
+  "chitin": [
+   24,
+   108,
+   158
+  ],
+  "chitin_hi": [
+   231,
+   242,
+   109
+  ],
+  "claw": [
+   140,
+   71,
+   158
+  ],
+  "conjoin": [
+   36,
+   242,
+   139
+  ],
+  "ear": [
+   158,
+   51,
+   24
+  ],
+  "eye": [
+   109,
+   120,
+   242
+  ],
+  "fang": [
+   104,
+   158,
+   71
+  ],
+  "feather": [
+   242,
+   36,
+   174
+  ],
+  "feather_hi": [
+   24,
+   153,
+   158
+  ],
+  "flame": [
+   242,
+   209,
+   109
+  ],
+  "flame_hi": [
+   111,
+   71,
+   158
+  ],
+  "force": [
+   36,
+   242,
+   70
+  ],
+  "frost": [
+   158,
+   24,
+   41
+  ],
+  "frost_hi": [
+   109,
+   165,
+   242
+  ],
+  "fur": [
+   133,
+   158,
+   71
+  ],
+  "gas_mind": [
+   242,
+   36,
+   242
+  ],
+  "gas_steam": [
+   24,
+   158,
+   118
+  ],
+  "gas_toxic": [
+   242,
+   164,
+   109
+  ],
+  "gill": [
+   82,
+   71,
+   158
+  ],
+  "glow_eye": [
+   71,
+   242,
+   36
+  ],
+  "glow_eye_dim": [
+   158,
+   24,
+   86
+  ],
+  "halo": [
+   109,
+   209,
+   242
+  ],
+  "halo_hi": [
+   158,
+   154,
+   71
+  ],
+  "heart": [
+   173,
+   36,
+   242
+  ],
+  "hook": [
+   24,
+   158,
+   74
+  ],
+  "horn": [
+   242,
+   120,
+   109
+  ],
+  "hover": [
+   71,
+   90,
+   158
+  ],
+  "inner_ear": [
+   140,
+   242,
+   36
+  ],
+  "leaf": [
+   158,
+   24,
+   131
+  ],
+  "leaf_hi": [
+   109,
+   242,
+   230
+  ],
+  "light": [
+   158,
+   125,
+   71
+  ],
+  "mandible": [
+   104,
+   36,
+   242
+  ],
+  "muscle": [
+   24,
+   158,
+   29
+  ],
+  "muzzle": [
+   242,
+   109,
+   143
+  ],
+  "nose": [
+   71,
+   119,
+   158
+  ],
+  "orbit": [
+   209,
+   242,
+   36
+  ],
+  "paw": [
+   141,
+   24,
+   158
+  ],
+  "psi": [
+   109,
+   242,
+   186
+  ],
+  "quill": [
+   158,
+   96,
+   71
+  ],
+  "regen": [
+   36,
+   38,
+   242
+  ],
+  "sack": [
+   64,
+   158,
+   24
+  ],
+  "sack_hi": [
+   242,
+   109,
+   188
+  ],
+  "scale": [
+   71,
+   148,
+   158
+  ],
+  "scale_hi": [
+   242,
+   207,
+   36
+  ],
+  "shadow": [
+   96,
+   24,
+   158
+  ],
+  "slime": [
+   109,
+   242,
+   141
+  ],
+  "spark": [
+   158,
+   71,
+   75
+  ],
+  "spark_hi": [
+   36,
+   106,
+   242
+  ],
+  "spectacles": [
+   109,
+   158,
+   24
+  ],
+  "speed": [
+   242,
+   109,
+   232
+  ],
+  "stinger": [
+   71,
+   158,
+   139
+  ],
+  "stripe": [
+   242,
+   138,
+   36
+  ],
+  "tendril": [
+   51,
+   24,
+   158
+  ],
+  "tendril_tip": [
+   121,
+   242,
+   109
+  ],
+  "third_eye": [
+   158,
+   71,
+   104
+  ],
+  "tongue": [
+   36,
+   175,
+   242
+  ],
+  "vortex": [
+   154,
+   158,
+   24
+  ],
+  "web": [
+   208,
+   109,
+   242
+  ],
+  "wing": [
+   71,
+   158,
+   110
+  ],
+  "wing_edge": [
+   242,
+   69,
+   36
+  ]
+ },
+ "alpha": {
+  "gas_toxic": 170,
+  "gas_mind": 170,
+  "gas_steam": 150,
+  "breath": 190,
+  "slime": 220,
+  "web": 200,
+  "glow_eye_dim": 170,
+  "psi": 200,
+  "force": 150,
+  "shadow": 180,
+  "hover": 140,
+  "speed": 120,
+  "albino": 110
+ }
+}

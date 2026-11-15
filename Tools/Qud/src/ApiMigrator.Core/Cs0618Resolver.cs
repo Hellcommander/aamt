@@ -20,6 +20,10 @@ public static class Cs0618Resolver
         public bool Backup { get; set; } = true;
         public string DumpPath { get; set; } = "";
         public string RulesPath { get; set; } = "";
+        /// <summary>Refuse a rewrite that unbalances brackets or changes string-literal text (ApplyGuard).</summary>
+        public bool TextGuard { get; set; } = true;
+        /// <summary>Compile the mod before and after applying; restore its files on new errors (CompileGuard).</summary>
+        public bool CompileGuard { get; set; } = true;
     }
 
     public sealed class Result
@@ -37,6 +41,11 @@ public static class Cs0618Resolver
         var result = new Result();
         var warnings = new List<Cs0618Warning>();
 
+        // --mod may be a bare folder name ("Arendeth_PoisonCrafter"): resolve it under the Mods root so the
+        // compile, the path fallback and the scope filter below all work on a real directory.
+        var modFolder = ResolveModFolder(options.ModFolder, result.Notes);
+        options.ModFolder = modFolder;
+
         if (!string.IsNullOrWhiteSpace(options.WarningText))
             warnings.AddRange(Cs0618Parser.Parse(options.WarningText));
 
@@ -51,8 +60,10 @@ public static class Cs0618Resolver
         {
             if (string.IsNullOrWhiteSpace(options.ModFolder))
                 throw new ArgumentException("ModFolder is required when Compile=true.");
+            // Other mods' assemblies too: a mod that depends on another mod otherwise fails to bind, and a
+            // file with binding errors reports few or none of its CS0618 warnings.
             var compile = ModCompiler.CompileAgainstManaged(
-                options.ModFolder!, options.ManagedDir, onLog);
+                options.ModFolder!, options.ManagedDir, onLog, null, CompileGuard.OtherModAssemblies(options.ModFolder!));
             result.Compile = compile;
             result.Notes.AddRange(compile.Notes);
             onLog?.Invoke($"Compile finished (exit {compile.ExitCode}). Parsing CS0618...");
@@ -71,26 +82,51 @@ public static class Cs0618Resolver
             .ThenBy(w => w.Line)
             .ToList();
 
-        foreach (var g in result.Warnings.GroupBy(w => ShortSymbol(w.ObsoleteSymbol)))
-            result.SymbolCounts[g.Key] = g.Count();
-
-        onLog?.Invoke($"Harvested {result.Warnings.Count} CS0618 warning(s) across {result.Warnings.Select(w => NormalizePath(w.FilePath)).Distinct(StringComparer.OrdinalIgnoreCase).Count()} file path(s).");
+        var harvested = result.Warnings.Count;
 
         // Resolve file paths: prefer real files under ModFolder when the log used truncated paths.
+        // A log (build_log.txt, Player.log) usually holds every mod's warnings. When a mod folder was given,
+        // only that mod's files are in scope: before this filter, --mod X --from-log <whole log> --apply
+        // rewrote every file the log named, in every mod.
+        var scopeRoot = modFolder is null
+            ? null
+            : Path.TrimEndingDirectorySeparator(Path.GetFullPath(modFolder)) + Path.DirectorySeparatorChar;
         var affected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var inScope = new List<Cs0618Warning>();
+        var outOfScope = 0;
         foreach (var w in result.Warnings)
         {
-            var resolved = ResolveFilePath(w.FilePath, options.ModFolder);
+            var resolved = ResolveFilePath(w.FilePath, modFolder);
             if (resolved != null && File.Exists(resolved))
             {
-                affected.Add(Path.GetFullPath(resolved));
-                w.FilePath = Path.GetFullPath(resolved);
+                var full = Path.GetFullPath(resolved);
+                if (scopeRoot != null && !full.StartsWith(scopeRoot, StringComparison.OrdinalIgnoreCase))
+                {
+                    outOfScope++;
+                    continue;
+                }
+                affected.Add(full);
+                w.FilePath = full;
+                inScope.Add(w);
+            }
+            else if (scopeRoot != null && !string.IsNullOrWhiteSpace(options.WarningLogPath))
+            {
+                // With a whole-game log and a mod filter, an unresolvable path is almost always another mod's file.
+                outOfScope++;
             }
             else
             {
+                inScope.Add(w);
                 result.Notes.Add($"Could not resolve file for warning: {w.FilePath}({w.Line}) {w.ObsoleteSymbol}");
             }
         }
+        result.Warnings = inScope;
+
+        foreach (var g in result.Warnings.GroupBy(w => ShortSymbol(w.ObsoleteSymbol)))
+            result.SymbolCounts[g.Key] = g.Count();
+
+        onLog?.Invoke($"Harvested {harvested} CS0618 warning(s); {result.Warnings.Count} in scope across {affected.Count} file(s)" +
+            (outOfScope > 0 ? $", {outOfScope} outside {modFolder} ignored." : "."));
         result.AffectedFiles = affected.OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList();
 
         if (result.AffectedFiles.Count == 0)
@@ -104,6 +140,10 @@ public static class Cs0618Resolver
         var dump = DumpStore.LoadDump(options.DumpPath);
         var rules = DumpStore.LoadRules(options.RulesPath);
         var engine = new RuleEngine(rules, dump);
+
+        var compileGuard = options.Apply && options.CompileGuard
+            ? new CompileGuard(options.ManagedDir, onLog)
+            : null;
 
         var migration = new MigrationReport
         {
@@ -124,15 +164,19 @@ public static class Cs0618Resolver
                 continue;
             }
 
-            var (working, fixes) = engine.ApplyCuratedRules(original, file);
-            var remaining = engine.ScanRemainingHits(working, file);
-            var changed = !string.Equals(working, original, StringComparison.Ordinal);
-
-            // Keep only remaining hits that correspond to CS0618 lines in this file (approx by line),
-            // but also keep all dump hits so the report stays useful.
             var fileWarnings = result.Warnings
                 .Where(w => string.Equals(NormalizePath(w.FilePath), NormalizePath(file), StringComparison.OrdinalIgnoreCase))
                 .ToList();
+
+            // Fixes that need the compiler's overload and position go first, while the reported lines and
+            // columns still match the file.
+            var (positioned, positionEdits) = Cs0618PositionFixer.Apply(original, fileWarnings);
+
+            var (working, fixes) = engine.ApplyCuratedRules(positioned, file);
+            if (positionEdits > 0)
+                fixes.Add(new AppliedFix { RuleName = Cs0618PositionFixer.FixRuleName, Count = positionEdits });
+            var remaining = engine.ScanRemainingHits(working, file);
+            var changed = !string.Equals(working, original, StringComparison.Ordinal);
 
             var scan = new FileScanResult
             {
@@ -146,6 +190,21 @@ public static class Cs0618Resolver
 
             if (changed && options.Apply)
             {
+                // Guards (ApplyGuard.cs): never write a rewrite that drops string text or unbalances
+                // brackets, and never write into a mod that can't be compiled first.
+                var refusal = options.TextGuard ? ApplyGuard.CheckRewrite(original, working) : new List<string>();
+                if (refusal.Count == 0 && compileGuard != null && !compileGuard.BeforeWrite(file, original))
+                    refusal.Add("the mod could not be compiled before the change, so the result could not be checked");
+                if (refusal.Count > 0)
+                {
+                    var why = $"GUARD: not writing {file}: {string.Join("; ", refusal)}";
+                    result.Notes.Add(why);
+                    onLog?.Invoke(why);
+                    scan.Changed = false;
+                    scan.NewContent = null;
+                    scan.AppliedFixes = new List<AppliedFix>();
+                    continue;
+                }
                 try
                 {
                     if (options.Backup)
@@ -196,6 +255,23 @@ public static class Cs0618Resolver
             }
         }
 
+        if (compileGuard != null)
+        {
+            foreach (var outcome in compileGuard.Finish().Where(o => o.Reverted))
+            {
+                var restored = new HashSet<string>(outcome.RevertedFiles, StringComparer.OrdinalIgnoreCase);
+                foreach (var fileResult in migration.FileResults)
+                {
+                    if (!restored.Contains(Path.GetFullPath(fileResult.FilePath))) continue;
+                    fileResult.Changed = false;
+                    fileResult.NewContent = null;
+                    fileResult.AppliedFixes = new List<AppliedFix>();
+                }
+                result.Notes.Add($"GUARD: restored {outcome.RevertedFiles.Count} file(s) in {outcome.ModFolder}: the rewrite added compile error(s): " +
+                    string.Join(" | ", outcome.NewErrors.Take(5)));
+            }
+        }
+
         result.Migration = migration;
         onLog?.Invoke(
             $"Migrator: {migration.TotalAutoFixes} auto-fix(es), " +
@@ -218,6 +294,24 @@ public static class Cs0618Resolver
         var s = ShortSymbol(symbol);
         var dot = s.LastIndexOf('.');
         return dot >= 0 ? s[(dot + 1)..] : s;
+    }
+
+    /// <summary>A mod folder given as a path or as a bare folder name under the Mods root; null when not given.</summary>
+    private static string? ResolveModFolder(string? modFolder, List<string> notes)
+    {
+        if (string.IsNullOrWhiteSpace(modFolder)) return null;
+        if (Directory.Exists(modFolder)) return Path.GetFullPath(modFolder);
+        try
+        {
+            var underMods = Path.Combine(CoqPaths.ResolveModsRoot(), modFolder);
+            if (Directory.Exists(underMods)) return Path.GetFullPath(underMods);
+        }
+        catch
+        {
+            // fall through to the note
+        }
+        notes.Add($"Mod folder not found as a path or under the Mods root: {modFolder}");
+        return modFolder;
     }
 
     private static string NormalizePath(string path) =>
@@ -248,18 +342,16 @@ public static class Cs0618Resolver
             return null;
         }
 
-        if (matches.Count == 1) return matches[0];
-
-        // Prefer path suffix match
-        var normLogged = p.TrimStart('\\');
-        foreach (var m in matches)
-        {
-            if (m.EndsWith(fileName, StringComparison.OrdinalIgnoreCase) &&
-                (normLogged.EndsWith(fileName, StringComparison.OrdinalIgnoreCase) ||
-                 m.Replace('/', '\\').EndsWith(normLogged, StringComparison.OrdinalIgnoreCase)))
-                return m;
-        }
-        // Ambiguous: truncated log path matched multiple files. Do not guess.
-        return null;
+        // A bare file name can only be matched by name; a logged path with folders must also agree on the
+        // folder the file sits in. Matching on the name alone handed another mod's warning to any mod that
+        // happened to have one file of the same name (Extensions.cs, Utils.cs...).
+        var segments = p.Split('\\', StringSplitOptions.RemoveEmptyEntries);
+        var tail = Path.DirectorySeparatorChar +
+            (segments.Length >= 2 ? segments[^2] + Path.DirectorySeparatorChar + segments[^1] : fileName);
+        var agreeing = matches
+            .Where(m => m.Replace('/', '\\').EndsWith(tail, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        // Ambiguous or no agreement: do not guess.
+        return agreeing.Count == 1 ? agreeing[0] : null;
     }
 }

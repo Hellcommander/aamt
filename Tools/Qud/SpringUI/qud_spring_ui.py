@@ -89,6 +89,28 @@ CONTRACTS = {
         "element": ["GridScroll", "HotkeyBar"],
         "accent": False,
     },
+    "sifrah_board": {
+        "runtime": "Mods/Arendeth_SifrahFork_Extended/SifrahBoardWindow.cs",
+        "required": [
+            "TitleText", "StatusText", "GuideText", "LegendText", "ContextIconSlot", "ContextIcon",
+            "SlotCaption", "SlotScroll", "SlotViewport", "SlotContent",
+            "TokenCaption", "TokenScroll", "TokenViewport", "TokenContent",
+            "ChanceCaption", "ChanceText",
+            "DetailCaption", "DetailScroll", "DetailViewport", "DetailContent", "DetailText",
+            "HotkeyBar", "HotkeyContent", "HintText",
+            "Templates", "RowTemplate", "Selection", "Pinned", "StateEdge", "HotkeySlot", "HotkeyText",
+            "IconSlot", "Icon", "LabelText", "SecondaryText",
+        ],
+        "scroll": ["SlotScroll", "TokenScroll", "DetailScroll", "HotkeyBar"],
+        "layout": {"SlotContent": "vertical", "TokenContent": "vertical", "HotkeyContent": "horizontal",
+                   "DetailContent": "vertical", "RowTemplate": "horizontal"},
+        "text": ["TitleText", "StatusText", "GuideText", "LegendText", "SlotCaption", "TokenCaption",
+                 "ChanceCaption", "ChanceText", "DetailCaption", "DetailText", "HintText", "HotkeyText",
+                 "LabelText", "SecondaryText"],
+        "template": {"container": "Templates", "template": "RowTemplate"},
+        "element": ["SlotScroll", "TokenScroll", "HotkeyBar", "RowTemplate"],
+        "accent": False,
+    },
     "custom": {"runtime": "(your own window class)", "required": [], "scroll": [], "layout": {}, "text": [],
                "template": None, "element": [], "accent": False},
 }
@@ -102,7 +124,7 @@ Spring UI spec (*.springui.json)
   "modFolder": "Arendeth_SpringUI",    folder under Mods when it differs from the id
   "bundle": "arendeth_springui",       lower case [a-z0-9_]; file Bundles/<platform>/<bundle>_<platform>
   "prefab": "SpringMenu",              prefab asset name == root object name; what the runtime LoadAsset()s
-  "kind": "springmenu",                runtime contract to lint against: springmenu | conjoined_picker | custom
+  "kind": "springmenu",                runtime contract to lint against: springmenu | conjoined_picker | sifrah_board | custom
   "theme": "qud-dark",                 themes/<name>.theme.json, a path, or an inline {"colors": {...}} object
   "reference": [1600, 900],            preview canvas size (the game UI is anchor-based; this is only the mock-up)
   "root": { <node> }                   the window root; it gets Canvas + GraphicRaycaster + CanvasGroup

@@ -11,11 +11,12 @@ param(
     [switch]$FrankyCLI,
     [switch]$Arzedit,
     [switch]$RenoDx,
+    [switch]$BitKnit,
     [string]$ToolsRoot = $PSScriptRoot
 )
 
 $ErrorActionPreference = 'Stop'
-if (-not ($TES5Edit -or $FrankyCLI -or $Arzedit -or $RenoDx -or $All)) {
+if (-not ($TES5Edit -or $FrankyCLI -or $Arzedit -or $RenoDx -or $BitKnit -or $All)) {
     $All = $true
 }
 if ($All) {
@@ -65,6 +66,13 @@ if ($Arzedit) {
 if ($RenoDx) {
     Write-Host "`n[RenoDX MIT — plus nested third-party]"
     Invoke-GitClone 'https://github.com/clshortfuse/renodx.git' (Join-Path $ToolsRoot 'GrimDawn\renodx-src')
+}
+
+if ($BitKnit) {
+    Write-Host "`n[ooz (no licence file upstream; not MIT) - reference source of the BitKnit decoder (bitknit.cpp)]"
+    Invoke-GitClone 'https://github.com/powzix/ooz.git' (Join-Path $ToolsRoot 'DiabloII\thirdparty\ooz')
+    Write-Host "Reference only. The Diablo II tools load a Python port, bitknit.py with decompress(data, size),"
+    Write-Host "from %LOCALAPPDATA%\D2RModAssets\thirdparty or the folder named by D2R_BITKNIT. Keep both out of the repo."
 }
 
 Write-Host @"

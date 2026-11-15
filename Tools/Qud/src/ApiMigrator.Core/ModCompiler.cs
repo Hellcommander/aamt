@@ -20,14 +20,19 @@ public static class ModCompiler
     }
 
     /// <summary>
-    /// Builds a throwaway netstandard2.1 project referencing Managed DLLs and compiling every
+    /// Builds a throwaway project referencing Managed DLLs and compiling every
     /// .cs under <paramref name="modFolder"/> (excluding bin/obj/_tools). Managed is never written.
+    /// 2026-11-12: the project targets net48 with the game's own mscorlib (NoStdLib, no implicit framework
+    /// references), as the game's mod compiler does. The earlier netstandard2.1 project could not bind
+    /// anything ("Predefined type 'System.Object' is not defined" on every file), so real errors and most
+    /// CS0618 warnings never appeared.
     /// </summary>
     public static CompileResult CompileAgainstManaged(
         string modFolder,
         string managedDir,
         Action<string>? onLog = null,
-        IEnumerable<string>? excludeDirNames = null)
+        IEnumerable<string>? excludeDirNames = null,
+        IEnumerable<string>? extraReferenceDirs = null)
     {
         if (!Directory.Exists(modFolder))
             throw new DirectoryNotFoundException("Mod folder not found: " + modFolder);
@@ -63,7 +68,7 @@ public static class ModCompiler
 
         try
         {
-            WriteProject(projPath, sources, managedDir);
+            WriteProject(projPath, sources, managedDir, extraReferenceDirs);
             onLog?.Invoke($"Compiling {sources.Count} file(s) against Managed...");
 
             var psi = new ProcessStartInfo
@@ -115,15 +120,19 @@ public static class ModCompiler
         return result;
     }
 
-    private static void WriteProject(string projPath, List<string> sources, string managedDir)
+    private static void WriteProject(string projPath, List<string> sources, string managedDir,
+        IEnumerable<string>? extraReferenceDirs = null)
     {
+        var referenced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var sb = new StringBuilder();
         sb.AppendLine("""
             <Project Sdk="Microsoft.NET.Sdk">
               <PropertyGroup>
-                <TargetFramework>netstandard2.1</TargetFramework>
+                <TargetFramework>net48</TargetFramework>
                 <LangVersion>latest</LangVersion>
                 <Nullable>disable</Nullable>
+                <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+                <NoStdLib>true</NoStdLib>
                 <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
                 <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
                 <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
@@ -149,12 +158,35 @@ public static class ModCompiler
             var name = Path.GetFileNameWithoutExtension(dll);
             if (name.StartsWith("api-ms-", StringComparison.OrdinalIgnoreCase)) continue;
             if (name.Equals("UnityPlayer", StringComparison.OrdinalIgnoreCase)) continue;
+            // Clashes with the game's own mscorlib facade; ModVerify.csproj leaves it out for the same reason.
+            if (name.Equals("System.Runtime.InteropServices.RuntimeInformation", StringComparison.OrdinalIgnoreCase)) continue;
 
             var hint = XmlEscape(dll);
+            referenced.Add(name);
             sb.Append("    <Reference Include=\"").Append(name).Append("\">")
               .Append("<HintPath>").Append(hint).Append("</HintPath>")
               .Append("<Private>false</Private>")
               .AppendLine("</Reference>");
+        }
+
+        // Other mods' assemblies (ModAssemblies from the last boot), so a mod with dependencies resolves
+        // its types. Used by the compile guard; the plain CS0618 harvest passes none.
+        foreach (var dir in extraReferenceDirs ?? Array.Empty<string>())
+        {
+            // An entry is a folder of DLLs or a single DLL.
+            IEnumerable<string> dlls;
+            if (File.Exists(dir)) dlls = new[] { dir };
+            else if (Directory.Exists(dir)) dlls = Directory.EnumerateFiles(dir, "*.dll").OrderBy(f => f, StringComparer.OrdinalIgnoreCase);
+            else continue;
+            foreach (var dll in dlls)
+            {
+                var name = Path.GetFileNameWithoutExtension(dll);
+                if (!referenced.Add(name)) continue;
+                sb.Append("    <Reference Include=\"").Append(XmlEscape(name)).Append("\">")
+                  .Append("<HintPath>").Append(XmlEscape(dll)).Append("</HintPath>")
+                  .Append("<Private>false</Private>")
+                  .AppendLine("</Reference>");
+            }
         }
 
         sb.AppendLine("""

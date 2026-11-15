@@ -1915,7 +1915,180 @@ var engine = new RuleEngine(
         AssertContains(gtFixed, "=object.a.name=", "an lambda");
         AssertContains(gtFixed, "=subject.Does:start= to radiate", "DidX");
         AssertContains(gtFixed, "EmitMessage(FromDialog: true)", "DidX FromDialog");
-        AssertContains(gtFixed, "=subject.poss:radiance=", "Poss concat");
+        // Poss(...) is the capitalised form, so the replacer keeps the capital P (was "=subject.poss:").
+        AssertContains(gtFixed, "=subject.Poss:radiance= dims out.", "Poss concat keeps its capital");
+
+        // 2026-11-12: shapes from Poison Crafter / Ichor Alchemy (the game's build_log CS0618 list).
+        const string mergeSrc = """
+            class Merge {
+              void M(GameObject actor, GameObject weapon, GameObject target, GameObject kit, string liquid) {
+                IComponent<GameObject>.EmitMessage(actor, actor.Does("coat") + " " + weapon.t() + " with " + liquid + ".");
+                IComponent<GameObject>.EmitMessage(actor, actor.Does("are") + " splashed by " + actor.its + " own solar corrosive!");
+                IComponent<GameObject>.EmitMessage(target, "{{m|A double buds from " + target.the + target.ShortDisplayNameSingle + " and turns on " + target.them + "!}}");
+                IComponent<GameObject>.EmitMessage(actor, actor.Does("assemble") + " " + kit.an() + ".");
+                Popup.ShowFail("There is nothing in " + kit.t() + " to fling.");
+                IComponent<GameObject>.EmitMessage(actor, "Costs " + cost + "=" + actor.its + " purse.");
+              }
+            }
+            """;
+        var (mergeOut, mergeN) = GameTextCallSiteFixer.Fix(mergeSrc);
+        Assert(mergeN >= 9, "merge sample edits");
+        AssertContains(mergeOut,
+            "\"=subject.Does:coat= =object.the.name= with \".StartReplace().SetSubject(actor).SetObject(weapon).ToString() + liquid + \".\"",
+            "two objects fold into one subject/object template; the non-literal stays outside");
+        AssertContains(mergeOut,
+            "\"=subject.Does:are= splashed by =subject.its= own solar corrosive!\".StartReplace().SetSubject(actor).ToString()",
+            "same object folds into one template");
+        AssertContains(mergeOut,
+            "\"{{m|A double buds from =subject.the.name:single= and turns on =subject.them=!}}\".StartReplace().SetSubject(target).ToString()",
+            "the + ShortDisplayNameSingle uses :single and leaves no stray identifier");
+        Assert(!mergeOut.Contains("ToString()Single", StringComparison.Ordinal), "no stray Single after the call");
+        AssertContains(mergeOut,
+            "\"=subject.Does:assemble= =object.a.name=.\".StartReplace().SetSubject(actor).SetObject(kit).ToString()",
+            "Does + an fold");
+        AssertContains(mergeOut,
+            "\"There is nothing in =object.the.name= to fling.\".StartReplace().SetObject(kit).ToString()",
+            "literals on both sides fold in");
+        AssertContains(mergeOut, "\"=\" + \"=object.its= purse.\".StartReplace().SetObject(actor).ToString()",
+            "a literal with '=' is never folded into a template");
+
+        // ".a" is also a colour's alpha; there is no type information, so only text contexts are rewritten.
+        const string alphaSrc = """
+            class Alpha {
+              void M(UnityEngine.Color[] px, UnityEngine.Color[] sp, UnityEngine.Color c, GameObject go, int i) {
+                if (px[i].a <= 0.05f) return;
+                bool solid = px[i].a > 0.5f;
+                c.a = sp[i].a;
+                float sum = px[i].a + sp[i].a;
+                string s = "You see " + go.a + go.ShortDisplayName + ".";
+                string t = "It bites " + go.them + ".";
+              }
+            }
+            """;
+        var (alphaOut, alphaN) = GameTextCallSiteFixer.Fix(alphaSrc);
+        AssertContains(alphaOut, "if (px[i].a <= 0.05f) return;", "alpha comparison untouched");
+        AssertContains(alphaOut, "bool solid = px[i].a > 0.5f;", "alpha greater-than untouched");
+        AssertContains(alphaOut, "c.a = sp[i].a;", "alpha assignment untouched");
+        AssertContains(alphaOut, "float sum = px[i].a + sp[i].a;", "alpha sum untouched");
+        AssertNotContains(alphaOut, "go.a +", "article next to text is rewritten");
+        AssertContains(alphaOut, "\"It bites =object.them=.\".StartReplace().SetObject(go).ToString()", "pronoun in text still rewritten and folded");
+        Assert(alphaN >= 2, "alpha sample edits: " + alphaN);
+
+        // Position-driven fix: only the call the compiler flagged is rewritten.
+        const string listSrc = "class L {\n" +
+            "  string A(System.Collections.Generic.List<string> w) => \"x \" + Grammar.MakeAndList(w) + \".\";\n" +
+            "  string B(System.Collections.Generic.List<GameObject> o) => Grammar.MakeAndList(o);\n" +
+            "  string C(System.Collections.Generic.List<string> w) => Grammar.MakeOrList(w, false);\n" +
+            "}\n";
+        var listWarnings = new[]
+        {
+            new Cs0618Warning { Line = 2, Column = 61, ObsoleteSymbol = "Grammar.MakeAndList(IReadOnlyList<string>, bool)" },
+            new Cs0618Warning { Line = 4, Column = 59, ObsoleteSymbol = "Grammar.MakeOrList(IReadOnlyList<string>, bool)" },
+        };
+        var (listOut, listN) = Cs0618PositionFixer.Apply(listSrc, listWarnings);
+        Assert(listN == 2, "position fixer edits: " + listN);
+        AssertContains(listOut, "\"x \" + Translator.MakeAndList(w, true) + \".\"", "one-argument call gains the old default");
+        AssertContains(listOut, "=> Grammar.MakeAndList(o);", "the GameObject overload is not obsolete and stays");
+        AssertContains(listOut, "=> Translator.MakeOrList(w, false);", "two-argument call keeps its arguments");
+
+        // A comma inside a generic argument list is not an argument separator (The Hacking of Qud).
+        const string genericSrc = "class G { string M(List<GameObject> gs) => Grammar.MakeAndList((IReadOnlyList<string>)gs.Select<GameObject, string>((Func<GameObject, string>)(x => x.DisplayName)).ToList<string>()); }\n";
+        var (genericOut, genericN) = Cs0618PositionFixer.Apply(genericSrc, new[]
+        {
+            new Cs0618Warning { Line = 1, Column = 43, ObsoleteSymbol = "Grammar.MakeAndList(IReadOnlyList<string>, bool)" },
+        });
+        Assert(genericN == 1, "generic-comma call edits: " + genericN);
+        AssertContains(genericOut, ".ToList<string>(), true); }", "a generic comma does not count as a second argument");
+
+        // Nullable cleaner: question marks in text and on the game's Version struct are not annotations.
+        const string nullableSrc = """
+            using XRL;
+            class N {
+              private Version? MigrateFrom;
+              string? Name;
+              void M() {
+                if (Popup.ShowYesNo("Cancel learning? You will be able to return later.") == DialogResult.Yes) return;
+                MetricsManager.LogWarning("hook missing (patch set not applied?); continuing");
+                // is it applied? maybe
+              }
+            }
+            """;
+        var (nullableOut, nullableN) = NullableAnnotationCleaner.Clean(nullableSrc);
+        AssertContains(nullableOut, "private Version? MigrateFrom;", "Version? (game struct) keeps its ?");
+        AssertContains(nullableOut, "  string Name;", "string? is still stripped");
+        AssertContains(nullableOut, "\"Cancel learning? You will be able to return later.\"", "? inside a string literal stays");
+        AssertContains(nullableOut, "(patch set not applied?); continuing", "? before ) inside a string literal stays");
+        AssertContains(nullableOut, "// is it applied? maybe", "? inside a comment stays");
+        Assert(nullableN == 1, "nullable edits: " + nullableN);
+
+        // ApplyGuard: the text check that would have stopped the deleted question marks.
+        const string guardBefore = "class G { void M(GameObject go) { Popup.Show(\"Cancel learning? You will be able to return later.\"); Say(\"The coat on \" + go.t() + \" is spent.\"); } }";
+        var guardDamaged = guardBefore.Replace("learning? You", "learning You");
+        var damagedReasons = ApplyGuard.CheckRewrite(guardBefore, guardDamaged);
+        Assert(damagedReasons.Count == 1 && damagedReasons[0].Contains("Cancel learning? You will", StringComparison.Ordinal),
+            "text guard names the changed string: " + string.Join(" / ", damagedReasons));
+        var (guardFixed, _) = GameTextCallSiteFixer.Fix(guardBefore);
+        AssertContains(guardFixed, "\"The coat on =object.the.name= is spent.\"", "guard sample is rewritten");
+        Assert(ApplyGuard.CheckRewrite(guardBefore, guardFixed).Count == 0,
+            "a template merge keeps every piece of text: " + string.Join(" / ", ApplyGuard.CheckRewrite(guardBefore, guardFixed)));
+        var unbalanced = ApplyGuard.CheckRewrite(guardBefore, guardBefore.Replace("go.t() +", "go.t( +"));
+        Assert(unbalanced.Any(r => r.Contains("no longer balance", StringComparison.Ordinal)), "text guard sees unbalanced brackets");
+        Assert(ApplyGuard.CheckRewrite(
+                "class I { string M(GameObject go) => $\"{go.t()} is compromised.\"; }",
+                "class I { string M(GameObject go) => \"=subject.the.name= is compromised.\".StartReplace().SetSubject(go).ToString(); }").Count == 0,
+            "interpolation holes are not text");
+        Assert(ApplyGuard.CheckRewrite("class C { /* a ( in a comment */ char c = '('; string s = \"(\"; }",
+                "class C { /* a ( in a comment */ char c = '('; string s = \"(\"; int x; }").Count == 0,
+            "brackets in comments, chars and strings are not code");
+
+        // CompileGuard end to end on a throwaway mod: a rewrite that breaks the build is put back.
+        if (Directory.Exists(SteamInstall.ManagedDirOrFallback))
+        {
+            var guardMod = Path.Combine(Path.GetTempPath(), "ApiMigratorGuardTest_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(guardMod);
+            try
+            {
+                File.WriteAllText(Path.Combine(guardMod, "manifest.json"), "{ \"id\": \"GuardTest\" }");
+                var goodFile = Path.Combine(guardMod, "Good.cs");
+                var otherFile = Path.Combine(guardMod, "Other.cs");
+                const string goodSrc = "namespace GuardTest { public class Good { public int Twice(int x) => x * 2; } }\n";
+                const string otherSrc = "namespace GuardTest { public class Other { public int Four() => new Good().Twice(2); } }\n";
+                File.WriteAllText(goodFile, goodSrc);
+                File.WriteAllText(otherFile, otherSrc);
+
+                var guardLog = new List<string>();
+                var breaking = new CompileGuard(SteamInstall.ManagedDirOrFallback, guardLog.Add);
+                Assert(breaking.BeforeWrite(goodFile, goodSrc), "compile guard baseline compiles: " + string.Join(" / ", guardLog));
+                File.WriteAllText(goodFile, goodSrc.Replace("Twice", "Double")); // Other.cs still calls Twice
+                var broken = breaking.Finish();
+                if (!(broken.Count == 1 && broken[0].Reverted))
+                {
+                    var dbg = ModCompiler.CompileAgainstManaged(guardMod, SteamInstall.ManagedDirOrFallback, null, null,
+                        new[] { Path.Combine(CoqPaths.LocalLowCoqRoot, "ModAssemblies") });
+                    Console.WriteLine("DEBUG exit=" + dbg.ExitCode + " outcomes=" + broken.Count + "\n" +
+                        string.Join("\n", dbg.Output.Split('\n').Where(l => l.Contains("error", StringComparison.Ordinal)).Distinct().Take(12)));
+                }
+                Assert(broken.Count == 1 && broken[0].Reverted, "compile guard reverts a breaking rewrite: " + string.Join(" / ", guardLog));
+                Assert(File.ReadAllText(goodFile) == goodSrc, "compile guard restored the original file");
+                Assert(broken[0].NewErrors.Any(e => e.Contains("Other.cs", StringComparison.Ordinal)), "compile guard reports the new error");
+
+                var harmless = new CompileGuard(SteamInstall.ManagedDirOrFallback);
+                Assert(harmless.BeforeWrite(goodFile, goodSrc), "compile guard baseline (second run)");
+                var renamed = goodSrc.Replace("int x", "int value").Replace("x * 2", "value * 2");
+                File.WriteAllText(goodFile, renamed);
+                var kept = harmless.Finish();
+                Assert(kept.Count == 1 && !kept[0].Reverted, "compile guard keeps a rewrite that still compiles");
+                Assert(File.ReadAllText(goodFile) == renamed, "kept rewrite stays on disk");
+            }
+            finally
+            {
+                try { Directory.Delete(guardMod, recursive: true); } catch { /* temp */ }
+            }
+        }
+
+        var (singleOut, _) = GameTextCallSiteFixer.Fix(
+            "class S { void M(GameObject go) { Fail(\"over \" + go.t(int.MaxValue, null, null, AsIfKnown: false, Single: true) + \".\"); } }");
+        AssertContains(singleOut, "\"over =object.the.name:single=.\".StartReplace().SetObject(go).ToString()", "t(Single: true) keeps :single");
         AssertContains(gtFixed, "using XRL.World.Text;", "GameText using");
         AssertContains(gtFixed, "using XRL;", "StartReplace extension using");
         // HotkeySpread.get must NOT be treated as Reputation.get by dump pattern
@@ -2348,13 +2521,12 @@ var engine = new RuleEngine(
         """;
     var (becomingOut, becomingN) = GameTextCallSiteFixer.Fix(becomingText);
     Assert(becomingN == 10, "Becoming GameText calls: " + becomingN);
-    AssertContains(becomingOut, "=object.the.name=", "t call");
-    AssertContains(becomingOut, "=object.a.name=", "an call");
-    AssertContains(becomingOut, "=object.does:carry=", "does call");
-    AssertContains(becomingOut, "=object.Does:move=", "Does call");
-    AssertContains(becomingOut, "=object.the.name's:withTitles= armor", "poss call");
-    AssertContains(becomingOut, "=object.them=", "them property");
-    AssertContains(becomingOut, "=object.itis=", "itis property");
+    // 2026-11-12: neighbouring fragments fold into one template; the first object named (target) becomes the
+    // subject and the second (item) the object, so the tokens below carry those roles.
+    AssertContains(becomingOut,
+        "\"=subject.the.name==object.a.name==subject.does:carry==subject.Does:move==subject.the.name's:withTitles= armor=subject.them==subject.itis=\".StartReplace().SetSubject(target).SetObject(item).ToString()",
+        "t/an/does/Does/poss/them/itis fold into one subject/object template");
+    AssertContains(becomingOut, "string Flags(GameObject target) => \"=object.the.name=\".StartReplace().SetObject(target).ToString();", "lone t call keeps its object role");
     AssertContains(becomingOut, "=text|title=", "MakeTitleCase call");
     AssertContains(becomingOut, "=LiquidVolume.liquid.name=", "GetLiquidName call");
 

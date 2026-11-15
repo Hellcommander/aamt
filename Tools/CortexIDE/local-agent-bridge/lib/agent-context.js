@@ -40,11 +40,12 @@ class Progress {
     const a = args || {};
     const r = String(result || "");
     const failed = /^error:/i.test(r);
-    if (name === "Read" && !failed) this.read.add(String(a.path));
+    if (name === "Read" && !failed) this.read.add(String(a.path || a.file_path || a.target_file));
+    else if (name === "Task" && !failed) this.notes.push("Sub-agent: " + short(a.description || a.prompt, 80) + " → " + short(r.replace(/^Sub-agent report[^\n]*\n/, ""), 300));
     else if ((name === "Grep" || name === "Glob") && !failed) {
       const hits = /^\(no /.test(r) ? 0 : r.split("\n").filter(Boolean).length;
       this.searched.push(name + " " + short(a.pattern, 60) + (a.path ? " in " + short(a.path, 80) : "") + " → " + hits + " hits");
-    } else if ((name === "StrReplace" || name === "Write" || name === "Delete") && !failed) {
+    } else if ((name === "StrReplace" || name === "MultiEdit" || name === "Write" || name === "Delete") && !failed) {
       const first = r.split("\n")[0];
       const detail = (first.match(/\(([^)]*)\)\s*$/) || [])[1];
       this.edited.set(String(a.path), first.split(" ")[0] + (detail ? ", " + detail : ""));

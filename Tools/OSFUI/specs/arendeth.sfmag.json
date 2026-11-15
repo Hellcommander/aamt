@@ -629,13 +629,19 @@
             "label": "Death Waste Release",
             "type": "bool",
             "default": false,
-            "hint": "Extra simulation, all off by default. A MAG holds solids until it is actually full; overflow (and any mess with no MAG) falls through pants onto the ground. Underwear and outer clothes do not contain. Urine soaks in — it is not a puddle."
+            "hint": "Extra simulation. A MAG holds until it is actually full. Overflow and any accident with no MAG leave the garment: solids fall through pants, urine (held as liquid in the MAG) dumps at the feet and pools. Underwear / outer clothes do not contain. Requires MadScience.dll (flp_fluid: urine=4, waste=..."
           },
           {
             "key": "Waste.WorldWasteDeposits",
             "label": "World Waste Deposits",
             "type": "bool",
             "default": false
+          },
+          {
+            "key": "Waste.EmitWorldFluid",
+            "label": "Emit World Fluid",
+            "type": "bool",
+            "default": true
           },
           {
             "key": "Waste.CleanupHours",

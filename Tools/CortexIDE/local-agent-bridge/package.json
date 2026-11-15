@@ -1,8 +1,8 @@
 {
   "name": "local-agent-bridge",
   "displayName": "Local Agent Bridge",
-  "description": "CortexIDE coding agent on local models (vLLM / Ollama) or Claude (Anthropic API) with file, search and shell tools, SKILL.md skills, .canvas.tsx canvases, and chat import (including Cursor exports).",
-  "version": "2.2.1",
+  "description": "CortexIDE coding agent on local models (vLLM / Ollama), Claude (Anthropic API) or the Claude Code engine, with file, search and shell tools, SKILL.md skills, .canvas.tsx canvases, and chat import (including Cursor exports).",
+  "version": "2.6.0",
   "publisher": "arend",
   "engines": {
     "vscode": "^1.80.0"
@@ -50,6 +50,12 @@
         "category": "Local Agent Bridge"
       },
       {
+        "command": "localAgentBridge.agentUndo",
+        "title": "Agent: Undo Last Turn's Edits",
+        "icon": "$(discard)",
+        "category": "Local Agent Bridge"
+      },
+      {
         "command": "localAgentBridge.agentProgress",
         "title": "Agent: Open Progress Index",
         "category": "Local Agent Bridge"
@@ -57,6 +63,16 @@
       {
         "command": "localAgentBridge.setClaudeApiKey",
         "title": "Agent: Set Claude API Key",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.signIn",
+        "title": "Agent: Sign In with Claude (browser)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.signOut",
+        "title": "Agent: Sign Out of Claude",
         "category": "Local Agent Bridge"
       },
       {
@@ -415,6 +431,7 @@
             "vllm",
             "ollama",
             "anthropic",
+            "claude-code",
             "openai"
           ],
           "enumDescriptions": [
@@ -422,6 +439,7 @@
             "vLLM or the Qud Lab SGLang router (:30000, then :8000)",
             "Ollama (:11434), using its native API so num_ctx is honoured",
             "Claude through the Anthropic Messages API (api.anthropic.com). Key from “Agent: Set Claude API Key”, ANTHROPIC_API_KEY, ANTHROPIC_AUTH_TOKEN or `ant auth login`.",
+            "The installed Claude Code CLI runs the agent — the same engine as the Claude app, with its own tools, skills, CLAUDE.md, MCP servers and subagents.",
             "Any OpenAI-compatible URL set in localAgentBridge.agent.baseUrl"
           ],
           "default": "auto",
@@ -455,7 +473,7 @@
         "localAgentBridge.agent.maxOutputTokens": {
           "type": "number",
           "default": 2048,
-          "description": "Max tokens per model reply on local backends (Claude uses claudeMaxOutputTokens)."
+          "description": "Max tokens per model reply on local backends (Claude uses claudeMaxOutputTokens). Thinking models (qwen3, deepseek-r1) need more, e.g. 4096-8192."
         },
         "localAgentBridge.agent.claudeMaxOutputTokens": {
           "type": "number",
@@ -487,6 +505,43 @@
           "type": "string",
           "default": "",
           "description": "Anthropic workspace id (wrkspc_…) sent as anthropic-workspace-id. Needed with a user-scoped key (sk-ant-usr-…); workspace-scoped keys leave it empty. Empty = ANTHROPIC_WORKSPACE_ID from the environment."
+        },
+        "localAgentBridge.agent.claudeCodePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Claude Code CLI for the claude-code backend. Empty = claude on PATH, then %USERPROFILE%\\.local\\bin\\claude.exe."
+        },
+        "localAgentBridge.agent.claudeCodePermissionMode": {
+          "type": "string",
+          "enum": [
+            "acceptEdits",
+            "auto",
+            "plan",
+            "manual"
+          ],
+          "enumDescriptions": [
+            "File edits are applied without asking; shell commands follow localAgentBridge.agent.shell",
+            "Claude Code's auto mode: a classifier decides what may run",
+            "Plan only: nothing is changed",
+            "Anything that would need approval is denied (the panel cannot show Claude Code's prompts)"
+          ],
+          "default": "acceptEdits",
+          "description": "Permission mode for the claude-code backend. The panel runs Claude Code headless, so a call that would prompt is denied and reported."
+        },
+        "localAgentBridge.agent.claudeCodeAuth": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "apiKey",
+            "login"
+          ],
+          "enumDescriptions": [
+            "Use the bridge's Anthropic key when one is set, otherwise Claude Code's own login",
+            "Always the bridge's Anthropic key (Secret Storage, apiKey setting or ANTHROPIC_API_KEY), with claudeWorkspaceId",
+            "Always Claude Code's own login (run claude and /login once); API keys in the environment are not passed on"
+          ],
+          "default": "auto",
+          "description": "How the claude-code backend authenticates."
         },
         "localAgentBridge.agent.maxRounds": {
           "type": "number",
@@ -523,6 +578,21 @@
           "type": "boolean",
           "default": true,
           "description": "Let the agent read files outside the workspace (writes stay limited to workspace + writableRoots)."
+        },
+        "localAgentBridge.agent.requireReadBeforeEdit": {
+          "type": "boolean",
+          "default": true,
+          "description": "Refuse whole-file Write over a file the agent has not Read, loose (indentation-tolerant) edits to unread files, and any edit to a file that changed on disk since the agent read it. Exact StrReplace matches are always allowed."
+        },
+        "localAgentBridge.agent.diagnosticsAfterEdit": {
+          "type": "boolean",
+          "default": true,
+          "description": "After each edit, wait briefly for the language server and add that file's errors to the edit result."
+        },
+        "localAgentBridge.agent.subagents": {
+          "type": "boolean",
+          "default": true,
+          "description": "Offer the Task tool: a read-only research sub-agent with its own context (uses extra model calls)."
         }
       }
     }

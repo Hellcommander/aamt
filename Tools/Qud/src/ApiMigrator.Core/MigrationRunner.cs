@@ -12,6 +12,10 @@ public static class MigrationRunner
         var dump = DumpStore.LoadDump(options.DumpPath);
         var rules = DumpStore.LoadRules(options.RulesPath);
         var engine = new RuleEngine(rules, dump);
+        _sidecarText = new List<string>();
+        options.ActiveCompileGuard = options.Apply && options.CompileGuard
+            ? new CompileGuard(SteamInstall.ManagedDirOrFallback, onLog)
+            : null;
 
         onLog?.Invoke($"Loaded {dump.Entries.Count} obsolete-API entries from {options.DumpPath}");
         onLog?.Invoke($"Loaded {rules.Rules.Count} curated auto-fix rules from {options.RulesPath}");
@@ -106,6 +110,7 @@ public static class MigrationRunner
             foreach (var (spicePath, spiceContent) in fofResult.SpiceFiles)
             {
                 onLog?.Invoke($"FriendOrFoe spice → {spicePath}");
+                _sidecarText?.Add(spiceContent);
                 var wrote = !options.Apply;
                 if (options.Apply)
                 {
@@ -313,8 +318,31 @@ public static class MigrationRunner
             TryWrite(file, working, changed, options, result, onLog);
         }
 
+        // Compile guard: every mod that was written to is compiled again; new errors put its files back.
+        if (options.ActiveCompileGuard is { } compileGuard)
+        {
+            foreach (var outcome in compileGuard.Finish().Where(o => o.Reverted))
+            {
+                var restored = new HashSet<string>(outcome.RevertedFiles, StringComparer.OrdinalIgnoreCase);
+                foreach (var fileResult in report.FileResults)
+                {
+                    if (!restored.Contains(Path.GetFullPath(fileResult.FilePath))) continue;
+                    fileResult.Changed = false;
+                    fileResult.NewContent = null;
+                    fileResult.AppliedFixes = new List<AppliedFix>();
+                }
+            }
+            options.ActiveCompileGuard = null;
+        }
+
         return report;
     }
+
+    /// <summary>
+    /// Contents of the XML sidecars produced in this run, for the text guard: a string a rule moved from a
+    /// .cs file into its sidecar is not lost.
+    /// </summary>
+    [ThreadStatic] static List<string>? _sidecarText;
 
     static void ApplySidecar(
         string modRoot,
@@ -348,6 +376,7 @@ public static class MigrationRunner
         foreach (var (sidecarPath, sidecarContent) in result.SidecarFiles)
         {
             workingMap[sidecarPath] = sidecarContent;
+            _sidecarText?.Add(sidecarContent);
             onLog?.Invoke($"{sidecarLabel} → {sidecarPath}");
 
             if (!originals.ContainsKey(sidecarPath))
@@ -430,6 +459,27 @@ public static class MigrationRunner
         FileScanResult result, Action<string>? onLog)
     {
         if (!changed || !options.Apply) return;
+
+        // Guards (ApplyGuard.cs): a C# rewrite that drops string text or unbalances brackets is never
+        // written, and a mod that can't be compiled first is left alone.
+        if (file.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+        {
+            string? onDisk = null;
+            try { onDisk = File.ReadAllText(file); } catch { /* the write below will report it */ }
+            if (onDisk != null)
+            {
+                var refusal = options.TextGuard ? ApplyGuard.CheckRewrite(onDisk, working, _sidecarText) : new List<string>();
+                if (refusal.Count == 0 && options.ActiveCompileGuard is { } guard && !guard.BeforeWrite(file, onDisk))
+                    refusal.Add("the mod could not be compiled before the change, so the result could not be checked");
+                if (refusal.Count > 0)
+                {
+                    onLog?.Invoke($"GUARD: not writing {file}: {string.Join("; ", refusal)}");
+                    result.Changed = false;
+                    result.NewContent = null;
+                    return;
+                }
+            }
+        }
 
         try
         {

@@ -51,7 +51,7 @@ param(
     [switch]$CompileOnly,   # build but do not deploy
     [switch]$Deploy,        # force deploy (default when not -CompileOnly)
     [switch]$NoDeploy,      # alias for -CompileOnly
-    [switch]$CompileTdb,    # after deploy, rebuild Transcendence.tdb from Transcendence_Source
+    [switch]$CompileTdb,    # compile Transcendence_Source to Output\CompiledTdb (never into the game folder)
     [switch]$DeployTools,   # also copy TransCompiler/TransData if built
     [switch]$UseVS2026,
     [switch]$SkipSdkCheck,
@@ -354,6 +354,7 @@ function Invoke-ApiTreeAutofix {
                 Force = $false
                 Script = "Audit-X64Libs.py"
                 Extra = @("--api-root", $ApiFolder)
+                ReadOnly = $true   # audit only; it has no --dry-run flag
             }
         )
     }
@@ -367,7 +368,7 @@ function Invoke-ApiTreeAutofix {
         }
         $a = @($path) + @($f.Extra)
         if ($f.Force) { $a += "--force" }
-        if ($DryRun) { $a += "--dry-run" }
+        if ($DryRun -and -not $f.ReadOnly) { $a += "--dry-run" }
         Write-Host "Autofix: $($f.Script)" -ForegroundColor Cyan
         & $py.Source @a 2>&1 | ForEach-Object { Write-Host $_ }
         if ($LASTEXITCODE -ne 0) {
@@ -480,11 +481,15 @@ function Invoke-ApiBuild {
     }
 
     if ($null -eq $code) { $code = 1 }
-    # TransCompiler when building game vcxproj only (solution build already includes it if mapped)
-    if ($code -eq 0 -and -not $useSolution -and (Test-Path $compilerProj)) {
-        Write-Host "Building TransCompiler..." -ForegroundColor Gray
+    # TransCompiler + TransData when building game vcxproj only (solution build already includes them if mapped).
+    # TransData used to be skipped here, so -DeployTools shipped a stale copy from an old build folder.
+    $toolProjs = @($compilerProj, (Join-Path (Split-Path $Solution -Parent) "TransData\TransData.vcxproj"))
+    foreach ($toolProj in $toolProjs) {
+    if ($code -eq 0 -and -not $useSolution -and (Test-Path $toolProj)) {
+        $toolName = [IO.Path]::GetFileNameWithoutExtension($toolProj)
+        Write-Host "Building $toolName..." -ForegroundColor Gray
         $cArgs = @(
-            $compilerProj,
+            $toolProj,
             "/p:Configuration=$Configuration",
             "/p:Platform=$Platform",
             "/p:LanguageStandard=stdcpp20",
@@ -500,8 +505,9 @@ function Invoke-ApiBuild {
             else { Write-Host $line }
         }
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "TransCompiler build failed (game exe may still be usable)" -ForegroundColor Yellow
+            Write-Host "$toolName build failed (game exe may still be usable)" -ForegroundColor Yellow
         }
+    }
     }
 
     Write-Host ""
@@ -547,9 +553,30 @@ function Deploy-BuiltExe {
     foreach ($name in $files) {
         $src = $null
         if ($name -in @("TransCompiler.exe", "TransData.exe")) {
-            foreach ($dir in $toolCandidates) {
-                $cand = Join-Path $dir $name
-                if (Test-Path $cand) { $src = $cand; break }
+            # Each tool project builds into its own <Tool>\<Platform>\<Config>\; older builds left copies in the
+            # shared folders above. Take the NEWEST copy, never the first one found.
+            $tool = [IO.Path]::GetFileNameWithoutExtension($name)
+            $dirs = @()
+            if ($ApiFolder) {
+                $dirs += @(
+                    (Join-Path $ApiFolder ("Transcendence\{0}\{1}\{2}" -f $tool, $Platform, $Configuration)),
+                    (Join-Path $ApiFolder ("Transcendence\{0}\x64\{1}" -f $tool, $Configuration))
+                )
+            }
+            $dirs += $toolCandidates
+            $newest = $dirs | ForEach-Object { Join-Path $_ $name } | Where-Object { Test-Path $_ } |
+                ForEach-Object { Get-Item $_ } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+            if ($newest) {
+                $src = $newest.FullName
+                $exeTime = (Get-Item $srcExe).LastWriteTime
+                $dstItem = Get-Item (Join-Path $DestRoot $name) -ErrorAction SilentlyContinue
+                if ($dstItem -and $dstItem.LastWriteTime -gt $newest.LastWriteTime) {
+                    Write-Host ("  skip {0}: game folder copy ({1}) is newer than the build ({2})" -f $name, $dstItem.LastWriteTime, $newest.LastWriteTime) -ForegroundColor DarkYellow
+                    continue
+                }
+                if ($newest.LastWriteTime -lt $exeTime.AddHours(-1)) {
+                    Write-Host ("  warning: {0} build ({1}) is older than this game exe build ({2}) - it was not rebuilt" -f $name, $newest.LastWriteTime, $exeTime) -ForegroundColor Yellow
+                }
             }
         } else {
             $src = Join-Path $ApiGameDir $name
@@ -565,7 +592,7 @@ function Deploy-BuiltExe {
             Write-Host "  skip missing build output: $name" -ForegroundColor DarkYellow
             continue
         }
-        if (Test-Path $dst) {
+        if ((Test-Path $dst) -and -not $DryRun) {
             Copy-Item -Force $dst (Join-Path $bakRoot $name)
             Write-Host "  backup $name -> $bakRoot" -ForegroundColor Gray
         }
@@ -857,10 +884,18 @@ if ($doDeploy) {
 if ($CompileTdb -and -not $DryRun) {
     $tc = Join-Path $cfg.GameRoot "TransCompiler.exe"
     $coreXml = Join-Path $cfg.GameRoot "game_and_dlc_source\Transcendence_Source\Transcendence.xml"
-    $outTdb = Join-Path $cfg.GameRoot "Transcendence.tdb"
+    # NEVER write official content (Transcendence.tdb, Collection\*.tdb) in the game folder: core/DLC files must
+    # stay exactly as Steam ships them (an in-place recompile on 2026-08-08 broke Stars of the Pilgrim and with it
+    # Corporate Command). Compile to the toolkit output folder; use the result for testing only.
+    $outDir = Join-Path $ScriptDir "Output\CompiledTdb"
+    New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+    $outTdb = Join-Path $outDir "Transcendence.tdb"
+    if ($outTdb.StartsWith($cfg.GameRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to compile a TDB into the game folder: $outTdb"
+    }
     if ((Test-Path $tc) -and (Test-Path $coreXml)) {
         Write-Host ""
-        Write-Host "Recompiling Transcendence.tdb ..." -ForegroundColor Cyan
+        Write-Host "Compiling Transcendence.tdb to $outTdb (game folder untouched) ..." -ForegroundColor Cyan
         Push-Location $cfg.GameRoot
         try {
             & $tc "/input:`"$coreXml`"" "/output:`"$outTdb`"" "/digest"

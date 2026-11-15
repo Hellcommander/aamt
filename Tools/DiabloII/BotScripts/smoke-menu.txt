@@ -1,0 +1,6 @@
+# First run of the harness: reach the main menu, look at it, leave. Touches no character.
+waitfor menu 120000
+wait 2000
+panel MainMenuPanel/QuickPlayButton
+screenshot menu
+exit
