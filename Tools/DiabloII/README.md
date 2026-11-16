@@ -1029,16 +1029,28 @@ same when nothing is changed.
 - Not identified yet: most one-argument math functions (shown as `fn1_XX`), the three-argument
   ones, and the exact order of the four inequality tests. The module's docstring marks what
   is presumed.
+- Rechecked 2026-11-16 on the game's current 2206 files (11849 distinct scripts): all round-trip
+  and pass `check`. They added opcode 76, integer division by a constant (one script, in
+  `rmagan\manashielddir00_overlay`).
+- Script headers: words 6-8 are the registers each bank uses. `set_program` (and
+  `set_instructions`) recompute them and the instruction count from the code, so an edited
+  script never gets fewer registers than it uses.
+- `check` (`Baked.validate()`) catches what an edit can break: header counts, constants,
+  externals or functions a script uses that are not there, references to missing objects,
+  curves whose keys, values and tangents disagree, the class table. `EffectEdit.py` runs it on
+  every file it writes and refuses one that fails.
 - Not tested in the game: a script whose instructions were changed (only constants so far).
 - Confirmed in the game (2026-11-13): an edited file with added strings, a changed length and
   textures drawn from scratch loads and shows.
 
 ```
-python PopcornBaked.py props <file.particles>       renderers and their properties (PC copy)
+python PopcornBaked.py props <file.particles> [--platform PC]  renderers and their properties
 python PopcornBaked.py code <file.particles>        compiled scripts: the names they use and their constants
 python PopcornBaked.py dis <file.particles> [n ...]  compiled scripts as readable instructions
 python PopcornBaked.py dump <file.particles> [--class <name>]
-python PopcornBaked.py roundtrip <file or folder>
+python PopcornBaked.py diff <old.particles> <new.particles>   what an edit changed, by object and field
+python PopcornBaked.py check <file or folder> ...   consistency checks (exit 1 on problems)
+python PopcornBaked.py roundtrip <file or folder> ... [--check]
 ```
 
 The layout and the known field meanings are in the module's docstring. First use:
