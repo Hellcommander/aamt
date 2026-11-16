@@ -461,7 +461,27 @@ def add_sequence_state(machine):
     return state
 
 
-def own_animations(archive, definition, variant, out_dir, write):
+CLIP_MODES = {clip: mode for mode, clip in MODES}
+
+
+def clip_marks(audit, spec):
+    """Named points for a clip's edit curves, from the legacy animation of the mode it plays:
+    "hit" = the trigger frame (melee hit, missile launch or skill) over the mode's frame count.
+    The game times the hit by the legacy animation and, as far as seen, plays the HD clip over the
+    same span, so "hit" is where the blow lands in the clip (presumed: stock HD clip lengths differ
+    from the legacy ones, so the clip is stretched)."""
+    mode = (spec.get('mode') or CLIP_MODES.get(spec['name']) or '').upper()
+    entry = (audit or {}).get('modes', {}).get(mode) or {}
+    cof = entry.get('cof')
+    if not cof or not cof.get('frames'):
+        return {}
+    for trigger in cof['triggers']:
+        if trigger['type'] in ('melee hit', 'missile launch', 'skill'):
+            return {'hit': trigger['frame'] / cof['frames']}
+    return {}
+
+
+def own_animations(archive, definition, variant, out_dir, write, audit=None):
     """Gives a variant its own skeleton, state machine and animation file, with new clips added.
 
     The donor's `animation/combined.animations` is copied to
@@ -485,9 +505,14 @@ def own_animations(archive, definition, variant, out_dir, write):
     stock = animations.names()
     added = []
     for spec in variant['animations']:
-        keys = GrannyAnim.build_clip(animations, skeleton, spec)
-        added.append({'clip': spec['name'], 'base': spec.get('base') or '+'.join(part['base'] for part in spec['parts']), 'seconds': round(keys.duration, 3), 'keys': len(keys.times),
-                      'mode': spec.get('mode')})
+        marks = clip_marks(audit, spec)
+        keys = GrannyAnim.build_clip(animations, skeleton, spec, marks)
+        entry = {'clip': spec['name'], 'base': spec.get('base') or '+'.join(part['base'] for part in spec['parts']), 'seconds': round(keys.duration, 3), 'keys': len(keys.times),
+                 'mode': spec.get('mode')}
+        hit = spec.get('hit', marks.get('hit'))
+        if hit is not None:
+            entry['hit'] = round(float(hit), 3)
+        added.append(entry)
     machine = json.loads(archive.read(old_machine[len('data/'):]).decode('utf-8'))
     text = json.dumps(machine, separators=(',', ':')).replace(f'{old_folder}/animation/', f'{new_folder}/animation/')
     machine = json.loads(text)
@@ -618,7 +643,7 @@ def run(preset, game_path, casclib, out_dir, audit_only):
                 sized.update({'donorMeshHeight': round(donor_height, 3), 'reshapedMeshHeight': round(new_height, 3)})
                 entry['scale'] = scale
             if variant.get('animations'):
-                entry['animations'] = own_animations(archive, definition, variant, out_dir, not audit_only)
+                entry['animations'] = own_animations(archive, definition, variant, out_dir, not audit_only, audit)
             prop_definitions = {name: build_prop_definition(archive, name, preset['props'][name]) for name in used_props}
             if not audit_only:
                 write_json(out_dir, entry['file'], definition)
