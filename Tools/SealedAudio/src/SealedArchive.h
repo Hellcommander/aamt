@@ -11,6 +11,13 @@
 // first two words). The build key and its id come from SealedKey.h (generated, never committed); an archive sealed with
 // another key opens when its 32-byte key sits beside it as <archive>.key (hex), so any mod author can seal with a key of
 // their own. Scrambling against copying and tools, not secrecy: the key is in this build.
+//
+// MTSA2 (audio_seal.py seal --sign NAME): sealed against editing. "MTSA2\0", key id, u32 count, then per entry u16
+// nameLen, path, u64 offset, u32 size (plaintext), 12 bytes nonce; data: AES-256-GCM ciphertext + 16-byte tag (associated
+// data "MTSA2\0" + key id + path), with the same key lookup as MTSA1 (so every player's game decrypts it, in memory);
+// trailer: the signer's ECDSA P-256 public key (X||Y) and a signature (r||s) over everything before the signature. The
+// signing key never leaves the author's machine. An archive whose signature does not verify is refused, so an edited
+// archive never plays; with SealedSigner.h (audio_seal.py write-cpp-signer) only the pinned signer is accepted.
 
 #pragma once
 
@@ -31,12 +38,27 @@ namespace SealedAudio
 
 	void SetBuildKey(const unsigned char* key32);   // nullptr: the compiled-in key
 
+	// AES-256-GCM decryption (Windows CNG, Archives.cpp). False when the tag does not verify.
+	bool GcmDecrypt(const unsigned char* key32, const unsigned char* nonce12, const unsigned char* aad, std::size_t aadLen,
+		const unsigned char* cipher, std::size_t len, const unsigned char* tag16, unsigned char* out);
+
+	constexpr std::size_t kGcmTag = 16;
+	constexpr std::size_t kSigTrailer = 128;  // public key 64 + signature 64
+
+	// ECDSA P-256 / SHA-256 over `data` (Windows CNG, Archives.cpp): raw X||Y public key and r||s signature.
+	bool EcdsaP256Verify(const unsigned char* pub64, const unsigned char* data, std::size_t len, const unsigned char* sig64);
+
+	// The pinned signer, if this build has one (SealedSigner.h); null when any valid signature is accepted.
+	const unsigned char* PinnedSigner();
+
 	struct Entry
 	{
 		std::string   name;  // path exactly as stored (seeds the keystream)
 		std::uint64_t offset{ 0 };
 		std::uint32_t size{ 0 };
 		std::uint64_t nonce{ 0 };
+		unsigned char iv[12]{};      // MTSA2
+		bool          gcm{ false };  // MTSA2: AES-256-GCM, size is the plaintext size, a 16-byte tag follows the data
 	};
 
 	inline std::uint64_t ReadU64(const unsigned char* p)
@@ -93,22 +115,28 @@ namespace SealedAudio
 	public:
 		// Parses the index from the whole archive's bytes. False (with a reason) when it is not an archive or was sealed
 		// with a key this build does not carry and `modKeyHex` (the sibling .key file's text) does not match either.
-		bool Open(std::vector<unsigned char> bytes, std::string* error, const std::string& modKeyHex = std::string())
+		// `storeKeyHex`: the local key store's key with this archive's id, if any (used when no .key sits beside it).
+		bool Open(std::vector<unsigned char> bytes, std::string* error, const std::string& modKeyHex = std::string(), const std::string& storeKeyHex = std::string())
 		{
 			_bytes = std::move(bytes);
 			_entries.clear();
 			if (!g_buildKeySet) SetBuildKey(nullptr);
 			std::memcpy(_key, g_buildKey, 32);
-			if (_bytes.size() < 18 || std::memcmp(_bytes.data(), "MTSA1\0", 6) != 0) {
-				return Fail("not a sealed sound archive (MTSA1)", error);
+			const bool v2 = _bytes.size() >= 18 && std::memcmp(_bytes.data(), "MTSA2\0", 6) == 0;
+			if (!v2 && (_bytes.size() < 18 || std::memcmp(_bytes.data(), "MTSA1\0", 6) != 0)) {
+				return Fail("not a sealed sound archive (MTSA1/MTSA2)", error);
 			}
+			const std::string& ownHex = modKeyHex.empty() ? storeKeyHex : modKeyHex;
 			if (std::memcmp(_bytes.data() + 6, g_buildKeyId, 8) != 0) {
 				unsigned char modKey[32];
-				if (!ParseHexKey(modKeyHex, modKey) || !KeyIdMatches(modKey, _bytes.data() + 6)) {
-					return Fail("sealed with a key this build does not carry, and no matching .key file beside it", error);
+				if (!ParseHexKey(ownHex, modKey) || !KeyIdMatches(modKey, _bytes.data() + 6)) {
+					return Fail("sealed with a key this build does not carry, and no matching .key file beside it or in the key store", error);
 				}
 				std::memcpy(_key, modKey, 32);
 				_ownKey = true;
+			}
+			if (v2) {
+				return OpenSigned(error);
 			}
 			const unsigned char* p = _bytes.data();
 			const std::size_t total = _bytes.size();
@@ -142,6 +170,9 @@ namespace SealedAudio
 		[[nodiscard]] bool        IsOpen() const { return !_entries.empty(); }
 		[[nodiscard]] std::size_t Count() const { return _entries.size(); }
 		[[nodiscard]] bool        UsesOwnKey() const { return _ownKey; }
+		[[nodiscard]] bool        Signed() const { return _gcm; }
+		// Signer id: first 8 bytes of SHA-256 of the signer's public key, as hex (MTSA2 only).
+		[[nodiscard]] const std::string& SignerId() const { return _signerId; }
 		[[nodiscard]] const std::unordered_map<std::string, Entry>& Entries() const { return _entries; }
 
 		[[nodiscard]] const Entry* Find(const std::string& normalizedPath) const
@@ -150,9 +181,20 @@ namespace SealedAudio
 			return it == _entries.end() ? nullptr : &it->second;
 		}
 
-		// The unsealed bytes of an entry.
+		// The unsealed bytes of an entry; empty (for a non-empty entry) when an MTSA2 entry fails authentication.
 		std::vector<unsigned char> Read(const Entry& e) const
 		{
+			if (e.gcm) {
+				std::vector<unsigned char> out(e.size);
+				std::vector<unsigned char> aad(_bytes.data(), _bytes.data() + 14);
+				aad.insert(aad.end(), e.name.begin(), e.name.end());
+				const unsigned char* c = _bytes.data() + e.offset;
+				if (!GcmDecrypt(_key, e.iv, aad.data(), aad.size(), c, e.size, c + e.size, out.data())) {
+					SecureZero(out);
+					return {};
+				}
+				return out;
+			}
 			std::vector<unsigned char> out(_bytes.data() + e.offset, _bytes.data() + e.offset + e.size);
 			const std::uint64_t key0 = ReadU64(_key);
 			const std::uint64_t key1 = ReadU64(_key + 8);
@@ -174,7 +216,8 @@ namespace SealedAudio
 			return out;
 		}
 
-	private:
+	public:
+		// 64 hex characters (surrounding whitespace allowed) -> 32 bytes.
 		static bool ParseHexKey(const std::string& hex, unsigned char* out32)
 		{
 			const std::size_t start = hex.find_first_not_of(" \t\r\n"), end = hex.find_last_not_of(" \t\r\n");
@@ -244,6 +287,61 @@ namespace SealedAudio
 			return std::memcmp(id, id8, 8) == 0;
 		}
 
+		static void SecureZero(std::vector<unsigned char>& v)
+		{
+			volatile unsigned char* p = v.data();
+			for (std::size_t i = 0; i < v.size(); i++) p[i] = 0;
+			v.clear();
+		}
+
+		static std::string SignerIdOf(const unsigned char* pub64);  // Archives.cpp (SHA-256 via CNG)
+
+	private:
+		bool OpenSigned(std::string* error)
+		{
+			if (_bytes.size() < 18 + kSigTrailer) {
+				return Fail("truncated archive (no signature)", error);
+			}
+			const std::size_t total = _bytes.size() - kSigTrailer;  // the data ends where the signer's key begins
+			const unsigned char* pub = _bytes.data() + total;
+			const unsigned char* sig = pub + 64;
+			if (!EcdsaP256Verify(pub, _bytes.data(), total + 64, sig)) {
+				return Fail("signature does not verify: the archive was edited after it was sealed", error);
+			}
+			if (const unsigned char* pin = PinnedSigner(); pin && std::memcmp(pin, pub, 64) != 0) {
+				return Fail("signed by someone other than the signer this plugin was built for (SealedSigner.h)", error);
+			}
+			_signerId = SignerIdOf(pub);
+			_gcm = true;
+			const unsigned char* p = _bytes.data();
+			std::size_t pos = 14;
+			const std::uint32_t count = ReadU32(p + pos);
+			pos += 4;
+			for (std::uint32_t i = 0; i < count; i++) {
+				if (pos + 2 > total) {
+					return Fail("truncated archive", error);
+				}
+				const std::uint16_t nameLen = (std::uint16_t)(p[pos] | (p[pos + 1] << 8));
+				pos += 2;
+				if (pos + nameLen + 24 > total) {
+					return Fail("truncated archive", error);
+				}
+				Entry e;
+				e.gcm = true;
+				e.name.assign((const char*)p + pos, nameLen);
+				pos += nameLen;
+				e.offset = ReadU64(p + pos);
+				e.size = ReadU32(p + pos + 8);
+				std::memcpy(e.iv, p + pos + 12, 12);
+				pos += 24;
+				if (e.offset > total || (std::uint64_t)e.size + kGcmTag > total - e.offset) {
+					return Fail("entry past the end of the archive", error);
+				}
+				_entries[NormalizePath(e.name)] = e;
+			}
+			return true;
+		}
+
 		bool Fail(const char* reason, std::string* error)
 		{
 			if (error) {
@@ -255,6 +353,8 @@ namespace SealedAudio
 
 		unsigned char                           _key[32]{};
 		bool                                    _ownKey{ false };
+		bool                                    _gcm{ false };
+		std::string                             _signerId;
 		std::vector<unsigned char>              _bytes;
 		std::unordered_map<std::string, Entry>  _entries;
 	};

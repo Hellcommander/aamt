@@ -175,6 +175,7 @@ function editorEnv() {
     git: gitSummary(roots[0]),
     checks: projectChecks(roots[0]),
     tree: repoMap(roots[0]),
+    canvasDir: roots[0] ? require("./canvas-link").projectCanvasDir(roots[0]) : "",
   };
 }
 
@@ -709,6 +710,12 @@ class AgentViewProvider {
     view.webview.options = { enableScripts: true };
     view.webview.html = html(this.context.extensionPath);
     view.webview.onDidReceiveMessage((m) => this.onMessage(m));
+    // Opening or focusing the Local Agent shows the New Tab page in the editor area instead of Welcome.
+    const showHome = () => {
+      if (this.home && view.visible !== false) Promise.resolve().then(() => this.home.onAgentShown()).catch(() => {});
+    };
+    showHome();
+    if (view.onDidChangeVisibility) view.onDidChangeVisibility(showHome);
     // The panels an empty chat shows follow the open tabs and the panels setting.
     let timer = 0;
     const later = () => {
@@ -768,6 +775,8 @@ class AgentViewProvider {
       else if (m.type === "progress") await this.openProgress();
       else if (m.type === "undo") await this.undoTurn(m.id);
       else if (m.type === "diff") await this.showDiff(m.id, m.path);
+      else if (m.type === "openCanvas") await this.showCanvas(m.file, { force: true });
+      else if (m.type === "canvasSource") await vscode.commands.executeCommand("localAgentBridge.openCanvasSource", vscode.Uri.file(String(m.file || "")));
       else if (m.type === "file") await this.fileAction(m);
       else if (m.type === "attach") await this.attach(m);
       else if (m.type === "panel") await this.panelAction(m);
@@ -1203,8 +1212,18 @@ class AgentViewProvider {
     } catch {
       vision = false;
     }
+    if (backend.provider === "ollama" && typeof llm.ollamaToolAdvice === "function") {
+      // A vision or chat-only model (llava, bakllava, gemma2, …) picked as the agent drives it badly: say so up front.
+      try {
+        const advice = await llm.ollamaToolAdvice(backend.baseUrl, model);
+        if (advice) post({ type: "status", text: advice });
+      } catch {
+        /* advice only */
+      }
+    }
     const tools = new ToolContext({
       roots: env.roots,
+      owner: s.id,
       vision,
       imageMaxEdge: a.get("imageMaxEdge", 1568),
       model,
@@ -1362,6 +1381,14 @@ class AgentViewProvider {
         run.changed = card.files.map((f) => f.path);
         c.log.push(card);
         post({ type: "changes", ...card });
+        // A canvas the turn made or changed gets its own card (as in Cursor), and opens beside the editor.
+        for (const f of card.files) {
+          if (f.kind === "deleted" || !/\.canvas\.tsx$/i.test(f.path)) continue;
+          const row = { cls: "canvas", file: f.path, name: path.basename(f.path).replace(/\.canvas\.tsx$/i, ""), kind: f.kind };
+          c.log.push(row);
+          post({ type: "canvas", ...row });
+          this.showCanvas(f.path, { created: f.kind === "created" }).catch(() => {});
+        }
       }
       if (!s.deleted) {
         try {
@@ -1641,6 +1668,13 @@ class AgentViewProvider {
    * Terminal, Files, Canvas, Side Chat), its canvases, and extra panels from localAgentBridge.agent.panels.
    */
   postPanels() {
+    const d = this.panelData();
+    this.post({ type: "panels", ...d });
+    if (this.home) this.home.refresh(d);
+  }
+
+  /** Everything the empty chat and the New Tab page list (tabs, panels, canvases, recent chats). */
+  panelData() {
     const tabs = [];
     try {
       for (const g of (vscode.window.tabGroups && vscode.window.tabGroups.all) || []) {
@@ -1678,7 +1712,74 @@ class AgentViewProvider {
     } catch {
       /* unreadable folders */
     }
-    this.post({ type: "panels", tabs, canvases, custom, ws, changes: this.gitChanges().length, commands, agents });
+    let recent = [];
+    try {
+      recent = this.store()
+        .list()
+        .slice(0, 8)
+        .map((e) => ({ id: e.id, title: e.title || "New chat", model: e.model || "", updated: e.updated || 0, pinned: !!e.pinned, status: this.runs.has(e.id) ? "running" : e.status || "idle" }));
+    } catch {
+      /* no history yet */
+    }
+    const backend = this.backend ? this.backend.label + " · " + (this.model || "default model") : "";
+    let otherCanvases = 0;
+    try {
+      otherCanvases = require("./canvas-link").otherCanvases(roots).length;
+    } catch {
+      /* unreadable */
+    }
+    return { tabs, canvases, custom, ws, changes: this.gitChanges().length, commands, agents, recent, backend, otherCanvases };
+  }
+
+  /**
+   * Open a canvas in its preview beside the editor. An open preview already re-renders when the
+   * file changes, so after a turn it is only opened when it is not showing (and
+   * localAgentBridge.canvas.autoOpen allows); force opens it anyway.
+   */
+  async showCanvas(file, { force = false, created = false } = {}) {
+    if (!file) return;
+    const uri = vscode.Uri.file(String(file));
+    if (!force) {
+      const mode = cfg().get("canvasAutoOpen", "always");
+      if (mode === "off" || (mode === "created" && !created)) return;
+      try {
+        const open = vscode.window.tabGroups.all.some((g) => g.tabs.some((t) => t.input && t.input.uri && t.input.uri.fsPath.toLowerCase() === uri.fsPath.toLowerCase() && t.input.viewType === "localAgentBridge.canvasPreview"));
+        if (open) return;
+      } catch {
+        /* no tab API */
+      }
+    }
+    await vscode.commands.executeCommand("vscode.openWith", uri, "localAgentBridge.canvasPreview", { viewColumn: vscode.ViewColumn.Beside, preserveFocus: !force });
+  }
+
+  /**
+   * A request about a canvas from its toolbar: the chat on screen takes it when it is idle, else a
+   * new chat does.
+   */
+  async askAboutCanvas(text) {
+    const t = String(text || "").trim();
+    if (!t) return;
+    await this.focus();
+    let s = this.active();
+    if (!s || this.runs.has(s.id)) s = await this.newChat({});
+    else await this.setActive(s.id);
+    this.send(t, s.id).catch((e) => vscode.window.showErrorMessage("Agent: " + ((e && e.message) || e)));
+  }
+
+  /** A prompt typed on the New Tab page: a new chat in the Agent panel runs it. */
+  async startFromHome(text, mode) {
+    const t = String(text || "").trim();
+    if (!t) return;
+    await this.focus();
+    const s = await this.newChat();
+    const body = /^\//.test(t) ? t : require("./composer").compose(t, mode || "agent", []);
+    this.send(body, s.id).catch((e) => vscode.window.showErrorMessage("Agent: " + ((e && e.message) || e)));
+  }
+
+  /** Open a chat from the New Tab page's recent list. */
+  async openChatFromHome(id) {
+    await this.focus();
+    if (id && this.session(id)) await this.setActive(id);
   }
 
   /**
@@ -1693,7 +1794,10 @@ class AgentViewProvider {
     if (id === "changes") return run("workbench.view.scm");
     if (id === "files") return run("workbench.view.explorer");
     if (id === "terminal") return run("workbench.action.terminal.focus");
-    if (id === "side") return this.newChat();
+    if (id === "side") {
+      await this.focus();
+      return this.newChat();
+    }
     if (id === "browser") return this.openBrowser("");
     if (id === "openCanvas" && m.file) return run("localAgentBridge.openCanvas", String(m.file));
     if (id === "canvas") {

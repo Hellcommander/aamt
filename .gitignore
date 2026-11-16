@@ -220,6 +220,18 @@ Tools/Qud/canvases/cortexide-docs-canvas.canvas.tsx
 
 # sealed sound archive key: readers carry it, the repo never does
 Tools/Shared/audio_seal.key
+Tools/SealedAudio/src/SealedKey.h
+# a mod author's pinned signer (audio_seal.py write-cpp-signer): per author, generated
+Tools/SealedAudio/src/SealedSigner.h
 Tools/Shared/archive.key
+# every key the sealing tools produce, wherever it lands (audio_seal.py / Seal-LocalAudio.ps1):
+# archive keys (<name>.key, <archive>.key, sounds.key), signing keys (<name>.signkey), generated key headers,
+# and a key store folder pointed inside the repo (key_dirs)
+*.key
+*.signkey
+**/SealedKey.h
+**/SealedSigner.h
+Tools/SealedAudio/**/keys/
+**/SealedAudio/keys/
 /Tools/Qud/_cache
 Tools/DiabloII/third_party/D2RBinTool/

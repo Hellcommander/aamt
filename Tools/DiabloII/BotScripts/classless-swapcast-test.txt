@@ -1,0 +1,22 @@
+# In-game check that Classless and Swap Cast load together and casting still works.
+# No cheats: enters the last played character, walks (walking is a skill use too), right-clicks the ground, leaves.
+
+waitfor menu 120000
+waitfor panel CharacterSelectPanel 20000
+wait 2500
+ui MainMenuHD:Play
+waitfor game 60000
+wait 5000
+screenshot entered
+
+click left 0.70 0.55 300
+wait 2000
+click left 0.35 0.55 300
+wait 2000
+click right 0.60 0.45 200
+wait 1500
+click right 0.40 0.45 200
+wait 1500
+screenshot after-casts
+state
+exit

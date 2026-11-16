@@ -144,3 +144,41 @@ test("OpenAI-compatible: vLLM without auto tool choice raises ToolsUnsupported",
     (e) => e instanceof llm.ToolsUnsupported
   );
 });
+
+test("local backends retry a 503 / dropped connection before anything streamed", async () => {
+  llm.retry.baseMs = 10;
+  let calls = 0;
+  const retries = [];
+  handler = (b, q, res) => {
+    calls++;
+    if (calls === 1) return json(res, 503, { error: "model is loading" });
+    if (calls === 2) return q.socket.destroy();
+    sse(res, [{ choices: [{ delta: { content: "back" } }] }, { choices: [{ delta: {}, finish_reason: "stop" }] }, "[DONE]"]);
+  };
+  const r = await llm.chat({ backend: { provider: "vllm", baseUrl: base + "/v1" }, model: "m", messages: msgs, onRetry: (x) => retries.push(x.attempt) });
+  assert.strictEqual(r.content, "back");
+  assert.strictEqual(calls, 3);
+  assert.deepStrictEqual(retries, [1, 2]);
+});
+
+test("local backends do not retry a 400 or a stream that already produced text", async () => {
+  llm.retry.baseMs = 10;
+  let calls = 0;
+  handler = (b, q, res) => {
+    calls++;
+    json(res, 400, { error: "bad request" });
+  };
+  await assert.rejects(llm.chat({ backend: { provider: "vllm", baseUrl: base + "/v1" }, model: "m", messages: msgs }));
+  assert.strictEqual(calls, 1);
+  calls = 0;
+  handler = (b, q, res) => {
+    calls++;
+    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    res.write("data: " + JSON.stringify({ choices: [{ delta: { content: "half" } }] }) + "\n\n");
+    setTimeout(() => q.socket.destroy(), 20);
+  };
+  let shown = "";
+  await assert.rejects(llm.chat({ backend: { provider: "vllm", baseUrl: base + "/v1" }, model: "m", messages: msgs, onText: (t) => (shown += t) }));
+  assert.strictEqual(calls, 1, "no second request once text was shown");
+  assert.strictEqual(shown, "half");
+});

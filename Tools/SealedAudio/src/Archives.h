@@ -16,8 +16,10 @@ namespace SealedAudio::Archives
 		std::size_t refused{ 0 };
 	};
 
-	// `archiveDir` holds the *.mtsa files. `key32` overrides the compiled-in key (nullptr keeps it). Returns what was mounted.
-	Stats Load(const std::wstring& archiveDir, const unsigned char* key32);
+	// `archiveDir` holds the *.mtsa files. `key32` overrides the compiled-in key (nullptr keeps it). An archive sealed with
+	// another key opens with <archive>.key beside it, else with whichever *.key in `keyDirs` (the local key store, keys
+	// that never ship with a mod) has the archive's key id. Returns what was mounted.
+	Stats Load(const std::wstring& archiveDir, const unsigned char* key32, const std::vector<std::wstring>& keyDirs = {});
 
 	// True when an archive holds that path (relative to Data, e.g. "Sound\fx\mymod\hit.wav").
 	[[nodiscard]] bool Has(const std::string& relativeToData);

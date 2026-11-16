@@ -25,6 +25,9 @@ usage:
                   [--conflicts mod|earlier] [--files overwrite|keep]
       (no page: updates the mods from --source, or from the download each was converted from;
        the row-matching options replace the ones the mod was converted with)
+  ModConverter.py --game <D2R folder> --convert <download> [--id <mod id>] [--name N] [--author A]
+                  [--version V] [--rows keep|rebuild] [--plugins mod|packages] (+ the options above)
+      (no page: the page's Convert; the download is remembered, so --update <mod id> redoes it)
 
 Only this computer can reach the server (it listens on 127.0.0.1).
 """
@@ -62,6 +65,35 @@ def find_d2rmm(game):
     return None
 
 
+def make_writable(root):
+    """Clears read-only flags under a folder; returns how many were set. Some downloads (Reimagined
+    3.1.1's zip) record every folder as read-only, and Windows will not rename or remove a read-only
+    folder: the update could then neither move the files into place nor clean up."""
+    import stat
+    n = 0
+    for p in [Path(root), *Path(root).rglob('*')]:
+        mode = os.stat(p).st_mode
+        if not mode & stat.S_IWRITE:
+            os.chmod(p, mode | stat.S_IWRITE)
+            n += 1
+    return n
+
+
+def _rm_writable(func, path, exc):
+    """rmtree error handler: clear read-only and retry once."""
+    import stat
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
+def rm_quiet(path):
+    """Removes a folder of the converter's own, read-only parts too; never fails the job."""
+    try:
+        shutil.rmtree(path, onexc=_rm_writable)
+    except OSError:
+        pass
+
+
 def find_7z():
     for p in (shutil.which('7z'), shutil.which('7za'), r'C:\Program Files\7-Zip\7z.exe', r'C:\Program Files (x86)\7-Zip\7z.exe'):
         if p and Path(p).exists():
@@ -71,6 +103,11 @@ def find_7z():
 
 def data_root_of(mod_dir):
     """(data folder, container to move) of a mod folder, or None."""
+    # the <Name>.mpq folder itself given as the source (e.g. <game>\Reimagined.mpq): keep it whole,
+    # so modinfo.json (name, version) goes along with its data
+    if mod_dir.is_dir() and mod_dir.name.lower().endswith('.mpq') and (mod_dir / 'modinfo.json').exists() \
+            and (mod_dir / 'data').is_dir():
+        return mod_dir / 'data', mod_dir
     for p in sorted(mod_dir.iterdir()) if mod_dir.is_dir() else []:
         if p.is_dir() and p.name.lower().endswith('.mpq') and (p / 'modinfo.json').exists() and (p / 'data').is_dir():
             return p / 'data', p
@@ -259,7 +296,7 @@ class App:
                 self.unpack_packed(out, job)
             return out, True
         if out.exists():
-            shutil.rmtree(out)
+            shutil.rmtree(out, onexc=_rm_writable)
         out.mkdir(parents=True)
         ext = src.suffix.lower()
         if ext == '.mpq':
@@ -275,6 +312,9 @@ class App:
             self.run_tool([self.sevenzip, 'x', '-y', '-bso0', '-bsp0', '-o' + str(out), str(src)], job)
         else:
             raise ValueError('cannot open %s (folder, .zip, .7z, .rar or .mpq)' % src.name)
+        cleared = make_writable(out)
+        if cleared:
+            job.log('  %d read-only files/folders in the download made writable' % cleared)
         if unpack:
             self.unpack_packed(out, job)
         (out / '.complete').write_text('ok')
@@ -384,7 +424,7 @@ class App:
     def backup(self, target, job):
         prev = target / 'd2rmm' / 'previous'
         if prev.exists():
-            shutil.rmtree(prev)
+            shutil.rmtree(prev, onexc=_rm_writable)
         prev.mkdir(parents=True)
         old = data_root_of(target)
         moved = []
@@ -398,7 +438,7 @@ class App:
         for part in list((target / 'd2rmm' / 'previous').iterdir()):
             now = target / part.name
             if now.exists():
-                shutil.rmtree(now) if now.is_dir() else now.unlink()
+                shutil.rmtree(now, onexc=_rm_writable) if now.is_dir() else now.unlink()
             shutil.move(str(part), str(now))
         job.log('old files restored; run the old conversion again with ConvertDataMod.py if mod.js changed')
 
@@ -565,13 +605,24 @@ class App:
                 if target.exists():
                     raise ValueError('%s is already in the mods folder: use Update, or pick another id' % mod_id)
                 target.mkdir(parents=True)
-            put = shutil.move if temporary else (lambda a, b: shutil.copytree(a, b) if Path(a).is_dir() else shutil.copy2(a, b))
+            def copy(a, b):
+                if Path(b).exists():  # a half-done move
+                    shutil.rmtree(b, onexc=_rm_writable) if Path(b).is_dir() else Path(b).unlink()
+                shutil.copytree(a, b) if Path(a).is_dir() else shutil.copy2(a, b)
+
+            def put(a, b):
+                # An extracted copy is moved; Windows can refuse the rename (a scanner holding the
+                # fresh files), and shutil.move's own fallback then fails deleting the source. Copy
+                # instead: the extracted folder is removed afterwards with errors ignored.
+                if not temporary:
+                    return copy(a, b)
+                try:
+                    os.rename(a, b)
+                except OSError as e:
+                    job.log('  moving %s was refused (%s): copying instead' % (Path(a).name, e.strerror or e))
+                    copy(a, b)
             container = Path(m['container'])
             extras = extra_loaders(root, Path(m['folder']), m['loader'])
-            job.log('putting %s into %s ...' % (container.name, target))
-            put(str(container), str(target / container.name))
-            if m['loader']:
-                put(str(m['loader']), str(target / 'd2rloader'))
             want = {
                 'name': p.get('name') or settings.get('name'),
                 'author': p.get('author') or settings.get('author'),
@@ -582,6 +633,11 @@ class App:
             }
             before = (ConvertDataMod.old_report(target).get('features') or {}) if update else {}
             try:
+                # inside the try: a failure while placing the new files also puts the old ones back
+                job.log('putting %s into %s ...' % (container.name, target))
+                put(str(container), str(target / container.name))
+                if m['loader']:
+                    put(str(m['loader']), str(target / 'd2rloader'))
                 self.run_tool(self.convert_cmd(target, want, p['source']), job)
                 if extras:
                     self.package_extras(mod_id, target, extras, job)
@@ -591,12 +647,15 @@ class App:
                 raise
             finally:
                 if temporary:  # the extracted copy is used up
-                    shutil.rmtree(root, ignore_errors=True)
+                    rm_quiet(root)
             after = ConvertDataMod.old_report(target).get('features') or {}
             if update:
                 for fid in sorted(set(before) | set(after)):
                     if before.get(fid) != after.get(fid):
                         job.log('  %s: %s -> %s files' % (fid, before.get(fid, 0), after.get(fid, 0)))
+                # the new conversion passed its check: the old files are no longer needed
+                rm_quiet(target / 'd2rmm' / 'previous')
+                job.log('old files removed from %s' % (target / 'd2rmm' / 'previous'))
             job.log('done: %s is ready. In D2RMM: Refresh list (and Plugins > Refresh when plugins were packaged), '
                     'then Install Mods with the game closed.' % mod_id)
             return {'id': mod_id}
@@ -652,6 +711,36 @@ def make_handler(app):
     return Handler
 
 
+def follow(job):
+    """Prints a job's log until it ends; True when it succeeded."""
+    n = 0
+    while True:
+        state = job.state  # read before printing, so lines logged before the end are all printed
+        while n < len(job.lines):
+            print(job.lines[n], flush=True)
+            n += 1
+        if state != 'running':
+            return state == 'done'
+        time.sleep(0.3)
+
+
+def convert_cli(app, source, p):
+    """--convert: the page's Convert without the page. The download is recorded in convert.json, so
+    --update <id> later redoes the conversion from it (or from a new --source)."""
+    src = Path(source)
+    if src.exists():
+        source = str(src.resolve())
+    if not p.get('id'):
+        job = Job('inspect')
+        root, _ = app.stage(source, job, unpack=False)
+        found = app.describe(root) if root.is_dir() else []
+        p['id'] = found[0]['id'] if found else src.stem
+    print('== converting %s into %s' % (source, app.mods / p['id']), flush=True)
+    ok = follow(app.convert(dict(p, source=source), update=False))
+    print('== %s: %s' % (p['id'], 'done' if ok else 'failed'), flush=True)
+    return 0 if ok else 1
+
+
 def update_cli(app, ids, source, options=None):
     """--update: the page's Update, run here one mod after the other; exit 1 if any failed.
     options: row-matching choices that replace the ones the mod was converted with."""
@@ -668,17 +757,9 @@ def update_cli(app, ids, source, options=None):
             code = 1
             continue
         print('== updating %s from %s' % (mod_id, src), flush=True)
-        job = app.convert(dict(options or {}, id=mod_id, source=src), update=True)
-        n = 0
-        while True:
-            while n < len(job.lines):
-                print(job.lines[n], flush=True)
-                n += 1
-            if job.state != 'running':
-                break
-            time.sleep(0.3)
-        print('== %s: %s' % (mod_id, job.state), flush=True)
-        if job.state != 'done':
+        ok = follow(app.convert(dict(options or {}, id=mod_id, source=src), update=True))
+        print('== %s: %s' % (mod_id, 'done' if ok else 'failed'), flush=True)
+        if not ok:
             code = 1
     return code
 
@@ -692,6 +773,15 @@ def main():
     ap.add_argument('--update', action='append', metavar='MOD_ID',
                     help='update this converted mod without the page (repeatable)')
     ap.add_argument('--source', help='with --update: the new download (default: the one in its convert.json)')
+    ap.add_argument('--convert', metavar='SOURCE',
+                    help='convert a mod without the page: a folder (also a <Name>.mpq folder), .zip/.7z/.rar or packed '
+                         '.mpq; it goes into <D2RMM>\\mods\\<id> and is remembered for --update')
+    ap.add_argument('--id', help='with --convert: the mod folder name in D2RMM (default: the mod\'s own name)')
+    ap.add_argument('--name', help='with --convert: the name shown in D2RMM')
+    ap.add_argument('--author', help='with --convert: the author shown in D2RMM')
+    ap.add_argument('--version', help='with --convert: the version (default: the mod\'s modinfo.json)')
+    ap.add_argument('--rows', choices=('keep', 'rebuild'), help='with --convert: row merge mode (default keep)')
+    ap.add_argument('--plugins', choices=('mod', 'packages'), help='with --convert: D2RLoader plugins in mod.js or as packages')
     ap.add_argument('--match-trim', action=argparse.BooleanOptionalAction, default=None,
                     help='with --update: match row names with the spaces around them ignored (default: as converted, else on)')
     ap.add_argument('--duplicates', choices=('content', 'order'),
@@ -717,6 +807,12 @@ def main():
                                      ('deleted', args.deleted), ('conflicts', args.conflicts),
                                      ('files', args.files)) if v is not None}
         sys.exit(update_cli(app, args.update, args.source, options))
+    if args.convert:
+        p = {k: v for k, v in (('id', args.id), ('name', args.name), ('author', args.author), ('version', args.version),
+                               ('rows', args.rows), ('plugins', args.plugins), ('matchTrim', args.match_trim),
+                               ('duplicates', args.duplicates), ('deleted', args.deleted),
+                               ('conflicts', args.conflicts), ('files', args.files)) if v is not None}
+        sys.exit(convert_cli(app, args.convert, p))
     server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(app))
     url = 'http://127.0.0.1:%d/' % args.port
     print('Mod converter on %s (game %s, D2RMM %s). Ctrl+C stops it.' % (url, game, d2rmm))

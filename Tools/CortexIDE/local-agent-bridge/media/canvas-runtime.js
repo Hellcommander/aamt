@@ -845,6 +845,8 @@
     Swatch, TodoList, TodoListCard, UsageBar,
     colorPalette, categoryPaletteDark, categoryPaletteLight, usageColorSequence,
     canvasTokens, canvasTokensLight, canvasPaletteDark, canvasPaletteLight,
+    // SDK brand variants: the local host has one brand, so they are the same tables.
+    canvasPaletteGrokDark: canvasPaletteDark, canvasPaletteGrokLight: canvasPaletteLight,
     canvasTypography, canvasSpacing, canvasRadius,
     DocsShell, TableOfContents, DocSection, CodeBlock, References,
     ThemeProvider, __setHost,

@@ -24,15 +24,17 @@ Groups (all idempotent; each patch is skipped when its result is already present
 
 Usage:
   python Fix-TranscendenceForkGaps.py --api-root <tree> [--skip upstream-fixes] [--only features] [--dry-run]
-         [--seal-key <audio_seal.key>] [--force]
+         [--seal-key <key file>] [--force]
 
-SealedKey.h is generated from the key with Tools\\Shared\\audio_seal.py and is never stored in the toolkit.
+SealedKey.h is generated from Transcendence's own key (%LOCALAPPDATA%\\SealedAudio\\game-keys\\transcendence.key, made by
+Tools\\Shared\\audio_seal.py --game transcendence) and is never stored in the toolkit.
 When the key is missing the sealed-sound feature is skipped (a tree with the include but no key would not build).
 """
 from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import os
 import re
 import shutil
 import subprocess
@@ -42,7 +44,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 TOOLS = HERE.parent
 OVERLAYS = HERE / "fork_overlays"
-DEFAULT_KEY = TOOLS / "Shared" / "audio_seal.key"
+# Transcendence's own build key (audio_seal.py --game transcendence): one key per game, never shared with another game's
+# readers, kept outside the repository.
+DEFAULT_KEY = Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "SealedAudio" / "game-keys" / "transcendence.key"
 SEAL_TOOL = TOOLS / "Shared" / "audio_seal.py"
 
 GROUPS = ("features", "upstream-fixes", "diagnostics", "build-config")
@@ -235,7 +239,8 @@ ALERROR CResourceDb::LoadSealedSound (CSoundMgr &SoundMgr, const CString &sFiles
 def feature_sealed_sounds(t: Tree, key: Path) -> None:
     overlay = OVERLAYS / "Mammoth" / "Include" / "SealedArchive.h"
     if not key.exists():
-        t.log.append(f"  ! sealed-sounds skipped: key {key} not found (SealedKey.h cannot be generated)")
+        t.log.append(f"  ! sealed-sounds skipped: key {key} not found (SealedKey.h cannot be generated); make it with "
+                     "audio_seal.py seal/rekey --game transcendence")
         return
     if not overlay.exists():
         t.errors.append(f"sealed-sounds: overlay {overlay} missing")

@@ -111,6 +111,34 @@ CONTRACTS = {
         "element": ["SlotScroll", "TokenScroll", "HotkeyBar", "RowTemplate"],
         "accent": False,
     },
+    "ssr_table": {
+        "runtime": "Mods/Arendeth_SaltShuffleTable/TableWindow.cs",
+        "required": [
+            "TitleText", "StatusText", "Felt",
+            "OppRow", "OppIcon", "OppNameText", "OppScoreBar", "OppScoreFill", "OppScoreText", "OppHand",
+            "OppDeck", "OppDeckText",
+            "OppField", "OppFieldContent", "BannerPanel", "BannerText", "PlayerField", "PlayerFieldContent",
+            "PlayerIcon", "PlayerNameText", "PlayerScoreBar", "PlayerScoreFill", "PlayerScoreText",
+            "PlayerDeck", "PlayerDeckText",
+            "HandScroll", "HandViewport", "HandContent",
+            "DetailText", "LogScroll", "LogViewport", "LogContent", "LogText", "RulesText", "PreviewHint",
+            "HotkeyBar", "HotkeyContent", "HintText", "FxLayer",
+            "Templates", "CardTemplate", "Shadow", "Lift", "Glow", "Face", "FaceInner", "ArtPanel", "Art", "FoilSheen",
+            "NameBand", "NameText", "SunGem", "SunText", "MoonGem", "MoonText", "StarGem", "StarText",
+            "ValueGem", "ValueText", "HotkeyBadge", "HotkeyText", "DimOverlay", "OutcomeBadge", "OutcomeText",
+            "CardBackTemplate", "BackInner", "BackEmblem", "FloatTemplate",
+        ],
+        "scroll": ["HandScroll", "LogScroll", "HotkeyBar"],
+        "layout": {"HandContent": "horizontal", "OppFieldContent": "horizontal", "PlayerFieldContent": "horizontal",
+                   "OppHand": "horizontal", "LogContent": "vertical", "HotkeyContent": "horizontal"},
+        "text": ["TitleText", "StatusText", "OppNameText", "OppScoreText", "OppDeckText", "BannerText",
+                 "PlayerNameText", "PlayerScoreText", "PlayerDeckText", "DetailText", "LogText", "RulesText",
+                 "PreviewHint", "HintText", "NameText", "SunText", "MoonText", "StarText", "ValueText", "HotkeyText",
+                 "OutcomeText", "FloatTemplate"],
+        "template": {"container": "Templates", "template": "CardTemplate"},
+        "element": ["HandScroll", "HotkeyBar", "CardTemplate"],
+        "accent": False,
+    },
     "custom": {"runtime": "(your own window class)", "required": [], "scroll": [], "layout": {}, "text": [],
                "template": None, "element": [], "accent": False},
 }
@@ -124,7 +152,7 @@ Spring UI spec (*.springui.json)
   "modFolder": "Arendeth_SpringUI",    folder under Mods when it differs from the id
   "bundle": "arendeth_springui",       lower case [a-z0-9_]; file Bundles/<platform>/<bundle>_<platform>
   "prefab": "SpringMenu",              prefab asset name == root object name; what the runtime LoadAsset()s
-  "kind": "springmenu",                runtime contract to lint against: springmenu | conjoined_picker | sifrah_board | custom
+  "kind": "springmenu",                runtime contract to lint against: springmenu | conjoined_picker | sifrah_board | ssr_table | custom
   "theme": "qud-dark",                 themes/<name>.theme.json, a path, or an inline {"colors": {...}} object
   "reference": [1600, 900],            preview canvas size (the game UI is anchor-based; this is only the mock-up)
   "root": { <node> }                   the window root; it gets Canvas + GraphicRaycaster + CanvasGroup

@@ -14,9 +14,23 @@ again from pieces cut out of the stock art:
 An arrow that would cross another occupied cell is left out (and reported): drawn through, it
 would look like a chain through the skill in between. Move one of the cells to get it drawn.
 
-    python SkillTreeArt.py draw --game <D2R> --class dr --page 1 --spec page.json --out <mod>/hd [--name qrskilltree]
+    python SkillTreeArt.py draw --game <D2R> --class dr --spec page.json --out <mod>/hd [--name qrskilltree]
+        [--ref-page 3 --top 1,3 --bottom 6,2 --arrow 1,3]
+
+The pieces come from one stock page (--ref-page, 1-based): the top half of a frame from a cell with
+no arrow touching its top half (--top), the bottom half from a cell with none at its bottom half
+(--bottom), and the arrow from a cell with a straight arrow two rows down (--arrow). The defaults
+fit the Druid picture; the Warlock's: --ref-page 1 --top 1,3 --bottom 6,3 --arrow 1,3.
 
 page.json: {"cells": [[row, col], ...], "arrows": [[[row, col], [row, col]], ...]}   (from -> to, 1-based)
+With "keep": true the stock grid of every page stays (frames and arrows, including the stock's bent
+arrows this tool cannot draw); a frame is added only in a listed cell that has none, and only the
+listed arrows are drawn. For a page that is its parent tab plus a few cells. List every occupied
+cell all the same: they decide which arrows are blocked. A stock arrow that runs through an added
+cell stays, so add only cells no stock arrow crosses. "redraw": [[[row, col], [row, col]], ...]
+erases those stock arrows (the shape outside the frames nearest the line between the two cells)
+and draws them again in this tool's straight style, e.g. when a stock arrow leaves a cell where a
+new arrow does (needs scipy).
 Writes <out>/global/ui/spells/skill_trees/<name>.sprite and <name>.lowend.sprite (same size and
 pages as the stock picture; only the grid of every page is replaced), and <name>.png to look at.
 A layout refers to it as `Spells\\Skill_Trees\\<name>`.
@@ -65,25 +79,35 @@ def write_sprite(header, pixels):
     return bytes(head) + pixels.astype(np.uint8).tobytes()
 
 
-def cell_template(page_img):
-    """Frame + level box, cut from two stock cells: the top half of the page-3 cell at row 1 column 3
-    (an arrow leaves its bottom) and the bottom half of the page-3 cell at row 6 column 2 (an arrow
-    enters its top). The stock cells are pixel copies of one another, so the halves meet cleanly."""
+def cell_template(page_img, top_cell=(1, 3), bottom_cell=(6, 2)):
+    """Frame + level box, cut from two stock cells: the top half of one (an arrow may leave its
+    bottom; Druid page 3 row 1 column 3) and the bottom half of another (an arrow may enter its top;
+    Druid page 3 row 6 column 2). The stock cells are pixel copies of one another, so the halves
+    meet cleanly."""
     def cut(img, r, c):
         x, y = COLUMNS[c - 1], ROWS[r - 1]
         return img[y - PAD - 4:y + ICON + PAD + 6, x - PAD - 4:x + CELL_W]
-    top = cut(page_img, 1, 3)
-    bottom = cut(page_img, 6, 2)
+    top = cut(page_img, *top_cell)
+    bottom = cut(page_img, *bottom_cell)
+    for name, part, (r, c) in (('top', top, top_cell), ('bottom', bottom, bottom_cell)):
+        if (part[:, :, 3] > 30).mean() < 0.05:
+            raise ValueError(f'the reference page has no frame at row {r} column {c} (--{name})')
     out = bottom.copy()
     half = (ICON // 2) + PAD + 4
     out[:half] = top[:half]
     return out
 
 
-def arrow_pieces(page_img):
-    """(shaft slice, arrowhead) pointing down, from the long stock arrow in page 3 under row 1 column 3."""
-    x = COLUMNS[2] + ICON // 2
-    region = page_img[ROWS[0] + ICON + PAD + 2:ROWS[2] - PAD, x - 40:x + 40]
+def arrow_pieces(page_img, cell=(1, 3)):
+    """(shaft slice, arrowhead) pointing down, from a long stock arrow running from `cell` two rows
+    down (Druid page 3, under row 1 column 3)."""
+    r, c = cell
+    if r + 2 > len(ROWS):
+        raise ValueError(f'--arrow row {r}: the arrow must run two rows down')
+    x = COLUMNS[c - 1] + ICON // 2
+    region = page_img[ROWS[r - 1] + ICON + PAD + 2:ROWS[r + 1] - PAD, x - 40:x + 40]
+    if (region[:, :, 3] > 30).sum(1).max() == 0:
+        raise ValueError(f'the reference page has no arrow under row {r} column {c} (--arrow)')
     alpha = region[:, :, 3].astype(int)
     width_per_row = (alpha > 30).sum(1)
     shaft_w = int(np.median(width_per_row[10:40]))
@@ -149,10 +173,62 @@ def blocked(arrow, cells):
     return hit
 
 
-def draw_page(page_img, cells, arrows, template, shaft, head):
+def has_frame(page_img, r, c):
+    """Whether a page already has a frame in a cell: a frame fills about 55% of the cell box with
+    opaque pixels, an arrow running past at most about 17% (Warlock picture)."""
+    x, y = COLUMNS[c - 1], ROWS[r - 1]
+    box = page_img[y - PAD - 4:y + ICON + PAD + 4, x - PAD - 4:x + ICON + PAD + 4, 3]
+    return (box > 100).mean() > 0.4
+
+
+def erase_stock_arrows(page_img, redraw, template):
+    """A copy of a page without the stock arrows in `redraw`: each is the connected shape outside
+    the page's frames with the most pixels near the line between its two cells."""
+    from scipy import ndimage
+    h, w = page_img.shape[:2]
+    out = page_img.copy()
+    # The page as bare frames: an arrow pixel is one clearly more opaque than the frame tile there
+    # (the stock cells are pixel copies of the tile), so arrow roots in the tile's gaps count too.
+    frames = np.zeros_like(page_img)
+    th, tw = template.shape[:2]
+    for r in range(1, len(ROWS) + 1):
+        for c in range(1, len(COLUMNS) + 1):
+            if has_frame(page_img, r, c):
+                x, y = COLUMNS[c - 1] - PAD - 4, ROWS[r - 1] - PAD - 4
+                part = template[:min(th, h - y), :min(tw, w - x)]
+                dst = frames[y:y + part.shape[0], x:x + part.shape[1]]
+                np.copyto(dst, part, where=(part[:, :, 3:] > dst[:, :, 3:]))
+    alpha = page_img[:, :, 3].astype(int)
+    free = (alpha > 10) & (alpha - frames[:, :, 3].astype(int) > 40)
+    free[:STRIP + 2] = False
+    labels, _ = ndimage.label(free, structure=np.ones((3, 3)))
+    yy, xx = np.mgrid[0:h, 0:w]
+    for (r0, c0), (r1, c1) in redraw:
+        ax, ay = COLUMNS[c0 - 1] + ICON / 2, ROWS[r0 - 1] + ANCHOR_Y
+        bx, by = COLUMNS[c1 - 1] + ICON / 2, ROWS[r1 - 1] + ANCHOR_Y
+        vx, vy = bx - ax, by - ay
+        t = np.clip(((xx - ax) * vx + (yy - ay) * vy) / (vx * vx + vy * vy), 0, 1)
+        near = np.hypot(xx - ax - t * vx, yy - ay - t * vy) < 70
+        counts = np.bincount(labels[near & free], minlength=labels.max() + 1)
+        counts[0] = 0
+        if counts.max() == 0:
+            print(f'redraw ({r0}, {c0}) -> ({r1}, {c1}): no stock arrow found there')
+            continue
+        gone = labels == int(np.argmax(counts))
+        out[gone] = frames[gone]
+    return out
+
+
+def draw_page(page_img, cells, arrows, template, shaft, head, keep=False, redraw=()):
     h, w = page_img.shape[:2]
     canvas = Image.new('RGBA', (w, h), (0, 0, 0, 0))
-    canvas.paste(Image.fromarray(page_img[:STRIP + 2]), (0, 0))
+    if keep:
+        base = erase_stock_arrows(page_img, redraw, template) if redraw else page_img
+        canvas.paste(Image.fromarray(base), (0, 0))
+        new_cells = [rc for rc in cells if not has_frame(page_img, *rc)]
+    else:
+        canvas.paste(Image.fromarray(page_img[:STRIP + 2]), (0, 0))
+        new_cells = cells
     layer = Image.new('RGBA', (w, h), (0, 0, 0, 0))
     half = ICON / 2 + PAD
     for (r0, c0), (r1, c1) in arrows:
@@ -170,20 +246,21 @@ def draw_page(page_img, cells, arrows, template, shaft, head):
         arrows_px[y:y + th, x:x + tw][cover[:min(th, h - y), :min(tw, w - x)]] = 0
     canvas.alpha_composite(Image.fromarray(arrows_px))
     tile = Image.fromarray(template)
-    for r, c in cells:
+    for r, c in new_cells:
         canvas.alpha_composite(tile, (COLUMNS[c - 1] - PAD - 4, ROWS[r - 1] - PAD - 4))
     return np.asarray(canvas)
 
 
-def build(stock, cells, arrows):
+def build(stock, cells, arrows, ref_page=3, top=(1, 3), bottom=(6, 2), arrow=(1, 3), keep=False, redraw=()):
     header, pixels, pages = read_sprite(stock)
     pw = pixels.shape[1] // pages
-    ref = pixels[:, 2 * pw:3 * pw] if pages >= 3 else pixels[:, :pw]
-    template = cell_template(ref)
-    shaft, head = arrow_pieces(ref)
+    p = min(ref_page, pages) - 1
+    ref = pixels[:, p * pw:(p + 1) * pw]
+    template = cell_template(ref, top, bottom)
+    shaft, head = arrow_pieces(ref, arrow)
     out = pixels.copy()
     for p in range(pages):
-        out[:, p * pw:(p + 1) * pw] = draw_page(pixels[:, p * pw:(p + 1) * pw], cells, arrows, template, shaft, head)
+        out[:, p * pw:(p + 1) * pw] = draw_page(pixels[:, p * pw:(p + 1) * pw], cells, arrows, template, shaft, head, keep, redraw)
     return header, out, pages
 
 
@@ -208,11 +285,18 @@ def main(argv):
     p.add_argument('--spec', required=True)
     p.add_argument('--out', required=True, help='the mod\'s hd folder')
     p.add_argument('--name', default='qrskilltree')
+    cell = lambda s: tuple(int(v) for v in s.split(','))
+    p.add_argument('--ref-page', type=int, default=3, help='stock page (1-based) the pieces are cut from')
+    p.add_argument('--top', type=cell, default=(1, 3), help='row,col of the cell giving the frame top half')
+    p.add_argument('--bottom', type=cell, default=(6, 2), help='row,col of the cell giving the frame bottom half')
+    p.add_argument('--arrow', type=cell, default=(1, 3), help='row,col of a cell with a straight arrow two rows down')
     args = parser.parse_args(argv)
     spec = json.load(open(args.spec, encoding='utf-8'))
     cells = [tuple(c) for c in spec['cells']]
     arrows = []
-    for a, b in spec.get('arrows', []):
+    redraw = [(tuple(a), tuple(b)) for a, b in spec.get('redraw', [])] if spec.get('keep') else []
+    listed = [tuple(map(tuple, x)) for x in spec.get('arrows', [])]
+    for a, b in listed + [x for x in redraw if x not in listed]:
         arrow = (tuple(a), tuple(b))
         crossing = blocked(arrow, cells)
         if crossing:
@@ -223,7 +307,7 @@ def main(argv):
     with D2RArchive(args.game) as archive:
         stock = archive.read(f'hd/global/ui/spells/skill_trees/{args.cls}skilltree.sprite')
         stock_low = archive.read(f'hd/global/ui/spells/skill_trees/{args.cls}skilltree.lowend.sprite')
-    header, pixels, pages = build(stock, cells, arrows)
+    header, pixels, pages = build(stock, cells, arrows, args.ref_page, args.top, args.bottom, args.arrow, bool(spec.get('keep')), redraw)
     folder = os.path.join(args.out, 'global', 'ui', 'spells', 'skill_trees')
     os.makedirs(folder, exist_ok=True)
     with open(os.path.join(folder, f'{args.name}.sprite'), 'wb') as f:

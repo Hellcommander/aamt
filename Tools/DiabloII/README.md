@@ -182,11 +182,11 @@ effect pipeline) write a recoloured copy (block by block, so format and mips
 stay) and point the rewritten models at it. The new path must be as long as the
 old one, because the model's texture name is swapped in place.
 
-A preset's `"modelIndexIncludes": ["../OtherMod"]` carries another mod's added
-models (from its `model_index.json`, bounding boxes from its own model files) in
-this mod's `hd/model_lod_desc.bin`; the entries keep `"source"`. Both mods ship
-the whole index and the one installed last wins, so the including mod must be
-installed after the other, and rebuilt when the other's models change.
+A preset's `"modelIndexIncludes": ["../OtherMod"]` only matters for a mod that
+still ships the whole index (`model_index.json` `"index": "whole"`): it carries
+the other mod's models in this mod's `hd/model_lod_desc.bin` (entries keep
+`"source"`). With the AssetMerge plugin (the default since 2026-11-15, see "The
+model index") each mod lists only its own models and the includes are dropped.
 
 The pipeline then writes the donor's models, edited, to
 `hd/character/enemy/<name>/<part>_lodN.model` (every LOD) and points the new
@@ -213,6 +213,24 @@ does not, and nothing is logged). A model that replaces a stock file at the
 stock path needs nothing. A model at a new path needs an entry, so the mod has
 to ship the index with its entries added. The pipeline does this for every
 `"reshape"` variant; the mod copies it with the rest of `hd`.
+
+**AssetMerge (2026-11-15, the default).** A whole index (or `global/animdata.d2`)
+shipped by several mods means the one installed last hides the others' entries.
+The AssetMerge D2RLoader plugin (`<game>\mods\AssetMerge`, README there: RVAs,
+fragment format) merges text fragments into both files when the game loads them:
+`global/excel/d2rloader/assetmerge/models.txt` (model, donor, lod, mesh, box)
+and `animdata.txt` (name, source, frames, speed, events). `AssetMerge.py models
+--mod <mod>` writes a mod's rows into its mod.js as a generated block plus the
+shared `assetMergeWrite`; the mod calls `assetMergeWrite(assetMergeModels())`.
+`ModelLodDesc.py update`/`check` and `ScaledMonster.py` do the same for a mod
+whose `model_index.json` has `"index": "assetmerge"` (the default for any mod
+without `"index": "whole"`), and remove a stale `hd/model_lod_desc.bin`. Timing
+rows come from a build script through `AssetMerge.write_block(mod_js,
+'animdata', rows)`. `ModHarness.js` checks the merged fragments and warns when a
+mod still copies either whole file. Block markers are whole lines written by the
+tool; never start a comment line with `// <assetmerge:` (2026-11-15: such a
+comment made the first version of the replace delete a stretch of a mod.js; the
+marker match is now anchored and refuses blocks holding other code).
 
 The index belongs to one game build. After a game patch a mod that still ships
 the old one hides whatever models the patch added, so the index is never the
@@ -367,6 +385,15 @@ the picture): columns 121, 383, 643; rows 136, 318, 494, 674, 854, 1030. Point a
 `ImageWidget` at it with `filename: 'Spells\Skill_Trees\<name>'`. Not seen in game yet
 (2026-11-14).
 
+The frame halves and the arrow are cut from one stock page: `--ref-page 3 --top 1,3 --bottom 6,2
+--arrow 1,3` by default (the Druid picture); the Warlock picture needs `--ref-page 1 --top 1,3
+--bottom 6,3 --arrow 1,3`. A page that is its parent tab plus a cell or two can keep the stock grid
+(`"keep": true`): frames are added only in listed cells that have none, only the listed arrows are
+drawn, and the stock's bent arrows stay. `"redraw": [[from, to], ...]` erases those stock arrows and
+draws them straight again (needs scipy), e.g. when a new arrow leaves the same cell. Example:
+Warlock Archetypes' Vanguard page (Eldritch plus Possess; its README has the command). The
+harness counts a page whose `Tab<N>` shows a picture a mod ships as framed in every cell.
+
 Not done yet:
 
 1. **Changing vertex or triangle counts** (new geometry): needs the structural
@@ -493,6 +520,52 @@ Encoded files are unpacked, so several times the size of the stock ones
 (fallen1: 43 KB stock, 330 KB encoded; `-Strip` drops the Maya attributes: 33 KB).
 They are edited copies of game art: keep them in your mod, out of this repository.
 
+## Licensed sounds in a mod (SealedAudio plugin)
+
+The licensed libraries in `D:\assets\audio` allow their clips only embedded in a production, never as loose files
+anyone can copy out. Sealing is how a mod complies: no loose audio ships, the game still plays every sound on every
+player's machine, and nobody can edit the sealed archive. The SealedAudio D2RLoader plugin
+(`Tools/SealedAudio/hosts/d2rloader`) serves sealed archives (`*.mtsa`) to the game as if their files sat loose in the mod's `data` folder, so `sounds.txt` rows and paths stay exactly as for loose `.flac` files.
+
+1. Make the mod as usual with the sounds loose (`<Mod>.mpq\data\hd\global\sfx\<mod>\hit_hd.flac`, legacy copies under
+   `global\sfx\...`, rows in `global\excel\sounds.txt`) and check it in game.
+2. Seal the sounds, with the paths relative to `data` and the loose copies removed from what you ship:
+   `Tools\SealedAudio\hosts\d2rloader\Seal-LocalAudio.ps1 -Data "<mod>\<Mod>.mpq\data" -Archive "<mod>\d2rloader\SealedAudio\<mod>.mtsa" -Remove -Pin`
+   It seals `hd\global\sfx` and `global\sfx` (`-Include` for others) as MTSA2: the audio is encrypted with the plugin's
+   key, so the game decrypts it in memory on any machine, and the archive is signed with
+   `%LOCALAPPDATA%\SealedAudio\keys\<mod>.signkey`, made on first use and never shipped (`-KeyName` picks another name;
+   reuse it to sign new versions). The plugin refuses an archive changed by even one byte; `-Pin` rebuilds the plugin so
+   it also refuses an archive re-signed by anyone else. Instead of loose files in the mod, `-Map sounds.json`
+   (`{"/hd/global/sfx/<mod>/hit_hd.flac": "D:/assets/audio/..."}`) seals straight from the library, so licensed files
+   are never copied into the mod; library files are never deleted. The script then fails if any loose audio
+   (`.wav .ogg .flac .mp3`) or any key file is left in the mod. Back the signing key up privately.
+   `audio_seal.py verify <archive>` checks an archive and names its signer.
+3. Build the plugin and copy it into the mod: `Tools\SealedAudio\hosts\d2rloader\build.bat "<mod>\d2rloader\plugins"`
+   (or `<game>\d2rloader\plugins` for every mod). Archives go in the same scope's `d2rloader\SealedAudio\`
+   (or `d2rloader\plugins\SealedAudio\`, which the plugin checks next).
+   With D2RMM (Custom), which rebuilds its output mod on every install, pack both instead and import the zip in its
+   D2RLoader plugin manager:
+   `Tools\SealedAudio\hosts\d2rloader\New-D2rmmPackage.ps1 -Archives "<mod>\d2rloader\SealedAudio" -Out "<somewhere>\sealedaudio-<mod>.zip"`
+   (or `-Package <zip>` on step 2's script, which also checks the zip for keys and loose audio). The zip holds
+   `d2rloader\plugins\sealedaudio.dll` and `d2rloader\plugins\SealedAudio\*.mtsa`, which D2RMM deploys into the output
+   mod unchanged, and never a key file. Players need nothing else.
+4. Start through D2RLoader. `d2rloader\logs\SealedAudio.log` says how many sounds were mounted and how many functions were
+   hooked; `Get-D2RLoaderLog.ps1 -Plugins` shows the plugin's summary lines. If a sound stays silent, set
+   `log_probes = true` in `<scope>\d2rloader\config\sealedaudio.toml`: every open under `hd\global\sfx` (and the other
+   `probe_prefixes`) is logged as served, loose or not found. A loose file at the same path always wins.
+
+The packed game imports no file functions, so the plugin uses the core's `patch_system` (kernel32's file stubs are
+redirected process-wide) plus the import table of D2RLoader's `D2RCore.dll`. Tested so far by loading the built plugin
+through a mock loader with the SDK's own structures (sealed `.flac` served to a caller that resolved `CreateFileW`
+through kernel32, config written, clean exit), with archives made by the step 2 command (both `hd\global\sfx` and
+`global\sfx`) in either archive folder, and the step 3 zip through D2RMM's own package importer (all files mapped to
+`d2rloader\plugins\...`, no warnings); not yet in a running game. MTSA2 (step 2) was tested through the mock loader with
+files from `D:\assets\audio\made`, on a "player" profile with no keys at all: served byte-identical to the library
+files; refused after one byte of audio or of the index was changed; an archive unpacked and re-signed with another key
+was accepted by the unpinned plugin and refused by the pinned one; no RIFF/WAVE bytes appear in the archive; the
+library was untouched by `-Remove`; the script's zip held only the dll and the archive, and a stray `.wav` in the mod
+stopped it.
+
 ## Files
 
 - `Granny.py`, `HdSkeleton.py` - Granny files as editable trees; skeleton decode / encode
@@ -500,6 +573,7 @@ They are edited copies of game art: keep them in your mod, out of this repositor
 - `d2r_casc.py` - read-only archive access (`D2RArchive.read`, `.exists`, `.list`)
 - `GrannyFile.py`, `GrannyPreview.py`, `GrannyMesh.py` - read, preview, rewrite and reshape HD models
 - `ModelLodDesc.py`, `Update-D2RModelIndex.ps1` - read, extend, check and rebuild the game's model index, needed for any model at a new path
+- `AssetMerge.py` - fragment rows for the AssetMerge plugin (new models for `hd/model_lod_desc.bin`, timing for `global/animdata.d2`) written into a mod's mod.js
 - `GrannyAnim.py` - read, pose, author and write animation clips
 - `LegacySprite.py`, `SpriteFit.py`, `SpriteMeshAI.py` - legacy sprites to images, fit an HD template to them, AI mesh reference
 - `GrannyPart.py` - cut a part (a quill) out of a body mesh into its own model
@@ -507,7 +581,8 @@ They are edited copies of game art: keep them in your mod, out of this repositor
 - `ScaledMonster.py` - the pipeline
 - `ModAssets.py`, `ModHarness.js` - the mod test pipeline (below)
 - `ConvertDataMod.py`, `ConvertDataModCheck.js`, `MpqArchive.py`, `Convert-D2RDataMod.ps1` - data mod (or packed .mpq) to D2RMM mod (below)
-- `Update-D2RConvertedMod.ps1`, `MergeCompiledMod.py` - update converted mods from a new download (VanillaDeluxe, Rebirth; below)
+- `Update-D2RConvertedMod.ps1`, `MergeCompiledMod.py` - update converted mods from a new download (Rebirth, Reimagined; below)
+- `Update-D2RNativeMod.ps1`, `NativeModUpdate.py` - install and update mods that already are D2RMM mods (Relics of Sanctuary; below)
 - `TreePlacement.js`, `TreePlacement.py` - shared tree-cell placement for the skill-page mods, also on reworked class trees (below)
 - `StockRows.js`, `StockRows.py` - the plain game's template rows embedded in the skill-page mods, so total conversions do not leak into their new rows (below)
 - `LeakCheck.js` - finds what a total conversion changes in the rows other mods add (below)
@@ -575,6 +650,20 @@ report) to the mod folder:
   Plugins > Refresh (hand-made package folders or edited manifests make D2RMM refuse to start).
   A plugin that one of D2RMM's own packages already installs with different bytes starts switched
   off (D2RMM refuses two different files at one place).
+- Switching a feature off must not leave rows naming rows that are gone. The converter reads its
+  own patches (`feature_links`): a cell counts as a reference only in a column that names another
+  table (`LINK_REFS`: cube inputs/outputs and TC items on item codes and unique names, monster
+  `Skill1-8` / `TreasureClass*` / level `mon1-25` / hireling and character skills, item property
+  parameters that take a skill, `runes`/affix `itype`...), and only against rows the mod adds
+  (names the game's table already has don't count). From that, each feature's setting text lists
+  what it **uses** (with the number of references and an example), what **uses it**, and whether it
+  is **always on**. `mod.js` (`NEEDS`, `FORCED`) then switches a feature off together with every
+  feature that uses its new rows (the install log says which and why), and ignores the switch of
+  a feature that always-installed tables use (`missiles.txt` `Skill` -> new skills) and of
+  whatever that feature needs in turn (a warning says so). The links are in `convert.json`
+  (`featureLinks`, `featuresForcedOn`). Limit: a link of a few cells still takes the whole feature
+  along; blanking just those cells is not done. Test: `node ConvertDataModCheck.js <mod> <cache>
+  <out> '{"itembases":false}'` and read the log.
 - Plugins built from source on this machine are left out (no entry, no switch, no package; the
   mod's settings and README point to the source build). Prebuilt DLLs in downloads have been found
   infected (VanillaDeluxe's and the D2RLoader Hub's `d2rl-merc-gear-models.dll`, user 2026-11-14). A
@@ -592,6 +681,11 @@ report) to the mod folder:
   for data mods; logs, backups and the package's `metadata.json` stay out.
 
 ```powershell
+# from where the mod is: copied into <D2RMM>\mods\Reimagined, converted, checked, and the source
+# remembered (convert.json), so Update-D2RConvertedMod.ps1 -Mod Reimagined redoes it after the mod updates
+.\Convert-D2RDataMod.ps1 -Source '<game>\Reimagined.mpq' -Mod Reimagined -Author ScottieKnowz
+
+# a mod already in D2RMM's mods folder
 .\Convert-D2RDataMod.ps1 -GamePath '<game>' -Mod '<D2RMM>\mods\Reimagined' -Author ScottieKnowz -Check
 
 # a packed archive (a real .mpq file, as D2RLoader packages ship): extracted into -Mod first
@@ -617,9 +711,8 @@ Notes:
 - Mods built on the stock skill trees (the skill-page mods) go below a conversion and fit
   themselves to its trees; run `Test-D2RMod.ps1 -KeepGoing` on the whole list (a mod that throws is rolled back and the
   rest still run, as in D2RMM).
-- Total conversions that add levels cannot be stacked: Reimagined (138-165), VanillaDeluxe
-  (137-294) and Frankenstein (138-259) put their new levels on the same level numbers, and
-  VanillaDeluxe's maps plugin checks its own level and cube-recipe layout.
+- Total conversions that add levels cannot be stacked: Reimagined (138-165) and Frankenstein
+  (138-259) put their new levels on the same level numbers. VanillaDeluxe is not supported.
 - A mod that ships its tables only as compiled `global\excel\*.bin` (Rebirth) cannot be patched:
   D2RMM runs the game on `.txt` tables, so those files are copied but do nothing. The converter
   warns; such tables have to be decompiled to `.txt` first.
@@ -645,7 +738,11 @@ Notes:
 - **Update a converted mod**: the new download of a mod converted before. The old data folder and
   `d2rloader` go to `<mod>\d2rmm\previous`, the new ones take their place, and the conversion runs
   again with the saved settings (the switches set in D2RMM keep their ids). The log lists the
-  features whose file count changed. If the conversion fails, the old files are put back.
+  features whose file count changed. If the conversion fails, the old files are put back; when it
+  passes its check, `previous` is removed.
+- A source can also be a `<Name>.mpq` folder itself (e.g. `<game>\Reimagined.mpq`): it is copied
+  whole, with its `modinfo.json`. Without the page: `ModConverter.py --convert <source> [--id <mod>]`
+  (or `Convert-D2RDataMod.ps1 -Source`).
 - **Converted mods**: what is in D2RMM's mods folder, how it was converted and from where.
 - A mod the converter cannot redo itself (one made from compiled `.bin` tables, such as Rebirth Skill
   Versions) can name its own updater in `<mod>\dev\update.json` (`{"script": "update_x.py", ...}`):
@@ -653,7 +750,7 @@ Notes:
 - Tables that are not UTF-8 or have duplicate column names, and string files whose repeated Keys
   cannot be rebuilt, are copied whole; `d2rmm\convert.json` lists them.
 - Update also packages the download's **other** `d2rloader` folder (a D2RLoader setup has one
-  beside `mods\`, e.g. VanillaDeluxe's item-quality-backgrounds and rune-gamble-gheed): each plugin
+  beside `mods\`, e.g. Frankenstein's): each plugin
   (DLL + its `.mpq` + its `config\*.toml`) and patch becomes a zip `<mod>-<plugin>.zip` in
   `<D2RMM>\d2rloader` (D2RMM imports it on start or Plugins > Refresh). Left out: loader settings,
   what an installed package already puts there with the same bytes, a different file another
@@ -666,12 +763,12 @@ Notes:
 - **Row matching** (Convert and Update panes; `ConvertDataMod.py` flags; saved in `convert.json`
   `settings`, so an update keeps them; mods converted before they existed get the defaults):
   - *Row names: spaces around them* - `--match-trim` (default) / `--no-match-trim`. The game's
-    `cubemain` has a recipe description with trailing spaces that VanillaDeluxe's copy lacks; matched
+    `cubemain` has a recipe description with trailing spaces that a mod's copy can lack; matched
     exactly, the game's recipe stayed (ilvl 75) and the mod's came in as a new row.
   - *Rows that share a name* - `--duplicates content` (default) / `order`. The game's 8 `Rainbow Facet`
     rows are matched to the mod's rows by what is in them (most alike first, ties by order), and
     left-over ones to the mod's new rows whose name starts with theirs (`Rainbow Facet Cold`, 3/4 of
-    the cells alike). By order, VanillaDeluxe's facets came out as 10 that drop instead of 4.
+    the cells alike). By order, a mod's facets can come out as 10 that drop instead of 4.
   - *Rows the mod deleted* (rows keep only) - `--deleted disable` (default) / `leave`. Keep mode never
     removes a row (row numbers); with disable the row is switched off: `spawnable` 0 in uniqueitems,
     setitems, magicprefix/suffix, automagic; `enabled` 0 in cubemain; `complete` 0 in runes.
@@ -705,8 +802,7 @@ Notes:
   - An *Options* rule (`"option": true`) is a part of the mod itself: on by default, no `when`, and
     its actions apply when it is switched **off**. `props` takes item property codes off every item
     (uniques, sets, runewords: later properties move up; set bonus slots keep their place; an affix
-    or automagic row left with nothing stops spawning). VanillaDeluxe's *Spell Multishot* takes
-    `r3ni-multishot` off (the `R3niSpellProcs` plugin stays for its other procs).
+    or automagic row left with nothing stops spawning).
   - Harness test of ticked rules: config `'{"listClassless":true}'`, `CHECK_MODLIST` with the partner
     mod above, and an `<earlier folder>` holding the partner's changed table.
 - A download that is a folder holding the mod as a packed `.mpq` (Frankenstein's
@@ -722,7 +818,7 @@ Without the page (same code), for one or more mods; no `-Source` = the download 
 which also redoes a conversion after a game patch:
 
 ```powershell
-.\Update-D2RConvertedMod.ps1 -Mod VanillaDeluxe, Rebirth
+.\Update-D2RConvertedMod.ps1 -Mod Reimagined, Rebirth
 .\Update-D2RConvertedMod.ps1 -Mod Rebirth -Source "$env:USERPROFILE\Downloads\Rebirth-Re.zip"
 ```
 
@@ -761,7 +857,47 @@ the code is a skillcalc row also in missile formulas. Reference for the evaluato
 Round trip on 3.4.95041 (cells identical): skills 99.97%, skilldesc 99.8%, missiles 99.3%,
 itemstatcost, states, overlay, pettype 100%, monstats2 99.9%, properties 99.8%; monstats 98.2%
 (NameStr and Sk*mode not found yet). Rows the compiler drops (`Expansion`) are left out of row
-numbers. Layouts are cached in `%LOCALAPPDATA%\D2RModAssetsinlayouts` (delete after a patch).
+numbers. Layouts are cached in `%LOCALAPPDATA%\D2RModAssets\binlayouts` (delete after a patch).
+
+## Mods that already are D2RMM mods (install and update)
+
+`Update-D2RNativeMod.ps1` → `NativeModUpdate.py` (+ `ModHarness.js`)
+
+A download with its own `mod.json` + `mod.js` (Relics of Sanctuary, by Cpp) patches rows at install
+time and has its own settings; running it through the data-mod converter would throw that away.
+This tool installs it as it is, with the same safety as the converter's Update:
+
+```powershell
+# first time: a folder, .zip, .7z or .rar (7-Zip for the last two) -> <D2RMM>\mods\<Id>
+.\Update-D2RNativeMod.ps1 -Install '<game>\RelicsOfSanctuary 745 3.5.0 2026-11-09T22-15Z xzHHu6uYW' -Id RelicsOfSanctuary
+
+# after the mod updates: the newest download with the same Nexus name
+.\Update-D2RNativeMod.ps1 -Mod RelicsOfSanctuary
+.\Update-D2RNativeMod.ps1 -Mod RelicsOfSanctuary -Source '<download>'   # this one instead
+.\Update-D2RNativeMod.ps1 -Mod RelicsOfSanctuary -DryRun                # stage, patch, test; mods\ untouched
+```
+
+- The download is unpacked and staged in `<D2RMM>\converter-work\<id>.new`, patched, and run alone
+  through `ModHarness.js`. Only a run where the script does not throw replaces `mods\<id>`; the old
+  folder waits in `converter-work\<id>.previous` and comes back if putting the new one in fails.
+  Harness problems the mod has on its own are counted, not fatal (see them with `Test-D2RMod.ps1`).
+- Settings stay: D2RMM keys them by the folder name (kept) and stores them in `<mod>\config.json`,
+  which is carried over.
+- `<mod>\d2rmm\native.json` remembers the download, version, Nexus name and id, the folders to look
+  in and the patches applied. Without `-Source`, `-Mod` takes the download whose name starts with the
+  same Nexus name (`<Name> <nexus id> <version> <date> <x>`) and has the highest version (then the
+  newest), from the folder the last one came from, the game folder, the D2RMM folder and Downloads.
+- Patches, redone on every install so they survive updates:
+  - *pause-menu*: a mod that copies its own `global\ui\layouts\pauselayoutgardenhd.json` with
+    `D2RMM.copyFile(..., true)` replaces the pause menu every mod above it built (Frankenstein,
+    Item Dictionary, Loot Guide Companion). The copy is moved to
+    `d2rmm\original-pauselayoutgardenhd.json` and the mod's own button tables are merged into the
+    installed menu from mod.js instead, right of the main buttons and below buttons other mods put
+    there. The mod's own switch for them still works. The test run fails the install if the merged
+    menu lost the game's `PauseTable` / `PauseTableExtra`.
+- Relics of Sanctuary 3.5.0 (2026-11-15): installed and updated with this; its test run flags the
+  copied Druid skills "Mythic Armageddon / Hurricane" sharing a tree cell with the originals (the
+  author's design). It goes above BestOf in the D2RMM list. Not yet seen in the game.
 
 ## D2RMM package size limit
 
@@ -889,9 +1025,24 @@ node LeakCheck.js --game '<game>' --python <python> --conversion '<D2RMM>\mods\F
   states, stats, every `skill('..')` / `miss('..')` / `stat('..')` in a calc, the
   skilldesc row and its strings, tree cell (inside 6 x 3, not shared, not on a stock skill).
 - **Extra skill pages** (SkillTab4 plugin): page not above the plugin's highest
-  (`-MaxPage`, default 15), `ListRow` names the parent tab, each page number used by one
-  class only, `Tab<N>` and `TextTab<N>` in the layout with an existing label string.
-  A warning when a skill sits where the parent tab has no skill (no frame in the picture).
+  (`-MaxPage`, default 126 since SkillTab4 0.7.0), `ListRow` names the parent tab, each page
+  number used by one class only, `Tab<N>` and `TextTab<N>` in the layout with an existing label string.
+- **Tab labels per class**: the layout is shared but SkillTab4 shows a class only its own pages,
+  so for each class its labels (`TextTab<N>` rect, `Tab<N>` click area, a `TabPlate<N>` plate)
+  must not overlap each other, the stock tab strip, the tree picture or the right hinge, and must
+  stay on screen (panel 0-1507 high, screen edge at panel x 1394): problems. A label that reaches
+  the middle of the skill counter's line, or whose text needs more lines than its box holds
+  (22 pt, about 12 px a letter), is a warning. `$Variable` fields are read from `_profilehd.json`
+  (Skill Tab Layout writes positions there); one it does not define is a problem. Prints one
+  `tabs <class>:` line with every page's position.
+  A warning when a skill sits where the parent tab has no skill (no frame in the picture),
+  unless the page's `Tab<N>` shows a picture a mod ships (`SkillTreeArt.py`); a problem when
+  that picture is neither shipped nor a class tree picture.
+- **ID limits**: a skill row above 32767 (problem); a class skill past the item width of
+  `item_singleskill` (9 bits, 511: needs the SkillLimits plugin); `states.txt` past 511 rows
+  (needs D2RCore and the StateLimits plugin) or past 32768 (problem); an item, set or cube
+  `state` property (in tables a mod wrote) naming a state past the width of stat 98 `state`
+  (8 bits, 255: needs StateLimits 0.2.0+), or a state that does not exist (problem).
 - **Missiles**: names without spaces or a trailing digit, `Skill`, sub-missiles,
   same row number in the main and the classic-rules table. A warning when a new
   skill's missile takes its damage from another skill. Lists new missiles without an HD entry.
@@ -1054,7 +1205,7 @@ python PopcornBaked.py roundtrip <file or folder> ... [--check]
 ```
 
 The layout and the known field meanings are in the module's docstring. First use:
-`SorceressSecondPages\devuild_effects.py`, which draws its own RGBA8 textures (one mip, the
+`SorceressSecondPages\dev\build_effects.py`, which draws its own RGBA8 textures (one mip, the
 gradient textures' layout) and points an effect's layers at them.
 
 ## Particle effect editor (GUI and command line)

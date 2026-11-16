@@ -158,6 +158,51 @@ async function contextWindow(backend, model, { override = 0, ollamaNumCtx = 1638
 /** Model names of OpenAI-compatible / local models that take images. */
 const VISION_RE = /(^|[\/:_.-])(vl|vlm|vision|llava|bakllava|pixtral|minicpm-?v|moondream|internvl|cogvlm|idefics|smolvlm|paligemma|molmo|gemma-?3|gemma3n|llama-?3\.2-?\d*b?-?vision|llama-?4|mistral-small-3\.[1-9]|qwen2(\.5)?-?(vl|omni)|qwen3-?(vl|omni)|qvq|kimi-vl|glm-4(\.\d)?v|phi-?3\.5-vision|phi-?4-multimodal|granite-vision|gpt-4o|gpt-4\.1|gpt-5|o3|o4|claude|gemini)/i;
 const visionCache = new Map();
+const OLLAMA_KEEP_ALIVE = "30m";
+const capCache = new Map();
+
+/**
+ * Ollama model capabilities from /api/show ("completion", "tools", "vision", "thinking", ...);
+ * null when unknown (older Ollama, other backends, server down).
+ */
+async function ollamaCapabilities(baseUrl, model) {
+  const key = baseUrl + "|" + model;
+  if (capCache.has(key)) return capCache.get(key);
+  let caps = null;
+  try {
+    const res = await request(ollamaRoot(baseUrl) + "/api/show", { method: "POST", body: { model }, timeout: 5000 });
+    if (res.json && Array.isArray(res.json.capabilities)) caps = res.json.capabilities.map(String);
+  } catch {
+    caps = null;
+  }
+  capCache.set(key, caps);
+  return caps;
+}
+
+/**
+ * Advice for a weak agent model on Ollama: "" when it can call tools, else a status line that names
+ * installed models which can (best guess at coding models first).
+ */
+async function ollamaToolAdvice(baseUrl, model) {
+  const caps = await ollamaCapabilities(baseUrl, model);
+  if (!caps || caps.includes("tools")) return "";
+  let names = [];
+  try {
+    const res = await request(ollamaRoot(baseUrl) + "/api/tags", { timeout: 5000 });
+    names = ((res.json && res.json.models) || []).map((m) => m.name || m.model).filter(Boolean).slice(0, 40);
+  } catch {
+    names = [];
+  }
+  const able = [];
+  await Promise.all(names.filter((n) => n !== model).map(async (n) => {
+    const c = await ollamaCapabilities(baseUrl, n);
+    if (c && c.includes("tools") && !c.includes("embedding")) able.push(n);
+  }));
+  const coderFirst = (n) => (/coder|code|devstral|qwen3|gpt-oss|deepseek|llama3\.[1-9]|mistral-small|granite/i.test(n) ? 0 : 1);
+  able.sort((x, y) => coderFirst(x) - coderFirst(y) || x.localeCompare(y));
+  return model + " cannot call tools (Ollama lists: " + caps.join(", ") + "), so it has to print tool calls as text and will drive the agent poorly." +
+    (able.length ? " Installed models that can: " + able.slice(0, 6).join(", ") + "." : " Pull a tool-capable coding model, e.g. ollama pull qwen3-coder or qwen2.5-coder:14b.");
+}
 
 /**
  * Whether the model can take images. mode "on"/"off" overrides; "auto": Claude and Claude Code yes,
@@ -281,10 +326,44 @@ function newId() {
 /** Socket idle limit for local backends: a big prompt on a CPU-offloaded model can take minutes before its first token. */
 const LOCAL_TIMEOUT = 15 * 60 * 1000;
 
-async function chat({ backend, model, messages, tools, maxTokens = 2048, temperature = 0.2, numCtx, signal, effort = "", replayThinking = true, onText, onReasoning }) {
-  if (backend.provider === "anthropic") {
+/** Local servers drop or refuse requests while a model loads or a router restarts: worth a retry. */
+const TRANSIENT_RE = /ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|EPIPE|socket hang up|^HTTP (408|409|425|429|500|502|503|504)\b|model is loading|server (is )?(busy|overloaded)|try again/i;
+const LOCAL_RETRIES = 3;
+/** First retry delay; doubles per attempt (tests lower it). */
+const retry = { baseMs: 1500 };
+
+function waitMs(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal && signal.aborted) return reject(new Error("stopped"));
+    const t = setTimeout(resolve, ms);
+    if (signal) signal.addEventListener("abort", () => (clearTimeout(t), reject(new Error("stopped"))), { once: true });
+  });
+}
+
+async function chat(o) {
+  if (o.backend.provider === "anthropic") {
+    const { backend, model, messages, tools, maxTokens = 2048, effort = "", replayThinking = true, signal, onText } = o;
     return anthropic.chat({ baseUrl: backend.baseUrl, cred: backend.cred, model, messages, tools, maxTokens, effort, replayThinking, signal, onText });
   }
+  // Retried only while nothing has streamed yet, so the panel never shows a reply twice.
+  for (let attempt = 0; ; attempt++) {
+    let started = false;
+    const mark = (fn) => (t) => {
+      if (t) started = true;
+      if (fn) fn(t);
+    };
+    try {
+      return await chatLocal({ ...o, onText: mark(o.onText), onReasoning: mark(o.onReasoning) });
+    } catch (e) {
+      const msg = String((e && e.message) || e);
+      if (e instanceof ToolsUnsupported || started || msg === "stopped" || (o.signal && o.signal.aborted) || attempt >= LOCAL_RETRIES || !TRANSIENT_RE.test(msg)) throw e;
+      if (typeof o.onRetry === "function") o.onRetry({ attempt: attempt + 1, of: LOCAL_RETRIES, error: msg });
+      await waitMs(retry.baseMs * 2 ** attempt, o.signal);
+    }
+  }
+}
+
+async function chatLocal({ backend, model, messages, tools, maxTokens = 2048, temperature = 0.2, numCtx, signal, onText, onReasoning, think: thinkMode, repeatPenalty }) {
   const isOllama = backend.provider === "ollama";
   const say = (t) => {
     if (t && onText) onText(t);
@@ -301,9 +380,12 @@ async function chat({ backend, model, messages, tools, maxTokens = 2048, tempera
       model,
       messages: toOllamaMessages(messages),
       stream: true,
-      options: { temperature, num_predict: maxTokens, ...(numCtx ? { num_ctx: numCtx } : {}) },
+      options: { temperature, num_predict: maxTokens, ...(numCtx ? { num_ctx: numCtx } : {}), ...(repeatPenalty ? { repeat_penalty: repeatPenalty } : {}) },
     };
     if (tools && tools.length) body.tools = tools;
+    if (typeof thinkMode === "boolean") body.think = thinkMode;
+    // Keep the model loaded between agent rounds and turns (Ollama unloads after 5 minutes by default).
+    body.keep_alive = OLLAMA_KEEP_ALIVE;
     res = await request(ollamaRoot(backend.baseUrl) + "/api/chat", {
       method: "POST",
       body,
@@ -416,6 +498,9 @@ async function chat({ backend, model, messages, tools, maxTokens = 2048, tempera
 }
 
 module.exports = {
+  ollamaCapabilities,
+  ollamaToolAdvice,
+  retry,
   PROVIDERS,
   ToolsUnsupported,
   ThinkingMismatch: anthropic.ThinkingMismatch,

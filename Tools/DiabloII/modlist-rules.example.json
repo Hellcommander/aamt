@@ -2,14 +2,6 @@
   "_readme": "'My mod list' rules for converted mods (ConvertDataMod.py / the converter's Update read this file). Each rule becomes a checkbox in the converted mod's settings, OFF by default, and acts only when a mod in 'when' is enabled in D2RMM ('above': only when it comes before the converted mod). mods: converted mod ids it is for (none = all). earlier: table/string paths where the mods above keep their values. skip: regex patterns on file/table paths to leave out. switches: switch ids to turn off. props: item property codes taken off items. option: true = an Options checkbox for a part of the mod itself, ON by default, needs no 'when', and its actions apply when switched OFF. Rerun Update-D2RConvertedMod.ps1 after editing. Format: Tools\\DiabloII\\modlist-rules.example.json.",
   "rules": [
     {
-      "id": "optSpellMultishot",
-      "name": "Spell Multishot",
-      "mods": ["VanillaDeluxe"],
-      "option": true,
-      "description": "Items with Spell Multishot fire 3 projectiles instead of 1 with supported spells: Bone Spear, Holy Bolt, Fire Ball, Ice Blast, Fire Bolt, Ice Bolt, Glacial Spike, Tornado and Miasma Bolt (the Triune prefix, some uniques, set items and the Echoing Dawn runeword). The R3niSpellProcs plugin stays on for its other spell procs.",
-      "props": ["r3ni-multishot"]
-    },
-    {
       "id": "listClassless",
       "name": "Classless above: keep its skill and character changes",
       "when": ["Classless"],
@@ -58,22 +50,6 @@
         "\\\\horadriccubelayout(hd)?\\.json$",
         "^hd\\\\global\\\\ui\\\\panel\\\\horadric_cube$"
       ]
-    },
-    {
-      "id": "listWiderMaggotLair",
-      "name": "Wider Maggot Lair mod: no WiderMaggotLair plugin",
-      "mods": ["VanillaDeluxe"],
-      "when": ["WiderMaggotLair"],
-      "description": "The Wider Maggot Lair mod already widens the Maggot Lair; this mod's WiderMaggotLair plugin does the same job.",
-      "switches": ["plugin_widermaggotlair"]
-    },
-    {
-      "id": "listMonsterDensity",
-      "name": "Increase Monster Density: no MonsterDensity plugin",
-      "mods": ["VanillaDeluxe"],
-      "when": ["IncreaseMonsterDensity"],
-      "description": "Increase Monster Density already raises density; this mod's MonsterDensity plugin (x2 in the end game) would stack with it.",
-      "switches": ["plugin_monsterdensity"]
     }
   ]
 }

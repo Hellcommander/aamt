@@ -8,6 +8,7 @@ const { syncWorkspace } = require("./lib/sync");
 const { CanvasEditorProvider } = require("./lib/canvas-editor");
 const { importChatFile, listImported, agentPrompt } = require("./lib/import-chat");
 const { AgentViewProvider } = require("./lib/agent-view");
+const { HomeTab } = require("./lib/home-tab");
 
 function folders() {
   return (vscode.workspace.workspaceFolders || []).map((f) => f.uri.fsPath);
@@ -194,6 +195,8 @@ function activate(context) {
   context.subscriptions.push(vscode.window.registerTreeDataProvider("localAgentBridge.chats", chatsTree));
   context.subscriptions.push(CanvasEditorProvider.register(context));
   const agent = AgentViewProvider.register(context, getState);
+  // The New Tab page takes the Welcome page's place when the Local Agent is opened or focused.
+  HomeTab.register(context, agent);
 
   const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
   status.command = "localAgentBridge.showCatalog";
@@ -209,6 +212,60 @@ function activate(context) {
   context.subscriptions.push(agentStatus);
 
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.openAgent", () => agent.focus()));
+  // Canvases of other workspaces (a moved project, a second checkout): hard-link them into this one.
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.linkCanvas", async (file) => {
+    const link = require("./lib/canvas-link");
+    const roots = (vscode.workspace.workspaceFolders || []).map((f) => f.uri.fsPath);
+    if (!roots.length) return vscode.window.showWarningMessage("Open a folder first: canvases are linked to a workspace.");
+    let picked = [];
+    if (typeof file === "string" && file) picked = [file];
+    else if (file && file.fsPath) picked = [file.fsPath];
+    else {
+      const others = link.otherCanvases(roots);
+      if (!others.length) return vscode.window.showInformationMessage("No canvases in other workspaces to link.");
+      const items = [];
+      let last = "";
+      for (const c of others.sort((a, b) => a.project.localeCompare(b.project) || a.name.localeCompare(b.name))) {
+        if (c.project !== last) {
+          items.push({ label: c.project, kind: vscode.QuickPickItemKind ? vscode.QuickPickItemKind.Separator : undefined });
+          last = c.project;
+        }
+        items.push({ label: c.name, description: c.project, detail: c.file, file: c.file });
+      }
+      const sel = await vscode.window.showQuickPick(items.filter((i) => i.file || i.kind), { canPickMany: true, matchOnDescription: true, placeHolder: "Canvases to link to " + path.basename(roots[0]) + " (they stay in sync with the original)" });
+      if (!sel || !sel.length) return;
+      picked = sel.filter((i) => i.file).map((i) => i.file);
+    }
+    const done = { linked: 0, copied: 0, already: 0, exists: [] };
+    let lastTarget = "";
+    for (const f of picked) {
+      const r = link.linkCanvas(f, roots[0]);
+      lastTarget = r.target;
+      if (r.how === "exists") done.exists.push(path.basename(f));
+      else if (r.how === "already linked") done.already++;
+      else done[r.how]++;
+    }
+    const parts = [];
+    if (done.linked) parts.push(done.linked + " linked");
+    if (done.copied) parts.push(done.copied + " copied (other drive)");
+    if (done.already) parts.push(done.already + " already linked");
+    if (done.exists.length) parts.push("skipped, a different canvas has the name: " + done.exists.join(", "));
+    vscode.window.showInformationMessage("Canvases → " + link.projectCanvasDir(roots[0]) + ": " + parts.join("; "));
+    agent.postPanels();
+    if (picked.length === 1 && lastTarget && !done.exists.length) await vscode.commands.executeCommand("localAgentBridge.openCanvas", lastTarget);
+  }));
+  // Canvas toolbar / in-canvas buttons: the request goes to the chat on screen (or a new one when it is busy).
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentAskCanvas", async (text) => {
+    let t = typeof text === "string" ? text : "";
+    if (!t) {
+      const tab = vscode.window.tabGroups.activeTabGroup.activeTab;
+      const file = tab && tab.input && tab.input.uri ? tab.input.uri.fsPath : "";
+      const ask = await vscode.window.showInputBox({ prompt: "What should the agent change" + (file ? " in " + require("path").basename(file) : "") + "?" });
+      if (!ask) return;
+      t = (file ? "Update the canvas " + file + ": " : "") + ask;
+    }
+    await agent.askAboutCanvas(t);
+  }));
   // Opened from another window's sidebar tree ("Start a chat here"): open the Agent with a new chat.
   setTimeout(() => agent.takeHandoff().catch(() => {}), 1500);
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentPickModel", () => agent.pickModel()));
@@ -412,6 +469,13 @@ async function pickCanvas(canvases) {
   return pick && pick.file;
 }
 
-function deactivate() {}
+function deactivate() {
+  // Servers and watchers the agent started in the background must not outlive CortexIDE.
+  try {
+    require("./lib/bg-shell").killAll();
+  } catch {
+    /* nothing running */
+  }
+}
 
 module.exports = { activate, deactivate };

@@ -13,7 +13,7 @@
 //   --cache <folder>     where fetched game files are kept (default %LOCALAPPDATA%\D2RModAssets\vanilla)
 //   --refresh            fetch again instead of using the cache (after a game update)
 //   --config k=v         override a mod option for every mod given (repeatable), e.g. testMode=true
-//   --max-page <n>       highest skilldesc SkillPage the SkillTab4 plugin draws (default 15)
+//   --max-page <n>       highest skilldesc SkillPage the SkillTab4 plugin draws (default 126, SkillTab4 0.7.0+)
 //   --manifest <file>    write what was read, written, copied and depended on (JSON)
 //   --dump [base]        print the non-empty columns of every row the mods added
 //   --out <folder>       save every file the mods wrote there (compare two runs byte for byte)
@@ -33,7 +33,7 @@ const { spawnSync } = require('child_process');
 // ---------------------------------------------------------------------------
 // Arguments
 // ---------------------------------------------------------------------------
-const opt = { game: process.env.D2R_PATH, cache: null, refresh: false, config: {}, maxPage: 15, manifest: null, dump: null, python: 'python', mods: [] };
+const opt = { game: process.env.D2R_PATH, cache: null, refresh: false, config: {}, maxPage: 126, manifest: null, dump: null, python: 'python', mods: [] };
 for (let i = 2; i < process.argv.length; i++) {
   const a = process.argv[i];
   const next = () => process.argv[++i];
@@ -141,8 +141,24 @@ function touch(key) {
   txn.files.set(key, files[key] === undefined ? undefined : structuredClone(files[key]));
   if (!txn.copied.has(key)) txn.copied.set(key, record.copied[key]);
 }
+// Like D2RMM's file manager: a mod that writes or copies over a file another mod wrote, without
+// having read or written that file itself first, gets D2RMM's "modifying ... without reading it
+// first" warning (the earlier mods' changes are lost).
+const fileOps = new Map(); // key -> { touched: Set of mod indexes, writers: [mod names] }
+const opsOf = (key) => fileOps.get(key) || fileOps.set(key, { touched: new Set(), writers: [] }).get(key);
+function noteWrite(key) {
+  const ops = opsOf(key);
+  const name = path.basename(currentMod || '');
+  if (!ops.touched.has(modIndex)) {
+    const others = ops.writers.filter((w) => w !== name);
+    if (others.length) warn(`${name} is modifying ${key} without reading it first; ${[...new Set(others)].join(', ')} wrote it before and those changes are lost (D2RMM warns the same)`);
+  }
+  ops.touched.add(modIndex);
+  ops.writers.push(name);
+}
 function load(p, kind) {
   const key = norm(p);
+  opsOf(key).touched.add(modIndex);
   touch(key);
   if (files[key] !== undefined) return files[key];
   if (record.copied[key]) {
@@ -172,7 +188,7 @@ function written(v) {
   }
   return typeof v === 'string' ? v : JSON.parse(JSON.stringify(v));
 }
-const write = (p, v) => { touch(norm(p)); files[norm(p)] = written(v); record.written.add(norm(p)); if (txn) txn.wrote.add(norm(p)); };
+const write = (p, v) => { noteWrite(norm(p)); touch(norm(p)); files[norm(p)] = written(v); record.written.add(norm(p)); if (txn) txn.wrote.add(norm(p)); };
 let nextId = 90000;
 let currentMod = null;
 function walk(dir, out, rel) {
@@ -203,6 +219,7 @@ const D2RMM = {
       const key = norm(rel ? `${dst}/${rel}` : dst);
       // Like D2RMM: without overwrite a file that is already there stays.
       if (!overwrite && (files[key] !== undefined || record.copied[key])) return;
+      noteWrite(key);
       touch(key);
       if (txn) txn.wrote.add(key);
       record.copied[key] = path.join(from, rel);
@@ -418,6 +435,25 @@ const stringText = {};
 const stats = new Set(now('global/excel/itemstatcost.txt', 'tsv').rows.map((r) => lower(r.Stat)));
 const hdMissiles = now('hd/missiles/missiles.json', 'json') || {};
 const layout = now('global/ui/layouts/skillstreepanelhd.json', 'json');
+// The tree picture a page's Tab<page> widget shows: 'own' when a mod ships it (SkillTreeArt.py draws
+// a frame in every cell of the page), 'stock' for a class picture, null when the widget has none.
+const STOCK_TREE_ART = /^spells\/skill_trees\/(am|as|ba|dr|ne|pa|so|wa)skilltree$/;
+const pageArtSeen = new Map();
+const pageArt = (page) => {
+  if (!pageArtSeen.has(String(page))) pageArtSeen.set(String(page), findPageArt(page));
+  return pageArtSeen.get(String(page));
+};
+const findPageArt = (page) => {
+  const tab = layout && layout.children.find((c) => c.name === `Tab${page}`);
+  const img = tab && (tab.children || []).find((c) => c.type === 'ImageWidget' && c.fields && c.fields.filename);
+  if (!img) return null;
+  const name = norm(img.fields.filename);
+  const key = `hd/global/ui/${name}.sprite`;
+  if (record.copied[key] || files[key] !== undefined) return 'own';
+  if (STOCK_TREE_ART.test(name)) return 'stock';
+  bad(`layout Tab${page} shows ${img.fields.filename}, which no mod ships (${key}) and is no class tree picture`);
+  return 'missing';
+};
 const SKILL_MISSILE_COLS = ['srvmissile', 'srvmissilea', 'srvmissileb', 'srvmissilec', 'cltmissile', 'cltmissilea', 'cltmissileb', 'cltmissilec', 'cltmissiled'];
 const SUB_MISSILE_COLS = ['ExplosionMissile', 'SubMissile1', 'SubMissile2', 'SubMissile3', 'HitSubMissile1', 'HitSubMissile2', 'HitSubMissile3', 'HitSubMissile4', 'CltSubMissile1', 'CltSubMissile2', 'CltSubMissile3', 'CltHitSubMissile1', 'CltHitSubMissile2', 'CltHitSubMissile3', 'CltHitSubMissile4'];
 const calcRefs = (v, fn) => (String(v).match(new RegExp(`${fn}\\('([^']+)'`, 'g')) || []).map((m) => m.slice(fn.length + 2, -1));
@@ -474,6 +510,48 @@ DIRS.forEach((dir) => {
 
   const grid = {};
   skills.rows.forEach((r, i) => { if (freshNames.has(lower(r.skill)) && '*Id' in r && r['*Id'] !== String(i)) bad(`skill ${r.skill} has *Id ${r['*Id']} at row ${i}`); });
+  // Skill ID limits: the table itself takes 16-bit IDs (plugins check 0x7FFF), but the item stats
+  // that name a skill (item_singleskill "+N to <skill>", item_nonclassskill oskills, item_aura) save
+  // it in 9 bits (itemstatcost Save Param Bits), so a class skill past ID 511 cannot be named on
+  // items unless the SkillLimits plugin (or a mod that raises those bits) widens them. Characters
+  // saved with one width need the same width to read their items.
+  const skillLimit = now('global/excel/itemstatcost.txt', 'tsv').rows.find((x) => lower(x.Stat) === 'item_singleskill');
+  const paramBits = skillLimit && Number(skillLimit['Save Param Bits']) > 0 ? Number(skillLimit['Save Param Bits']) : 9;
+  const itemMax = (1 << paramBits) - 1;
+  skills.rows.forEach((r, i) => {
+    if (!freshNames.has(lower(r.skill))) return;
+    if (i > 0x7FFF) bad(`skill ${r.skill} is row ${i}, above 32767 (skill IDs are 16-bit)`);
+    else if (r.charclass && r.skilldesc && i > itemMax) warn(`class skill ${r.skill} is row ${i}: items name skills in ${paramBits} bits (item_singleskill, oskills, auras; max ${itemMax}), so +skills need the SkillLimits plugin (or put class skills before hidden rows)`);
+  });
+  // State limits: the game reports an error past 511 states.txt rows (StateLimits lifts that to
+  // 32768 once D2RCore's wide-state code is in place; per-unit state bits hold 32768), and the item
+  // property `state` (stat 98) names its state in 8 bits (itemstatcost Save Param Bits; StateLimits
+  // 0.2.0 widens it), so an item that sets a state past 255 gets the wrong state after a save.
+  if (states.rows.length > 0x8000) bad(`states.txt has ${states.rows.length} rows; units hold at most 32768 states`);
+  else if (states.rows.length > 511) warn(`states.txt has ${states.rows.length} rows (the game's limit is 511): needs D2RCore and the StateLimits plugin`);
+  const stateStat = now('global/excel/itemstatcost.txt', 'tsv').rows.find((x) => lower(x.Stat) === 'state');
+  const stateBits = stateStat && Number(stateStat['Save Param Bits']) > 0 ? Number(stateStat['Save Param Bits']) : 8;
+  const stateMax = (1 << stateBits) - 1;
+  const stateRow = {};
+  states.rows.forEach((r, i) => { stateRow[lower(r.state)] = i; });
+  ['uniqueitems', 'setitems', 'sets', 'runes', 'magicprefix', 'magicsuffix', 'automagic', 'cubemain'].forEach((t) => {
+    if (!record.written.has(norm(`${dir}${t}.txt`))) return;
+    const table = now(`${dir}${t}.txt`, 'tsv');
+    if (!table) return;
+    table.rows.forEach((r) => {
+      table.headers.forEach((h, k) => {
+        if (lower(r[h]) !== 'state' || !/code|prop|^mod \d+$/i.test(h)) return;
+        // The parameter column: "mod 1 param" in cubemain, otherwise the next column (par1, PParam2a, T1Param1, mod1param...).
+        const parCol = table.headers.includes(`${h} param`) ? `${h} param` : table.headers[k + 1];
+        const par = String(r[parCol] || '').trim();
+        if (!par) return;
+        const id = /^\d+$/.test(par) ? Number(par) : stateRow[lower(par)];
+        const who = `${t}.txt ${r[table.headers[0]]}.${h}`;
+        if (id === undefined) bad(`${who}: state ${par} is not in states.txt`);
+        else if (id > stateMax) warn(`${who}: state ${par} is row ${id}, but items name states in ${stateBits} bits (max ${stateMax}): needs StateLimits 0.2.0+ (state_param_bits)`);
+      });
+    });
+  });
   fresh.forEach((r) => {
     const who = r.skill;
     ['reqskill1', 'reqskill2', 'reqskill3'].forEach((c) => {
@@ -523,7 +601,7 @@ DIRS.forEach((dir) => {
       if (!['1', '2', '3'].includes(d.ListRow)) bad(`${who}: ListRow ${d.ListRow} must name the parent tab's page (1-3)`);
       else {
         const stock = stockCells[`${r.charclass}/${d.ListRow}/${d.SkillRow}/${d.SkillColumn}`];
-        if (!stock) warn(`${who} is in a cell (row ${d.SkillRow}, column ${d.SkillColumn}) where the parent tab has no skill, so the tab picture has no frame for it`);
+        if (!stock && pageArt(page) !== 'own') warn(`${who} is in a cell (row ${d.SkillRow}, column ${d.SkillColumn}) where the parent tab has no skill, so the tab picture has no frame for it`);
       }
     } else if (!(page >= 1)) bad(`${who}: SkillPage ${d.SkillPage}`);
     ['str name', 'str short', 'str long', 'str alt'].forEach((c) => { if (!strings.has(d[c])) bad(`${who} skilldesc ${c} = ${d[c]}: no such string`); });
@@ -629,6 +707,83 @@ if (layout) {
     console.log(`layout ${c.name}: "${stringText[key]}" at x ${r.x}, y ${r.y}${pagesByClass[m[1]] ? ` (${[...pagesByClass[m[1]]].join(', ')})` : ''}`);
     if (!strings.has(key)) bad(`layout ${c.name} text ${key}: no such string`);
     if (!pagesByClass[m[1]]) warn(`layout has ${c.name} but no skill is on SkillPage ${m[1]}`);
+    pageArt(m[1]);
+  });
+}
+
+// Extra tab labels, per class: the layout is shared, but SkillTab4 hides every page a class has
+// no skills on, so only one class's labels are ever on screen together. Each label (its text box,
+// its click area Tab<N>.activationRect and a SkillTabLayout plate TabPlate<N>) must stay clear of
+// the class's other labels, the stock tabs, the tree picture, the skill counter's text and the
+// right hinge, and must stay on screen. Coordinates are local to the right panel: it is 1162 x
+// 1507 and its right edge is 232 left of the screen's right edge (RightPanelRect x -1394).
+if (layout) {
+  const SCREEN_RIGHT = 1394;
+  const FIXED = [
+    { what: 'stock tab strip', x: 130, y: 160, width: 888, height: 99 },
+    { what: 'tree picture', x: 132, y: 260, width: 897, height: 1065 },
+    { what: "skill counter's text", x: 91 + 972 * 0.3, y: 1388, width: 972 * 0.4, height: 60, soft: true },
+    { what: 'right hinge', x: 1076, y: 630, width: 331, height: 297 },
+  ];
+  const PLATES = { 'panel\\waypoints\\waypoints_tab': { width: 174, height: 82 } };
+  const byName = Object.fromEntries(layout.children.filter((c) => c.name).map((c) => [c.name, c]));
+  // Fields may name a _profilehd variable ("$SkillTabClick22", SkillTabLayout); the HD profile is checked.
+  const profile = now('global/ui/layouts/_profilehd.json', 'json') || {};
+  const v = (x) => (typeof x === 'string' && x[0] === '$' && profile[x.slice(1)] !== undefined ? v(profile[x.slice(1)]) : x);
+  const boxesOf = (page) => {
+    const out = [];
+    const text = byName[`TextTab${page}`];
+    const tab = byName[`Tab${page}`];
+    const plate = byName[`TabPlate${page}`];
+    const box = (r) => (r && typeof r === 'object' && Number.isFinite(r.x) && Number.isFinite(r.y) ? r : null);
+    [text && text.fields.rect, text && text.fields.style, tab && tab.fields.activationRect, plate && plate.fields.rect, plate && plate.fields.filename].forEach((f) => {
+      if (typeof f === 'string' && f[0] === '$' && typeof v(f) === 'string' && v(f)[0] === '$' && !/^\$Style/.test(v(f))) bad(`layout page ${page}: ${f} is not defined in _profilehd.json`);
+    });
+    if (text && box(v(text.fields.rect))) out.push({ what: 'label', ...v(text.fields.rect) });
+    if (tab && box(v(tab.fields.activationRect))) out.push({ what: 'click area', ...v(tab.fields.activationRect) });
+    if (plate && box(v(plate.fields.rect))) {
+      const r = v(plate.fields.rect);
+      const size = PLATES[lower(v(plate.fields.filename))];
+      const s = r.scale || 1;
+      if (size) out.push({ what: 'plate', x: r.x, y: r.y, width: size.width * s, height: size.height * s });
+    }
+    return out;
+  };
+  const SLACK = 4; // stock labels touch the tree picture's bottom edge by a pixel or two
+  const hit = (a, b) => a.x + SLACK < b.x + b.width && b.x + SLACK < a.x + a.width && a.y + SLACK < b.y + b.height && b.y + SLACK < a.y + a.height;
+  const classPages = {};
+  Object.keys(pagesByClass).forEach((page) => pagesByClass[page].forEach((cls) => (classPages[cls] = classPages[cls] || []).push(page)));
+  Object.keys(classPages).sort().forEach((cls) => {
+    const pages = classPages[cls].sort((x, y) => x - y);
+    const label = (p) => `${stringText[String((byName[`TextTab${p}`] || { fields: {} }).fields.text || '').replace(/^@/, '')] || `page ${p}`} (TextTab${p})`;
+    pages.forEach((p, i) => {
+      const mine = boxesOf(p);
+      mine.forEach((b) => {
+        if (b.x < 0 || b.x + b.width > SCREEN_RIGHT || b.y < 0 || b.y + b.height > 1507) bad(`${cls}: ${label(p)} ${b.what} at x ${b.x}, y ${b.y}, ${b.width} x ${b.height} is off screen (panel 0..1507 high, screen edge at x ${SCREEN_RIGHT})`);
+        // The counter's text is centred and its width depends on the number, so only a warning.
+        FIXED.forEach((f) => { if (hit(b, f)) (f.soft ? warn : bad)(`${cls}: ${label(p)} ${b.what} at x ${b.x}, y ${b.y} ${f.soft ? 'may cover' : 'covers'} the ${f.what}`); });
+      });
+      pages.slice(i + 1).forEach((q) => {
+        const theirs = boxesOf(q);
+        if (mine.some((a) => theirs.some((b) => hit(a, b)))) bad(`${cls}: ${label(p)} and ${label(q)} overlap`);
+      });
+      // The label's text has to fit: 22 pt, about 12 px a letter, lines of 27 px (lineWrap is on).
+      const text = mine.find((b) => b.what === 'label');
+      const words = String(stringText[String((byName[`TextTab${p}`] || { fields: {} }).fields.text || '').replace(/^@/, '')] || '');
+      const size = (v((byName[`TextTab${p}`] || { fields: {} }).fields.style) || {}).pointSize;
+      const pt = Number.isFinite(size) ? size : 22;
+      if (text && words) {
+        const perLine = Math.max(1, Math.floor((text.width - 8) / (pt * 0.55)));
+        let lines = 1;
+        let used = 0;
+        words.split(/\s+/).forEach((w) => {
+          if (used && used + 1 + w.length > perLine) { lines++; used = w.length; } else used += (used ? 1 : 0) + w.length;
+          if (w.length > perLine) lines += Math.ceil(w.length / perLine) - 1;
+        });
+        if (lines * pt * 1.2 > text.height + 2) warn(`${cls}: ${label(p)} needs about ${lines} line(s) of ${pt} pt but its box is ${text.width} x ${text.height}`);
+      }
+    });
+    console.log(`tabs ${cls}: ${pages.length} extra page(s): ${pages.map((p) => { const t = byName[`TextTab${p}`]; const r = (t && t.fields.rect) || {}; const at = v(r) || {}; return `${p}@${at.x},${at.y}`; }).join(' ')}`);
   });
 }
 
@@ -668,24 +823,204 @@ if (toCheck.size) {
 }
 console.log(`HD: ${[...record.written].filter((k) => /^hd\/missiles\/.+\.json$/.test(k) && k !== 'hd/missiles/missiles.json').length} own missile definitions, ${Object.keys(record.copied).length} files copied from mod folders, ${toCheck.size} game files they depend on checked`);
 
-// PetAI plugin rules: strict format, and every rule must point at a monster whose Skill<slot> is that skill.
-DIRS.forEach((dir) => {
-  const text = files[`${dir}d2rloader/petai/rules.txt`];
-  if (typeof text !== 'string') return;
-  if (!text.endsWith('\n') || /[^\x20-\x7E\t\n]/.test(text)) bad(`${dir}: PetAI rules are not plain line-feed text`);
-  const lines = text.slice(0, -1).split('\n').map((l) => l.split('\t'));
-  const head = lines[0];
-  const monsters = now(`${dir}monstats.txt`, 'tsv').rows.filter((r) => r.Id !== 'Expansion');
-  const skillRows = now(`${dir}skills.txt`, 'tsv').rows.filter((r) => r.skill !== 'Expansion');
-  lines.slice(1).forEach((cells, i) => {
-    if (cells.length !== head.length || cells.some((c) => !/^\d+$/.test(c))) return bad(`${dir}: PetAI rule ${i + 1} is malformed`);
-    const rule = Object.fromEntries(head.map((h, k) => [h, Number(cells[k])]));
-    const mon = monsters[rule.monster];
-    const skill = skillRows[rule.skillid];
-    if (!mon || !skill || lower(mon[`Skill${rule.slot}`]) !== lower(skill.skill) || !mon[`Sk${rule.slot}mode`]) return bad(`${dir}: PetAI rule ${i + 1} does not match its monster`);
-    console.log(`  ${dir} PetAI rule: ${mon.Id} uses ${skill.skill} (Skill${rule.slot}, ${mon[`Sk${rule.slot}mode`]}), chance ${rule.chance}, cooldown ${rule.cooldown}`);
+// PetAI plugin tables (<game>\mods\PetAI): all four, checked the way the plugin (0.6.0) reads them.
+// Format: plain line-feed text, final line feed, a header with exactly the plugin's columns (the
+// loader rejects a file that lacks one), numbers only. Values: what the plugin would skip or
+// misread, and rows that do not point at what they mean to (monster rows, skill slots, routines).
+{
+  const PETAI_TABLES = {
+    rules: ['monster', 'slot', 'skillid', 'chance', 'enemy', 'maxdist', 'attarget', 'cooldown'],
+    nearrules: ['monster', 'near', 'dist', 'slot', 'cooldown'],
+    springrules: ['monster', 'trigger', 'dist', 'skill', 'levelskill', 'count'],
+    commandrules: ['skill', 'monster', 'slot', 'range', 'window', 'attarget'],
+  };
+  const PETAI_MAX_ROWS = 1024; // per table and folder since 0.6.0 (0.5.0: 256, commands 1024)
+  DIRS.forEach((dir) => {
+    const read = (name) => {
+      const text = files[`${dir}d2rloader/petai/${name}.txt`];
+      if (typeof text !== 'string') return null;
+      const where = `${dir}d2rloader/petai/${name}.txt`;
+      if (!text.endsWith('\n') || /[^\x20-\x7E\t\n]/.test(text)) bad(`${where}: not plain line-feed text ending with a line feed (the loader rejects it)`);
+      const lines = text.replace(/\n$/, '').split('\n').map((l) => l.split('\t'));
+      const head = lines[0].map((h) => h.trim().toLowerCase());
+      const want = PETAI_TABLES[name];
+      const missing = want.filter((c) => !head.includes(c));
+      const extra = head.filter((c) => !want.includes(c));
+      if (missing.length || extra.length) bad(`${where}: header must be exactly ${want.join(', ')}${missing.length ? ` (missing ${missing.join(', ')})` : ''}${extra.length ? ` (unknown ${extra.join(', ')})` : ''}`);
+      const rows = [];
+      lines.slice(1).forEach((cells, i) => {
+        if (cells.length !== head.length || cells.some((c) => !/^\d+$/.test(c))) return bad(`${where}: row ${i + 1} is malformed (numbers only, one per column)`);
+        rows.push({ n: i + 1, ...Object.fromEntries(head.map((h, k) => [h, Number(cells[k])])) });
+      });
+      if (rows.length > PETAI_MAX_ROWS) bad(`${where}: ${rows.length} rows; PetAI reads at most ${PETAI_MAX_ROWS} per folder and ignores the whole table beyond that`);
+      else if (name !== 'commandrules' && rows.length > 256) warn(`${where}: ${rows.length} rows need PetAI 0.6.0 (0.5.0 ignores a table over 256 rows)`);
+      return { where, rows };
+    };
+    const monsters = now(`${dir}monstats.txt`, 'tsv').rows.filter((r) => r.Id !== 'Expansion');
+    const skillRows = now(`${dir}skills.txt`, 'tsv').rows.filter((r) => r.skill !== 'Expansion');
+    const slotSkill = (mon, slot) => (mon && slot >= 1 && slot <= 8 && mon[`Skill${slot}`] && mon[`Sk${slot}mode`] ? mon[`Skill${slot}`] : null);
+
+    const rules = read('rules');
+    (rules ? rules.rows : []).forEach((r) => {
+      const mon = monsters[r.monster];
+      const skill = skillRows[r.skillid];
+      if (r.slot < 1 || r.slot > 8 || r.chance === 0) return bad(`${rules.where}: row ${r.n}: slot must be 1-8 and chance above 0 (the plugin skips it)`);
+      if (!mon || !skill || lower(slotSkill(mon, r.slot)) !== lower(skill.skill)) return bad(`${rules.where}: row ${r.n} does not match its monster (Skill${r.slot} of monster row ${r.monster} must be skill row ${r.skillid}, with a mode)`);
+      if (r.chance > 100) warn(`${rules.where}: row ${r.n}: chance ${r.chance} is over 100`);
+      if (r.attarget > 1) warn(`${rules.where}: row ${r.n}: attarget ${r.attarget} reads as 1`);
+      const when = r.enemy >= 2 ? `with ${r.enemy}+ enemies within ${r.maxdist || 10} (PetAI 0.6.0+; older: any target)` : r.enemy === 1 ? `with a target${r.maxdist ? ` within ${r.maxdist}` : ''}` : 'any turn';
+      console.log(`  ${dir} PetAI rule: ${mon.Id} uses ${skill.skill} (Skill${r.slot}, ${mon[`Sk${r.slot}mode`]}) ${when}, chance ${r.chance}, cooldown ${r.cooldown}`);
+    });
+
+    const near = read('nearrules');
+    (near ? near.rows : []).forEach((r) => {
+      const mon = monsters[r.monster];
+      const other = monsters[r.near];
+      if (r.dist === 0 || r.slot > 8) return bad(`${near.where}: row ${r.n}: dist must be above 0 and slot 0-8 (the plugin skips it)`);
+      if (!mon || !other) return bad(`${near.where}: row ${r.n}: monster row ${!mon ? r.monster : r.near} does not exist`);
+      if (r.slot > 0 && !slotSkill(mon, r.slot)) return bad(`${near.where}: row ${r.n}: ${mon.Id} has no Skill${r.slot} with a mode`);
+      if (!mon.AI) warn(`${near.where}: row ${r.n}: ${mon.Id} has no AI, so it never gets the turn the rule needs`);
+      console.log(`  ${dir} PetAI near rule: ${mon.Id} near ${other.Id} (within ${r.dist}): ${r.slot === 0 ? 'dies' : `uses ${slotSkill(mon, r.slot)}`}`);
+    });
+
+    const spring = read('springrules');
+    (spring ? spring.rows : []).forEach((r) => {
+      const mon = monsters[r.monster];
+      const skill = skillRows[r.skill];
+      const level = r.levelskill ? skillRows[r.levelskill] : skill;
+      if (r.trigger < 1 || r.trigger > 3 || ((r.trigger & 1) && r.dist === 0) || r.count < 1 || r.count > 20) return bad(`${spring.where}: row ${r.n}: trigger 1-3, dist above 0 for touch, count 1-20 (the plugin skips it)`);
+      if (!mon) return bad(`${spring.where}: row ${r.n}: monster row ${r.monster} does not exist`);
+      if (!skill || !skill.summon || !skill.pettype) return bad(`${spring.where}: row ${r.n}: skill row ${r.skill} must have summon and pettype`);
+      if (!level) return bad(`${spring.where}: row ${r.n}: levelskill row ${r.levelskill} does not exist`);
+      console.log(`  ${dir} PetAI spring: ${mon.Id} (${['', 'touch', 'death', 'touch or death'][r.trigger]}) summons ${r.count} x ${skill.summon} via ${skill.skill} at ${level.skill}'s level`);
+    });
+
+    const commands = read('commandrules');
+    const bySkill = {};
+    (commands ? commands.rows : []).forEach((r) => {
+      const mon = monsters[r.monster];
+      const skill = skillRows[r.skill];
+      if (r.skill === 0 || r.slot > 10 || r.window > 750) return bad(`${commands.where}: row ${r.n}: skill above 0, slot 0-10, window at most 750 (the plugin skips it)`);
+      if (!skill || String(skill.srvdofunc) !== '179') return bad(`${commands.where}: row ${r.n}: skill row ${r.skill} ${skill ? `(${skill.skill}) has srvdofunc ${skill.srvdofunc || 'empty'}, not 179` : 'does not exist'}`);
+      if (!mon) return bad(`${commands.where}: row ${r.n}: monster row ${r.monster} does not exist`);
+      if (r.slot >= 1 && r.slot <= 8 && !slotSkill(mon, r.slot)) return bad(`${commands.where}: row ${r.n}: ${mon.Id} has no Skill${r.slot} with a mode`);
+      if (r.attarget > 1) warn(`${commands.where}: row ${r.n}: attarget ${r.attarget} reads as 1`);
+      (bySkill[skill.skill] = bySkill[skill.skill] || []).push(r);
+    });
+    Object.keys(bySkill).forEach((name) => {
+      const rows = bySkill[name];
+      const seen = new Set();
+      rows.forEach((r) => {
+        if (seen.has(r.monster)) warn(`${commands.where}: ${name} lists monster row ${r.monster} twice; only the first row is used`);
+        seen.add(r.monster);
+      });
+      const what = (r) => (r.slot === 0 ? 'burst' : r.slot === 9 ? 'strike' : r.slot === 10 ? 'shoot' : slotSkill(monsters[r.monster], r.slot));
+      const sample = rows.slice(0, 6).map((r) => `${monsters[r.monster].Id} ${what(r)}`).join(', ');
+      console.log(`  ${dir} PetAI command ${name}: ${rows.length} pet kind(s)${rows.length > 64 ? ' (PetAI 0.6.0+: 0.5.0 lost most of these orders)' : ''}: ${sample}${rows.length > 6 ? ', ...' : ''}`);
+    });
   });
-});
+}
+
+// ---------------------------------------------------------------------------
+// AssetMerge plugin fragments (<game>\mods\AssetMerge): rows the plugin merges into the game's
+// hd/model_lod_desc.bin and global/animdata.d2 at load. Checked here the way the plugin reads
+// them; a mod that still ships one of the two whole files is pointed at the fragments.
+// ---------------------------------------------------------------------------
+{
+  const vanillaBytes = (p) => {
+    const key = norm(p);
+    fetchVanilla([key]);
+    return fetched[key] ? fs.readFileSync(path.join(opt.cache, key)) : null;
+  };
+  ['hd/model_lod_desc.bin', 'global/animdata.d2'].forEach((key) => {
+    if (record.copied[key] || record.written.has(key)) {
+      warn(`${key} is replaced whole by a mod; with the AssetMerge plugin a mod adds rows to global/excel/d2rloader/assetmerge/${key.endsWith('.bin') ? 'models' : 'animdata'}.txt instead (toolkit AssetMerge.py), and whole copies hide the other mods' entries`);
+    }
+  });
+  const fragmentText = (file) => {
+    const key = norm(`global/excel/d2rloader/assetmerge/${file}`);
+    return typeof files[key] === 'string' ? files[key] : null;
+  };
+  const tsvRows = (text) => {
+    const lines = text.replace(/\r/g, '').split('\n').filter((l) => l.trim() && !l.startsWith('#'));
+    const header = (lines[0] || '').split('\t').map((h) => h.trim().toLowerCase());
+    return { header, rows: lines.slice(1).map((l, i) => ({ line: i + 2, cell: (name) => { const c = header.indexOf(name); return c < 0 ? '' : ((l.split('\t')[c]) || '').trim(); } })) };
+  };
+  const models = fragmentText('models.txt');
+  if (models !== null) {
+    const index = vanillaBytes('hd/model_lod_desc.bin');
+    const { header, rows } = tsvRows(models);
+    if (!['model', 'donor'].every((h) => header.includes(h))) bad('AssetMerge models.txt has no model/donor column');
+    // The game's index: models sorted by FNV-1a 32 of the lower-case path; 44-byte records.
+    const fnv = (s) => { let h = 0x811c9dc5; for (const ch of Buffer.from(s.replace(/\\/g, '/').toLowerCase())) h = Math.imul(h ^ ch, 0x01000193) >>> 0; return h; };
+    const pathOf = (s) => { const p = s.replace(/\\/g, '/').toLowerCase(); return p.startsWith('data/') ? p : `data/${p}`; };
+    let byHash = null;
+    if (index) {
+      const n0 = index.readUInt32LE(0);
+      const a0 = 4 + index.readInt32LE(4);
+      const a1 = 12 + index.readInt32LE(12);
+      byHash = new Map();
+      for (let i = 0; i < n0; i++) {
+        const r = a0 + i * 44;
+        const lodCount = index.readUInt32LE(r + 32);
+        const firstLod = r + 36 + index.readInt32LE(r + 36);
+        const meshes = [];
+        for (let k = 0; k < lodCount; k++) meshes.push(index.readUInt32LE(firstLod + k * 12 + 4));
+        byHash.set(index.readUInt32LE(r), meshes);
+        if (firstLod < a1) { byHash = null; warn("AssetMerge: the game's model index is not the expected layout; donors not checked"); break; }
+      }
+    }
+    const added = new Map(); // model -> meshes per LOD (from its donor)
+    rows.forEach(({ line, cell }) => {
+      const model = pathOf(cell('model'));
+      if (!/\.model$/.test(model) || /_lod\d/.test(model)) return bad(`AssetMerge models.txt line ${line}: ${cell('model')} is not a model path (data/hd/.../name.model, no _lodN)`);
+      if (cell('donor')) {
+        const donor = pathOf(cell('donor'));
+        const meshes = byHash ? byHash.get(fnv(donor)) || added.get(donor) : [];
+        if (!meshes) return bad(`AssetMerge models.txt line ${line}: donor ${donor} is not in the game's model index`);
+        added.set(model, meshes);
+      }
+      if (cell('lod') === '' && cell('mesh') === '') return;
+      const lod = Number(cell('lod'));
+      const mesh = Number(cell('mesh'));
+      const box = ['minx', 'miny', 'minz', 'maxx', 'maxy', 'maxz'].map((h) => Number(cell(h)));
+      const meshes = added.get(model);
+      if (!meshes) return bad(`AssetMerge models.txt line ${line}: ${model} has no donor`);
+      if (byHash && !(lod < meshes.length && mesh < meshes[lod])) return bad(`AssetMerge models.txt line ${line}: ${model} LOD ${lod} mesh ${mesh}, but its donor has ${JSON.stringify(meshes)} meshes per LOD`);
+      if (box.some((v) => !Number.isFinite(v)) || box[0] > box[3] || box[1] > box[4] || box[2] > box[5]) bad(`AssetMerge models.txt line ${line}: ${model} needs six box values with min <= max`);
+    });
+    if (!index) warn('AssetMerge models.txt: the game\'s hd/model_lod_desc.bin could not be read, donors not checked');
+    console.log(`AssetMerge models.txt: ${rows.length} row(s), ${added.size} model(s) (needs the AssetMerge plugin)`);
+  }
+  const anims = fragmentText('animdata.txt');
+  if (anims !== null) {
+    const table = vanillaBytes('global/animdata.d2');
+    const names = new Set();
+    if (table) {
+      for (let o = 0, b = 0; b < 256 && o + 4 <= table.length; b++) {
+        const count = table.readUInt32LE(o);
+        o += 4;
+        for (let i = 0; i < count; i++, o += 160) names.add(table.toString('latin1', o, o + 8).replace(/\0.*$/s, '').toUpperCase());
+      }
+    }
+    const { header, rows } = tsvRows(anims);
+    if (!header.includes('name')) bad('AssetMerge animdata.txt has no name column');
+    const seen = new Map();
+    rows.forEach(({ line, cell }) => {
+      const name = cell('name').toUpperCase();
+      if (!/^[A-Z0-9_]{1,7}$/.test(name)) return bad(`AssetMerge animdata.txt line ${line}: "${cell('name')}" is not a COF name (1-7 letters/digits)`);
+      const source = cell('source').toUpperCase();
+      if (source && !names.has(source) && !seen.has(source)) return bad(`AssetMerge animdata.txt line ${line}: ${name} copies ${source}, which is not in animdata.d2`);
+      if (!source && !(Number(cell('frames')) > 0)) return bad(`AssetMerge animdata.txt line ${line}: ${name} needs frames or a source`);
+      const ev = cell('events');
+      if (ev && ev !== '-' && ev !== '0' && !ev.split(/[, ]+/).filter(Boolean).every((p) => /^\d+:\d+$/.test(p) && Number(p.split(':')[0]) < 144)) bad(`AssetMerge animdata.txt line ${line}: ${name} events "${ev}" are not "-" or frame:code pairs (frame 0-143)`);
+      if (seen.has(name)) warn(`AssetMerge animdata.txt line ${line}: ${name} again (line ${seen.get(name)}); the later row wins`);
+      if (names.has(name)) warn(`AssetMerge animdata.txt line ${line}: ${name} is already in the game's animdata.d2; the row replaces it`);
+      seen.set(name, line);
+    });
+    console.log(`AssetMerge animdata.txt: ${rows.length} row(s) (needs the AssetMerge plugin)`);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // What it took: the files needed to produce the mods' output.

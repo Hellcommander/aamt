@@ -24,40 +24,16 @@ Cursor's canvas runtime is not a VSIX CortexIDE can import. In CortexIDE, Local 
 
 Read `~/.cursor/skills-cursor/canvas/SKILL.md` for generation policy, slop rules, and the Pre-delivery self-check. Exact SDK exports live in `~/.cursor/skills-cursor/canvas/sdk/index.d.ts`.
 
-## CortexIDE extras
+## Stay on the public SDK
 
-These are exported from the same `cursor/canvas` import on CortexIDE. They are **not** in Cursor's published SDK. If the canvas must also open in Cursor, compose the same layout with `Stack` / `Row` / `Card` / `H1`–`H3` / `Link` instead.
+Use only exports listed in `~/.cursor/skills-cursor/canvas/sdk/index.d.ts`, so the canvas opens in Cursor and in CortexIDE alike. The CortexIDE runtime still renders the old extras (`DocsShell`, `TableOfContents`, `DocSection`, `CodeBlock`, `References`) for canvases written earlier, but Cursor's SDK has none of them, and a canvas that imports them fails to compile there.
 
-```ts
-import {
-  DocsShell,
-  TableOfContents,
-  DocSection,
-  CodeBlock,
-  References,
-} from "cursor/canvas";
-```
+For docs layout, define small helpers inside the canvas file:
 
-| Export | Role |
-| --- | --- |
-| `DocsShell` | Page chrome: sticky TOC column, title, subtitle, overview card, body, optional references. |
-| `TableOfContents` | Standalone jump list if you are not using `DocsShell`. |
-| `DocSection` | `id` + `H2` heading so TOC anchors work. |
-| `CodeBlock` | Fenced snippet with optional `language` / `title`. |
-| `References` | File and URL list (`{ label, href, note? }`). |
-
-`DocsShell` props:
-
-- `title?: string`
-- `subtitle?: string`
-- `overview?: ReactNode`
-- `toc?: { id: string; label: string; level?: number }[]`
-- `children?: ReactNode`
-- `references?: { label: string; href: string; note?: string }[]`
-
-`DocSection` props: `id: string`, `title: string`, `children`.
-
-`CodeBlock` props: `language?: string`, `title?: string`, `children` (plain source text).
+- **Section:** a `<section id>` wrapping `H2` + `Stack`, so `#id` jump links work.
+- **Table of contents:** a `Row` of `<a href="#id">` links coloured with `useHostTheme().accent.primary`.
+- **Code:** a `Card` with `CardHeader` (title) and `CardBody` holding a `<pre>` (monospace, `theme.text.primary`).
+- **References:** `Link` + `Text tone="secondary"` rows.
 
 ## Gather the source material
 
@@ -67,9 +43,9 @@ Accept any of: a directory of markdown files, a single doc URL, an inline outlin
 
 Decide the top-level structure before writing components:
 
-1. **Overview** — purpose, scope, audience (one card or `DocsShell` `overview`).
-2. **Table of contents** — sticky jump list (`DocsShell` `toc` or `TableOfContents`).
-3. **Body sections** — one `DocSection` per logical unit. Mix prose, `Table`, `Callout`, `CodeBlock`, charts, DAG layout.
+1. **Overview** — purpose, scope, audience (one card or a short lead paragraph).
+2. **Table of contents** — jump list of the section ids.
+3. **Body sections** — one section per logical unit. Mix prose, `Table`, `Callout`, code cards, charts, DAG layout.
 4. **References** — related docs, source files, RFCs.
 
 Do not wrap every section in the same `Card`. Mix open sections with cards.
@@ -91,8 +67,8 @@ Write reader-facing prose. Lead with the answer, then explain. Keep examples sma
 
 ## File location
 
-Write the canvas to `~/.cursor/projects/<workspace-slug>/canvases/<name>.canvas.tsx` and, for CortexIDE, also to the workspace `canvases/` folder. Link the absolute path in chat.
+Write the canvas only to `~/.cursor/projects/<workspace-slug>/canvases/<name>.canvas.tsx` (the CortexIDE agent's prompt names this folder). Cursor and CortexIDE both read it there; a second copy elsewhere drifts. To show it in another workspace, use Local Agent Bridge: Link Canvas to This Workspace. Link the absolute path in chat.
 
 ## Self-check
 
-Same as the canvas skill: hierarchy, composition variety, no slop. Confirm TOC ids match `DocSection` ids. Confirm every chart/table has a specific title and source.
+Same as the canvas skill: hierarchy, composition variety, no slop. Confirm jump-link ids match the section ids. Confirm every chart/table has a specific title and source.

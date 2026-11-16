@@ -68,8 +68,9 @@ How you work:
 4. When the user says something fails (a test, build, command or error), reproduce it first: run that command with Shell and read the actual error before searching. Then locate before you act: Glob / Grep (output_mode files_with_matches for a first wide search), then Read. Never say a file or folder does not exist until LS or Read has failed on it. Put independent lookups in one reply as several tool calls: they run in parallel. For a broad question about unfamiliar code, send a Task sub-agent and work from its report.
 5. See the exact current lines before you change them (Read, or Grep output). Edit with StrReplace, or MultiEdit for several changes to one file: copy old_string exactly, without the line-number prefix, and keep it short (the few lines that change plus one distinctive line). Use Write only for new files or full rewrites of files you have Read. Follow the code's existing style. Never claim a change you did not make with a tool.
 6. Verify: an edit result shows the changed lines and any compiler errors in that file; fix errors you caused. Then build, test or lint with Shell when the project has a way to, and fix what fails.
-7. Shell is PowerShell on Windows. Quote paths with spaces; run a quoted exe as: & "C:\\path\\tool.exe" args. Do not start servers or watchers that never exit.
+7. Shell is PowerShell on Windows. Quote paths with spaces; run a quoted exe as: & "C:\\path\\tool.exe" args. Start servers, watchers and other commands that never exit with run_in_background: true, wait for their ready line with ShellOutput (until), and stop them with ShellKill when they are no longer needed.
 8. If a skill matches the task, call read_skill and follow it.
+   Canvas: when the result is a standalone artifact the user will look at (a dashboard, report, audit, analysis, comparison, timeline, data-heavy findings), make a canvas instead of a long markdown table: read_skill canvas, then Write one <name>.canvas.tsx (kebab-case) into the canvas folder named under Environment, that default-exports a React component and imports only from "cursor/canvas", with the data embedded. It opens beside the chat by itself and re-renders whenever you edit it. To change a canvas, edit that file.
 9. Keep going until the task is complete, then call attempt_completion with what changed and how you verified it. If the user only asked a question, answer it directly after gathering the facts.`;
 
 const SUBAGENT_RULES = `You are a read-only research sub-agent working for CortexIDE Agent. Answer the question below by looking at the code with Glob, Grep, LS, Read and WebFetch. Put independent lookups in one reply: they run in parallel. You cannot change files or run commands.
@@ -112,6 +113,7 @@ function systemPrompt({ env, skills, task, prior, textMode, subagent, mcp, agent
   if (env.openFiles && env.openFiles.length) envLines.push("- Open editors: " + env.openFiles.slice(0, 8).join("; "));
   if (env.git) envLines.push("- Git: " + clip(env.git, 1200).replace(/\n/g, "\n  "));
   if (env.checks && env.checks.length) envLines.push("- Check a change with: " + env.checks.join(" | "));
+  if (env.canvasDir && !subagent) envLines.push("- Canvas folder (write new canvases directly here; Cursor and CortexIDE both find them): " + env.canvasDir);
   parts.push(envLines.join("\n"));
   if (env.tree) parts.push("Workspace layout (top two levels):\n" + clip(env.tree, 2500));
   if (!subagent && env.selection) parts.push("Selected text in the active file:\n```\n" + clip(env.selection, 4000) + "\n```");
@@ -230,6 +232,16 @@ async function runAgent(o) {
   let toolsUsed = 0;
   let mutated = false;
   let mutatedCode = false; // a non-prose file changed
+  // The project checks come from the first workspace folder: they say nothing about files elsewhere
+  // (a mod folder under Steam is not checked by the toolkit's dotnet build).
+  const checkRoot = o.env && o.env.roots && o.env.roots[0] ? String(o.env.roots[0]).toLowerCase().replace(/[\\/]+$/, "").replace(/\//g, "\\") + "\\" : "";
+  let mutatedChecked = false; // a code file under checkRoot changed
+  // Ollama thinking models (qwen3, deepseek-r1) can spend the whole output budget thinking; then
+  // the rest of the turn runs with thinking off.
+  let noThink = false;
+  // A small model stuck repeating itself (Ollama aborts with "token repeat limit reached") gets the
+  // round again with a repetition penalty and more temperature instead of losing the turn.
+  let antiRepeat = 0;
   let idleRounds = 0; // tool rounds since the start without a successful edit
   let verifyNudged = false;
   let verified = false;
@@ -295,7 +307,12 @@ async function runAgent(o) {
     if (c.name !== "Shell" && MUTATING.has(c.name) && !/^error/.test(result)) {
       mutated = true;
       verified = false;
-      if (!/\.(md|markdown|txt|rst)$/i.test(String((c.args && (c.args.path || c.args.file_path || c.args.target_file)) || ""))) mutatedCode = true;
+      const edited = String((c.args && (c.args.path || c.args.file_path || c.args.target_file)) || "");
+      if (!/\.(md|markdown|txt|rst)$/i.test(edited)) {
+        mutatedCode = true;
+        const abs = edited && o.tools && typeof o.tools.resolve === "function" ? o.tools.resolve(edited) : edited;
+        if (!checkRoot || String(abs).toLowerCase().replace(/\//g, "\\").startsWith(checkRoot)) mutatedChecked = true;
+      }
     } else if (mutated && c.name === "ReadLints" && !/^error/.test(result)) verified = true;
     // A failed, blocked or declined command proves nothing; only a clean exit verifies.
     else if (mutated && c.name === "Shell" && /^exit 0 \(/.test(result)) verified = true;
@@ -391,10 +408,13 @@ async function runAgent(o) {
         messages: sanitize(messages),
         tools: textMode ? null : defs,
         maxTokens,
-        temperature: o.temperature == null ? 0.2 : o.temperature,
+        temperature: Math.max(o.temperature == null ? 0.2 : o.temperature, antiRepeat ? 0.4 + 0.2 * antiRepeat : 0),
+        repeatPenalty: antiRepeat ? 1.1 + 0.1 * antiRepeat : undefined,
         numCtx: o.backend.provider === "ollama" ? o.contextTokens : undefined,
         effort: o.effort || "",
         replayThinking: !historyEdited,
+        think: noThink ? false : undefined,
+        onRetry: (r) => emit({ type: "status", text: "Backend unavailable (" + short(r.error, 100) + ") — retry " + r.attempt + " of " + r.of }),
         onText: (t) => {
           streamed += t.length;
           if (!subagent && streamed - shown >= 300) {
@@ -415,6 +435,12 @@ async function runAgent(o) {
       if (e instanceof llm.ThinkingMismatch && !historyEdited) {
         historyEdited = true;
         emit({ type: "status", text: "Claude rejected the replayed thinking blocks — resending without them" });
+        round--;
+        continue;
+      }
+      if (/repeat limit|repetition|repeating/i.test(String(e.message || "")) && antiRepeat < 2 && !(o.signal && o.signal.aborted)) {
+        antiRepeat++;
+        emit({ type: "status", text: "The model got stuck repeating itself (" + short(String(e.message), 80) + ") — retrying this step with a repetition penalty" });
         round--;
         continue;
       }
@@ -488,7 +514,12 @@ async function runAgent(o) {
         continue;
       }
       let reason = nudges < MAX_NUDGES ? unfinishedReason({ said, prompt: task, toolsUsed, mutated: mutated || heldOff, verified: verified || (heldOff && !mutated), todos: todos(), subagent, readOnly }) : "";
-      if (nudges < MAX_NUDGES && reply.truncated && !said) reason = reply.reasoning || /<think/i.test(reply.content || "")
+      const thinkOverflow = reply.truncated && !said && (reply.reasoning || /<think/i.test(reply.content || ""));
+      if (thinkOverflow && o.backend.provider === "ollama" && !noThink) {
+        noThink = true;
+        emit({ type: "status", text: "The model used the whole output budget (" + maxTokens + " tokens) thinking — thinking is off for the rest of this turn" });
+      }
+      if (nudges < MAX_NUDGES && reply.truncated && !said) reason = thinkOverflow
         ? "You used the whole output budget thinking and produced no answer. Think briefly, then make the next tool call directly."
         : CUT_ADVICE;
       if (reason) {
@@ -544,7 +575,7 @@ async function runAgent(o) {
         else if (nudges < MAX_NUDGES && wantsEdit(task) && !mutated && !heldOff) why = "no file has been changed yet. Make the change first.";
         else if (nudges < MAX_NUDGES && mutated && wantsVerify(task) && !verified) why = "the change is not verified. Run the requested check with Shell first.";
         else if (nudges < MAX_NUDGES && open.length) why = "your todo list still has open items (" + open.map((t) => t.content).join("; ") + "). Finish them or update the list with TodoWrite.";
-        else if (!verifyNudged && mutatedCode && !verified && o.env && o.env.checks && o.env.checks.length) {
+        else if (!verifyNudged && mutatedCode && mutatedChecked && !verified && o.env && o.env.checks && o.env.checks.length) {
           // Once per turn: the project has a known check and the change was never checked.
           verifyNudged = true;
           why = "you changed code but have not checked it. Run " + o.env.checks[0] + " with Shell (or ReadLints) and fix any failure. If no check applies to this change, call attempt_completion again.";
@@ -614,18 +645,25 @@ async function runAgent(o) {
     else if (round === roundLimit) {
       emit({ type: "status", text: "Reached " + roundLimit + " rounds — asking for a wrap-up" });
       messages.push({ role: "user", content: subagent ? "Stop using tools. Report what you found so far." : "Stop using tools. Summarise what you did, what is verified, and what is left." });
-      const wrap = await llm.chat({
-        backend: o.backend,
-        model: o.model,
-        messages: sanitize(messages),
-        tools: null,
-        maxTokens,
-        numCtx: o.backend.provider === "ollama" ? o.contextTokens : undefined,
-        effort: o.effort || "",
-        replayThinking: !historyEdited,
-        signal: o.signal,
-      });
-      final = narration(wrap.content) || "(stopped after " + roundLimit + " rounds)";
+      // The work is already on disk: a failed wrap-up must not turn the whole turn into an error.
+      let wrap = null;
+      try {
+        wrap = await llm.chat({
+          backend: o.backend,
+          model: o.model,
+          messages: sanitize(messages),
+          tools: null,
+          maxTokens,
+          numCtx: o.backend.provider === "ollama" ? o.contextTokens : undefined,
+          effort: o.effort || "",
+          replayThinking: !historyEdited,
+          signal: o.signal,
+        });
+      } catch (e) {
+        if (o.signal && o.signal.aborted) throw e;
+        emit({ type: "status", text: "Wrap-up request failed (" + short(String(e.message || e), 120) + ") — showing the last progress instead" });
+      }
+      final = (wrap && narration(wrap.content)) || said || "(stopped after " + roundLimit + " rounds" + (mutated ? "; files were changed — see the changed-files card" : "") + ")";
     }
   }
 

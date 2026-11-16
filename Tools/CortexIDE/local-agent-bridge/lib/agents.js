@@ -154,6 +154,8 @@ function toolNames(agent, names) {
   // opencode's V1 tool switches: write/edit/patch cover every edit tool, bash the shell.
   if (deny.has("edit") || deny.has("write") || deny.has("patch")) EDIT_TOOLS.forEach((t) => deny.add(lower(t)));
   if (deny.has("bash")) deny.add("shell");
+  // Background shells are part of the shell: no Shell, no reading or stopping them either.
+  if (deny.has("shell")) ["shelloutput", "shellkill"].forEach((t) => deny.add(t));
   return out.filter((n) => !deny.has(lower(n)));
 }
 

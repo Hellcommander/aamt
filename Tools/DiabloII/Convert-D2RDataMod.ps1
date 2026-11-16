@@ -8,10 +8,17 @@
 .EXAMPLE
     # a packed archive (D2RLoader package): extracted into -Mod first, with the d2rloader folder next to it
     .\Convert-D2RDataMod.ps1 -Archive '<download>\FMMP-Experimental-R67\FMMP-Experimental-R67.mpq' -Mod '<D2RMM>\mods\FrankensteinMod' -Author ALvl4Ninja -Check
+.EXAMPLE
+    # from where the mod is (a <Name>.mpq folder, a mod folder, .zip/.7z/.rar or packed .mpq): copied into
+    # <D2RMM>\mods\<Mod>, converted and checked, and the source remembered, so
+    # Update-D2RConvertedMod.ps1 -Mod Reimagined redoes it when the mod there is updated
+    .\Convert-D2RDataMod.ps1 -Source 'D:\games\Steam\steamapps\common\Diablo II Resurrected\Reimagined.mpq' -Mod Reimagined
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)][string]$Mod,
+    [string]$Mod,
+    # where the mod comes from; remembered in d2rmm\convert.json for Update-D2RConvertedMod.ps1
+    [string]$Source,
     [string]$GamePath = $env:D2R_PATH,
     [string]$Archive,
     [string]$Author,
@@ -30,6 +37,20 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'D2RToolPaths.ps1')
 $GamePath = Resolve-D2RGamePath $GamePath
 $python = Resolve-D2RPython
+
+if ($Source) {
+    # the converter window's Convert, without the window (always checked)
+    $D2RMM = Resolve-D2RMMPath $D2RMM $GamePath
+    $arguments = @((Join-Path $PSScriptRoot 'ModConverter.py'), '--game', $GamePath, '--d2rmm', $D2RMM, '--convert', $Source,
+                   '--rows', $Rows, '--conflicts', $Conflicts, '--files', $Files)
+    if ($Mod) { $arguments += @('--id', (Split-Path $Mod -Leaf)) }
+    if ($Author) { $arguments += @('--author', $Author) }
+    if ($Name) { $arguments += @('--name', $Name) }
+    if ($Version) { $arguments += @('--version', $Version) }
+    & $python @arguments
+    exit $LASTEXITCODE
+}
+if (-not $Mod) { throw 'Pass -Mod (the mod folder in D2RMM), or -Source (where the mod is).' }
 
 if ($Archive) {
     if (-not (Test-Path $Archive -PathType Leaf)) { throw "-Archive must be an .mpq file: $Archive" }

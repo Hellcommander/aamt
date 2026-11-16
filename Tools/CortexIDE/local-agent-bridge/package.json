@@ -2,7 +2,7 @@
   "name": "local-agent-bridge",
   "displayName": "Local Agent Bridge",
   "description": "CortexIDE coding agent on local models (vLLM / Ollama), Claude (Anthropic API) or the Claude Code engine, with file, search and shell tools, SKILL.md skills, .canvas.tsx canvases, and chat import (including Cursor exports).",
-  "version": "2.15.2",
+  "version": "2.17.1",
   "publisher": "arend",
   "engines": {
     "vscode": "^1.80.0"
@@ -147,6 +147,24 @@
         "command": "localAgentBridge.continueImportedChat",
         "title": "Continue Imported Chat in Agent",
         "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.openHome",
+        "title": "Open New Tab (Agent Home)",
+        "icon": "$(home)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.agentAskCanvas",
+        "title": "Agent: Ask About This Canvas",
+        "icon": "$(sparkle)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.linkCanvas",
+        "title": "Link Canvas to This Workspace",
+        "icon": "$(link)",
+        "category": "Local Agent Bridge"
       }
     ],
     "menus": {
@@ -189,6 +207,11 @@
           "group": "navigation"
         },
         {
+          "command": "localAgentBridge.linkCanvas",
+          "when": "resourceFilename =~ /\\.canvas\\.tsx$/",
+          "group": "navigation"
+        },
+        {
           "command": "localAgentBridge.openCanvasSource",
           "when": "resourceFilename =~ /\\.canvas\\.tsx$/",
           "group": "navigation"
@@ -224,6 +247,11 @@
           "command": "localAgentBridge.agentHistory",
           "when": "view == localAgentBridge.agent",
           "group": "navigation@4"
+        },
+        {
+          "command": "localAgentBridge.openHome",
+          "when": "view == localAgentBridge.agent",
+          "group": "navigation@9"
         }
       ],
       "chat/title": [
@@ -761,6 +789,28 @@
           "type": ["array", "object"],
           "default": [],
           "markdownDescription": "Permission rules for agent tool calls; the **last** matching rule wins (as in opencode). List form: `[{ \"action\": \"shell\", \"resource\": \"git push *\", \"effect\": \"ask\" }]` or strings like `\"shell:git push *=deny\"`. Map form: `{ \"edit\": \"ask\", \"shell\": { \"rm *\": \"deny\" } }`. Actions: `read`, `edit`, `glob`, `grep`, `shell`, `webfetch`, `subagent`, `mcp`, `skill`, `*`. Effects: `allow`, `ask`, `deny`. Chained shell commands are checked part by part. Reading `.env` files asks by default. Does not apply to the Claude Code backend."
+        },
+        "localAgentBridge.agent.canvasAutoOpen": {
+          "type": "string",
+          "enum": ["always", "created", "off"],
+          "default": "always",
+          "enumDescriptions": [
+            "A canvas an agent turn creates or changes opens beside the editor (an open one just re-renders)",
+            "Only canvases the turn created open by themselves",
+            "Never; the card in the chat opens it"
+          ],
+          "markdownDescription": "Open canvases (`.canvas.tsx`) that the agent writes beside the editor when its turn ends."
+        },
+        "localAgentBridge.newTab": {
+          "type": "string",
+          "enum": ["replaceWelcome", "always", "off"],
+          "default": "replaceWelcome",
+          "enumDescriptions": [
+            "Opening or focusing the Local Agent shows the New Tab page when the editor area is empty or holds the Welcome page (which it closes)",
+            "Show the New Tab page every time the Local Agent is opened or focused",
+            "Never open it by itself (the command Open New Tab still does)"
+          ],
+          "markdownDescription": "The **New Tab** page in the editor area: a composer that starts an agent chat, open tabs, this workspace's panels (Changes, Browser, Terminal, Files, Canvas, Side Chat), canvases, your `localAgentBridge.agent.panels` and recent chats."
         },
         "localAgentBridge.agent.panels": {
           "type": "array",

@@ -57,6 +57,10 @@ typedef struct sa_config {
 	int32_t        patch_system;         /* 1: also redirect kernel32's file export stubs, process-wide, for executables that resolve the
 	                                        file functions at run time instead of importing them (packed games: Diablo II Resurrected) */
 	const wchar_t* probe_prefixes;       /* semicolon list of data-relative folders whose opens are sound probes; default L"sound;music" */
+	/* added in core 1.3 */
+	const wchar_t* key_dirs;             /* semicolon list of local key-store folders: an archive with no <archive>.key beside it opens with
+	                                        whichever *.key there has its key id (keys that never ship with the mod);
+	                                        NULL or empty = %LOCALAPPDATA%\\SealedAudio\\keys */
 } sa_config;
 
 /* Fills a config with defaults (size set, hooks on, patch_modules 1); then set what differs. */

@@ -18,7 +18,7 @@ Output (under --out, normally a D2RMM mod folder):
     hd/character/enemy/<name>.json      one per variant
     hd/character/props/<prop>.json      one per prop used
     hd/character/enemy/<name>/*.model   the donor's models, edited, for a variant with "reshape"
-    hd/model_lod_desc.bin               the game's model index with the new models added (only with "reshape")
+    mod.js <assetmerge:models> rows     the new models for the game's index (only with "reshape"; AssetMerge plugin)
     model_index.json                    which models were added and from which game build; Update-D2RModelIndex.ps1
                                         rebuilds the index from it after a game patch
     scaled_monsters.report.json         what was built + the animation audit
@@ -405,7 +405,9 @@ def write_textures(archive, definition, variant, out_dir, write):
 def included_models(out_dir, folders):
     """Model index entries of other mods ("modelIndexIncludes": mod folders relative to this one).
 
-    Both mods ship the whole hd/model_lod_desc.bin and the one installed last wins, so the
+    Only for mods that still ship the whole index (model_index.json "index": "whole"); with the
+    AssetMerge plugin (the default) each mod lists its own models and these entries are dropped.
+    Whole-index mods: both ship the whole hd/model_lod_desc.bin and the one installed last wins, so the
     index this mod ships also carries the other mod's models (bounding boxes read from that
     mod's own model files). Each entry keeps "source" so a rebuild finds the files again.
     """

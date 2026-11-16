@@ -1,0 +1,36 @@
+# In-game check of the Druid Runecasting page (DruidSummoningRunecaster, testMode on) and the
+# Runecaster plugin. Character: a throwaway Druid played last (cheats change and save it).
+# Run with -NoWait: this part enters the game and sets the skills; casting is then driven step by
+# step with Send-D2RBotCommand.ps1 (bind a skill in the skill menu, then key <n> casts it).
+
+waitfor menu 120000
+waitfor panel CharacterSelectPanel 20000
+wait 2500
+screenshot menu
+ui MainMenuHD:Play
+waitfor game 60000
+wait 3000
+
+console god 1
+cheat sklvl Ward Stone,10
+cheat sklvl Thorn Glyph,10
+cheat sklvl Stonewise,5
+cheat sklvl Cairn Warden,5
+cheat sklvl Frost Sigil,10
+cheat sklvl Invoke the Circle,5
+cheat sklvl Storm Menhir,10
+cheat sklvl Draw Rune,5
+cheat sklvl Ley Mastery,5
+cheat sklvl Monolith,5
+wait 1000
+console goto 2
+waitfor area == 2 30000
+wait 2500
+screenshot blood-moor
+# Skill tree: open it so the Runecasting tab can be checked on the screenshot.
+key t
+wait 1500
+screenshot skilltree
+key t
+wait 500
+state

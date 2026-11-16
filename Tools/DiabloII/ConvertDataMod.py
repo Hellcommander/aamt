@@ -639,8 +639,18 @@ function applyTable(path, patch) {
 // ---- 'keep' mode -------------------------------------------------------------------------
 // Where each row of the mod's own table ended up: INDEX[table path][row in the mod's file].
 const INDEX = {};
-// Cells that hold a row number of another table: [table name pattern, column, target table].
-const ROW_REFS = [[/^(weapons|misc|armor)\.txt$/i, 'missiletype', 'missiles.txt']];
+// Cells that hold a row number of another table: [table name pattern, column pattern, target table].
+// A level's number is its row in levels.txt (its Id column, which Vis/Depend/lvlmaze/lvlprest repeat),
+// a warp's number its row in lvlwarp.txt: when an earlier mod (Reimagined, Frankenstein...) already
+// added levels, the mod's new levels move behind them and every one of these numbers moves with them.
+const ROW_REFS = [
+  [/^(weapons|misc|armor)\.txt$/i, /^missiletype$/, 'missiles.txt'],
+  [/^levels\.txt$/i, /^(Id|Depend|Vis[0-7])$/, 'levels.txt'],
+  [/^levels\.txt$/i, /^Warp[0-7]$/, 'lvlwarp.txt'],
+  [/^lvlwarp\.txt$/i, /^Id$/, 'lvlwarp.txt'],
+  [/^lvlmaze\.txt$/i, /^Level$/, 'levels.txt'],
+  [/^lvlprest\.txt$/i, /^LevelId$/, 'levels.txt'],
+];
 // Item properties whose parameter is a skill (by name or by row number).
 const SKILL_PROPS = new Set(['skill', 'oskill', 'aura', 'hit-skill', 'gethit-skill', 'att-skill', 'kill-skill',
   'death-skill', 'levelup-skill', 'charged', 'charge-noconsume']);
@@ -650,13 +660,20 @@ const PARAM_OF = [
   [/^T1Code(\d+)$/, (m) => 'T1Param' + m[1]], [/^mod(\d+)code$/, (m) => 'mod' + m[1] + 'param'],
   [/^((?:[bc] )?mod \d+)$/, (m) => m[1] + ' param'], [/^(\w+Mod\d)Code$/, (m) => m[1] + 'Param'],
 ];
-const TARGET_FIRST = ['missiles.txt', 'skills.txt', 'states.txt', 'itemstatcost.txt', 'monstats.txt'];
+const TARGET_FIRST = ['missiles.txt', 'skills.txt', 'states.txt', 'itemstatcost.txt', 'monstats.txt', 'lvlwarp.txt', 'levels.txt'];
 
 function folderOf(path) {
   return path.slice(0, path.lastIndexOf('\\') + 1);
 }
+// Tables whose rows are numbered by an Id column that skips separator rows (levels.txt has an
+// "Expansion" row without an Id: from there on a level's Id is its row minus one, and lvlwarp.txt
+// repeats some Ids), so a row number is no use: every Id above the game's own top one moves by what
+// earlier mods added; IDS[table path] = { own: the game's top Id, delta: how far Ids above it move }.
+const ID_TABLES = { 'levels.txt': 'Id', 'lvlwarp.txt': 'Id' };
+const IDS = {};
 function moved(target, value) {
   if (!/^\d+$/.test(String(value))) return value;
+  if (IDS[target]) return Number(value) > IDS[target].own ? String(Number(value) + IDS[target].delta) : value;
   const map = INDEX[target];
   const to = map ? map[Number(value)] : undefined;
   return to === undefined || to < 0 ? value : String(to);
@@ -666,7 +683,10 @@ function remap(path, cells, full) {
   const dir = folderOf(path);
   const name = path.slice(dir.length);
   ROW_REFS.forEach(([re, col, target]) => {
-    if (re.test(name) && cells[col] !== undefined) cells[col] = moved(dir + target, cells[col]);
+    if (!re.test(name)) return;
+    Object.keys(cells).forEach((h) => {
+      if (col.test(h)) cells[h] = moved(dir + target, cells[h]);
+    });
   });
   Object.keys(full).forEach((code) => {
     const rule = PARAM_OF.find(([re]) => re.test(code));
@@ -697,27 +717,46 @@ function applyTableKeep(path, patch) {
       if (v != null && v !== '' && v !== '0') rows[i][patch.disable] = '0';
     });
   }
+  // Where every row of the mod's file ends up, before any cell moves: a row can point at a later
+  // row of its own table (a level's Vis numbers), and new rows go behind what earlier mods added.
   const where = [];
   let missing = 0;
+  let next = rows.length;
   patch.rows.forEach((entry) => {
     if (entry[0] === '=') {
       const i = at.get(rowId(entry[1][0], entry[1][1]));
-      if (i === undefined) {
-        missing++;
-        where.push(-1);
-        return;
-      }
+      if (i === undefined) missing++;
+      where.push(i === undefined ? -1 : i);
+    } else {
+      where.push(next++);
+    }
+  });
+  INDEX[path] = where;
+  const idCol = ID_TABLES[path.slice(path.lastIndexOf('\\') + 1).toLowerCase()];
+  if (idCol) {
+    const num = (v) => (v != null && /^\d+$/.test(String(v).trim()) ? Number(String(v).trim()) : -1);
+    // The mod's new Ids follow its last old one, so they all move by what earlier mods added.
+    let top = -1; // highest Id in the table now
+    rows.forEach((row) => (top = Math.max(top, num(row[idCol]))));
+    let own = -1; // highest Id among the rows the mod already finds in the table
+    patch.rows.forEach((entry, n) => {
+      if (entry[0] === '=' && where[n] >= 0) own = Math.max(own, num(rows[where[n]][idCol]));
+    });
+    // Ids up to the game's own top stay (the mod may reuse one of them), every one above moves.
+    IDS[path] = { own, delta: top - own };
+  }
+  patch.rows.forEach((entry, n) => {
+    if (entry[0] === '=') {
+      const i = where[n];
+      if (i < 0) return;
       const diff = mergeCells(path, rows[i], Object.assign({}, entry[2] || {}), entry[3], entry[1][0]);
       Object.assign(rows[i], remap(path, diff, Object.assign({}, rows[i], diff)));
-      where.push(i);
     } else {
       const row = {};
       patch.headers.forEach((h, i) => (row[h] = entry[1][i] == null ? '' : entry[1][i]));
       rows.push(remap(path, row, row));
-      where.push(rows.length - 1);
     }
   });
-  INDEX[path] = where;
   const headers = table.headers.concat(patch.headers.filter((h) => !table.headers.includes(h)));
   if (missing) console.warn(MOD_ID + ': ' + path + ': ' + missing + ' row(s) the mod changes are gone (removed by an earlier mod?)');
   D2RMM.writeTsv(path, { headers, rows });
@@ -827,7 +866,35 @@ function stripProps(path, codes) {
 }
 
 // Every entry names the switch (mod settings) it belongs to; 'core' is always installed.
-const ON = (id) => !id || id === 'core' || (!LIST_OFF.has(id) && config[id] !== false && config[id] !== 'false');
+// A feature that uses another feature's new rows (NEEDS) goes off with it, and one that always-on
+// tables use (FORCED) cannot be switched off, so no row is left naming a row that is not there.
+const SWITCHED_OFF = (id) => LIST_OFF.has(id) || config[id] === false || config[id] === 'false';
+const OFF_FEATURES = new Set();
+const WHY_OFF = {};
+(() => {
+  const ids = new Set(COPY.map((e) => e[2]).concat(TABLES.map((e) => e[1]), STRINGS.map((e) => e[1]),
+    Object.keys(NEEDS), [].concat(...Object.values(NEEDS))));
+  ids.forEach((id) => {
+    if (id && id !== 'core' && SWITCHED_OFF(id)) {
+      if (FORCED.includes(id)) console.warn(MOD_ID + ': ' + id + ' cannot be switched off: ' + FORCED_WHY[id] + '. Left on.');
+      else OFF_FEATURES.add(id);
+    }
+  });
+  for (let grew = true; grew; ) {
+    grew = false;
+    Object.keys(NEEDS).forEach((id) => {
+      const gone = NEEDS[id].filter((n) => OFF_FEATURES.has(n));
+      if (gone.length && !OFF_FEATURES.has(id) && !FORCED.includes(id)) {
+        OFF_FEATURES.add(id);
+        WHY_OFF[id] = gone;
+        grew = true;
+      }
+    });
+  }
+  Object.keys(WHY_OFF).forEach((id) =>
+    console.log(MOD_ID + ': ' + id + ' is switched off too: it uses new rows of ' + WHY_OFF[id].join(', ') + ' (switched off).'));
+})();
+const ON = (id) => !id || id === 'core' || FORCED.includes(id) || (!OFF_FEATURES.has(id) && !SWITCHED_OFF(id));
 const COPY_ON = COPY.filter((e) => ON(e[2]) && !skipped(e[0]));
 const LOADER_ON = LOADER.filter((e) => ON(e[2]) && !skipped(e[0]));
 const TABLES_ON = TABLES.filter((e) => ON(e[1]) && !skipped(e[0])).map((e) => e[0]);
@@ -1069,18 +1136,180 @@ def modlist_ui(rules):
             'children': children} if children else None
 
 
-def settings_ui(feature_count, loader, duplicates=None, from_source=None, load_order=None, modlist=None):
+# What a table's cells name, by table: (table pattern, column pattern, targets), a target being
+# (table, id column) in the same folder. A cell is a reference only in such a column, and it is only
+# looked up among the NEW rows of those target tables, so a word that happens to equal some other
+# table's row name (hp, cold, red...) is not taken for one.
+_ITEMS = (('weapons.txt', 'code'), ('armor.txt', 'code'), ('misc.txt', 'code'), ('gems.txt', 'code'), ('itemtypes.txt', 'Code'))
+_UNIQ = (('uniqueitems.txt', 'index'), ('setitems.txt', 'index'))
+_SKILL = (('skills.txt', 'skill'),)
+_MON = (('monstats.txt', 'Id'),)
+_PROP_ROWS = r'^(uniqueitems|setitems|sets|runes|magicprefix|magicsuffix|automagic|monprop)\.txt$'
+LINK_REFS = [
+    (r'^cubemain\.txt$', r'^(input \d+|output( [bc])?)$', _ITEMS + _UNIQ),
+    (r'^treasureclassex\.txt$', r'^Item\d+$', _ITEMS + (('treasureclassex.txt', 'Treasure Class'),)),
+    (r'^treasureclassex\.txt$', r'^Treasure Class$', ()),
+    (r'^monstats\.txt$', r'^Skill\d+$', _SKILL),
+    (r'^monstats\.txt$', r'^TreasureClass.*$', (('treasureclassex.txt', 'Treasure Class'),)),
+    (r'^monstats\.txt$', r'^(MonProp|Mon Prop)$', (('monprop.txt', 'Id'),)),
+    (r'^monstats\.txt$', r'^(rightArmItemType|leftArmItemType|BaseId|NextInClass)$', _ITEMS + _MON),
+    (r'^levels\.txt$', r'^(mon|umon|nmon|cmon)\d+$', _MON),
+    (r'^hireling\.txt$', r'^Skill\d+$', _SKILL),
+    (r'^charstats\.txt$', r'^(StartSkill|Skill \d+)$', _SKILL),
+    (r'^charstats\.txt$', r'^item\d+$', _ITEMS),
+    (r'^runes\.txt$', r'^(Rune\d+|itype\d+|etype\d+)$', _ITEMS),
+    (r'^(uniqueitems|setitems)\.txt$', r'^code$', _ITEMS),
+    (r'^(magicprefix|magicsuffix|automagic)\.txt$', r'^(itype|etype)\d+$', _ITEMS),
+    (r'^(weapons|armor|misc)\.txt$', r'^(type|type2)$', (('itemtypes.txt', 'Code'),)),
+    (r'^itemtypes\.txt$', r'^(Equiv1|Equiv2)$', (('itemtypes.txt', 'Code'),)),
+    (r'^skills\.txt$', r'^summon$', _MON),
+    (r'^missiles\.txt$', r'^Skill$', _SKILL),
+]
+MIN_LINKS = 1
+
+
+def _link_tokens(cell):
+    """The names in a cell: the whole cell, and its comma / semicolon / bar parts (cube recipes list
+    `"r01",qty=2` or `weap,mag`), without quotes and with 'qty=2' / 'low' style tails cut off."""
+    cell = str(cell).strip().lower()
+    out = set()
+    for part in [cell] + _re.split(r'[,;|]', cell):
+        part = part.strip().strip('"\'').strip()
+        if part:
+            out.add(part)
+            out.add(_re.split(r'[=:]', part)[0].strip().strip('"\''))
+    return {t for t in out if len(t) > 1 and not t.isdigit()}
+
+
+def feature_links(patches_dir, tables, game_table=None):
+    """Which features use rows that another feature adds. A switched-off feature's new rows are gone,
+    so a feature that names them (a cube recipe on a new item, a monster on a new skill, a level on a
+    new monster, a unique on a new skill) would point at nothing.
+    Returns {user feature: {provider feature: {'count': n, 'examples': ['table: row (column) -> name']}}};
+    the user can be 'core' (always installed). References are the LINK_REFS columns, plus the parameter
+    of an item property that takes a skill (SKILL_PROPS), looked up among the new rows of the target."""
+    cached = {}
+
+    def game_has(t, col):
+        """The values the game's own table already has in `col` (a 'new' row may reuse one)."""
+        if (t, col) not in cached:
+            vals = set()
+            got = game_table(t) if game_table else None
+            lows = [h.lower() for h in got[0]] if got else []
+            if got and col.lower() in lows:
+                i = lows.index(col.lower())
+                vals = {r[i].strip().lower() for r in got[1] if i < len(r)}
+            cached[(t, col)] = vals
+        return cached[(t, col)]
+
+    patches = {}
+    for t in tables:
+        patches[t] = json.loads((patches_dir / (t + '.json')).read_text(encoding='utf-8'))
+    provided = {}  # (table name, lower case value) -> feature adding that row
+    for t, p in patches.items():
+        fid = feature_of(t)
+        tname = t.rsplit('/', 1)[-1].lower()
+        lows = [h.lower() for h in p['headers']]
+        for e in p['rows']:
+            if e[0] != '+':
+                continue
+            for tt, col in {(x, c) for _, _, targets in LINK_REFS for x, c in targets if x == tname}:
+                if col.lower() in lows:
+                    v = str(e[1][lows.index(col.lower())]).strip().lower() if lows.index(col.lower()) < len(e[1]) else ''
+                    if v and v not in game_has(t, col):
+                        provided[(tname, v)] = fid
+    links = {}
+
+    def hit(user, tname, name, col, value, targets):
+        for tok in _link_tokens(value):
+            for tt, _ in targets:
+                prov = provided.get((tt, tok))
+                if prov is None or prov == user or prov == 'core':
+                    continue
+                slot = links.setdefault(user, {}).setdefault(prov, {'count': 0, 'examples': []})
+                slot['count'] += 1
+                if len(slot['examples']) < 3:
+                    slot['examples'].append('%s: %s (%s) -> %s' % (tname, str(name)[:40], col, tok))
+                return
+
+    for t, p in patches.items():
+        user = feature_of(t)
+        tname = t.rsplit('/', 1)[-1].lower()
+        rules = [(_re.compile(c), tg) for tp, c, tg in LINK_REFS if _re.search(tp, tname) and tg]
+        for e in p['rows']:
+            if e[0] == '+':
+                row = dict(zip(p['headers'], e[1]))
+                name = e[1][0] if e[1] else ''
+            else:
+                row = dict((e[2] if len(e) > 2 else None) or {})
+                name = e[1][0]
+            for h, v in row.items():
+                for pat, targets in rules:
+                    if pat.search(h):
+                        hit(user, tname, name, h, v, targets)
+            # a property that takes a skill: its parameter names a skill
+            if _re.search(_PROP_ROWS, tname):
+                for h, v in row.items():
+                    par = param_of(h)
+                    if par and par in row and str(v).strip().lower() in SKILL_PROPS:
+                        hit(user, tname, name, par, row[par], _SKILL)
+    return {u: {p: s for p, s in l.items() if s['count'] >= MIN_LINKS} for u, l in links.items() if l}
+
+
+def feature_graph(links):
+    """-> (needs, forced). needs: {feature: [features whose new rows it uses]}, for switchable
+    features only. forced: {feature: the forced feature that needs it, or None for core} for the features that cannot be switched off: the ones the
+    always-installed ('core') tables use, and everything those need in turn (a feature switched off
+    takes every feature that needs it with it, so a forced one drags what it needs along)."""
+    needs = {u: sorted(l) for u, l in links.items() if u != 'core'}
+    forced = {f: None for f in links.get('core', {})}  # None: the always-installed tables use it
+    todo = list(forced)
+    while todo:
+        f = todo.pop()
+        for n in needs.get(f, []):
+            if n not in forced:
+                forced[n] = f  # the forced feature f uses it
+                todo.append(n)
+    return needs, forced
+
+
+def settings_ui(feature_count, loader, duplicates=None, from_source=None, load_order=None, modlist=None, links=None):
     """The converted mod's settings: a switch per feature it changes and per D2RLoader part."""
     duplicates = duplicates or {}
     from_source = from_source or {}
+    links = links or {}
+    _, forced = feature_graph(links)
+    pinned = set(forced)
+    used_by = {}
+    for user, l in links.items():
+        for prov in l:
+            used_by.setdefault(prov, []).append(user)
+    flabel = lambda f: FEATURE_INFO[f][1] if f in FEATURE_INFO else f
     features = []
     for fid, fname, what, _ in FEATURES:
         if fid in feature_count:
+            lines = []
+            needs = links.get(fid, {})
+            if fid in forced:
+                lines.append('Always on, this switch is ignored: ' + (
+                    'tables that cannot be switched off use its new rows (%d references, e.g. %s).' % (
+                        links['core'][fid]['count'], links['core'][fid]['examples'][0]) if forced[fid] is None else
+                    '%s stays on and uses its new rows.' % flabel(forced[fid])))
+            if needs:
+                lines.append('Uses new rows of: ' + '; '.join('%s (%d references, e.g. %s)' % (flabel(p), s['count'], s['examples'][0])
+                                                              for p, s in sorted(needs.items())) +
+                             ('.' if fid in forced else '. When one of those is off, this one is switched off too '
+                                                        '(the install log says so).'))
+            users = sorted(u for u in used_by.get(fid, []) if u != 'core')
+            if users and fid not in forced:
+                lines.append('Used by: %s. Turning this off switches them off too, so nothing is left pointing at rows '
+                             'that are not there.' % ', '.join(flabel(u) for u in users))
+            if not lines:
+                lines.append('Nothing else in this mod uses its new rows: safe to switch off on its own.')
             features.append({
                 'id': fid, 'type': 'checkbox', 'name': fname, 'defaultValue': True,
-                'description': '%s (%d file%s). Turning a feature off can break other parts of this mod that use it '
-                               '(new items dropped in new areas, monsters using new skills...).'
-                               % (what, feature_count[fid], '' if feature_count[fid] == 1 else 's')})
+                'description': '%s (%d file%s). %s' % (what, feature_count[fid], '' if feature_count[fid] == 1 else 's',
+                                                      ' '.join(lines))})
     units = []
     for unit in sorted({u for _, _, u in loader}):
         label = (unit[len('plugin_'):] if unit.startswith('plugin_') else unit[len('patch_'):] if unit.startswith('patch_') else unit)
@@ -1406,12 +1635,20 @@ def main():
     rules_path = (None if (args.modlist_rules or '').lower() == 'none' else args.modlist_rules or
                   ((Path(args.d2rmm) if args.d2rmm else mod.parent.parent) / 'mods' / 'modlist-rules.json'))
     rules, rules_used = modlist_rules(rules_path, mod_id, loader, tables, strings, copy_list, data)
+    links = feature_links(patches_dir, tables, lambda t: read_table(vanilla[t]) if vanilla.get(t) else None)
+    needs, forced = feature_graph(links)
     data_block = '\n'.join([
         '// Generated by ConvertDataMod.py - do not edit by hand.',
         js_list('COPY', [[win(p), d, fid] for p, d, fid in copy_list], 'Copied as they are: [path under DATA, is a folder, switch].'),
         js_list('LOADER', [[win(p), d, u] for p, d, u in loader], 'D2RLoader files, to D2RMM\'s d2rloader output: [path in the mod folder, is a folder, switch].'),
         js_list('TABLES', [[win(t), feature_of(t)] for t in tables], 'Tables patched row by row (d2rmm\\patches\\<path>.json): [path, switch].'),
         js_list('STRINGS', [[win(s), feature_of(s)] for s in strings], 'String files merged by Key (d2rmm\\patches\\<path>.json): [path, switch].'),
+        '// Features that use new rows of other features: {feature: [features it needs]}; FORCED: the features always-on\n'
+        '// tables use (and what those need), which cannot be switched off, with the reason.\n'
+        'const NEEDS = %s;\nconst FORCED = %s;\nconst FORCED_WHY = %s;\n' % (
+            json.dumps(needs, ensure_ascii=False), json.dumps(sorted(forced)),
+            json.dumps({f: ('tables that cannot be switched off use its new rows' if by is None else '%s needs it' % by)
+                        for f, by in forced.items()})),
         js_list('MODLIST', [{k: v for k, v in r.items() if k != 'description'} for r in rules],
                 'My mod list rules (settings, off by default) and Options (option: on by default, acts when off): '
                 '{id, name, when, above, option, skip, switches, earlier, props}.'),
@@ -1441,7 +1678,7 @@ def main():
         'version': version,
         'config': settings_ui(feature_count, loader, duplicates, from_source,
                               load_order_ui(args.rows, args.conflicts, args.files),
-                              [options_ui(rules), modlist_ui(rules)]),
+                              [options_ui(rules), modlist_ui(rules)], links),
     })
     mod_json.write_text(json.dumps(info, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
 
@@ -1462,6 +1699,8 @@ def main():
         'loaderBuiltFromSource': from_source,
         'loaderProvidedByPackage': provided,
         'features': feature_count,
+        'featureLinks': links,
+        'featuresForcedOn': sorted(forced),
         'modListRules': {'file': rules_used, 'rules': [r['id'] for r in rules]},
         'rows': args.rows,
         'rowMatching': {'matchTrim': args.match_trim, 'duplicates': args.duplicates, 'deleted': args.deleted,
@@ -1539,7 +1778,7 @@ def write_readme(mod, name, author, version, orig, data_rel, tables, strings, co
         lines += [
             '**Rows: keep.** Every row stays where it is (row numbers are what saves, plugins and other tables point',
             "at), rows the mod deleted stay too, the mod's new rows go at the end, and row numbers in its cells",
-            '(weapon missiles, skills in item properties) follow their rows. It can sit anywhere in the mod list;',
+            '(weapon missiles, skills in item properties, level and warp numbers) follow their rows. It can sit anywhere in the mod list;',
             'mods made for it go below it. Test combinations with `Test-D2RMod.ps1 -KeepGoing`.',
         ]
     else:
@@ -1561,7 +1800,17 @@ def write_readme(mod, name, author, version, orig, data_rel, tables, strings, co
     path.write_text('\n'.join(lines), encoding='utf-8')
 
 
-REF_COLUMNS = {'missiletype': 'missiles.txt'}  # weapons, misc, armor (same as ROW_REFS in mod.js)
+# Same as ID_TABLES in mod.js
+ID_TABLES = {'levels.txt': 'Id', 'lvlwarp.txt': 'Id'}
+# Same as ROW_REFS in mod.js: (tables, column pattern, target table)
+REF_COLUMNS = [
+    (('weapons.txt', 'misc.txt', 'armor.txt'), r'missiletype', 'missiles.txt'),
+    (('levels.txt',), r'Id|Depend|Vis[0-7]', 'levels.txt'),
+    (('levels.txt',), r'Warp[0-7]', 'lvlwarp.txt'),
+    (('lvlwarp.txt',), r'Id', 'lvlwarp.txt'),
+    (('lvlmaze.txt',), r'Level', 'levels.txt'),
+    (('lvlprest.txt',), r'LevelId', 'levels.txt'),
+]
 SKILL_PROPS = {'skill', 'oskill', 'aura', 'hit-skill', 'gethit-skill', 'att-skill', 'kill-skill',
                'death-skill', 'levelup-skill', 'charged', 'charge-noconsume'}
 
@@ -1597,14 +1846,35 @@ def check_keep(mod, data, out, tables, cache):
                 w.append(appended)
                 appended += 1
         where[t] = w
-    bad = 0
+    # tables numbered by an Id column that skips separator rows (levels.txt): the mod's Id -> its new Id
+    idmap = {}
+    sequence = []
+    for t in patches:
+        if t.rsplit('/', 1)[-1].lower() in ID_TABLES:
+            mh_, mr_ = read_table(data / t)
+            gh_, gr_ = read_table(out / t)
+            cm, cg = mh_.index('Id'), gh_.index('Id')
+            idmap[t] = {r[cm].strip(): gr_[where[t][j]][cg] for j, r in enumerate(mr_)
+                        if r[cm].strip() and 0 <= where[t][j] < len(gr_)}
+            # every Id above the game's own top one moves by the same amount
+            vh_, vr_ = read_table(cache / t)
+            own = max([int(r[vh_.index('Id')]) for r in vr_ if r[vh_.index('Id')].strip().isdigit()] or [-1])
+            moves = {int(gr_[where[t][j]][cg]) - int(r[cm]) for j, r in enumerate(mr_)
+                     if r[cm].strip().isdigit() and int(r[cm]) > own and 0 <= where[t][j] < len(gr_)
+                     and gr_[where[t][j]][cg].strip().isdigit()}
+            if len(moves) > 1:
+                sequence.append(t)
+    bad = len(sequence)
+    for t in sequence:
+        print('  DIFFERS: %s: the mod\'s added Ids did not all move by the same amount' % t)
     for t, p in patches.items():
         folder = t[:t.rfind('/') + 1]
         mh, mrows = read_table(data / t)
         gh, grows = read_table(out / t)
         col = {h: i for i, h in enumerate(gh)}
         code_of = {param_of(c): c for c in mh if param_of(c)}  # parameter column -> its property column
-        is_weapon_table = t.rsplit('/', 1)[-1].lower() in ('weapons.txt', 'misc.txt', 'armor.txt')
+        tname = t.rsplit('/', 1)[-1].lower()
+        refs = [(pat, tgt) for names, pat, tgt in REF_COLUMNS if tname in names]
         problems = []
         for j, (e, r) in enumerate(zip(p['rows'], mrows)):
             at = where[t][j]
@@ -1621,11 +1891,13 @@ def check_keep(mod, data, out, tables, cache):
                 target = None
                 if h not in set_by_mod:
                     pass
-                elif h in REF_COLUMNS and is_weapon_table:
-                    target = folder + REF_COLUMNS[h]
+                elif any(_re.fullmatch(pat, h) for pat, _ in refs):
+                    target = folder + next(tgt for pat, tgt in refs if _re.fullmatch(pat, h))
                 elif h in code_of and row.get(code_of[h], '').lower() in SKILL_PROPS:
                     target = folder + 'skills.txt'
-                if target in where and val.isdigit() and int(val) < len(where[target]) and where[target][int(val)] >= 0:
+                if target in idmap and val.isdigit():
+                    want = idmap[target].get(val, val)
+                elif target in where and val.isdigit() and int(val) < len(where[target]) and where[target][int(val)] >= 0:
                     want = str(where[target][int(val)])
                 if grows[at][col[h]] != want:
                     problems.append('row %d (%s) column %s: %r, expected %r' % (j, r[0], h, grows[at][col[h]], want))

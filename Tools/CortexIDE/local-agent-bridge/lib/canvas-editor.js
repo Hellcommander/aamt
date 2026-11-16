@@ -27,6 +27,14 @@ function html(webview, extensionUri, n) {
   <title>Canvas</title>
 </head>
 <body>
+  <div id="bar" class="canvas-bar" role="toolbar" aria-label="Canvas">
+    <span id="bar-name" class="canvas-bar-name"></span>
+    <span id="bar-time" class="canvas-bar-time"></span>
+    <form id="bar-ask" class="canvas-bar-ask"><input id="bar-q" type="text" placeholder="Ask the agent to change this canvas…" aria-label="Ask the agent to change this canvas" /></form>
+    <button type="button" data-act="refresh" title="Ask the agent to rerun the data behind this canvas and update it">Refresh data</button>
+    <button type="button" data-act="source" title="Open the .canvas.tsx source beside">Source</button>
+    <button type="button" data-act="reveal" title="Show the file in the Explorer">Reveal</button>
+  </div>
   <div id="error" class="canvas-error" hidden></div>
   <div id="root"></div>
   <script nonce="${n}" src="${react}"></script>
@@ -100,7 +108,9 @@ class CanvasEditorProvider {
       }
       if (msg.type === "action") {
         await this.dispatch(msg.action, document);
+        return;
       }
+      if (msg.type === "toolbar") await this.toolbar(msg, document);
     });
 
     webviewPanel.onDidDispose(() => {
@@ -132,13 +142,30 @@ class CanvasEditorProvider {
       return;
     }
     if (type === "newComposerChat") {
-      const prompt = String(action.userPrompt || "");
-      await vscode.env.clipboard.writeText(document.fileName + (prompt ? "\n" + prompt : ""));
-      vscode.window.showInformationMessage("Canvas path copied. Paste it into CortexIDE Agent chat as an @mention.");
+      // A button inside the canvas that starts a chat: the Agent panel runs it, about this canvas.
+      const prompt = String(action.userPrompt || "").trim();
+      await vscode.commands.executeCommand("localAgentBridge.agentAskCanvas", (prompt || "Look at this canvas.") + "\n\n[Canvas: " + document.fileName + "]");
       return;
     }
-    if (type === "openAgent") {
-      vscode.window.showInformationMessage("openAgent is a Cursor host action. Open the transcript in Cursor, or paste the agent id in CortexIDE chat.");
+    if (type === "openAgent") await vscode.commands.executeCommand("localAgentBridge.openAgent");
+  }
+
+  /** The toolbar above the canvas: ask the agent, refresh its data, open the source, reveal. */
+  async toolbar(msg, document) {
+    const file = document.fileName;
+    const act = String(msg.action || "");
+    if (act === "source") {
+      await vscode.window.showTextDocument(document, { viewColumn: vscode.ViewColumn.Beside, preview: false });
+    } else if (act === "reveal") {
+      await vscode.commands.executeCommand("revealInExplorer", document.uri);
+    } else if (act === "refresh") {
+      await vscode.commands.executeCommand(
+        "localAgentBridge.agentAskCanvas",
+        "Refresh the canvas " + file + ": rerun the commands, queries or file reads its data came from and update the embedded data in place. Keep the layout. Say what changed."
+      );
+    } else if (act === "ask") {
+      const text = String(msg.text || "").trim();
+      if (text) await vscode.commands.executeCommand("localAgentBridge.agentAskCanvas", "Update the canvas " + file + ": " + text);
     }
   }
 }

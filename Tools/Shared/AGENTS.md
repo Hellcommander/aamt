@@ -88,8 +88,13 @@ then generate a variant — they do not invent a new commercial pack.
   .meta.json sidecars): a sound from licensed or barred-pack clips that stays far from every clip. Never ship a
   direct- or restricted-tier clip cleaned and levelled only; run it through this.
 - Ship: `audio_seal.py`: seal a mod's sounds into one MTSA1 archive; Lua (`install-lua`) and C++ (fork
-  `SealedAssetSource`, `write-cpp-key`) readers unseal in memory. Key file never committed. Other mods: their own key
-  + `--embed-key` (sounds.key beside the archive); Chimera mods: wrapped keys via the loader's public key.
+  `SealedAssetSource`, `write-cpp-key`) readers unseal in memory. One build key per game (`--game NAME`, in
+  `%LOCALAPPDATA%\SealedAudio\game-keys`, never committed, no shared default); `rekey` moves an archive to another key.
+  Other mods: their own key + `--embed-key` (sounds.key beside the archive); Chimera mods: wrapped keys via the loader's public key.
+  Checking for leaked keys, key files or loose copies of sealed sounds: run `audio_seal.py audit <folders...>` ONCE
+  (all folders in one call; seconds, a few lines of output, exit 1 on findings). Never walk folders, hash files or
+  grep for key bytes by hand: every extra tool call re-sends the whole conversation and costs tokens on per-token
+  billing. Leaked keys live in `%LOCALAPPDATA%\SealedAudio\retired`.
 - Shape: `audio_bench.py`: mixing, blending, texture layering and effects (pitch, formant, EQ30, saturation,
   modulation, reverb, ...) as deterministic DSP from a recipe. An agent decides the recipe from `analyze()` and the
   listener; the bench applies it. No model touches audio. `AUDIO_BENCH.md` has the recipe format.

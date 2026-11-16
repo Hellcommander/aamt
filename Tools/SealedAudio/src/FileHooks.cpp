@@ -7,6 +7,7 @@
 #include <Psapi.h>
 
 #include <atomic>
+#include <cstdlib>
 #include <set>
 #include <cstdio>
 #include <cwctype>
@@ -22,6 +23,11 @@ namespace SealedAudio::Hooks
 	{
 		Options g_options;
 		std::atomic<int> g_probeLogs{ 0 };
+		// False once the process is exiting: the hooks then touch none of the containers below, which static destruction is
+		// about to tear down while other modules may still call the (by then restored) file functions.
+		std::atomic<bool> g_live{ true };
+		// Every import slot and kernel32 stub slot patched, with its old value, for the restore at exit. Never freed.
+		auto* g_restore = new std::vector<std::pair<void**, void*>>();
 		std::atomic<std::uint64_t> g_served{ 0 }, g_reads{ 0 }, g_probesSeen{ 0 }, g_probesAnswered{ 0 }, g_looseWins{ 0 };
 
 		// ---- virtual files -------------------------------------------------------------------------------------------
@@ -41,7 +47,7 @@ namespace SealedAudio::Hooks
 
 		std::shared_ptr<VFile> Lookup(HANDLE h)
 		{
-			if (h == nullptr || h == INVALID_HANDLE_VALUE) {
+			if (h == nullptr || h == INVALID_HANDLE_VALUE || !g_live.load(std::memory_order_relaxed)) {
 				return nullptr;
 			}
 			std::shared_lock lock(g_filesLock);
@@ -78,7 +84,7 @@ namespace SealedAudio::Hooks
 		// ("Data\Sound\...") and absolute paths both work.
 		std::string RelativeToData(const wchar_t* path)
 		{
-			if (!path) {
+			if (!path || !g_live.load(std::memory_order_relaxed)) {
 				return {};
 			}
 			const std::wstring& name = g_options.dataFolderName;
@@ -224,7 +230,15 @@ namespace SealedAudio::Hooks
 				return INVALID_HANDLE_VALUE;
 			}
 			auto vf = std::make_shared<VFile>();
-			vf->data = Archives::Read(rel);
+			std::uint32_t expected = 0;
+			vf->data = Archives::Read(rel, &expected);
+			if (vf->data.size() != expected) {
+				// an MTSA2 entry whose tag did not verify: never hand the game altered bytes
+				Log::Warn("%s failed authentication in its sealed archive; not served", rel.c_str());
+				Probe("CreateFileW", rel, "sealed entry failed authentication; not served");
+				::SetLastError(ERROR_FILE_CORRUPT);
+				return INVALID_HANDLE_VALUE;
+			}
 			vf->path = rel;
 			vf->overlapped = (flags & FILE_FLAG_OVERLAPPED) != 0;
 			// A real kernel object stands in for the file: unique, closeable by CloseHandle, harmless to any API we do not
@@ -782,7 +796,7 @@ namespace SealedAudio::Hooks
 
 		std::shared_ptr<VFind> LookupFind(HANDLE h)
 		{
-			if (h == nullptr || h == INVALID_HANDLE_VALUE) return nullptr;
+			if (h == nullptr || h == INVALID_HANDLE_VALUE || !g_live.load(std::memory_order_relaxed)) return nullptr;
 			std::shared_lock lock(g_filesLock);
 			auto it = g_finds.find(h);
 			return it == g_finds.end() ? nullptr : it->second;
@@ -995,6 +1009,7 @@ namespace SealedAudio::Hooks
 						if (!*p.original) {
 							*p.original = reinterpret_cast<void*>(static_cast<std::uintptr_t>(thunks->u1.Function));
 						}
+						g_restore->emplace_back(reinterpret_cast<void**>(&thunks->u1.Function), reinterpret_cast<void*>(static_cast<std::uintptr_t>(thunks->u1.Function)));
 						thunks->u1.Function = static_cast<decltype(thunks->u1.Function)>(reinterpret_cast<std::uintptr_t>(p.hook));
 						::VirtualProtect(&thunks->u1.Function, sizeof(void*), old, &old);
 						patched++;
@@ -1050,6 +1065,7 @@ namespace SealedAudio::Hooks
 					continue;
 				}
 				*p.original = *slot;
+				g_restore->emplace_back(slot, *slot);
 				InterlockedExchangePointer(slot, p.hook);
 				::VirtualProtect(slot, sizeof(void*), old, &old);
 				patched++;
@@ -1057,10 +1073,27 @@ namespace SealedAudio::Hooks
 			Log::Info("redirected %d kernel32 file stubs (callers that resolved them at run time)", patched);
 			return patched;
 		}
+
+		// Registered with atexit from Install, i.e. after every static of the core was constructed, so it runs before their
+		// destructors (in the dll's detach for a plugin, at exit() for an executable): puts every patched slot back, newest
+		// first, and turns the hooks into pass-throughs for calls already in flight.
+		void Teardown()
+		{
+			g_live.store(false);
+			for (auto it = g_restore->rbegin(); it != g_restore->rend(); ++it) {
+				DWORD old = 0;
+				if (::VirtualProtect(it->first, sizeof(void*), PAGE_READWRITE, &old)) {
+					InterlockedExchangePointer(it->first, it->second);
+					::VirtualProtect(it->first, sizeof(void*), old, &old);
+				}
+			}
+			g_restore->clear();
+		}
 	}
 
 	int Install(const Options& options)
 	{
+		std::atexit(&Teardown);
 		g_options = options;
 		{
 			g_probePrefixes.clear();

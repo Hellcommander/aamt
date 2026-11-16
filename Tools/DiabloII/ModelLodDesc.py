@@ -325,11 +325,13 @@ def build_for_mod(archive, mod_dir, additions=None, game_build=None, write=True)
     additions: [{"model": "data/hd/.../x.model", "donor": "data/hd/.../y.model"}];
     read from the mod's model_index.json when not given. Returns the manifest.
     """
+    existing = read_manifest(mod_dir)
     if additions is None:
-        manifest = read_manifest(mod_dir)
-        if manifest is None:
+        if existing is None:
             raise FileNotFoundError(f'{os.path.join(mod_dir, MANIFEST)} not found: this mod adds no models to the index')
-        additions = manifest['models']
+        additions = existing['models']
+    if (existing or {}).get('index', 'assetmerge') == 'assetmerge':
+        return build_fragment_for_mod(archive, mod_dir, additions, game_build, write)
     stock = archive.read(INDEX)
     desc = ModelLodDesc(stock)
     found = desc.check_hash(stock_model_paths(archive.list()))
@@ -361,11 +363,56 @@ def build_for_mod(archive, mod_dir, additions=None, game_build=None, write=True)
     return manifest
 
 
+def build_fragment_for_mod(archive, mod_dir, additions, game_build=None, write=True):
+    """The AssetMerge way (the default since 2026-11-15): the mod ships no index at all.
+
+    Its own models (entries without "source") become rows in mod.js (block <assetmerge:models>,
+    see AssetMerge.py) and the AssetMerge D2RLoader plugin adds them to the game's index at load,
+    so mods no longer carry each other's models. A stale hd/model_lod_desc.bin is removed.
+    """
+    import AssetMerge
+    own = [a for a in additions if not a.get('source')]
+    rows = AssetMerge.model_rows(mod_dir, own)
+    stock = archive.read(INDEX)
+    desc = AssetMerge.apply_models(ModelLodDesc(stock), rows)   # stops on a row the plugin would reject
+    found = desc.check_hash(stock_model_paths(archive.list()))
+    manifest = {
+        'about': 'Models this mod adds to the HD model index. They reach the game through the AssetMerge D2RLoader plugin: '
+                 'the rows in mod.js (block <assetmerge:models>) are rebuilt with: python AssetMerge.py models --mod <this folder>',
+        'index': 'assetmerge',
+        'models': [{'model': a['model'], 'donor': a['donor']} for a in own],
+        'builtFrom': {'gameBuild': game_build, 'stockIndexBytes': len(stock), 'stockIndexSha256': hashlib.sha256(stock).hexdigest(),
+                      'stockModelsFoundByHash': round(found, 4) if found is not None else None, 'layout': desc.layout()},
+        'rowsSha256': hashlib.sha256(AssetMerge.fragment_text('models', rows).encode()).hexdigest(),
+    }
+    if write:
+        AssetMerge.write_block(os.path.join(mod_dir, 'mod.js'), 'models', rows, ' from model_index.json')
+        stale = os.path.join(mod_dir, *INDEX.split('/'))
+        if os.path.isfile(stale):
+            os.remove(stale)
+        with open(os.path.join(mod_dir, MANIFEST), 'w', encoding='utf-8', newline='\n') as f:
+            json.dump(manifest, f, indent=2)
+    return manifest
+
+
 def check_mod(archive, mod_dir):
     """Problems that mean the mod's index must be rebuilt (empty list = up to date)."""
     manifest = read_manifest(mod_dir)
     if manifest is None:
         return []
+    if manifest.get('index') == 'assetmerge':
+        import AssetMerge
+        problems = []
+        rows = AssetMerge.model_rows(mod_dir, manifest['models'])
+        if hashlib.sha256(AssetMerge.fragment_text('models', rows).encode()).hexdigest() != manifest.get('rowsSha256'):
+            problems.append('the model files changed since the mod.js rows were written')
+        try:
+            AssetMerge.apply_models(ModelLodDesc(archive.read(INDEX)), rows)
+        except (KeyError, ValueError, LayoutError) as error:
+            problems.append(f'the rows no longer fit this game build: {error}')
+        if os.path.isfile(os.path.join(mod_dir, *INDEX.split('/'))):
+            problems.append(f'{INDEX} is still in the mod: it would replace the whole index (AssetMerge mods ship none)')
+        return problems
     problems = []
     stock = archive.read(INDEX)
     built_from = manifest.get('builtFrom', {})
@@ -449,7 +496,8 @@ def main(argv):
                 return 1 if problems else 0
             manifest = build_for_mod(archive, args.mod, game_build=_game_build(args.game))
             built = manifest['builtFrom']
-            print(f"Rebuilt {INDEX} for game build {built['gameBuild']}: {len(manifest['models'])} model(s) added, "
+            target = 'the mod.js <assetmerge:models> rows' if manifest.get('index') == 'assetmerge' else INDEX
+            print(f"Rebuilt {target} for game build {built['gameBuild']}: {len(manifest['models'])} model(s) added, "
                   f"{built['stockModelsFoundByHash']:.1%} of stock models found by hash.")
             print('Layout found: ' + json.dumps(built['layout']['model']) + ' ' + json.dumps(built['layout']['lod']))
             return 0

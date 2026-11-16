@@ -1,0 +1,1790 @@
+{
+  "mod": "Arendeth_SaltShuffleTable",
+  "modFolder": "Arendeth_SaltShuffleTable",
+  "bundle": "arendeth_ssr_table",
+  "prefab": "SsrTable",
+  "kind": "ssr_table",
+  "theme": "ssr-felt",
+  "reference": [
+    1600,
+    900
+  ],
+  "root": {
+    "name": "SsrTable",
+    "type": "panel",
+    "rect": {
+      "stretch": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "fill": "backdrop",
+    "raycast": true,
+    "children": [
+      {
+        "name": "Window",
+        "type": "panel",
+        "rect": {
+          "anchors": [
+            0.02,
+            0.03,
+            0.98,
+            0.97
+          ]
+        },
+        "fill": "rail",
+        "raycast": true,
+        "border": {
+          "color": "brass",
+          "thickness": 2
+        },
+        "children": [
+          {
+            "name": "TitleBand",
+            "type": "panel",
+            "rect": {
+              "top": [
+                0,
+                40,
+                2
+              ]
+            },
+            "fill": "rail"
+          },
+          {
+            "name": "TitleText",
+            "type": "text",
+            "rect": {
+              "top": [
+                4,
+                32,
+                260
+              ]
+            },
+            "text": {
+              "sample": "Salt Shuffle  -  you vs. Warden Une",
+              "size": "header",
+              "color": "accent",
+              "align": "center"
+            }
+          },
+          {
+            "name": "StatusText",
+            "type": "text",
+            "rect": {
+              "top": [
+                10,
+                24,
+                16
+              ]
+            },
+            "text": {
+              "sample": "Round 6",
+              "size": "small",
+              "color": "textMuted",
+              "align": "right"
+            }
+          },
+          {
+            "name": "TitleRule",
+            "type": "panel",
+            "rect": {
+              "top": [
+                40,
+                2,
+                2
+              ]
+            },
+            "fill": "brass"
+          },
+          {
+            "name": "Felt",
+            "type": "panel",
+            "rect": {
+              "stretch": [
+                10,
+                54,
+                330,
+                46
+              ]
+            },
+            "fill": "felt",
+            "border": {
+              "color": "brassSoft",
+              "thickness": 2
+            },
+            "children": [
+              {
+                "name": "OppRow",
+                "type": "panel",
+                "rect": {
+                  "anchors": [
+                    0,
+                    0.855,
+                    1,
+                    1
+                  ]
+                },
+                "fill": "feltDark",
+                "children": [
+                  {
+                    "name": "OppPortraitSlot",
+                    "type": "panel",
+                    "rect": {
+                      "size": [
+                        64,
+                        64
+                      ],
+                      "anchor": [
+                        0,
+                        0.5
+                      ],
+                      "pivot": [
+                        0,
+                        0.5
+                      ],
+                      "pos": [
+                        14,
+                        0
+                      ]
+                    },
+                    "fill": "gem",
+                    "border": {
+                      "color": "opp",
+                      "thickness": 2
+                    },
+                    "children": [
+                      {
+                        "name": "OppIcon",
+                        "type": "image",
+                        "rect": {
+                          "stretch": [
+                            6,
+                            6,
+                            6,
+                            6
+                          ]
+                        },
+                        "fill": "textBright",
+                        "preserveAspect": true
+                      }
+                    ]
+                  },
+                  {
+                    "name": "OppNameText",
+                    "type": "text",
+                    "rect": {
+                      "size": [
+                        360,
+                        28
+                      ],
+                      "anchor": [
+                        0,
+                        0.5
+                      ],
+                      "pivot": [
+                        0,
+                        0
+                      ],
+                      "pos": [
+                        90,
+                        4
+                      ]
+                    },
+                    "text": {
+                      "sample": "Warden Une",
+                      "size": "normal",
+                      "color": "textBright",
+                      "align": "left"
+                    }
+                  },
+                  {
+                    "name": "OppScoreBar",
+                    "type": "panel",
+                    "rect": {
+                      "size": [
+                        300,
+                        14
+                      ],
+                      "anchor": [
+                        0,
+                        0.5
+                      ],
+                      "pivot": [
+                        0,
+                        1
+                      ],
+                      "pos": [
+                        90,
+                        -4
+                      ]
+                    },
+                    "fill": "gem",
+                    "border": {
+                      "color": "brassSoft",
+                      "thickness": 1
+                    },
+                    "children": [
+                      {
+                        "name": "OppScoreFill",
+                        "type": "panel",
+                        "rect": {
+                          "anchors": [
+                            0,
+                            0,
+                            0.42,
+                            1
+                          ]
+                        },
+                        "fill": "opp"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "OppScoreText",
+                    "type": "text",
+                    "rect": {
+                      "size": [
+                        140,
+                        40
+                      ],
+                      "anchor": [
+                        0,
+                        0.5
+                      ],
+                      "pivot": [
+                        0,
+                        0.5
+                      ],
+                      "pos": [
+                        402,
+                        0
+                      ]
+                    },
+                    "text": {
+                      "sample": "21 / 50",
+                      "size": "header",
+                      "color": "opp",
+                      "align": "left"
+                    }
+                  },
+                  {
+                    "name": "OppHand",
+                    "type": "panel",
+                    "rect": {
+                      "anchors": [
+                        0.4,
+                        0.08,
+                        0.72,
+                        0.92
+                      ]
+                    },
+                    "layout": {
+                      "type": "horizontal",
+                      "spacing": -26,
+                      "alignment": "MiddleCenter",
+                      "controlWidth": false,
+                      "controlHeight": false,
+                      "expandWidth": false,
+                      "expandHeight": false
+                    },
+                    "preview": {
+                      "repeat": "CardBackTemplate",
+                      "count": 3
+                    },
+                    "children": []
+                  },
+                  {
+                    "name": "OppDeck",
+                    "type": "panel",
+                    "rect": {
+                      "size": [
+                        60,
+                        84
+                      ],
+                      "anchor": [
+                        1,
+                        0.5
+                      ],
+                      "pivot": [
+                        1,
+                        0.5
+                      ],
+                      "pos": [
+                        -100,
+                        0
+                      ]
+                    },
+                    "fill": "back",
+                    "border": {
+                      "color": "cardEdge",
+                      "thickness": 2
+                    },
+                    "children": [
+                      {
+                        "name": "OppDeckText",
+                        "type": "text",
+                        "rect": {
+                          "stretch": [
+                            0,
+                            0,
+                            0,
+                            0
+                          ]
+                        },
+                        "text": {
+                          "sample": "7",
+                          "size": "header",
+                          "color": "textBright",
+                          "align": "center"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "name": "OppDeckCaption",
+                    "type": "text",
+                    "rect": {
+                      "size": [
+                        80,
+                        20
+                      ],
+                      "anchor": [
+                        1,
+                        0.5
+                      ],
+                      "pivot": [
+                        1,
+                        0.5
+                      ],
+                      "pos": [
+                        -14,
+                        0
+                      ]
+                    },
+                    "text": {
+                      "sample": "deck",
+                      "size": "xsmall",
+                      "color": "textMuted",
+                      "align": "left"
+                    }
+                  }
+                ]
+              },
+              {
+                "name": "OppField",
+                "type": "panel",
+                "rect": {
+                  "anchors": [
+                    0,
+                    0.575,
+                    1,
+                    0.85
+                  ]
+                },
+                "children": [
+                  {
+                    "name": "OppFieldCaption",
+                    "type": "text",
+                    "rect": {
+                      "size": [
+                        200,
+                        18
+                      ],
+                      "anchor": [
+                        0,
+                        1
+                      ],
+                      "pivot": [
+                        0,
+                        1
+                      ],
+                      "pos": [
+                        12,
+                        -4
+                      ]
+                    },
+                    "text": {
+                      "sample": "THEIR FIELD",
+                      "size": "xsmall",
+                      "color": "textMuted",
+                      "align": "left"
+                    }
+                  },
+                  {
+                    "name": "OppFieldContent",
+                    "type": "panel",
+                    "rect": {
+                      "stretch": [
+                        12,
+                        4,
+                        12,
+                        4
+                      ]
+                    },
+                    "layout": {
+                      "type": "horizontal",
+                      "spacing": 10,
+                      "alignment": "MiddleCenter",
+                      "controlWidth": false,
+                      "controlHeight": false,
+                      "expandWidth": false,
+                      "expandHeight": false
+                    },
+                    "preview": {
+                      "repeat": "CardTemplate",
+                      "count": 4,
+                      "selected": 1,
+                      "activate": [
+                        "OutcomeBadge"
+                      ]
+                    },
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "name": "MidBand",
+                "type": "panel",
+                "rect": {
+                  "anchors": [
+                    0,
+                    0.5,
+                    1,
+                    0.57
+                  ]
+                },
+                "children": [
+                  {
+                    "name": "MidRuleLeft",
+                    "type": "panel",
+                    "rect": {
+                      "anchors": [
+                        0.02,
+                        0.48,
+                        0.24,
+                        0.52
+                      ]
+                    },
+                    "fill": "brassSoft"
+                  },
+                  {
+                    "name": "MidRuleRight",
+                    "type": "panel",
+                    "rect": {
+                      "anchors": [
+                        0.76,
+                        0.48,
+                        0.98,
+                        0.52
+                      ]
+                    },
+                    "fill": "brassSoft"
+                  },
+                  {
+                    "name": "BannerPanel",
+                    "type": "panel",
+                    "rect": {
+                      "anchors": [
+                        0.25,
+                        0.04,
+                        0.75,
+                        0.96
+                      ]
+                    },
+                    "fill": "banner",
+                    "border": {
+                      "color": "brassSoft",
+                      "thickness": 1
+                    },
+                    "children": [
+                      {
+                        "name": "BannerText",
+                        "type": "text",
+                        "rect": {
+                          "stretch": [
+                            10,
+                            2,
+                            10,
+                            2
+                          ]
+                        },
+                        "text": {
+                          "sample": "Warden Une plays Goatfolk Sower and vanquishes your snapjaw",
+                          "size": "normal",
+                          "color": "textBright",
+                          "align": "center"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "PlayerField",
+                "type": "panel",
+                "rect": {
+                  "anchors": [
+                    0,
+                    0.215,
+                    1,
+                    0.495
+                  ]
+                },
+                "children": [
+                  {
+                    "name": "PlayerFieldCaption",
+                    "type": "text",
+                    "rect": {
+                      "size": [
+                        200,
+                        18
+                      ],
+                      "anchor": [
+                        0,
+                        0
+                      ],
+                      "pivot": [
+                        0,
+                        0
+                      ],
+                      "pos": [
+                        12,
+                        4
+                      ]
+                    },
+                    "text": {
+                      "sample": "YOUR FIELD",
+                      "size": "xsmall",
+                      "color": "textMuted",
+                      "align": "left"
+                    }
+                  },
+                  {
+                    "name": "PlayerFieldContent",
+                    "type": "panel",
+                    "rect": {
+                      "stretch": [
+                        12,
+                        4,
+                        12,
+                        4
+                      ]
+                    },
+                    "layout": {
+                      "type": "horizontal",
+                      "spacing": 10,
+                      "alignment": "MiddleCenter",
+                      "controlWidth": false,
+                      "controlHeight": false,
+                      "expandWidth": false,
+                      "expandHeight": false
+                    },
+                    "preview": {
+                      "repeat": "CardTemplate",
+                      "count": 3
+                    },
+                    "children": []
+                  }
+                ]
+              },
+              {
+                "name": "PlayerRow",
+                "type": "panel",
+                "rect": {
+                  "anchors": [
+                    0,
+                    0,
+                    1,
+                    0.21
+                  ]
+                },
+                "fill": "feltDark",
+                "children": [
+                  {
+                    "name": "PlayerPortraitSlot",
+                    "type": "panel",
+                    "rect": {
+                      "size": [
+                        64,
+                        64
+                      ],
+                      "anchor": [
+                        0,
+                        0.5
+                      ],
+                      "pivot": [
+                        0,
+                        0.5
+                      ],
+                      "pos": [
+                        14,
+                        0
+                      ]
+                    },
+                    "fill": "gem",
+                    "border": {
+                      "color": "mine",
+                      "thickness": 2
+                    },
+                    "children": [
+                      {
+                        "name": "PlayerIcon",
+                        "type": "image",
+                        "rect": {
+                          "stretch": [
+                            6,
+                            6,
+                            6,
+                            6
+                          ]
+                        },
+                        "fill": "textBright",
+                        "preserveAspect": true
+                      }
+                    ]
+                  },
+                  {
+                    "name": "PlayerNameText",
+                    "type": "text",
+                    "rect": {
+                      "size": [
+                        160,
+                        26
+                      ],
+                      "anchor": [
+                        0,
+                        0.5
+                      ],
+                      "pivot": [
+                        0,
+                        0
+                      ],
+                      "pos": [
+                        90,
+                        8
+                      ]
+                    },
+                    "text": {
+                      "sample": "Yashrala",
+                      "size": "normal",
+                      "color": "textBright",
+                      "align": "left"
+                    }
+                  },
+                  {
+                    "name": "PlayerScoreBar",
+                    "type": "panel",
+                    "rect": {
+                      "size": [
+                        160,
+                        12
+                      ],
+                      "anchor": [
+                        0,
+                        0.5
+                      ],
+                      "pivot": [
+                        0,
+                        1
+                      ],
+                      "pos": [
+                        90,
+                        2
+                      ]
+                    },
+                    "fill": "gem",
+                    "border": {
+                      "color": "brassSoft",
+                      "thickness": 1
+                    },
+                    "children": [
+                      {
+                        "name": "PlayerScoreFill",
+                        "type": "panel",
+                        "rect": {
+                          "anchors": [
+                            0,
+                            0,
+                            0.3,
+                            1
+                          ]
+                        },
+                        "fill": "mine"
+                      }
+                    ]
+                  },
+                  {
+                    "name": "PlayerScoreText",
+                    "type": "text",
+                    "rect": {
+                      "size": [
+                        160,
+                        30
+                      ],
+                      "anchor": [
+                        0,
+                        0.5
+                      ],
+                      "pivot": [
+                        0,
+                        1
+                      ],
+                      "pos": [
+                        90,
+                        -14
+                      ]
+                    },
+                    "text": {
+                      "sample": "15 / 50",
+                      "size": "header",
+                      "color": "mine",
+                      "align": "left"
+                    }
+                  },
+                  {
+                    "name": "PlayerDeck",
+                    "type": "panel",
+                    "rect": {
+                      "size": [
+                        52,
+                        74
+                      ],
+                      "anchor": [
+                        0,
+                        0.5
+                      ],
+                      "pivot": [
+                        0,
+                        0.5
+                      ],
+                      "pos": [
+                        264,
+                        6
+                      ]
+                    },
+                    "fill": "back",
+                    "border": {
+                      "color": "cardEdge",
+                      "thickness": 2
+                    },
+                    "children": [
+                      {
+                        "name": "PlayerDeckText",
+                        "type": "text",
+                        "rect": {
+                          "stretch": [
+                            0,
+                            0,
+                            0,
+                            0
+                          ]
+                        },
+                        "text": {
+                          "sample": "9",
+                          "size": "header",
+                          "color": "textBright",
+                          "align": "center"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "name": "PlayerDeckCaption",
+                    "type": "text",
+                    "rect": {
+                      "size": [
+                        52,
+                        16
+                      ],
+                      "anchor": [
+                        0,
+                        0.5
+                      ],
+                      "pivot": [
+                        0,
+                        1
+                      ],
+                      "pos": [
+                        264,
+                        -32
+                      ]
+                    },
+                    "text": {
+                      "sample": "deck",
+                      "size": "xsmall",
+                      "color": "textMuted",
+                      "align": "center"
+                    }
+                  },
+                  {
+                    "name": "HandScroll",
+                    "type": "scroll",
+                    "rect": {
+                      "stretch": [
+                        330,
+                        0,
+                        10,
+                        0
+                      ]
+                    },
+                    "element": {
+                      "flexibleWidth": 1
+                    },
+                    "scroll": {
+                      "horizontal": false,
+                      "vertical": false,
+                      "inertia": false,
+                      "viewport": "HandViewport",
+                      "content": "HandContent"
+                    },
+                    "children": [
+                      {
+                        "name": "HandViewport",
+                        "type": "panel",
+                        "rect": {
+                          "stretch": [
+                            0,
+                            0,
+                            0,
+                            0
+                          ]
+                        },
+                        "fill": "transparent",
+                        "raycast": true,
+                        "children": [
+                          {
+                            "name": "HandContent",
+                            "type": "panel",
+                            "rect": {
+                              "stretch": [
+                                0,
+                                0,
+                                0,
+                                0
+                              ]
+                            },
+                            "layout": {
+                              "type": "horizontal",
+                              "spacing": 16,
+                              "padding": [
+                                8,
+                                8,
+                                6,
+                                6
+                              ],
+                              "alignment": "MiddleCenter",
+                              "controlWidth": false,
+                              "controlHeight": false,
+                              "expandWidth": false,
+                              "expandHeight": false
+                            },
+                            "preview": {
+                              "repeat": "CardTemplate",
+                              "count": 3,
+                              "selected": 1,
+                              "activate": [
+                                "Glow"
+                              ]
+                            },
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "SidePanel",
+            "type": "panel",
+            "rect": {
+              "right": [
+                10,
+                312
+              ]
+            },
+            "children": [
+              {
+                "name": "SideInner",
+                "type": "panel",
+                "rect": {
+                  "stretch": [
+                    0,
+                    46,
+                    0,
+                    54
+                  ]
+                },
+                "children": [
+                  {
+                    "name": "DetailPanel",
+                    "type": "panel",
+                    "rect": {
+                      "anchors": [
+                        0,
+                        0.52,
+                        1,
+                        0.94
+                      ]
+                    },
+                    "fill": "panel",
+                    "border": {
+                      "color": "border",
+                      "thickness": 1
+                    },
+                    "children": [
+                      {
+                        "name": "DetailCaption",
+                        "type": "text",
+                        "rect": {
+                          "top": [
+                            4,
+                            20,
+                            10
+                          ]
+                        },
+                        "text": {
+                          "sample": "CARD",
+                          "size": "xsmall",
+                          "color": "textMuted",
+                          "align": "left"
+                        }
+                      },
+                      {
+                        "name": "DetailText",
+                        "type": "text",
+                        "rect": {
+                          "stretch": [
+                            12,
+                            8,
+                            12,
+                            28
+                          ]
+                        },
+                        "text": {
+                          "sample": "Goatfolk Sower  (Lv 9)\nSun 4   Moon 3   Star 2\nAllegiance: Goatfolk\n\nIf you play it now:\n  topples their Snapjaw Hunter  +3\n  vanquishes their Albino Ape  +1\n  then your field earns 4\nTotal this turn: +8 renown",
+                          "size": "small",
+                          "color": "text",
+                          "valign": "top"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "name": "LogPanel",
+                    "type": "panel",
+                    "rect": {
+                      "anchors": [
+                        0,
+                        0.06,
+                        1,
+                        0.505
+                      ]
+                    },
+                    "fill": "panel",
+                    "border": {
+                      "color": "border",
+                      "thickness": 1
+                    },
+                    "children": [
+                      {
+                        "name": "LogCaption",
+                        "type": "text",
+                        "rect": {
+                          "top": [
+                            4,
+                            20,
+                            10
+                          ]
+                        },
+                        "text": {
+                          "sample": "CHRONICLE",
+                          "size": "xsmall",
+                          "color": "textMuted",
+                          "align": "left"
+                        }
+                      },
+                      {
+                        "name": "LogScroll",
+                        "type": "scroll",
+                        "rect": {
+                          "stretch": [
+                            4,
+                            4,
+                            4,
+                            26
+                          ]
+                        },
+                        "scroll": {
+                          "horizontal": false,
+                          "vertical": true,
+                          "sensitivity": 25,
+                          "inertia": false,
+                          "viewport": "LogViewport",
+                          "content": "LogContent"
+                        },
+                        "children": [
+                          {
+                            "name": "LogViewport",
+                            "type": "panel",
+                            "rect": {
+                              "stretch": [
+                                0,
+                                0,
+                                0,
+                                0
+                              ]
+                            },
+                            "fill": "transparent",
+                            "raycast": true,
+                            "mask": true,
+                            "children": [
+                              {
+                                "name": "LogContent",
+                                "type": "panel",
+                                "rect": {
+                                  "topStretch": true
+                                },
+                                "fitter": "vertical",
+                                "layout": {
+                                  "type": "vertical",
+                                  "padding": [
+                                    10,
+                                    10,
+                                    6,
+                                    8
+                                  ],
+                                  "controlWidth": true,
+                                  "controlHeight": true,
+                                  "expandWidth": true,
+                                  "expandHeight": false
+                                },
+                                "children": [
+                                  {
+                                    "name": "LogText",
+                                    "type": "text",
+                                    "text": {
+                                      "sample": "Round 5\nWarden Une plays Albino Ape.\nWarden Une scores 3 renown.\nYou play Snapjaw Hunter.\n~ vanquishes their Glowfish (+1)\nYou score 2 renown.",
+                                      "size": "small",
+                                      "color": "text",
+                                      "valign": "top"
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "RulesText",
+                    "type": "text",
+                    "rect": {
+                      "anchors": [
+                        0,
+                        0.94,
+                        1,
+                        1
+                      ]
+                    },
+                    "text": {
+                      "sample": "Beat 2 of 3 stats to remove a card. First to 50 renown wins.",
+                      "size": "xsmall",
+                      "color": "textMuted",
+                      "align": "center"
+                    }
+                  },
+                  {
+                    "name": "PreviewHint",
+                    "type": "text",
+                    "rect": {
+                      "anchors": [
+                        0,
+                        0,
+                        1,
+                        0.055
+                      ]
+                    },
+                    "text": {
+                      "sample": "Badges show what the highlighted card would do.",
+                      "size": "xsmall",
+                      "color": "textMuted",
+                      "align": "center"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "Footer",
+            "type": "panel",
+            "rect": {
+              "bottom": [
+                4,
+                40,
+                16
+              ]
+            },
+            "children": [
+              {
+                "name": "HotkeyBar",
+                "type": "scroll",
+                "rect": {
+                  "anchors": [
+                    0,
+                    0,
+                    0.72,
+                    1
+                  ]
+                },
+                "element": {
+                  "flexibleWidth": 1
+                },
+                "scroll": {
+                  "horizontal": false,
+                  "vertical": false,
+                  "inertia": false,
+                  "content": "HotkeyContent"
+                },
+                "children": [
+                  {
+                    "name": "HotkeyContent",
+                    "type": "panel",
+                    "rect": {
+                      "stretch": [
+                        0,
+                        0,
+                        0,
+                        0
+                      ]
+                    },
+                    "layout": {
+                      "type": "horizontal",
+                      "spacing": 28,
+                      "padding": [
+                        8,
+                        8,
+                        4,
+                        4
+                      ],
+                      "alignment": "MiddleLeft",
+                      "controlWidth": true,
+                      "controlHeight": true,
+                      "expandWidth": false,
+                      "expandHeight": false
+                    },
+                    "children": [
+                      {
+                        "name": "PreviewKey1",
+                        "type": "text",
+                        "text": {
+                          "sample": "[Enter] Play card",
+                          "size": "small",
+                          "color": "text"
+                        }
+                      },
+                      {
+                        "name": "PreviewKey2",
+                        "type": "text",
+                        "text": {
+                          "sample": "[F1] Rules",
+                          "size": "small",
+                          "color": "text"
+                        }
+                      },
+                      {
+                        "name": "PreviewKey3",
+                        "type": "text",
+                        "text": {
+                          "sample": "[Esc] Forfeit",
+                          "size": "small",
+                          "color": "text"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "name": "HintText",
+                "type": "text",
+                "rect": {
+                  "anchors": [
+                    0.72,
+                    0,
+                    1,
+                    1
+                  ]
+                },
+                "text": {
+                  "sample": "1-9 play a card    arrows choose",
+                  "size": "small",
+                  "color": "textMuted",
+                  "align": "right"
+                }
+              }
+            ]
+          },
+          {
+            "name": "FxLayer",
+            "type": "panel",
+            "rect": {
+              "stretch": [
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "name": "Templates",
+        "type": "template",
+        "rect": {
+          "stretch": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "active": false,
+        "children": [
+          {
+            "name": "CardTemplate",
+            "type": "panel",
+            "rect": {
+              "size": [
+                132,
+                184
+              ],
+              "anchor": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ]
+            },
+            "fill": "transparent",
+            "raycast": true,
+            "element": {
+              "preferredWidth": 132,
+              "preferredHeight": 184,
+              "minWidth": 132,
+              "minHeight": 184
+            },
+            "children": [
+              {
+                "name": "Shadow",
+                "type": "panel",
+                "rect": {
+                  "stretch": [
+                    -2,
+                    -8,
+                    -6,
+                    2
+                  ]
+                },
+                "fill": "shadow"
+              },
+              {
+                "name": "Lift",
+                "type": "panel",
+                "rect": {
+                  "stretch": [
+                    0,
+                    0,
+                    0,
+                    0
+                  ]
+                },
+                "children": [
+                  {
+                    "name": "Glow",
+                    "type": "panel",
+                    "rect": {
+                      "stretch": [
+                        -9,
+                        -9,
+                        -9,
+                        -9
+                      ]
+                    },
+                    "fill": "glow",
+                    "active": false
+                  },
+                  {
+                    "name": "Face",
+                    "type": "panel",
+                    "rect": {
+                      "stretch": [
+                        0,
+                        0,
+                        0,
+                        0
+                      ]
+                    },
+                    "fill": "cardEdge",
+                    "children": [
+                      {
+                        "name": "FaceInner",
+                        "type": "panel",
+                        "rect": {
+                          "stretch": [
+                            4,
+                            4,
+                            4,
+                            4
+                          ]
+                        },
+                        "fill": "cardFace"
+                      },
+                      {
+                        "name": "ArtPanel",
+                        "type": "panel",
+                        "rect": {
+                          "anchors": [
+                            0.08,
+                            0.4,
+                            0.92,
+                            0.86
+                          ]
+                        },
+                        "fill": "artBack",
+                        "border": {
+                          "color": "cardInner",
+                          "thickness": 1
+                        },
+                        "children": [
+                          {
+                            "name": "Art",
+                            "type": "image",
+                            "rect": {
+                              "stretch": [
+                                10,
+                                8,
+                                10,
+                                8
+                              ]
+                            },
+                            "fill": "textBright",
+                            "preserveAspect": true
+                          },
+                          {
+                            "name": "FoilSheen",
+                            "type": "panel",
+                            "rect": {
+                              "stretch": [
+                                0,
+                                0,
+                                0,
+                                0
+                              ]
+                            },
+                            "fill": "foil",
+                            "active": false
+                          }
+                        ]
+                      },
+                      {
+                        "name": "NameBand",
+                        "type": "panel",
+                        "rect": {
+                          "anchors": [
+                            0.05,
+                            0.245,
+                            0.95,
+                            0.39
+                          ]
+                        },
+                        "fill": "cardInner",
+                        "children": [
+                          {
+                            "name": "NameText",
+                            "type": "text",
+                            "rect": {
+                              "stretch": [
+                                4,
+                                1,
+                                4,
+                                1
+                              ]
+                            },
+                            "text": {
+                              "sample": "Snapjaw Hunter",
+                              "size": "xsmall",
+                              "color": "textBright",
+                              "align": "center"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "name": "StatRow",
+                        "type": "panel",
+                        "rect": {
+                          "anchors": [
+                            0.06,
+                            0.04,
+                            0.94,
+                            0.225
+                          ]
+                        },
+                        "children": [
+                          {
+                            "name": "SunGem",
+                            "type": "panel",
+                            "rect": {
+                              "anchors": [
+                                0,
+                                0,
+                                0.31,
+                                1
+                              ]
+                            },
+                            "fill": "sun",
+                            "children": [
+                              {
+                                "name": "SunText",
+                                "type": "text",
+                                "rect": {
+                                  "stretch": [
+                                    0,
+                                    0,
+                                    0,
+                                    0
+                                  ]
+                                },
+                                "text": {
+                                  "sample": "4",
+                                  "size": "normal",
+                                  "color": "cardName",
+                                  "align": "center"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "name": "MoonGem",
+                            "type": "panel",
+                            "rect": {
+                              "anchors": [
+                                0.345,
+                                0,
+                                0.655,
+                                1
+                              ]
+                            },
+                            "fill": "moon",
+                            "children": [
+                              {
+                                "name": "MoonText",
+                                "type": "text",
+                                "rect": {
+                                  "stretch": [
+                                    0,
+                                    0,
+                                    0,
+                                    0
+                                  ]
+                                },
+                                "text": {
+                                  "sample": "3",
+                                  "size": "normal",
+                                  "color": "cardName",
+                                  "align": "center"
+                                }
+                              }
+                            ]
+                          },
+                          {
+                            "name": "StarGem",
+                            "type": "panel",
+                            "rect": {
+                              "anchors": [
+                                0.69,
+                                0,
+                                1,
+                                1
+                              ]
+                            },
+                            "fill": "star",
+                            "children": [
+                              {
+                                "name": "StarText",
+                                "type": "text",
+                                "rect": {
+                                  "stretch": [
+                                    0,
+                                    0,
+                                    0,
+                                    0
+                                  ]
+                                },
+                                "text": {
+                                  "sample": "2",
+                                  "size": "normal",
+                                  "color": "cardName",
+                                  "align": "center"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "name": "ValueGem",
+                        "type": "panel",
+                        "rect": {
+                          "size": [
+                            32,
+                            32
+                          ],
+                          "anchor": [
+                            0,
+                            1
+                          ],
+                          "pivot": [
+                            0.5,
+                            0.5
+                          ],
+                          "pos": [
+                            10,
+                            -10
+                          ]
+                        },
+                        "fill": "gem",
+                        "border": {
+                          "color": "cardEdge",
+                          "thickness": 2
+                        },
+                        "children": [
+                          {
+                            "name": "ValueText",
+                            "type": "text",
+                            "rect": {
+                              "stretch": [
+                                0,
+                                0,
+                                0,
+                                0
+                              ]
+                            },
+                            "text": {
+                              "sample": "9",
+                              "size": "normal",
+                              "color": "accent",
+                              "align": "center"
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "name": "HotkeyBadge",
+                        "type": "panel",
+                        "rect": {
+                          "size": [
+                            24,
+                            24
+                          ],
+                          "anchor": [
+                            1,
+                            1
+                          ],
+                          "pivot": [
+                            0.5,
+                            0.5
+                          ],
+                          "pos": [
+                            -8,
+                            -8
+                          ]
+                        },
+                        "fill": "gem",
+                        "children": [
+                          {
+                            "name": "HotkeyText",
+                            "type": "text",
+                            "rect": {
+                              "stretch": [
+                                0,
+                                0,
+                                0,
+                                0
+                              ]
+                            },
+                            "text": {
+                              "sample": "1",
+                              "size": "small",
+                              "color": "accent",
+                              "align": "center"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "name": "DimOverlay",
+                    "type": "panel",
+                    "rect": {
+                      "stretch": [
+                        0,
+                        0,
+                        0,
+                        0
+                      ]
+                    },
+                    "fill": "dim",
+                    "active": false
+                  },
+                  {
+                    "name": "OutcomeBadge",
+                    "type": "panel",
+                    "rect": {
+                      "size": [
+                        124,
+                        26
+                      ],
+                      "anchor": [
+                        0.5,
+                        0
+                      ],
+                      "pivot": [
+                        0.5,
+                        0.5
+                      ],
+                      "pos": [
+                        0,
+                        6
+                      ]
+                    },
+                    "fill": "gem",
+                    "border": {
+                      "color": "accent",
+                      "thickness": 1
+                    },
+                    "active": false,
+                    "children": [
+                      {
+                        "name": "OutcomeText",
+                        "type": "text",
+                        "rect": {
+                          "stretch": [
+                            2,
+                            0,
+                            2,
+                            0
+                          ]
+                        },
+                        "text": {
+                          "sample": "TOPPLE +3",
+                          "size": "small",
+                          "color": "accent",
+                          "align": "center"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "CardBackTemplate",
+            "type": "panel",
+            "rect": {
+              "size": [
+                56,
+                78
+              ],
+              "anchor": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ]
+            },
+            "fill": "cardEdge",
+            "element": {
+              "preferredWidth": 56,
+              "preferredHeight": 78
+            },
+            "children": [
+              {
+                "name": "BackInner",
+                "type": "panel",
+                "rect": {
+                  "stretch": [
+                    3,
+                    3,
+                    3,
+                    3
+                  ]
+                },
+                "fill": "back",
+                "children": [
+                  {
+                    "name": "BackEmblem",
+                    "type": "panel",
+                    "rect": {
+                      "anchors": [
+                        0.2,
+                        0.3,
+                        0.8,
+                        0.7
+                      ]
+                    },
+                    "fill": "backInner",
+                    "border": {
+                      "color": "brass",
+                      "thickness": 1
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "FloatTemplate",
+            "type": "text",
+            "rect": {
+              "size": [
+                160,
+                40
+              ],
+              "anchor": [
+                0.5,
+                0.5
+              ],
+              "pivot": [
+                0.5,
+                0.5
+              ]
+            },
+            "text": {
+              "sample": "+3",
+              "size": "header",
+              "color": "accent",
+              "align": "center"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

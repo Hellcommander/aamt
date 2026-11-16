@@ -12,10 +12,11 @@
 #include <atomic>
 #include <cstring>
 #include <string>
+#include <vector>
 
 namespace
 {
-	constexpr const char* kVersion = "SealedAudio core 1.2.0 (MTSA1)";
+	constexpr const char* kVersion = "SealedAudio core 1.4.0 (MTSA1, MTSA2 signed)";
 	std::atomic<bool>     g_initialized{ false };
 	std::wstring          g_dataDir;
 	SealedAudio::Hooks::Options g_hookOptions;
@@ -27,6 +28,37 @@ namespace
 		std::wstring s(buf);
 		const auto slash = s.find_last_of(L"\\/");
 		return slash == std::wstring::npos ? L"." : s.substr(0, slash);
+	}
+
+	// The key-store folders: the configured semicolon list, else the per-user default %LOCALAPPDATA%\SealedAudio\keys.
+	std::vector<std::wstring> KeyDirs(const wchar_t* list)
+	{
+		std::vector<std::wstring> dirs;
+		if (list && *list) {
+			std::wstring s(list);
+			std::size_t start = 0;
+			while (start <= s.size()) {
+				std::size_t end = s.find(L';', start);
+				if (end == std::wstring::npos) end = s.size();
+				std::wstring d = s.substr(start, end - start);
+				while (!d.empty() && (d.back() == L' ' || d.back() == L'\\' || d.back() == L'/')) d.pop_back();
+				while (!d.empty() && d.front() == L' ') d.erase(d.begin());
+				if (!d.empty()) {
+					wchar_t expanded[MAX_PATH * 2]{};
+					const DWORD n = ::ExpandEnvironmentStringsW(d.c_str(), expanded, (DWORD)(sizeof(expanded) / sizeof(expanded[0])));
+					dirs.push_back(n > 0 && n <= sizeof(expanded) / sizeof(expanded[0]) ? std::wstring(expanded) : d);
+				}
+				start = end + 1;
+			}
+		}
+		if (dirs.empty()) {
+			wchar_t buf[MAX_PATH]{};
+			const DWORD n = ::GetEnvironmentVariableW(L"LOCALAPPDATA", buf, MAX_PATH);
+			if (n > 0 && n < MAX_PATH) {
+				dirs.push_back(std::wstring(buf) + L"\\SealedAudio\\keys");
+			}
+		}
+		return dirs;
 	}
 
 	std::string Narrow(const std::wstring& w)
@@ -77,7 +109,7 @@ extern "C"
 		const std::wstring archiveDir = cfg.archive_dir && *cfg.archive_dir ? std::wstring(cfg.archive_dir) : g_dataDir + L"\\SealedAudio";
 		Log::Info("data folder %s, archives %s", Narrow(g_dataDir).c_str(), Narrow(archiveDir).c_str());
 
-		const auto stats = Archives::Load(archiveDir, cfg.key32);
+		const auto stats = Archives::Load(archiveDir, cfg.key32, KeyDirs(cfg.key_dirs));
 		Log::Info("%zu archive(s), %zu sealed sounds, %zu refused", stats.archives, stats.entries, stats.refused);
 
 		g_hookOptions = Hooks::Options{};
@@ -201,8 +233,8 @@ extern "C"
 		}
 		std::uint32_t n = 0;
 		auto bytes = SealedAudio::Archives::Read(relative_path, &n);
-		if (bytes.empty() && !SealedAudio::Archives::Has(relative_path)) {
-			return 0;
+		if ((bytes.empty() && !SealedAudio::Archives::Has(relative_path)) || bytes.size() != n) {
+			return 0;  // not sealed, or an MTSA2 entry that failed authentication
 		}
 		if (size) {
 			*size = (uint32_t)bytes.size();

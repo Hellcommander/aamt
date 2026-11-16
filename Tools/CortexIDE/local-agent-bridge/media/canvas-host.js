@@ -30,9 +30,33 @@
     },
   };
 
+  // Toolbar: name, last render time, ask / refresh / source / reveal.
+  const bar = document.getElementById("bar");
+  if (bar) {
+    bar.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-act]");
+      if (b) vscode.postMessage({ type: "toolbar", action: b.dataset.act });
+    });
+    document.getElementById("bar-ask").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const q = document.getElementById("bar-q");
+      const text = q.value.trim();
+      if (!text) return;
+      vscode.postMessage({ type: "toolbar", action: "ask", text });
+      q.value = "";
+    });
+  }
+  function stamp(file) {
+    const n = document.getElementById("bar-name");
+    if (n && file) n.textContent = String(file).split(/[\\/]/).pop().replace(/\.canvas\.tsx$/i, "");
+    const t = document.getElementById("bar-time");
+    if (t) t.textContent = "updated " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
   window.addEventListener("message", (event) => {
     const msg = event.data;
     if (!msg || msg.type !== "source") return;
+    stamp(msg.file);
     showError((msg.diagnostics && msg.diagnostics.length) ? msg.diagnostics.join("\n") : "");
     try {
       if (!window.CanvasRuntime) throw new Error("cursor/canvas runtime did not load");

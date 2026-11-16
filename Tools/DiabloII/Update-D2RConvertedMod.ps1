@@ -3,7 +3,7 @@
     Updates data mods converted into D2RMM mods (ConvertDataMod.py) from a new download, with the
     settings each was converted with. Same as Update in Start-D2RModConverter, without the page.
 .DESCRIPTION
-    - A normal conversion (VanillaDeluxe, Reimagined...): the new mod files go in place, the old ones
+    - A normal conversion (Reimagined, Rebirth...): the new mod files go in place, the old ones
       stay in <mod>\d2rmm\previous until the new conversion passed its check, then ConvertDataMod.py
       runs again. Plugins and patches in the download's other d2rloader folder (the one beside mods\
       in a D2RLoader setup) become D2RMM packages in <D2RMM>\d2rloader, unless installed already.
@@ -19,9 +19,9 @@
 .EXAMPLE
     .\Update-D2RConvertedMod.ps1 -Mod Rebirth -Conflicts earlier -Files keep
 .EXAMPLE
-    .\Update-D2RConvertedMod.ps1 -Mod VanillaDeluxe, Rebirth
+    .\Update-D2RConvertedMod.ps1 -Mod Reimagined, Rebirth
 .EXAMPLE
-    .\Update-D2RConvertedMod.ps1 -Mod VanillaDeluxe -Duplicates order -Deleted leave
+    .\Update-D2RConvertedMod.ps1 -Mod Reimagined -Duplicates order -Deleted leave
 .EXAMPLE
     .\Update-D2RConvertedMod.ps1 -Mod Rebirth -Source "$env:USERPROFILE\Downloads\Rebirth-Re.zip"
 #>

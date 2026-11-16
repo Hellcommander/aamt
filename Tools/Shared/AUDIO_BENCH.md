@@ -124,7 +124,8 @@ doesn't win. A tone reference never enters the model. Command line: `audit`, `co
 sounds; `install-lua <mod>` writes the self-contained OpenStarbound `postLoad` asset script (`assets.bytes` →
 unseal → `assets.add`) and hooks it in `_metadata`; `write-cpp-key <StarSealedKey.hpp>` writes the key header for the
 engine fork's `SealedAssetSource` (`source/base/StarSealedAssetSource.*`), which mounts every `*.mtsa` inside a mod.
-The key file `audio_seal.key` is never committed. **Any mod can seal its own sounds**: seal with its own key file
+Every game has its own build key (`--game NAME`: `%LOCALAPPDATA%\SealedAudio\game-keys\NAME.key`, never committed; there is no shared
+default key, and `rekey` moves an archive to another key). **Any mod can seal its own sounds**: seal with its own key file
 (`--key mine.key`) and `--embed-key`, which writes `sounds.key` beside the archive; both engine readers try that
 file when the archive's key is not the build's, and the Lua reader is installed with the same key
 (`install-lua --key mine.key`). For StarCrawlers Chimera the Breachwork Loader uses wrapped keys instead: every

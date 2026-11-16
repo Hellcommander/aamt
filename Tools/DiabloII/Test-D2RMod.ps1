@@ -15,7 +15,7 @@ param(
     [string[]]$Config = @(),
     [string]$Cache,
     [string]$Manifest,
-    [int]$MaxPage = 15,
+    [int]$MaxPage = 126, # SkillTab4 0.7.0+ draws pages 4-126 (same default as ModHarness.js)
     [switch]$Refresh,
     [switch]$Dump,
     [switch]$DumpBase,

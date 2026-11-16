@@ -11,6 +11,9 @@ const mcpc = require("./mcp-client");
 const perms = require("./permissions");
 const instructions = require("./instructions");
 const toolOutput = require("./tool-output");
+const bg = require("./bg-shell");
+
+const short = (t, n) => { const x = String(t == null ? "" : t).replace(/\s+/g, " ").trim(); return x.length > n ? x.slice(0, n - 1) + "…" : x; };
 
 let vscode = null;
 try {
@@ -73,11 +76,21 @@ const TOOL_DEFS = [
     case_sensitive: { type: "boolean" },
     head_limit: { type: "number", description: "Max output lines (default 200)" },
   }, ["pattern"]),
-  tool("Shell", "Run a PowerShell command (build, test, git, dotnet, scripts). Returns exit code and output. Do not start servers or watchers that never exit.", {
+  tool("Shell", "Run a PowerShell command (build, test, git, dotnet, scripts). Returns exit code and output. For servers, watchers and anything that never exits, set run_in_background: true and read it with ShellOutput.", {
     command: { type: "string" },
     cwd: { type: "string", description: "Working folder (default: workspace)" },
     timeout: { type: "number", description: "Seconds before the command is killed (default from settings, max 600)" },
+    run_in_background: { type: "boolean", description: "Start it and return at once with a shell id (dev servers, watchers, long builds). It keeps running after this turn; stop it with ShellKill." },
   }, ["command"]),
+  tool("ShellOutput", "New output of a background shell since you last read it, and whether it still runs. No id: list this chat's background shells.", {
+    id: { type: "string", description: "Shell id from Shell run_in_background, e.g. bg1" },
+    wait: { type: "number", description: "Seconds to wait for new output (or for `until`) before returning (default 2, max 120)" },
+    until: { type: "string", description: "Regex: keep waiting until the output matches it, e.g. 'listening|error' (bounded by wait)" },
+    filter: { type: "string", description: "Regex: only return matching lines" },
+  }, []),
+  tool("ShellKill", "Stop a background shell (and its child processes).", {
+    id: { type: "string", description: "Shell id, or \"all\" for every background shell of this chat" },
+  }, ["id"]),
   tool("StrReplace", "Replace an exact, unique snippet in a file. Copy old_string verbatim from Read (or Grep) output, without the line-number prefix. The result shows the edited lines and any new compiler errors.", {
     path: { type: "string" },
     old_string: { type: "string" },
@@ -146,6 +159,8 @@ const ALIASES = {
   glob: "Glob", glob_files: "Glob", glob_file_search: "Glob", file_search: "Glob", find_file: "Glob", find_files: "Glob",
   grep: "Grep", search: "Grep", grep_search: "Grep", codebase_search: "Grep", search_files: "Grep",
   shell: "Shell", run_terminal: "Shell", run_terminal_cmd: "Shell", run_command: "Shell", terminal: "Shell", bash: "Shell", powershell: "Shell",
+  shelloutput: "ShellOutput", shell_output: "ShellOutput", bashoutput: "ShellOutput", bash_output: "ShellOutput", get_output: "ShellOutput", read_output: "ShellOutput", check_process: "ShellOutput",
+  shellkill: "ShellKill", shell_kill: "ShellKill", killshell: "ShellKill", kill_shell: "ShellKill", kill_process: "ShellKill", stop_process: "ShellKill",
   strreplace: "StrReplace", str_replace: "StrReplace", replace_in_file: "StrReplace", search_replace: "StrReplace", edit_file: "StrReplace", edit: "StrReplace",
   write: "Write", write_file: "Write", create_file: "Write",
   delete: "Delete", delete_file: "Delete", remove_file: "Delete",
@@ -191,6 +206,9 @@ function normArgs(name, args) {
   if (a["-C"] != null && a.context == null) a.context = a["-C"];
   if (a["-i"] != null && a.case_sensitive == null) a.case_sensitive = !a["-i"];
   if (a.timeout_sec != null && a.timeout == null) a.timeout = a.timeout_sec;
+  if (name === "Shell" && a.run_in_background == null && a.background != null) a.run_in_background = a.background;
+  if (typeof a.run_in_background === "string") a.run_in_background = /^(true|1|yes)$/i.test(a.run_in_background);
+  if ((name === "ShellOutput" || name === "ShellKill") && a.id == null) a.id = a.shell_id || a.bash_id || a.shellId || a.process_id;
   if (a.task && !a.prompt) a.prompt = a.task;
   if (a.question && !a.prompt) a.prompt = a.question;
   if (name === "McpCall" || name === "McpTools") {
@@ -277,6 +295,8 @@ class ToolContext {
     this.requireRead = o.requireRead !== false;
     this.diagnosticsAfterEdit = o.diagnosticsAfterEdit !== false;
     this.signal = o.signal;
+    /** chat id: background shells are listed and capped per owner */
+    this.owner = o.owner || "";
     this.claimFn = typeof o.claim === "function" ? o.claim : null;
     this.vision = o.vision !== false;
     this.imageMaxEdge = Math.max(256, Number(o.imageMaxEdge) || fa.DEFAULT_MAX_EDGE);
@@ -852,9 +872,66 @@ async function shell(ctx, a) {
     exe = "powershell.exe";
     args = ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")];
   }
+  if (a.run_in_background === true) {
+    const started = bg.start(exe, args, { cwd, command: cmd, owner: ctx.owner });
+    if (started.error) return started.error;
+    const s = bg.get(started.id);
+    // A moment for the first lines (or an immediate failure) so the agent sees whether it started.
+    await bg.waitFor(s, 3000, { signal: ctx.signal });
+    const first = bg.takeNew(s).trim();
+    return (
+      "started background shell " + s.id + " (pid " + s.pid + ", cwd " + cwd + "), " + bg.status(s) + "\n" +
+      (first ? clip(first, 6000) : "(no output yet)") +
+      "\n\nRead more with ShellOutput { id: \"" + s.id + "\" } (wait / until to wait for a line); stop it with ShellKill when done."
+    );
+  }
   const timeoutSec = Math.min(600, Math.max(1, Number(a.timeout) || ctx.shellTimeoutSec));
   const r = await runProcess(exe, args, { cwd, timeoutSec, signal: ctx.signal });
-  return "exit " + r.code + " (cwd " + cwd + ")\n" + (toolOutput.clipSaved(r.out.trim(), MAX_OUT, clip, "shell") || "(no output)");
+  const hint = /\[timed out after \d+s\]$/.test(r.out.trim())
+    ? "\n\n[Agent note] The command was killed at the timeout. If it is a server or watcher, start it with run_in_background: true; if it is a slow build, pass a larger timeout."
+    : "";
+  return "exit " + r.code + " (cwd " + cwd + ")\n" + (toolOutput.clipSaved(r.out.trim(), MAX_OUT, clip, "shell") || "(no output)") + hint;
+}
+
+function regexArg(v, name) {
+  if (v == null || v === "") return null;
+  try {
+    return new RegExp(String(v), "i");
+  } catch (e) {
+    throw new Error("bad " + name + " regex: " + e.message);
+  }
+}
+
+async function shellOutput(ctx, a) {
+  const id = String(a.id || "").trim();
+  if (!id) {
+    const mine = bg.list(ctx.owner);
+    if (!mine.length) return "(no background shells in this chat)";
+    return mine.map((s) => s.id + "  " + bg.status(s) + "  pid " + s.pid + "  " + short(s.command, 120)).join("\n");
+  }
+  const s = bg.get(id);
+  if (!s) return "error: no background shell " + id + ". Call ShellOutput without an id to list them.";
+  let until;
+  let filter;
+  try {
+    until = regexArg(a.until, "until");
+    filter = regexArg(a.filter, "filter");
+  } catch (e) {
+    return "error: " + e.message;
+  }
+  const waitSec = Math.min(120, Math.max(0, a.wait == null ? 2 : Number(a.wait) || 0));
+  await bg.waitFor(s, waitSec * 1000, { until, signal: ctx.signal });
+  const out = bg.takeNew(s, filter).trim();
+  return s.id + " " + bg.status(s) + "\n" + (out ? toolOutput.clipSaved(out, MAX_OUT, clip, "shell") : "(no new output)");
+}
+
+function shellKill(ctx, a) {
+  const id = String(a.id || "").trim();
+  if (!id) return "error: missing id";
+  const targets = id.toLowerCase() === "all" ? bg.list(ctx.owner).filter((s) => s.exitCode == null) : [bg.get(id)].filter(Boolean);
+  if (!targets.length) return id.toLowerCase() === "all" ? "(no running background shells)" : "error: no background shell " + id;
+  for (const s of targets) bg.kill(s);
+  return "stopped " + targets.map((s) => s.id + (s.exitCode != null ? " (had already exited, code " + s.exitCode + ")" : "")).join(", ");
 }
 
 async function saveText(abs, contents) {
@@ -888,7 +965,7 @@ function currentText(abs) {
  */
 function applyReplace(cur, oldS, newS, replaceAll, abs, allowLoose = true) {
   if (!oldS) return { error: "old_string is empty" };
-  if (oldS === newS) return { error: "old_string and new_string are identical; nothing to change" };
+  if (oldS === newS) return { error: "old_string and new_string are identical; nothing to change. new_string must be old_string WITH your change applied: write out the changed text, not a copy of the original" };
   const crlf = cur.includes("\r\n");
   const variants = [[oldS, newS]];
   const stripped = stripLineNumbers(oldS);
@@ -1008,11 +1085,75 @@ async function commit(ctx, abs, next) {
   ctx.markRead(abs);
 }
 
+/** Extensions that are never text: Write / StrReplace on them would destroy the file. */
+const BINARY_EXT = /\.(dll|exe|pdb|lib|obj|o|a|so|dylib|sys|ocx|node|wasm|class|jar|pyc|pak|casc|mpq|bsa|ba2|esp|esm|esl|mtsa|bin|dat|idx|dds|tga|png|jpe?g|gif|bmp|ico|webp|psd|wav|ogg|mp3|flac|wem|bnk|fsb|mp4|webm|avi|mkv|zip|7z|rar|gz|tgz|bz2|xz|pdf|docx|xlsx|pptx|ttf|otf|woff2?|granny|gr2|fbx|glb|blend|sqlite|db)$/i;
+
+/** "" when abs may be edited as text, else the error result. */
+function binaryRefusal(abs) {
+  let binary = BINARY_EXT.test(abs);
+  if (!binary && fs.existsSync(abs)) {
+    try {
+      const fd = fs.openSync(abs, "r");
+      const buf = Buffer.alloc(8192);
+      const n = fs.readSync(fd, buf, 0, buf.length, 0);
+      fs.closeSync(fd);
+      binary = buf.subarray(0, n).includes(0);
+    } catch {
+      /* unreadable: the edit itself reports it */
+    }
+  }
+  return binary
+    ? "error: " + abs + " is a binary file; text tools would corrupt it. To replace it with another copy use Shell (Copy-Item -LiteralPath <source> -Destination <target>); to inspect it use AnalyzeFile."
+    : "";
+}
+
+/** Cheap syntax check of a JSON or XML file after an edit; "" when it parses (or is another type). */
+function syntaxProblem(abs, text) {
+  const t = String(text || "").replace(/^\uFEFF/, "");
+  if (/\.json$/i.test(abs)) {
+    try {
+      JSON.parse(t);
+      return "";
+    } catch (e) {
+      // JSON with comments / trailing commas (tsconfig, VS Code settings) is fine.
+      const loose = t.replace(/("(?:[^"\\]|\\.)*")|\/\/[^\n]*|\/\*[\s\S]*?\*\//g, (m, str) => str || "").replace(/,(\s*[}\]])/g, "$1");
+      try {
+        JSON.parse(loose);
+        return "";
+      } catch {
+        const m = /position (\d+)/.exec(e.message);
+        const line = m ? t.slice(0, Number(m[1])).split("\n").length : 0;
+        return "\n[check] This file is no longer valid JSON" + (line ? " (near line " + line + ")" : "") + ": " + e.message.split("\n")[0] + ". Fix it.";
+      }
+    }
+  }
+  if (/\.(xml|xaml|csproj|vcxproj|props|targets|config|resx|manifest)$/i.test(abs)) {
+    const body = t.replace(/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>|<!DOCTYPE[^>]*>/gi, (m) => m.replace(/[^\n]/g, " "));
+    const stack = [];
+    const re = /<(\/?)([A-Za-z_][\w.:-]*)((?:"[^"]*"|'[^']*'|[^'">])*)>/g;
+    let m;
+    while ((m = re.exec(body))) {
+      const line = body.slice(0, m.index).split("\n").length;
+      if (m[3].trim().endsWith("/")) continue;
+      if (!m[1]) stack.push({ name: m[2], line });
+      else {
+        const top = stack.pop();
+        if (!top) return "\n[check] XML: closing </" + m[2] + "> on line " + line + " has no opening tag. Fix it.";
+        if (top.name !== m[2]) return "\n[check] XML: </" + m[2] + "> on line " + line + " closes <" + top.name + "> from line " + top.line + ". Fix it.";
+      }
+    }
+    if (stack.length) return "\n[check] XML: <" + stack[stack.length - 1].name + "> on line " + stack[stack.length - 1].line + " is never closed. Fix it.";
+  }
+  return "";
+}
+
 async function strReplace(ctx, a) {
   const abs = ctx.resolve(a.path);
   if (!abs) return "error: missing path";
   if (!ctx.canWrite(abs)) return ctx.writeDenied(abs);
   if (!fs.existsSync(abs)) return "error: not found: " + abs + " (use Write to create it)";
+  const bin = binaryRefusal(abs);
+  if (bin) return bin;
   // Another running chat's file comes before "Read it first": reading would not help.
   const held = ctx.claimCheck(abs, "edit");
   if (held) return held;
@@ -1024,7 +1165,7 @@ async function strReplace(ctx, a) {
   await commit(ctx, abs, r.next);
   const line = r.next.slice(0, r.at).split(/\r?\n/).length;
   return "edited " + abs + " (" + r.count + " replacement" + (r.count > 1 ? "s" : "") + ", at line " + line + (r.loose ? ", matched ignoring whitespace and re-indented — check the lines below" : "") + ")\n" +
-    snippet(r.next, r.at, r.repl.length) + (await editorProblems(ctx, abs));
+    snippet(r.next, r.at, r.repl.length) + syntaxProblem(abs, r.next) + (await editorProblems(ctx, abs));
 }
 
 async function multiEdit(ctx, a) {
@@ -1034,6 +1175,8 @@ async function multiEdit(ctx, a) {
   if (!fs.existsSync(abs)) return "error: not found: " + abs + " (use Write to create it)";
   const edits = Array.isArray(a.edits) ? a.edits : [];
   if (!edits.length) return "error: edits must be a non-empty array of {old_string, new_string}";
+  const bin = binaryRefusal(abs);
+  if (bin) return bin;
   const held = ctx.claimCheck(abs, "edit");
   if (held) return held;
   const unread = ctx.unread(abs);
@@ -1054,7 +1197,7 @@ async function multiEdit(ctx, a) {
   await commit(ctx, abs, cur);
   const line = cur.slice(0, firstAt).split(/\r?\n/).length;
   return "edited " + abs + " (" + edits.length + " edits, from line " + line + ")\n" +
-    snippet(cur, firstAt, Math.max(0, lastEnd - firstAt)) + (await editorProblems(ctx, abs));
+    snippet(cur, firstAt, Math.max(0, lastEnd - firstAt)) + syntaxProblem(abs, cur) + (await editorProblems(ctx, abs));
 }
 
 async function writeFile(ctx, a) {
@@ -1064,12 +1207,14 @@ async function writeFile(ctx, a) {
   const contents = String(a.contents == null ? "" : a.contents);
   const existed = fs.existsSync(abs);
   if (existed && fs.statSync(abs).isDirectory()) return "error: " + abs + " is a folder";
+  const bin = binaryRefusal(abs);
+  if (bin) return bin;
   const held = ctx.claimCheck(abs, existed ? "write" : "create");
   if (held) return held;
   const stale = ctx.staleCheck(abs);
   if (stale) return stale.replace("before changing it", "before overwriting it (or use StrReplace for a partial change)");
   await commit(ctx, abs, contents);
-  return (existed ? "overwrote " : "created ") + abs + " (" + contents.split(/\r?\n/).length + " lines)" + (await editorProblems(ctx, abs));
+  return (existed ? "overwrote " : "created ") + abs + " (" + contents.split(/\r?\n/).length + " lines)" + syntaxProblem(abs, contents) + (await editorProblems(ctx, abs));
 }
 
 async function deleteFile(ctx, a) {
@@ -1231,6 +1376,10 @@ async function dispatch(ctx, name, rawArgs) {
       return grep(ctx, a);
     case "Shell":
       return shell(ctx, a);
+    case "ShellOutput":
+      return shellOutput(ctx, a);
+    case "ShellKill":
+      return shellKill(ctx, a);
     case "StrReplace":
       return strReplace(ctx, a);
     case "MultiEdit":
@@ -1431,5 +1580,7 @@ module.exports = {
   promptImages,
   ToolContext,
   defaultRgPath,
+  syntaxProblem,
+  binaryRefusal,
   clip,
 };
