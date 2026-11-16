@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ModOrder</title>
+<style>
+:root {
+  --bg: #f6f5f2; --panel: #ffffff; --ink: #1d1c1a; --muted: #6b6760; --line: #e2dfd8;
+  --err: #b42318; --err-bg: #fdecea; --warn: #9a6700; --warn-bg: #fff6dc; --info: #1f5fa8; --info-bg: #e9f1fb;
+  --moved: #fff3c4; --accent: #7a3e12; --accent-ink: #fff;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161514; --panel: #201f1d; --ink: #ece9e4; --muted: #a29d94; --line: #34322e;
+    --err: #ff8a80; --err-bg: #3a1d1b; --warn: #f0c35a; --warn-bg: #362b12; --info: #8cb8f0; --info-bg: #182638;
+    --moved: #3b3418; --accent: #d08a4f; --accent-ink: #1a1208;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
+header { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; flex-wrap: wrap; }
+h1 { font-size: 18px; margin: 0; letter-spacing: .02em; }
+.sum { color: var(--muted); }
+.sp { flex: 1; }
+button { font: inherit; padding: 7px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button:disabled { opacity: .5; cursor: default; }
+main { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; padding: 16px 20px; }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0; padding: 10px 14px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
+.filters label { text-transform: none; letter-spacing: 0; font-size: 13px; color: var(--ink); display: inline-flex; gap: 4px; align-items: center; }
+.msg { padding: 8px 14px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 54px 1fr; gap: 10px; }
+.msg:last-child { border-bottom: 0; }
+.lvl { font-size: 11px; font-weight: 700; text-transform: uppercase; border-radius: 4px; padding: 2px 0; text-align: center; height: fit-content; }
+.error .lvl { color: var(--err); background: var(--err-bg); }
+.warn .lvl { color: var(--warn); background: var(--warn-bg); }
+.info .lvl, .note .lvl { color: var(--info); background: var(--info-bg); }
+.mod { font-weight: 600; }
+ol { margin: 0; padding: 0; list-style: none; max-height: calc(100vh - 160px); overflow: auto; }
+li { display: grid; grid-template-columns: 34px 1fr auto; gap: 8px; padding: 5px 14px; border-bottom: 1px solid var(--line); align-items: baseline; }
+li.moved { background: var(--moved); }
+li .n { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+li .why { grid-column: 2 / 4; font-size: 12px; color: var(--muted); }
+.chip { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 10px; padding: 0 7px; white-space: nowrap; }
+.flag { font-size: 11px; font-weight: 700; margin-left: 6px; }
+.flag.error { color: var(--err); } .flag.warn { color: var(--warn); }
+.empty { padding: 14px; color: var(--muted); }
+#status { padding: 0 20px; color: var(--muted); min-height: 1.4em; }
+#status.bad { color: var(--err); }
+</style>
+</head>
+<body>
+<header>
+  <h1>ModOrder</h1>
+  <span class="sum" id="sum">reading your D2RMM list...</span>
+  <span class="sp"></span>
+  <button id="reload">Check again</button>
+  <button id="apply" class="primary" disabled>Apply sorted order</button>
+</header>
+<p id="status"></p>
+<main>
+  <section>
+    <h2>Messages <span class="sp"></span>
+      <span class="filters">
+        <label><input type="checkbox" data-l="error" checked> errors</label>
+        <label><input type="checkbox" data-l="warn" checked> warnings</label>
+        <label><input type="checkbox" data-l="info" checked> info</label>
+        <label><input type="checkbox" data-l="note"> notes</label>
+      </span>
+    </h2>
+    <div id="msgs"></div>
+  </section>
+  <section>
+    <h2>Sorted order <span class="sp"></span><span id="movecount"></span></h2>
+    <ol id="order"></ol>
+  </section>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let report = null;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function shown() {
+  return new Set([...document.querySelectorAll('.filters input')].filter((i) => i.checked).map((i) => i.dataset.l));
+}
+function render() {
+  const r = report;
+  const n = (l) => r.messages.filter((m) => m.level === l).length;
+  $('sum').textContent = `${r.ticked.length} ticked mods · ${n('error')} errors · ${n('warn')} warnings · ${r.unknown.length} not in the masterlist (${r.masterlist.updated})`;
+  const levels = shown();
+  const msgs = r.messages.filter((m) => levels.has(m.level));
+  $('msgs').innerHTML = msgs.length ? msgs.map((m) => `<div class="msg ${m.level}"><span class="lvl">${m.level}</span><span>${m.mod ? `<span class="mod">${esc(r.names[m.mod] || m.mod)}</span>: ` : ''}${esc(m.text)}</span></div>`).join('') : '<div class="empty">Nothing to show.</div>';
+  const moved = new Map(r.moves.map((m) => [m.id, m]));
+  const worst = new Map();
+  r.messages.forEach((m) => {
+    if (!m.mod || (m.level !== 'error' && m.level !== 'warn')) return;
+    if (worst.get(m.mod) !== 'error') worst.set(m.mod, m.level);
+  });
+  $('order').innerHTML = r.order.map((id, i) => {
+    const mv = moved.get(id);
+    const w = worst.get(id);
+    return `<li class="${mv ? 'moved' : ''}"><span class="n">${i + 1}</span><span>${esc(r.names[id] || id)}${w ? `<span class="flag ${w}">${w === 'error' ? '●' : '▲'}</span>` : ''}</span><span class="chip">${esc(r.groups[id])}</span>${mv ? `<span class="why">from ${mv.from}: ${esc(mv.why)}</span>` : ''}</li>`;
+  }).join('');
+  $('movecount').textContent = r.moves.length ? `${r.moves.length} moved` : 'already sorted';
+  $('apply').disabled = !r.moves.length;
+}
+async function load() {
+  $('status').textContent = '';
+  $('status').className = '';
+  try {
+    const res = await fetch('/api/report');
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error);
+    report = body;
+    render();
+  } catch (e) {
+    $('status').textContent = e.message;
+    $('status').className = 'bad';
+  }
+}
+$('reload').onclick = load;
+document.querySelectorAll('.filters input').forEach((i) => (i.onchange = () => report && render()));
+$('apply').onclick = async () => {
+  $('apply').disabled = true;
+  $('status').className = '';
+  $('status').textContent = 'Putting the sorted order into D2RMM (it may start or reload)...';
+  try {
+    const res = await fetch('/api/apply', { method: 'POST' });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error);
+    report = body.report;
+    render();
+    $('status').textContent = `Done. The list before is saved in ${body.backup}. Click Install Mods in D2RMM with the game closed.`;
+  } catch (e) {
+    $('status').textContent = e.message;
+    $('status').className = 'bad';
+    $('apply').disabled = false;
+  }
+};
+load();
+</script>
+</body>
+</html>

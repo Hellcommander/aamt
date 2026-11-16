@@ -2,7 +2,7 @@
   "name": "local-agent-bridge",
   "displayName": "Local Agent Bridge",
   "description": "CortexIDE coding agent on local models (vLLM / Ollama), Claude (Anthropic API) or the Claude Code engine, with file, search and shell tools, SKILL.md skills, .canvas.tsx canvases, and chat import (including Cursor exports).",
-  "version": "2.17.1",
+  "version": "2.18.0",
   "publisher": "arend",
   "engines": {
     "vscode": "^1.80.0"
@@ -758,6 +758,36 @@
           ],
           "default": "standard",
           "description": "Output limits new chats start with. Each chat can be changed on its own with “Agent: Set Chat Limits” or the panel menu. Presets only raise the settings; outputs are capped to the model's limit (Claude) or half the context window (local models)."
+        },
+        "localAgentBridge.agent.autoSwitch": {
+          "type": "string",
+          "enum": ["ollama", "off"],
+          "default": "ollama",
+          "enumDescriptions": [
+            "On Ollama, a model that clearly struggles (cannot call tools, keeps announcing instead of acting, keeps failing edits, loops, stalls, or uses all rounds without a change) hands the request to a stronger installed model, which reads the chat and the first attempt",
+            "Never switch models by itself"
+          ],
+          "markdownDescription": "Switch the chat to a stronger Ollama model when the current one is not up to the request. The new model gets the chat history and a handoff of what the previous model tried, and the chat keeps the new model."
+        },
+        "localAgentBridge.agent.autoSwitchModels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "markdownDescription": "Ollama models to switch to first, in order (e.g. `[\"qwen2.5-coder:14b\", \"devstral\"]`). After these, installed models that can call tools are tried, coding and larger models first."
+        },
+        "localAgentBridge.agent.autoSwitchMax": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "maximum": 5,
+          "markdownDescription": "Most model switches in one turn."
+        },
+        "localAgentBridge.agent.autoCompactPercent": {
+          "type": "number",
+          "default": 60,
+          "minimum": 0,
+          "maximum": 95,
+          "markdownDescription": "Auto-compact: before a turn, a chat whose carried-over history would fill more than this percent of the model's context window is compacted first (as `/compact` does), then your message runs on the summary. `0` turns it off. Chats on the Claude Code engine compact themselves."
         },
         "localAgentBridge.agent.compressRecentTurns": {
           "type": "integer",

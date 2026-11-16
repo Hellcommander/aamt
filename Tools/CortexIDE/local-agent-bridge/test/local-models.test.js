@@ -146,3 +146,58 @@ test("Ollama advice names tool-capable models when the chosen one cannot call to
     server.close();
   }
 });
+
+test("struggle signals end the turn early only when switching is on", async () => {
+  const run = (steps, extra = {}) => {
+    script(steps);
+    return runAgent({ backend: { provider: "ollama", baseUrl: "http://x" }, model: "weak", prompt: "fix the bug in a.js", tools: new ToolContext({ roots: [ws] }), env: {}, onEvent: () => {}, ...extra });
+  };
+  const announce = () => ({ content: "I will fix it now.", tool_calls: [] });
+  const r1 = await run([announce], { switchOnStruggle: true });
+  assert.match(r1.struggling, /announcing instead of doing the work/);
+  const r2 = await run([announce]);
+  assert.strictEqual(r2.struggling, undefined, "off: the old behaviour (nudges, then the answer)");
+
+  const noTools = () => { throw new llm.ToolsUnsupported("model does not support tools"); };
+  assert.match((await run([noTools], { switchOnStruggle: true })).struggling, /cannot call tools/);
+
+  fs.writeFileSync(path.join(ws, "edit-me.js"), "const a = 1;\n");
+  const badEdit = call("StrReplace", { path: path.join(ws, "edit-me.js"), old_string: "nope " + Math.random(), new_string: "x" });
+  const r4 = await run([() => badEdit, () => call("StrReplace", { path: path.join(ws, "edit-me.js"), old_string: "nope2", new_string: "y" }), () => call("StrReplace", { path: path.join(ws, "edit-me.js"), old_string: "nope3", new_string: "z" }), announce], { switchOnStruggle: true });
+  assert.match(r4.struggling, /edits kept failing/);
+
+  const repeat = () => { throw new Error("prediction aborted, token repeat limit reached"); };
+  assert.match((await run([repeat], { switchOnStruggle: true })).struggling, /repeating itself/);
+});
+
+test("switch candidates: the preference list first, then tool-capable coding / larger models", async () => {
+  const models = {
+    "weak:8b": { size: "8.2B", caps: ["completion", "tools"] },
+    "llava:13b": { size: "13B", caps: ["completion", "vision"] },
+    "qwen2.5-coder:14b": { size: "14.8B", caps: ["completion", "tools"] },
+    "qwen2.5-coder:7b": { size: "7.6B", caps: ["completion", "tools"] },
+    "llama3.1:70b": { size: "70.6B", caps: ["completion", "tools"] },
+    "nomic-embed-text:latest": { size: "137M", caps: ["embedding"] },
+    "mistral-small:24b": { size: "24B", caps: ["completion", "tools"] },
+  };
+  const server = http.createServer((req, res) => {
+    const chunks = [];
+    req.on("data", (c) => chunks.push(c));
+    req.on("end", () => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      if (req.url === "/api/tags") return res.end(JSON.stringify({ models: Object.entries(models).map(([name, m]) => ({ name, details: { parameter_size: m.size } })) }));
+      const m = models[JSON.parse(Buffer.concat(chunks).toString("utf8")).model];
+      res.end(JSON.stringify({ capabilities: m ? m.caps : [] }));
+    });
+  });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const base = "http://127.0.0.1:" + server.address().port;
+  try {
+    const c = await llm.ollamaSwitchCandidates(base, "weak:8b", { prefer: ["mistral-small:24b", "not-installed"], exclude: ["weak:8b"] });
+    assert.deepStrictEqual(c, ["mistral-small:24b", "qwen2.5-coder:14b", "llama3.1:70b", "qwen2.5-coder:7b"], "preferred, then larger coders, larger others, smaller last; no vision-only or embedding models");
+    assert.ok(!(await llm.ollamaSwitchCandidates(base, "weak:8b", { exclude: ["qwen2.5-coder:14b"] })).includes("qwen2.5-coder:14b"), "already tried models are skipped");
+    assert.strictEqual(llm.paramBillions("500M"), 0.5);
+  } finally {
+    server.close();
+  }
+});

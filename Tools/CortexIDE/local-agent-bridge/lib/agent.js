@@ -242,6 +242,18 @@ async function runAgent(o) {
   // A small model stuck repeating itself (Ollama aborts with "token repeat limit reached") gets the
   // round again with a repetition penalty and more temperature instead of losing the turn.
   let antiRepeat = 0;
+  // Auto-switch (o.switchOnStruggle): a model that is clearly not up to the task ends the turn early
+  // with a reason, so the caller can hand the work to a stronger model.
+  let thinkOverflows = 0;
+  let struggle = "";
+  const struggling = (why) => {
+    if (o.switchOnStruggle && !subagent && !struggle) struggle = why;
+    return !!struggle;
+  };
+  const struggleResult = () => {
+    emit({ type: "status", text: "This model is struggling: " + struggle });
+    return { text: "", struggling: struggle, toolsUsed, mutated, progress: progress.toJSON(), todos: todos(), steered };
+  };
   let idleRounds = 0; // tool rounds since the start without a successful edit
   let verifyNudged = false;
   let verified = false;
@@ -389,6 +401,12 @@ async function runAgent(o) {
   for (let round = 1; round <= roundLimit; round++) {
     if (o.signal && o.signal.aborted) throw new Error("stopped");
     takeSteer(round);
+    if (o.switchOnStruggle && !subagent) {
+      const edits = !readOnly && wantsEdit(task) && !mutated && !heldOff;
+      if (nudges >= 3 && !mutated && !readOnly && struggling("it kept answering or announcing instead of doing the work (" + nudges + " reminders)")) return struggleResult();
+      if (Math.max(0, ...editFails.values()) >= 3 && struggling("its edits kept failing on the same file")) return struggleResult();
+      if (edits && idleRounds >= STALL_ROUNDS + 4 && struggling("it kept looking around for " + idleRounds + " rounds without making the change")) return struggleResult();
+    }
     const level = compact(messages, budget, progress, { firstUser });
     if (level) {
       historyEdited = true;
@@ -438,12 +456,14 @@ async function runAgent(o) {
         round--;
         continue;
       }
+      if (/repeat limit|repetition|repeating/i.test(String(e.message || "")) && antiRepeat >= 2 && struggling("it kept repeating itself")) return struggleResult();
       if (/repeat limit|repetition|repeating/i.test(String(e.message || "")) && antiRepeat < 2 && !(o.signal && o.signal.aborted)) {
         antiRepeat++;
         emit({ type: "status", text: "The model got stuck repeating itself (" + short(String(e.message), 80) + ") — retrying this step with a repetition penalty" });
         round--;
         continue;
       }
+      if (e instanceof llm.ToolsUnsupported && !textMode && struggling("it cannot call tools (" + short(e.message, 80) + ")")) return struggleResult();
       if (e instanceof llm.ToolsUnsupported && !textMode) {
         textMode = true;
         messages[0].content = buildSystem();
@@ -515,6 +535,8 @@ async function runAgent(o) {
       }
       let reason = nudges < MAX_NUDGES ? unfinishedReason({ said, prompt: task, toolsUsed, mutated: mutated || heldOff, verified: verified || (heldOff && !mutated), todos: todos(), subagent, readOnly }) : "";
       const thinkOverflow = reply.truncated && !said && (reply.reasoning || /<think/i.test(reply.content || ""));
+      if (thinkOverflow) thinkOverflows++;
+      if (thinkOverflows >= 2 && struggling("it spent its whole output budget thinking, twice")) return struggleResult();
       if (thinkOverflow && o.backend.provider === "ollama" && !noThink) {
         noThink = true;
         emit({ type: "status", text: "The model used the whole output budget (" + maxTokens + " tokens) thinking — thinking is off for the rest of this turn" });
@@ -642,6 +664,7 @@ async function runAgent(o) {
       break;
     }
     if (round === roundLimit && steerPending()) roundLimit++; // a message arrived on the last round: answer it
+    else if (round === roundLimit && !readOnly && wantsEdit(task) && !mutated && !heldOff && struggling("it used all " + roundLimit + " rounds without changing anything")) return struggleResult();
     else if (round === roundLimit) {
       emit({ type: "status", text: "Reached " + roundLimit + " rounds — asking for a wrap-up" });
       messages.push({ role: "user", content: subagent ? "Stop using tools. Report what you found so far." : "Stop using tools. Summarise what you did, what is verified, and what is left." });

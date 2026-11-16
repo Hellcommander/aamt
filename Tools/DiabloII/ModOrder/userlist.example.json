@@ -1,0 +1,15 @@
+{
+  "_readme": "Your own ModOrder rules. Copy this file to <D2RMM>\\modorder-userlist.json and edit it. Same format as masterlist.json: an entry with the ids of a mod the masterlist knows adds to it (lists are appended, single values such as group replace it); an entry for another mod is new. Delete the examples you do not want.",
+  "mods": [
+    {
+      "ids": ["TheAbyss"],
+      "group": "late",
+      "after": [{"tag": "conversion", "why": "it places its dungeon after the conversions' levels"}],
+      "notes": "my own note"
+    },
+    {
+      "ids": ["IncreaseMonsterDensity"],
+      "after": [{"mod": "Rebirth", "why": "I want my density, not Rebirth's"}]
+    }
+  ]
+}

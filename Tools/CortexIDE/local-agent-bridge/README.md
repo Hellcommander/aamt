@@ -1,6 +1,13 @@
-# Local Agent Bridge for CortexIDE (2.17.1)
+# Local Agent Bridge for CortexIDE (2.18.0)
 
 Turns CortexIDE into a working AI coding toolset on **local models** (vLLM / SGLang router, Ollama, any OpenAI-compatible server) **or on Claude** through the Anthropic Messages API, with file, search and shell tools, `SKILL.md` skills, `.canvas.tsx` canvases, and imported chats (including Cursor exports and agent transcripts).
+
+2.18 makes **`/compact`** (alias `/compress`) work the way Claude Code's does, and adds **auto-switching between Ollama models**:
+- **A summary built to continue from**: the model first drafts notes in `<analysis>`, then writes a `<summary>` with the request and intent, technical context, files and code (with snippets where the next step needs them), errors and fixes, approaches tried, **every user message**, pending tasks, the current work and the next step. Only the summary is kept. `/compact <focus>` steers it, and a `## Compact instructions` section in `AGENTS.md` / `CLAUDE.md` / project rules applies to every compaction.
+- **Auto-compact**: before a turn, a chat whose carried-over history would fill more than `localAgentBridge.agent.autoCompactPercent` (default 60) of the model's context window is compacted first; your message then runs on the summary. Messages sent meanwhile wait; if you stop it, your message goes back into the input box. Chats on the Claude Code engine compact themselves.
+- **The working set carries over**: the open todo list and the files the chat was working with (newest edits first) go into the new context, with a note to read them again before editing.
+- **A boundary in the chat**: "Conversation compacted · N turns summarised" with the summary under *Show summary*; messages above it stay visible but dimmed, since the model no longer gets them.
+- **Auto-switch on Ollama** (`localAgentBridge.agent.autoSwitch`, on by default): a model that clearly is not up to the request (it cannot call tools, keeps announcing instead of acting, keeps failing edits on one file, loops on repeated output, spends its whole budget thinking twice, looks around for 10 rounds without a change, or uses all its rounds without changing anything) hands the request over. The next model comes from `localAgentBridge.agent.autoSwitchModels`, else the installed tool-capable models larger than the current one, coding models first. It gets the whole chat plus a handoff of what the first model tried, and the chat keeps the stronger model. At most `autoSwitchMax` (2) switches per turn.
 
 2.17.1 restyles the **Agent panel**: no speaker labels; your messages sit in a soft bubble and the agent writes plain prose; tool calls are compact lines with a status dot on a thin rail; the composer is one rounded box with the text field, chips and a round send / stop button, with the + / @ picker floating above it; the top bar and chat tabs are slimmer. See *Credits* for where the look comes from.
 

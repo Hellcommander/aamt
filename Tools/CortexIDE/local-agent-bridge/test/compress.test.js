@@ -76,3 +76,47 @@ test("summaryMessages asks for brief old work and detailed recent work, with the
   assert.ok(/most recent turns in much greater detail/.test(m[1].content));
   assert.ok(m[1].content.includes("TRANSCRIPT") && m[1].content.includes("the build script"));
 });
+
+test("the summary request: structured sections, every user message, compact instructions", () => {
+  const t = c.buildTranscript({ log: [...turn(1), ...turn(2)] }, {});
+  assert.ok(/## Every message from the user \(oldest first\)\n- \(1\) task 1/.test(t.text), t.text.slice(-400));
+  const m = c.summaryMessages(t.text, "", { instructions: "Always list the failing tests." });
+  for (const sec of ["Request and intent", "Files and code", "Errors and fixes", "User messages", "Pending tasks", "Current work", "Next step"]) assert.ok(m[1].content.includes(sec), sec);
+  assert.ok(/<analysis>/.test(m[1].content) && /<summary>/.test(m[1].content));
+  assert.ok(m[1].content.includes("Always list the failing tests."));
+});
+
+test("extractSummary keeps the <summary> block and drops reasoning and <analysis>", () => {
+  assert.strictEqual(c.extractSummary("<think>hm</think><analysis>notes</analysis>\n<summary>\nTHE SUMMARY\n</summary>"), "THE SUMMARY");
+  assert.strictEqual(c.extractSummary("<analysis>notes</analysis>plain summary"), "plain summary", "no summary tags");
+  assert.strictEqual(c.extractSummary("<summary>cut off at the limit"), "cut off at the limit");
+  assert.strictEqual(c.extractSummary("just text"), "just text");
+});
+
+test("compactInstructions reads its section from project rules", () => {
+  const rules = "# Project\nstuff\n## Compact instructions\nKeep test output.\n### Detail\nand paths\n## Build\nnpm test";
+  assert.strictEqual(c.compactInstructions(rules), "Keep test output.\n### Detail\nand paths");
+  assert.strictEqual(c.compactInstructions("# nothing here"), "");
+});
+
+test("the summary history carries the open todos and working files, and the raw summary", () => {
+  const files = c.workingFiles({ edited: [["a.js", "edited"], ["b.js", "created"]], read: ["c.js", "a.js"] });
+  assert.deepStrictEqual(files, ["b.js", "a.js", "c.js"], "newest edits first, then reads, no repeats");
+  const h = c.summaryHistory("SUM", 3, { todos: [{ content: "write tests", status: "pending" }, { content: "done", status: "completed" }], files, auto: true });
+  assert.ok(/automatically/.test(h[0].content) && /write tests/.test(h[0].content) && !/\] done/.test(h[0].content) && /b\.js/.test(h[0].content));
+  assert.strictEqual(h[0].raw, "SUM");
+  const t = c.buildTranscript({ log: turn(4), history: h }, {});
+  assert.ok(t.text.includes("## Summary from an earlier /compress\nSUM\n"), "a later compaction carries only the summary forward");
+});
+
+test("autoCompactDue: history share of the context window, never for a near-empty chat", () => {
+  const msg = (role, n) => ({ role, content: "x".repeat(n) });
+  const one = [msg("user", 3000), msg("assistant", 3000)];
+  assert.strictEqual(c.autoCompactDue(one, 1000, 10), false, "one turn is not worth summarising");
+  const many = [];
+  for (let i = 0; i < 10; i++) many.push(msg("user", 3000), msg("assistant", 3000));
+  assert.strictEqual(c.historyTokens(many), Math.ceil(60000 / 3.5));
+  assert.strictEqual(c.autoCompactDue(many, 24000, 60), true, "~17k of 24k tokens");
+  assert.strictEqual(c.autoCompactDue(many, 128000, 60), false);
+  assert.strictEqual(c.autoCompactDue(many, 24000, 0), false, "0 turns it off");
+});

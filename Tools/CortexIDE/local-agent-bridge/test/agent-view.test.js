@@ -19,7 +19,8 @@ after(() => {
   fs.rmSync(ws, { recursive: true, force: true });
 });
 
-const stub = install({ workspace: ws, settings: { "localAgentBridge.agent.provider": "vllm", "localAgentBridge.agent.maxParallel": 2 } });
+const settings = { "localAgentBridge.agent.provider": "vllm", "localAgentBridge.agent.maxParallel": 2 };
+const stub = install({ workspace: ws, settings });
 // A chat saved by 2.6 (one conversation in workspaceState).
 stub.workspaceState.set("localAgentBridge.agent.conversation", {
   log: [{ cls: "user", text: "Old question from 2.6" }, { cls: "assistant", text: "old answer" }],
@@ -465,4 +466,65 @@ test("/compress replaces the chat's history with a summary; the next turn is sen
   await provider.send("/compact", b.id);
   assert.ok(!waiting.has("m-y"));
   assert.strictEqual(provider.store().get(b.id) ? provider.store().get(b.id).history.length : 0, 0);
+});
+
+test("auto-compact: a history near the context limit is compacted first, then the message runs on the summary", async () => {
+  const a = provider.createSession({ model: "m-q" });
+  const done = (text) => () => ({ content: "", tool_calls: [{ id: "c", type: "function", function: { name: "attempt_completion", arguments: JSON.stringify({ summary: text }) } }] });
+  scripted.set("m-q", [done("answer one " + "a".repeat(900)), done("answer two " + "b".repeat(900))]);
+  await provider.send("first task about parser.js", a.id);
+  await provider.send("second task about lexer.js", a.id);
+  settings["localAgentBridge.agent.autoCompactPercent"] = 1; // 1% of 32k tokens: the two turns are over it
+  const reqs = [];
+  scripted.set("m-q", [
+    (req) => (reqs.push(req), { content: "<analysis>notes</analysis><summary>AUTO SUMMARY of parser and lexer</summary>", tool_calls: [] }),
+    (req) => (reqs.push(req), done("answer three")()),
+  ]);
+  await provider.send("third task", a.id);
+  for (let i = 0; i < 50 && reqs.length < 2; i++) await new Promise((r) => setTimeout(r, 20));
+  for (let i = 0; i < 50 && provider.runs.has(a.id); i++) await new Promise((r) => setTimeout(r, 20));
+  delete settings["localAgentBridge.agent.autoCompactPercent"];
+  assert.strictEqual(reqs.length, 2, "a summary call, then the turn");
+  assert.ok(!reqs[0].tools && /<transcript>/.test(reqs[0].messages[1].content), "first call is the summary");
+  const sent = reqs[1].messages.map((m) => String(m.content)).join("\n");
+  assert.ok(/AUTO SUMMARY/.test(sent) && !/answer one/.test(sent) && !/<analysis>/.test(sent), "the turn gets the summary, not the old history");
+  assert.ok(/third task/.test(sent));
+  const s = provider.store().get(a.id);
+  const row = s.log.find((e) => e.cls === "compact");
+  assert.ok(row && row.auto && row.turns === 2, JSON.stringify(row));
+  assert.ok(s.log.findIndex((e) => e.cls === "compact") < s.log.findIndex((e) => e.cls === "user" && e.text === "third task"), "boundary before the message");
+});
+
+test("auto-switch: a struggling Ollama model hands the request to a stronger one, which reads the chat and the attempt", async () => {
+  const saved = { discover: llm.discover, cands: llm.ollamaSwitchCandidates, advice: llm.ollamaToolAdvice, vision: llm.supportsVision };
+  llm.discover = async (o) => (o.provider === "ollama" ? { provider: "ollama", label: "Ollama", baseUrl: "http://oll", models: ["weak:8b", "strong:14b"] } : saved.discover(o));
+  llm.ollamaSwitchCandidates = async (base, current, { exclude }) => ["strong:14b"].filter((m) => !exclude.includes(m));
+  llm.ollamaToolAdvice = async () => "";
+  llm.supportsVision = async () => false;
+  try {
+    const s0 = provider.createSession({ provider: "ollama", baseUrl: "http://oll", model: "weak:8b" });
+    scripted.set("weak:8b", [() => ({ content: "parser.js tokenises the input with a hand-written lexer.", tool_calls: [] })]);
+    await provider.send("what does parser.js do?", s0.id);
+    // The edit request: the weak model only announces, so it is reminded until it counts as struggling.
+    scripted.set("weak:8b", Array.from({ length: 8 }, () => () => ({ content: "I will fix the bug in parser.js now.", tool_calls: [] })));
+    let handed = null;
+    const target = path.join(ws, "parser-fix.js");
+    scripted.set("strong:14b", [
+      (req) => ((handed = req), { content: "", tool_calls: [{ id: "w", type: "function", function: { name: "Write", arguments: JSON.stringify({ path: target, contents: "fixed\n" }) } }] }),
+      () => ({ content: "", tool_calls: [{ id: "d", type: "function", function: { name: "attempt_completion", arguments: JSON.stringify({ summary: "fixed by strong" }) } }] }),
+    ]);
+    await provider.send("fix the bug in parser.js", s0.id);
+    for (let i = 0; i < 100 && provider.runs.has(s0.id); i++) await new Promise((r) => setTimeout(r, 20));
+    assert.ok(handed, "the stronger model ran");
+    const sent = handed.messages.map((m) => String(m.content)).join("\n");
+    assert.ok(/hand-written lexer/.test(sent), "it reads the earlier chat");
+    assert.ok(/\[Handoff\] Another model \(weak:8b\)/.test(sent) && /I will fix the bug/.test(sent), "and the weak model's attempt: " + sent.slice(-1500));
+    const s = provider.store().get(s0.id);
+    assert.strictEqual(s.model, "strong:14b", "the chat keeps the stronger model");
+    assert.ok(s.log.some((e) => e.switched && e.switched.from === "weak:8b" && e.switched.to === "strong:14b"));
+    assert.strictEqual(fs.readFileSync(target, "utf8"), "fixed\n");
+    assert.ok(s.history.some((h) => /fixed by strong/.test(h.content)));
+  } finally {
+    Object.assign(llm, { discover: saved.discover, ollamaSwitchCandidates: saved.cands, ollamaToolAdvice: saved.advice, supportsVision: saved.vision });
+  }
 });

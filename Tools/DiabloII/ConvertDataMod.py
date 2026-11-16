@@ -661,6 +661,7 @@ const PARAM_OF = [
   [/^((?:[bc] )?mod \d+)$/, (m) => m[1] + ' param'], [/^(\w+Mod\d)Code$/, (m) => m[1] + 'Param'],
 ];
 const TARGET_FIRST = ['missiles.txt', 'skills.txt', 'states.txt', 'itemstatcost.txt', 'monstats.txt', 'lvlwarp.txt', 'levels.txt'];
+// (cubemain.txt is not a target; it comes after these, so its portal levels see where levels went.)
 
 function folderOf(path) {
   return path.slice(0, path.lastIndexOf('\\') + 1);
@@ -688,6 +689,15 @@ function remap(path, cells, full) {
       if (col.test(h)) cells[h] = moved(dir + target, cells[h]);
     });
   });
+  // A cube recipe that opens a portal names the level in its output ("Red Portal,lvl=139"): that
+  // number moves with the mod's levels too.
+  if (/^cubemain\.txt$/i.test(name)) {
+    Object.keys(cells).forEach((h) => {
+      const v = cells[h] == null ? '' : String(cells[h]);
+      if (!/^output( [bc])?$/i.test(h) || !/portal/i.test(v.split(',')[0])) return;
+      cells[h] = v.replace(/(^|,)(\s*lvl\s*=\s*)(\d+)/gi, (m, a, b, n) => a + b + moved(dir + 'levels.txt', n));
+    });
+  }
   Object.keys(full).forEach((code) => {
     const rule = PARAM_OF.find(([re]) => re.test(code));
     if (!rule) return;

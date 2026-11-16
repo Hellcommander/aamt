@@ -1,0 +1,262 @@
+{
+  "_readme": "ModOrder masterlist: what is known about D2RMM mods, so ModOrder.js can sort a mod list and warn about it (like LOOT's masterlist). One entry per mod. ids = D2RMM folder names it goes by (first = usual); names = mod.json names that identify a renamed folder. checked = the version the rules were written against. group = whole-file | top | early | default | late | patch | final (a mod never sorts above a lower group; whole-file mods copy entire tables, so they go first and every other mod, conversions included, patches their copy). after/before = {mod|tag, why, if}: when both are ticked. requires = {mod|plugin, min, why, if, level}: plugin = the DLL name without .dll as D2RMM imports it into d2rloader\\. incompatible = {mod, why}. messages = {level: error|warn|info, text, if}. if = {ticked:[ids], notTicked:[ids], config:{key:value}} (all must hold). tags: 'conversion' (a data mod converted by the toolkit), 'skill-pages' (adds SkillTab4 pages), 'stock-lookup' (looks up plain-game rows by name: goes above the conversions, which rename or replace them). Players add their own rules in <D2RMM>\\modorder-userlist.json (same format; its entries are merged over these).",
+  "version": 1,
+  "updated": "2026-11-16",
+  "groups": ["whole-file", "top", "early", "default", "late", "patch", "final"],
+  "mods": [
+    {
+      "ids": ["Classless"], "names": ["Classless"], "author": "Megashadow1121", "group": "top",
+      "before": [{"tag": "conversion", "why": "its plugin uses fixed rows (skill copies from 429, stats from 368): nothing may add rows before it"}],
+      "notes": "Its plugin (classless-skills.dll) uses fixed rows: skill copies from row 429, stats from row 368, so it has to be the very first mod.",
+      "messages": [{"level": "warn", "text": "Classless copies every class skill into fixed rows; mods that rebuild skills.txt (Reimagined, Rebirth, Frankenstein) move them. Classless Pages does the same job without copies."}],
+      "requires": [{"plugin": "classless-skills", "why": "the Classless plugin"}],
+      "incompatible": [{"mod": "ClasslessPages", "why": "two ways of learning other classes' skills; use one"}]
+    },
+    {
+      "ids": ["Rebirth"], "checked": "3.0.1b", "author": "jb-5th", "group": "top", "tags": ["conversion"],
+      "after": [{"mod": "Reimagined", "why": "with rows 'keep' Rebirth's 4 new levels (138-141) move behind Reimagined's at install time, with its level presets and portal recipes (converter 2026-11-16)"}],
+      "notes": "Converted with rows 'keep' since 2026-11-16 (was 'rebuild'): rows stay where they are, its new rows and levels follow the mods above.",
+      "messages": [{"level": "error", "text": "Its Load order > Rows setting is 'rebuild': its levels 138-141 then land on Reimagined's. Set Rows to 'keep' and put it below Reimagined.", "if": {"ticked": ["Reimagined"], "config": {"loadorderRows": "rebuild"}}}],
+      "incompatible": [
+        {"mod": "VanillaDeluxe", "why": "both put their new levels on the same level numbers (from 137)"}
+      ]
+    },
+    {
+      "ids": ["Reimagined"], "checked": "3.1.1", "author": "ScottieKnowz", "group": "top", "tags": ["conversion"],
+      "after": [{"tag": "stock-lookup", "why": "that mod looks up plain-game skills by name, which Reimagined renames or replaces"}],
+      "notes": "Converted with rows 'keep'. Ships whole player state machines and a whole animdata.d2. Replaces 19 stock skills in their rows (Confuse -> Corpse Field, Power Strike -> Toxic Whirl, Psychic Hammer -> Ice Barrage...) and renames 89 uniques and 14 set items.",
+      "messages": [{"level": "info", "text": "Necromancer V1.6 is above it: tick its setting 'Necromancer V1.6 above: keep its Necromancer changes' so its other Necromancer changes stay.", "if": {"ticked": ["Necromancer_V1.6"], "config": {"listNecromancerV16": false}}}],
+      "incompatible": [
+        {"mod": "VanillaDeluxe", "why": "both put their new levels on the same level numbers (VanillaDeluxe 137-294, Reimagined 138-165)"},
+        {"mod": "FrankensteinMod", "why": "both put their new levels on the same level numbers (Frankenstein 138-259, Reimagined 138-165)"}
+      ]
+    },
+    {
+      "ids": ["VanillaDeluxe"], "author": "", "group": "top", "tags": ["conversion"],
+      "notes": "Its d2rl-maps.dll calibrates against its own level and cube layout.",
+      "incompatible": [{"mod": "FrankensteinMod", "why": "both put their new levels on the same level numbers (VanillaDeluxe 137-294, Frankenstein 138-259)"}]
+    },
+    {
+      "ids": ["FrankensteinMod"], "names": ["FMMP-Experimental-R67"], "author": "", "group": "top", "tags": ["conversion"],
+      "after": [{"mod": "Necromancer_V1.6", "why": "Necromancer_V1.6 looks for Poison Dagger, which Frankenstein renames to Poison Weapon"}],
+      "messages": [{"level": "error", "text": "FMMP 0.11.0-test (fmmp-reward-fixes.dll) crashed the game on every weapon hit (call to address 0, 2026-11-15). Test weapon hits before playing with a newer FMMP."}],
+      "incompatible": [{"mod": "PoisonWeapon", "why": "Frankenstein already turns Poison Dagger into Poison Weapon, so Poison Weapon stops"}]
+    },
+    {
+      "ids": ["FrankensteinSkillPages"], "author": "Arendeth",
+      "requires": [{"mod": "FrankensteinMod", "why": "Frankenstein's skill rules on the page skills"}],
+      "after": [{"tag": "skill-pages", "why": "applies Frankenstein's rules to every page skill"}, {"mod": "DualThrow", "why": "it changes the skills Dual Throw touches"}]
+    },
+    {
+      "ids": ["ClasslessFinish"], "author": "Arendeth", "group": "final",
+      "requires": [{"mod": "Classless", "why": "it completes Classless"}],
+      "after": [{"tag": "skill-pages", "why": "it empties the stock trees the page skills are placed by"}, {"mod": "AllDruidSpiritsAndVinesTogetherWithBuffedAuras", "why": "it has to see the Druid summons as changed"}]
+    },
+    {
+      "ids": ["ClasslessPages"], "checked": "0.1.0", "author": "Arendeth", "group": "late",
+      "after": [{"tag": "skill-pages", "why": "it builds its pages after the mods that add skills"}, {"tag": "conversion", "why": "it reads the trees the conversion leaves"}],
+      "requires": [
+        {"plugin": "skilltab4", "min": "0.8.0", "why": "draws the pages"},
+        {"plugin": "classlesspages", "min": "0.1.0", "why": "lets every class use the other trees and raises the per-save skill limit"},
+        {"plugin": "assetmerge", "min": "0.2.0", "why": "the animation remapper's '?source' rows"}
+      ],
+      "messages": [{"level": "info", "text": "Use new characters. Legacy (2D) graphics are not covered by the animation remapper."}]
+    },
+    {
+      "ids": ["SkillTabLayout"], "checked": "0.1.0", "author": "Arendeth", "group": "final",
+      "after": [{"tag": "skill-pages", "why": "it moves the tabs of every page mod above it"}, {"mod": "ClasslessPages", "why": "it moves the tabs Classless Pages adds"}],
+      "requires": [{"plugin": "skilltab4", "min": "0.8.0", "why": "hides the plates of pages a class does not have"}]
+    },
+    {
+      "ids": ["HdArtMatch"], "checked": "1.0.0", "author": "D2NX", "group": "final",
+      "notes": "Install it last; rerun HdMatch.py build after adding mods with their own sprites."
+    },
+    {
+      "ids": ["BestOf"], "checked": "3.0.0", "author": "Arendeth", "group": "patch",
+      "notes": "The compatibility patch: repairs what the mods above leave clashing."
+    },
+    {
+      "ids": ["BestOfEarly"], "checked": "1.0.0", "author": "Arendeth",
+      "requires": [{"mod": "BestOf", "why": "Best Of puts back what the early part changes"}],
+      "before": [{"mod": "CharmingVendors", "why": "Charming Vendors stops on VanillaDeluxe's hidden skills without a required level", "if": {"ticked": ["VanillaDeluxe"]}}],
+      "messages": [{"level": "info", "text": "Only needed with VanillaDeluxe and Charming Vendors together.", "if": {"notTicked": ["VanillaDeluxe"]}}]
+    },
+    {
+      "ids": ["CharmingVendors"], "checked": "1.1.0", "author": "Tim / OpenAI",
+      "requires": [{"mod": "BestOfEarly", "why": "it stops on VanillaDeluxe's 8 vd_hidden_* skills (no required level); Best Of (early part) sets one for it", "if": {"ticked": ["VanillaDeluxe"]}}],
+      "messages": [{"level": "info", "text": "It adds a charm affix per class skill; with many skill page mods the affix count can pass the 2047-affix limit of save files."}]
+    },
+    {
+      "ids": ["Better and New Unique Items"], "checked": "1.0", "author": "NudeMortals", "group": "whole-file",
+      "files": ["global\\excel\\uniqueitems.txt", "local\\lng\\strings\\item-names.json"],
+      "notes": "Copies its whole uniqueitems.txt and item-names.json: every change a mod above made to them is lost, so it goes right below the conversions and the mods below patch its copy."
+    },
+    {
+      "ids": ["FaillesEnChaine"], "checked": "0.6.10+riftlimits.1", "author": "Automatic Rifts", "group": "late",
+      "notes": "Automatic Rifts' data half; it wants to be below every mod that adds levels, monsters or superuniques.",
+      "requires": [
+        {"plugin": "d2rl-rift-atmospheres", "why": "the Automatic Rifts plugin (it refuses to load without this mod, and this mod does nothing without it)"},
+        {"plugin": "riftlimits", "why": "named superuniques on big mod lists", "level": "warn"}
+      ]
+    },
+    {
+      "ids": ["ResistCurve"], "checked": "0.1.0", "author": "Arendeth",
+      "requires": [{"plugin": "resistcurve", "why": "without it the mod only changes some text"}],
+      "incompatible": [{"mod": "RemoveMonsterImmunities", "why": "monster resistances are lowered twice (Best Of drops Resistance Curve's monster curve when both are on; better untick Remove Monster Immunities)", "level": "warn"}]
+    },
+    {"ids": ["RemoveMonsterImmunities"], "checked": "1.2", "author": "olegbl"},
+    {"ids": ["PoisonWeapon"], "checked": "0.2.0", "author": "DevilInLaw"},
+    {
+      "ids": ["AllDruidVinesTogetherWithBuffedAuras"], "checked": "1.0.13", "author": "luciano96369",
+      "incompatible": [{"mod": "AllDruidSpiritsAndVinesTogetherWithBuffedAuras", "why": "they change the same Druid skills; All Druid Spirits And Vines does the same and more", "level": "warn"}]
+    },
+    {"ids": ["AllDruidSpiritsAndVinesTogetherWithBuffedAuras"], "checked": "1.0.5", "author": "luciano96369"},
+    {
+      "ids": ["Necromancer_V1.6"], "checked": "1.6", "author": "Paul", "group": "top", "tags": ["stock-lookup"],
+      "before": [{"tag": "conversion", "why": "it looks up plain-game Necromancer skills by name (Confuse, Poison Dagger), which the conversions rename or replace; above them it finds them (harness 2026-11-16: no failure above Reimagined)"}],
+      "notes": "Looks up Necromancer skills by name (Confuse, Poison Dagger)."
+    },
+    {
+      "ids": ["QuillRatDruid"], "checked": "1.33.1", "author": "Arendeth", "tags": ["skill-pages"],
+      "after": [{"mod": "RevampedSynergies Druid", "why": "keep it below Revamped Synergies Druid"}],
+      "notes": "Replaces animdata.d2 and ships the HD model index that Giant Raven and Wild Boar extend.",
+      "requires": [
+        {"plugin": "skilltab4", "min": "0.4.1", "why": "the second Shape Shifting page (not needed in replace mode)", "level": "warn"},
+        {"plugin": "assetmerge", "why": "the Quill Bear's body in the model index and its extra modes"},
+        {"plugin": "petai", "why": "its summons' rules", "level": "warn"}
+      ]
+    },
+    {
+      "ids": ["DruidGiantRaven"], "checked": "0.2.2", "author": "Arendeth", "tags": ["skill-pages"],
+      "after": [{"mod": "QuillRatDruid", "why": "its model index includes Quill Rat's models"}],
+      "requires": [{"plugin": "skilltab4", "min": "0.5.0"}, {"plugin": "assetmerge", "why": "the raven body is only drawn if the model index lists it"}]
+    },
+    {
+      "ids": ["DruidWildBoar"], "checked": "0.1.3", "author": "Arendeth", "tags": ["skill-pages"],
+      "after": [{"mod": "QuillRatDruid", "why": "its model index includes Quill Rat's models"}, {"mod": "DruidGiantRaven", "why": "its model index includes Giant Raven's models"}],
+      "requires": [{"plugin": "skilltab4", "min": "0.5.0"}, {"plugin": "assetmerge", "why": "adds the boar to the models the game draws"}]
+    },
+    {
+      "ids": ["DualThrow"], "checked": "0.1.0", "author": "Arendeth",
+      "after": [
+        {"mod": "AssassinAlchemyTools", "why": "it changes Alchemy Tools' skills"},
+        {"mod": "AssassinKnifeArts", "why": "it changes Knife Arts' skills"},
+        {"mod": "QuillRatDruid", "why": "its animdata.d2 carries Quill Rat's entries"}
+      ],
+      "requires": [{"plugin": "dualthrow", "min": "0.2.0", "why": "without it the game refuses a second thrown weapon"}, {"plugin": "assetmerge"}]
+    },
+    {"ids": ["DarknessMagicNecro"], "checked": "3.0.2", "author": "Arendeth", "tags": ["skill-pages"], "requires": [{"plugin": "skilltab4", "min": "0.3.0"}]},
+    {"ids": ["SorceressSecondPages"], "checked": "2.9.1", "author": "Arendeth", "tags": ["skill-pages"], "requires": [{"plugin": "skilltab4", "min": "0.3.0"}]},
+    {"ids": ["BarbarianSpiritsShaman"], "checked": "0.1.4", "author": "Arendeth", "tags": ["skill-pages"], "requires": [{"plugin": "skilltab4", "min": "0.4.1"}]},
+    {"ids": ["AmazonBloodMagic"], "checked": "0.3.3", "author": "Arendeth", "tags": ["skill-pages"], "requires": [{"plugin": "skilltab4", "min": "0.4.0"}, {"plugin": "bloodcost", "why": "the life costs"}]},
+    {"ids": ["AssassinAlchemyTools"], "checked": "0.4.4", "author": "Arendeth", "tags": ["skill-pages"], "requires": [{"plugin": "skilltab4", "min": "0.4.1"}, {"plugin": "alchemy", "min": "0.4.0", "why": "mixes the bombs"}]},
+    {"ids": ["AssassinKnifeArts"], "checked": "0.2.4", "author": "Arendeth", "tags": ["skill-pages"], "requires": [{"plugin": "skilltab4", "min": "0.4.1"}]},
+    {"ids": ["DruidPoisonDisaster"], "checked": "1.1.4", "author": "Arendeth", "tags": ["skill-pages"], "requires": [{"plugin": "skilltab4", "min": "0.4.1"}, {"plugin": "petai", "why": "its summons' rules"}]},
+    {"ids": ["DruidWeatherMagic"], "checked": "0.1.2", "author": "Arendeth", "tags": ["skill-pages"], "requires": [{"plugin": "skilltab4", "min": "0.5.0"}, {"plugin": "weather", "min": "0.1.0"}]},
+    {
+      "ids": ["DruidSummoningRunecaster"], "checked": "0.1.1", "author": "Arendeth", "tags": ["skill-pages"],
+      "requires": [{"plugin": "skilltab4", "min": "0.7.0"}, {"plugin": "runecaster", "min": "0.1.0", "why": "ley lines, Invoke and Draw Rune", "level": "warn"}, {"plugin": "skilllimits", "why": "with all page mods the new skills' rows are past 511", "level": "warn"}]
+    },
+    {
+      "ids": ["DruidWildSpirits"], "checked": "0.4.0", "author": "Arendeth", "tags": ["skill-pages"],
+      "requires": [{"plugin": "skilltab4", "min": "0.7.0"}, {"plugin": "bloodmoon", "min": "0.1.0", "why": "Blood Howl, Earthen Hide, Lacerate, Spirit Pack and Dire Moon", "level": "warn"}, {"plugin": "skilllimits", "level": "warn"}]
+    },
+    {
+      "ids": ["WarlockArchetypes"], "checked": "0.4.5", "author": "Arendeth", "tags": ["skill-pages"],
+      "requires": [{"plugin": "skilltab4", "min": "0.6.0"}, {"plugin": "warlockpact", "min": "0.6.1", "why": "Pact and Possess"}, {"plugin": "petai", "why": "its pets' rules"}]
+    },
+    {
+      "ids": ["NecromancerRathma"], "checked": "0.2.1", "author": "Arendeth", "tags": ["skill-pages"],
+      "requires": [
+        {"plugin": "skilltab4", "min": "0.7.0"},
+        {"plugin": "petai", "min": "0.5.0", "why": "Command the Dead", "level": "warn"},
+        {"plugin": "rathma", "min": "0.1.0", "why": "Blood Orbs (turn the bloodOrbs option off without it)", "if": {"config": {"bloodOrbs": true}}},
+        {"plugin": "skilllimits", "level": "warn"}
+      ]
+    },
+    {
+      "ids": ["BarbarianBerserker"], "checked": "0.3.0", "author": "Arendeth", "tags": ["skill-pages"],
+      "requires": [{"plugin": "skilltab4", "min": "0.7.0"}, {"plugin": "skilllimits", "level": "warn"}]
+    },
+    {
+      "ids": ["AssassinRogue"], "checked": "0.2.0", "author": "Arendeth", "tags": ["skill-pages"],
+      "requires": [{"plugin": "skilltab4", "min": "0.7.0"}, {"plugin": "petai", "min": "0.5.0", "why": "the Seneschal's Governing Stones", "level": "warn"}, {"plugin": "skilllimits", "level": "warn"}]
+    },
+    {
+      "ids": ["PaladinOaths"], "checked": "0.2.1", "author": "Arendeth", "tags": ["skill-pages"],
+      "requires": [{"plugin": "skilltab4", "min": "0.7.0"}, {"plugin": "paladinoaths", "why": "Sequence and Judge (routines 182, 183)"}, {"plugin": "skilllimits", "level": "warn"}]
+    },
+    {
+      "ids": ["SorceressElementalist"], "checked": "0.1.1", "author": "Arendeth", "tags": ["skill-pages"],
+      "requires": [{"plugin": "skilltab4", "min": "0.7.0"}, {"plugin": "enchantments", "why": "the enchantments option", "if": {"config": {"enchantments": true}}}, {"plugin": "skilllimits", "level": "warn"}]
+    },
+    {
+      "ids": ["AmazonSpiritborn"], "checked": "0.1.1", "author": "Arendeth", "tags": ["skill-pages"],
+      "requires": [{"plugin": "skilltab4", "min": "0.7.0"}, {"plugin": "skilllimits", "level": "warn"}, {"plugin": "statelimits", "why": "with many page mods states.txt passes 511", "level": "warn"}]
+    },
+    {
+      "ids": ["SkillPageIcons"], "checked": "1.1.0", "author": "Arendeth", "group": "late",
+      "after": [{"mod": "D2RMM_Custom_Icon_Pack_With_Editor", "why": "it builds on the icon pack"}, {"tag": "skill-pages", "why": "it gives the page skills their icons"}]
+    },
+    {"ids": ["D2RMM_Custom_Icon_Pack_With_Editor"], "checked": "3.2", "author": "Paul j"},
+    {
+      "ids": ["ItemDictionary"], "checked": "2.12", "author": "강낭땅콩"
+    },
+    {
+      "ids": ["LootGuideCompanion"], "checked": "1.0.0", "author": "ArcBeez3",
+      "requires": [{"mod": "ItemDictionary", "why": "it extends Item Dictionary's Help menu"}],
+      "after": [{"mod": "ItemDictionary", "why": "it extends Item Dictionary's Help menu"}]
+    },
+    {
+      "ids": ["PaladinShieldsForAll", "PaladinShieldsForAll-1089-1-0-0-1779344490"], "checked": "1.0.0", "author": "start03"
+    },
+    {"ids": ["RelicsOfSanctuary"], "checked": "3.5.0", "author": "Cpp"},
+    {"ids": ["Better Body Armors__Shields__Weapons"], "checked": "1.0", "author": "NudeMortals", "group": "whole-file", "files": ["global\\excel\\armor.txt", "global\\excel\\weapons.txt", "local\\lng\\strings\\item-modifiers.json"], "notes": "Copies its whole armor.txt, weapons.txt and item-modifiers.json: what the mods above changed in them is lost (conversions included), so it goes right below the top group."},
+    {"ids": ["RevampedSynergies Amazon"], "checked": "1.1c", "author": "Sadie227"},
+    {"ids": ["RevampedSynergies Assassin"], "checked": "1.0", "author": "Sadie227"},
+    {"ids": ["RevampedSynergies Barbarian"], "checked": "1.1c", "author": "Sadie227"},
+    {"ids": ["RevampedSynergies Druid"], "checked": "1.0d", "author": "Sadie227"},
+    {"ids": ["RevampedSynergies Necromancer"], "checked": "1.0b", "author": "Sadie227", "notes": "Adds its golem pet types once per pet type already there (dozens of copies with other mods); Best Of keeps one row each."},
+    {"ids": ["RevampedSynergies Paladin"], "checked": "1.1c", "author": "Sadie227"},
+    {"ids": ["RevampedSynergies Sorceress"], "checked": "1.1d", "author": "Sadie227"},
+    {"ids": ["Revamped Charms"], "checked": "1.1", "author": "Sadie227"},
+    {"ids": ["Inventory10x8"], "checked": "1.1.0", "author": "Bandit"},
+    {"ids": ["FastLeveling"], "checked": "1.0.1", "author": "Arendeth"},
+    {"ids": ["Clavis socket 1.1"], "checked": "1.1.0", "author": "johnnygrs"},
+    {"ids": ["AdvancedStatsColors"], "checked": "1.3.2", "author": "Bandit"},
+    {"ids": ["AkaraRuneMaster"], "checked": "1.0", "author": "dk"},
+    {"ids": ["CountessRuneDropFix"], "checked": "1.0", "author": "pulsereaction"},
+    {"ids": ["DungeonPortal"], "checked": "1.1", "author": "Paul J"},
+    {"ids": ["EasierDiabloCloneEvent"], "checked": "1.0.1", "author": "luciano96369"},
+    {"ids": ["GambleClassItems_CH"], "checked": "1.8.0", "author": "CelticHound"},
+    {"ids": ["GeneratedRunewords"], "checked": "1.0.1", "author": "Emu"},
+    {"ids": ["ImprovedThunderstorm"], "checked": "1.2", "author": "duffbeeeer"},
+    {"ids": ["IncreaseMonsterDensity"], "checked": "1.1", "author": "olegbl"},
+    {"ids": ["IncreaseStackSize"], "checked": "1.4", "author": "olegbl"},
+    {"ids": ["MagicQuivers"], "checked": "1.3", "author": "daedalus_pl"},
+    {"ids": ["MeleeAreaDamage"], "checked": "1.4", "author": "olegbl"},
+    {"ids": ["More Mercenary Weapons"], "checked": "1.3", "author": "Iodine131"},
+    {"ids": ["OrbValues"], "checked": "1.0.1", "author": "Bandit"},
+    {"ids": ["QoL_Map Waypoint"], "checked": "9.1complete", "author": "yinyin333333", "group": "whole-file", "files": ["local\\lng\\strings\\ui.json"], "notes": "Copies its whole ui.json string file: other mods' interface strings above it are lost."},
+    {"ids": ["RecallAllies"], "checked": "1.2", "author": "Finkster"},
+    {"ids": ["RejuvenationPotionVendor"], "checked": "1.2", "author": "erSch"},
+    {"ids": ["RunesAndGemsOnSale"], "checked": "2.1", "author": "griswd"},
+    {"ids": ["SocketPunching"], "checked": "1.3", "author": "olegbl"},
+    {"ids": ["SoloTrading"], "checked": "0.5", "author": "t.me/jstqw"},
+    {"ids": ["WiderMaggotLair"], "checked": "0.8.1", "author": "Bandit"},
+    {"ids": ["BuffedSetItems"], "checked": "1.0.5", "author": "OGGamerDude"},
+    {"ids": ["BuffedUniqueItems"], "checked": "1.0.3", "author": "OGGamerDude"},
+    {"ids": ["DruidShapeshiftTeleport"], "checked": "1.0.0", "author": "PyroSplat"},
+    {"ids": ["Enhanced effects and sounds"], "checked": "3.4", "author": "anwjrzlffj"},
+    {"ids": ["ExpandedCube"], "checked": "1.5", "author": "olegbl"},
+    {"ids": ["RichMerchants"], "checked": "1.0", "author": "deo"},
+    {"ids": ["ShowItemLevel"], "checked": "1.4", "author": "olegbl"},
+    {"ids": ["SuperVendors"], "checked": "1.0.1", "author": "Garrett HE"},
+    {"ids": ["Better Duriel Drop"], "checked": "1.1", "author": "iodine131"},
+    {"ids": ["BossesAlwaysDropUniqueAndSetItems"], "checked": "1.0.1", "author": "OGGamerDude"},
+    {"ids": ["ChestsAreBoring"], "checked": "0.1.0", "author": "czubai"},
+    {"ids": ["GlyphLootFilter"], "checked": "1.0", "author": "levinium"},
+    {"ids": ["Travincal Fix"], "checked": "1.0", "author": "Ubeogesh"},
+    {"ids": ["Quest Rewards"], "checked": "1.0.0", "author": "wild-healer"}
+  ]
+}

@@ -833,6 +833,7 @@ console.log(`HD: ${[...record.written].filter((k) => /^hd\/missiles\/.+\.json$/.
     nearrules: ['monster', 'near', 'dist', 'slot', 'cooldown'],
     springrules: ['monster', 'trigger', 'dist', 'skill', 'levelskill', 'count'],
     commandrules: ['skill', 'monster', 'slot', 'range', 'window', 'attarget'],
+    tactics: ['monster', 'dist', 'count', 'mindist', 'state', 'stateon', 'state2', 'state2on', 'life', 'ownerdist', 'action', 'slot', 'param', 'chance', 'cooldown', 'pick', 'stance'],
   };
   const PETAI_MAX_ROWS = 1024; // per table and folder since 0.6.0 (0.5.0: 256, commands 1024)
   DIRS.forEach((dir) => {
@@ -897,11 +898,20 @@ console.log(`HD: ${[...record.written].filter((k) => /^hd\/missiles\/.+\.json$/.
 
     const commands = read('commandrules');
     const bySkill = {};
+    const stancesBySkill = {};
+    const stancesKnown = new Set();
     (commands ? commands.rows : []).forEach((r) => {
       const mon = monsters[r.monster];
       const skill = skillRows[r.skill];
-      if (r.skill === 0 || r.slot > 10 || r.window > 750) return bad(`${commands.where}: row ${r.n}: skill above 0, slot 0-10, window at most 750 (the plugin skips it)`);
+      const stance = r.slot === 11;
+      if (r.skill === 0 || r.slot > 11 || r.window > (stance ? 30000 : 750) || (stance && (r.attarget < 1 || r.attarget > 999))) {
+        return bad(`${commands.where}: row ${r.n}: skill above 0, slot 0-11, window at most 750 (stances 30000), a stance's attarget 1-999 (the plugin skips it)`);
+      }
       if (!skill || String(skill.srvdofunc) !== '179') return bad(`${commands.where}: row ${r.n}: skill row ${r.skill} ${skill ? `(${skill.skill}) has srvdofunc ${skill.srvdofunc || 'empty'}, not 179` : 'does not exist'}`);
+      if (stance) {
+        (stancesBySkill[skill.skill] = stancesBySkill[skill.skill] || []).push(r);
+        return;
+      }
       if (!mon) return bad(`${commands.where}: row ${r.n}: monster row ${r.monster} does not exist`);
       if (r.slot >= 1 && r.slot <= 8 && !slotSkill(mon, r.slot)) return bad(`${commands.where}: row ${r.n}: ${mon.Id} has no Skill${r.slot} with a mode`);
       if (r.attarget > 1) warn(`${commands.where}: row ${r.n}: attarget ${r.attarget} reads as 1`);
@@ -918,6 +928,55 @@ console.log(`HD: ${[...record.written].filter((k) => /^hd\/missiles\/.+\.json$/.
       const sample = rows.slice(0, 6).map((r) => `${monsters[r.monster].Id} ${what(r)}`).join(', ');
       console.log(`  ${dir} PetAI command ${name}: ${rows.length} pet kind(s)${rows.length > 64 ? ' (PetAI 0.6.0+: 0.5.0 lost most of these orders)' : ''}: ${sample}${rows.length > 6 ? ', ...' : ''}`);
     });
+    Object.keys(stancesBySkill).forEach((name) => {
+      const rows = stancesBySkill[name];
+      rows.forEach((r) => stancesKnown.add(r.attarget));
+      console.log(`  ${dir} PetAI stance skill ${name} (PetAI 0.10.0): cycles ${rows.map((r) => `stance ${r.attarget}${r.window ? ` for ${r.window} frames` : ''}`).join(' -> ')} -> none`);
+    });
+
+    // tactics.txt (PetAI 0.7.0): condition + action rows, first match per monster acts.
+    const tactics = read('tactics');
+    if (tactics) {
+      const stateRows = now(`${dir}states.txt`, 'tsv').rows.filter((r) => r.state !== 'Expansion');
+      const ON = ['', 'enemy has', 'enemy lacks', 'self has', 'self lacks', 'owner has', 'owner lacks'];
+      const ACT = ['', 'skill at the enemy', 'skill where it stands', 'rush and strike', 'hold', 'retreat', 'flank', 'return to owner', 'skill on the owner', 'kite', 'shoot', 'keep range', 'surround', 'follow owner beyond', 'guard the stance anchor beyond', 'pincer', 'orbit', 'mend below', 'sacrifice'];
+      const PICK = ['', 'the owner\'s target', 'the weakest', 'one attacking the owner', 'one attacking it', 'the one nearest the owner'];
+      const perMonster = {};
+      tactics.rows.forEach((r) => {
+        const mon = monsters[r.monster];
+        const skillAct = r.action === 1 || r.action === 2 || r.action === 8 || r.action === 17;
+        const why = !mon ? `monster row ${r.monster} does not exist`
+          : r.action < 1 || r.action > 18 ? 'action must be 1-18 (9-11: PetAI 0.8.0, 12-13: 0.9.0, 14-18: 0.10.0)'
+          : skillAct && !slotSkill(mon, r.slot) ? `${mon.Id} has no Skill${r.slot} with a mode`
+          : r.chance === 0 ? 'chance must be above 0'
+          : r.stateon > 6 || r.state2on > 6 ? 'stateon/state2on must be 0-6'
+          : (r.stateon && !stateRows[r.state]) || (r.state2on && !stateRows[r.state2]) ? 'state row does not exist'
+          : r.life > 200 ? 'life must be 0-200'
+          : [1, 3, 5, 6, 9, 10, 11, 12, 15, 16, 18].includes(r.action) && r.count === 0 ? 'this action needs an enemy: count 1 or more'
+          : r.count > 50 ? 'count at most 50'
+          : r.pick > 5 ? 'pick must be 0-5'
+          : r.stance > 1999 ? 'stance must be 0-1999' : null;
+        if (why) return bad(`${tactics.where}: row ${r.n}: ${why} (the plugin skips it)`);
+        if (!mon.AI) warn(`${tactics.where}: row ${r.n}: ${mon.Id} has no AI, so it never gets the turn tactics need`);
+        const n = (perMonster[mon.Id] = (perMonster[mon.Id] || 0) + 1);
+        const cond = [];
+        cond.push(r.dist ? (r.count ? `${r.count}+ enemies within ${r.dist}` : `no enemy within ${r.dist}`) : r.count ? 'has a target' : 'any (PetAI 0.9.0; 0.7-0.8: no target)');
+        if (r.mindist) cond.push(`enemy ${r.mindist}+ away`);
+        if (r.stateon) cond.push(`${ON[r.stateon]} ${stateRows[r.state].state}`);
+        if (r.state2on) cond.push(`${ON[r.state2on]} ${stateRows[r.state2].state}`);
+        if (r.life) cond.push(r.life > 100 ? `owner life <= ${r.life - 100}%` : `own life <= ${r.life}%`);
+        if (r.ownerdist) cond.push(`owner within ${r.ownerdist}`);
+        if (r.pick) cond.push(`pick ${PICK[r.pick]}`);
+        if (r.stance) {
+          const st = r.stance === 1000 ? 'no stance' : r.stance > 1000 ? `stance not ${r.stance - 1000}` : `stance ${r.stance}`;
+          cond.push(st);
+          const num = r.stance > 1000 ? r.stance - 1000 : r.stance;
+          if (r.stance !== 1000 && !stancesKnown.has(num)) warn(`${tactics.where}: row ${r.n}: stance ${num} is set by no command skill in this folder`);
+        }
+        const act = `${ACT[r.action]}${skillAct ? ` ${slotSkill(mon, r.slot)}` : ''}${[4, 5, 6, 9, 11, 12, 13, 14, 15, 16, 17].includes(r.action) ? ` ${r.param || { 4: 25, 5: 6, 6: 6, 9: 7, 11: 10, 12: 2, 13: 10, 14: 3, 15: 3, 16: 2, 17: 80 }[r.action]}${r.action === 17 ? '%' : ''}` : ''}${r.action === 9 && r.ownerdist ? ` (leash ${r.ownerdist})` : ''}`;
+        console.log(`  ${dir} PetAI tactic ${n} of ${mon.Id}: ${cond.join(', ')} -> ${act} (chance ${r.chance}, cooldown ${r.cooldown})`);
+      });
+    }
   });
 }
 

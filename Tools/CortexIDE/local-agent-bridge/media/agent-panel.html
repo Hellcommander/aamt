@@ -334,6 +334,17 @@
   #pick{position:absolute;left:0;right:0;bottom:calc(100% + 6px);z-index:12;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35)}
   #att .a{border-radius:6px;background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.14));border-color:transparent}
   #down{bottom:130px;right:16px}
+  /* compaction boundary: what is above it is kept for you, but the model only gets the summary */
+  .compact{margin:6px 0 16px}
+  .compact .rule{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
+  .compact .rule:before,.compact .rule:after{content:"";flex:1;border-top:1px dashed var(--rail)}
+  .compact details{margin-top:6px;font-size:12px}
+  .compact summary{cursor:pointer;color:var(--muted);list-style:none;text-align:center}
+  .compact summary::-webkit-details-marker{display:none}
+  .compact summary:hover{color:var(--vscode-foreground)}
+  .compact .sum{margin-top:6px;padding:8px 11px;border:1px solid var(--rail);border-radius:10px;line-height:1.55;white-space:pre-wrap;max-height:40vh;overflow:auto}
+  #log > .pre-compact{opacity:.5}
+  #log > .pre-compact:hover{opacity:.85}
 </style>
 </head>
 <body>
@@ -706,6 +717,26 @@ function changesCard(row){
   }
   return box;
 }
+function compactRow(row){
+  const box = document.createElement("div");
+  box.className = "compact";
+  const rule = document.createElement("div"); rule.className = "rule";
+  const n = Number(row.turns) || 0;
+  rule.textContent = (row.auto ? "Auto-compacted" : "Conversation compacted") + " · " + n + " turn" + (n === 1 ? "" : "s") + " summarised" + (row.model ? " by " + row.model : "");
+  rule.title = "Messages above stay here for you; the model now gets only the summary" + (row.files ? " plus the " + row.files + " files it was working with" : "") + (row.before ? " (" + row.before + " → " + row.after + " chars)" : "");
+  box.appendChild(rule);
+  if (row.summary){
+    const d = document.createElement("details");
+    const s = document.createElement("summary"); s.textContent = "Show summary";
+    const b = document.createElement("div"); b.className = "sum body"; b.innerHTML = md(row.summary);
+    d.appendChild(s); d.appendChild(b);
+    d.ontoggle = () => { s.textContent = d.open ? "Hide summary" : "Show summary"; };
+    box.appendChild(d);
+  }
+  // Everything before the boundary is dimmed: it is no longer part of what the model sees.
+  for (const c of log.children) if (c.id !== "welcome") c.classList.add("pre-compact");
+  return box;
+}
 function canvasCard(row){
   const box = document.createElement("div");
   box.className = "canvascard"; box.tabIndex = 0;
@@ -731,6 +762,7 @@ function add(row){
   let el;
   if (row.cls === "changes") el = changesCard(row);
   else if (row.cls === "canvas") el = canvasCard(row);
+  else if (row.cls === "compact") el = compactRow(row);
   else if (row.cls === "tool"){
     el = document.createElement("details");
     el.className = "tool" + (row.ok === false ? " bad" : "");
@@ -1163,6 +1195,7 @@ window.addEventListener("message", (e) => {
   else if (m.type === "todos") todos(m.todos);
   else if (m.type === "changes") add({ cls: "changes", id: m.id, files: m.files });
   else if (m.type === "canvas") add({ cls: "canvas", file: m.file, name: m.name, kind: m.kind });
+  else if (m.type === "compact") add(m);
   else if (m.type === "undone"){ const card = log.querySelector('.changes[data-id="' + m.id + '"]'); if (card){ card.querySelector("button").disabled = true; const s = card.querySelector(".hd span"); s.textContent = "Reverted · " + s.textContent; } }
   else if (m.type === "busy") busy(true);
   else if (m.type === "idle") busy(false);

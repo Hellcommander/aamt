@@ -588,6 +588,7 @@ stopped it.
 
 ## Files
 
+- `ModOrder\ModOrder.js`, `ModOrder\masterlist.json`, `Sort-D2RMods.ps1` - sort and check a D2RMM mod list like LOOT (see "Mod list sorter")
 - `Granny.py`, `HdSkeleton.py` - Granny files as editable trees; skeleton decode / encode
 - `LegacyToHd.py`, `Convert-D2RLegacyMonster.ps1` - HD version of a sprite monster from the closest HD one
 - `d2r_casc.py` - read-only archive access (`D2RArchive.read`, `.exists`, `.list`)
@@ -731,8 +732,17 @@ Notes:
 - Mods built on the stock skill trees (the skill-page mods) go below a conversion and fit
   themselves to its trees; run `Test-D2RMod.ps1 -KeepGoing` on the whole list (a mod that throws is rolled back and the
   rest still run, as in D2RMM).
-- Total conversions that add levels cannot be stacked: Reimagined (138-165) and Frankenstein
-  (138-259) put their new levels on the same level numbers. VanillaDeluxe is not supported.
+- Conversions that add levels can be stacked in `keep` mode: the lower one's new levels (every Id
+  above the game's own top level, 137) move behind the levels the mods above it added, at install
+  time, and so do the numbers that point at them in its own tables: `levels.txt` Id/Depend/Vis,
+  `lvlmaze.txt` Level, `lvlprest.txt` LevelId, `lvlwarp.txt`, and cube recipes that open a portal
+  (`Red Portal,lvl=139` in `output`, `output b`, `output c`). Example: Reimagined, then Rebirth
+  (rows keep) puts Rebirth's levels 138-141 on 288-291. Numbers built into a mod's D2RLoader DLLs
+  cannot move, so the mod with plugins that know its levels (Reimagined: its maps) goes above. A
+  `rebuild` conversion keeps its own numbers and must be first. VanillaDeluxe is not supported.
+- Mods that look up plain-game rows by name (Necromancer_V1.6: Confuse, Poison Dagger) go ABOVE a
+  conversion that renames or replaces those rows (Reimagined replaces 19 stock skills in place);
+  below it they stop. The conversion's "My mod list" rules keep their other changes.
 - A mod that ships its tables only as compiled `global\excel\*.bin` (Rebirth) cannot be patched:
   D2RMM runs the game on `.txt` tables, so those files are copied but do nothing. The converter
   warns; such tables have to be decompiled to `.txt` first.
@@ -919,6 +929,58 @@ This tool installs it as it is, with the same safety as the converter's Update:
   copied Druid skills "Mythic Armageddon / Hurricane" sharing a tree cell with the originals (the
   author's design). It goes above BestOf in the D2RMM list. Not yet seen in the game.
 
+## Mod list sorter (`ModOrder`, like LOOT)
+
+Sorts a D2RMM mod list and checks it, the way LOOT does for Bethesda games. Node.js 22 or later,
+nothing else.
+
+```
+Sort-D2RMods.bat                     # report and the sorted order; changes nothing
+Sort-D2RMods.ps1 gui                 # the same in a browser window, with an Apply button
+Sort-D2RMods.ps1 apply               # put the sorted order into D2RMM (old list saved first)
+Sort-D2RMods.ps1 restore <file>      # put a saved list back
+Sort-D2RMods.ps1 audit [-Sorted]     # ModHarness on the list: what each mod loses to mods below it
+```
+
+What it reads:
+
+- **Your list**, straight from D2RMM's storage (`%APPDATA%\d2rmm\Local Storage`, a LevelDB it
+  copies and reads; only the mod list, the last installed list and the plugin switches, never the
+  rest). D2RMM may be open or closed. `--from <saved list.json>` uses a saved list instead.
+- **The masterlist**, `ModOrder\masterlist.json`: one entry per known mod with its group, load-after
+  / load-before rules, required mods and D2RLoader plugins (with minimum versions), mods it breaks
+  with, and messages. Rules can depend on other ticked mods or on the mod's own settings. The
+  `_readme` at its top describes the format.
+- **Your own rules**, `<D2RMM>\modorder-userlist.json` (same format, merged over the masterlist;
+  `ModOrder\userlist.example.json` shows how).
+- **The mods folder**: each mod's `mod.json`, settings, README and `mod.js`, and the plugins D2RMM
+  imported into `d2rloader\` (their versions read from the DLLs).
+
+How it sorts: groups first (`top`, `whole-file`, `early`, `default`, `late`, `patch`, `final`),
+then the after/before rules between ticked mods. Everything else keeps your order: a mod a rule
+needs higher is pulled up to just above the mod that needs it, so only what a rule names moves.
+Each move is shown with its reason. A rule that goes against the groups, or rules that go in a
+circle, are reported and left out.
+
+What it reports: required mods or plugins missing, turned off or too old; mods that break each
+other (from the masterlist, and on its own when two converted data mods put levels on the same
+level numbers); mods that copy whole tables or string files over what the mods above them wrote;
+the same mod ticked twice under two folder names; ticked mods whose folder is gone; mods newer than
+the masterlist knows; mods it does not know (it guesses their group from their README: "put it
+last", a converted mod's rows mode) and plugins their README names that are not imported; and
+that the list changed since the last Install Mods.
+
+`apply` talks to D2RMM over Chrome remote debugging (port 9333): it starts D2RMM with
+`--remote-debugging-port=9333` when D2RMM is closed (with D2RMM open without it, close D2RMM first
+or pass `-Restart`), saves the list it had in `<D2RMM>\modorder-backups\`, writes the new list,
+reloads the window and reads the list back to check it. Then Install Mods with the game closed.
+
+Best Of (the compatibility patch mod) takes its order rules from the masterlist:
+`node ModOrder\ModOrder.js bestof-rules` writes them into its `mod.js` RULES block.
+
+Keep the masterlist up to date when a mod is added or updated: the `checked` version, its rules,
+and failures the harness finds (`audit`, or `Test-D2RMod.ps1 -KeepGoing` on a list).
+
 ## D2RMM package size limit
 
 `Set-D2rmmLimit.ps1` / `.bat` (wrapper) → `D2rmmLimit.py`
@@ -1071,7 +1133,7 @@ node LeakCheck.js --game '<game>' --python <python> --conversion '<D2RMM>\mods\F
 - **HD**: every texture, particle file, model or definition an HD definition written by a
   mod names must be in a mod folder or in the archive; same for the textures named inside
   particle files copied from a mod folder. (Animations and skeletons are not checked.)
-- **PetAI rules**: format, and that each rule matches its monster's skill slot.
+- **PetAI tables** (rules, nearrules, springrules, commandrules, tactics): format and header, the values the plugin would skip, monster/skill/state rows, `Skill<slot>` with a mode, spring skills with `summon`/`pettype`, command skills with `srvdofunc` 179; prints what each rule and tactic does.
 
 It cannot tell whether anything works in the game: it checks that every name points at
 something, not what the engine does with it.

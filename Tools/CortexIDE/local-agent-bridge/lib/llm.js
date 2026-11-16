@@ -179,6 +179,54 @@ async function ollamaCapabilities(baseUrl, model) {
   return caps;
 }
 
+/** "8.2B" / "14.8B" / "70B" / "500M" → billions of parameters (0 when unknown). */
+function paramBillions(s) {
+  const m = /([\d.]+)\s*([BMK])/i.exec(String(s || ""));
+  if (!m) return 0;
+  const n = Number(m[1]);
+  return m[2].toUpperCase() === "B" ? n : m[2].toUpperCase() === "M" ? n / 1000 : n / 1e6;
+}
+
+/**
+ * Installed Ollama models to switch to when `current` struggles, best first. `prefer` (the
+ * localAgentBridge.agent.autoSwitchModels setting) comes first in its own order; then models that
+ * can call tools, coding models and larger ones first, skipping embedding models and `exclude`.
+ * @returns {Promise<string[]>}
+ */
+async function ollamaSwitchCandidates(baseUrl, current, { prefer = [], exclude = [] } = {}) {
+  let tags = [];
+  try {
+    const res = await request(ollamaRoot(baseUrl) + "/api/tags", { timeout: 5000 });
+    tags = ((res.json && res.json.models) || []).map((m) => ({ name: m.name || m.model, size: paramBillions(m.details && m.details.parameter_size) || (m.size || 0) / 6e8 })).filter((m) => m.name);
+  } catch {
+    return [];
+  }
+  const skip = new Set([current, ...exclude].map((x) => String(x || "").toLowerCase()));
+  const installed = new Map(tags.map((t) => [t.name.toLowerCase(), t]));
+  const out = [];
+  for (const p of prefer || []) {
+    const t = installed.get(String(p).toLowerCase()) || installed.get(String(p).toLowerCase() + ":latest");
+    if (t && !skip.has(t.name.toLowerCase()) && !out.includes(t.name)) out.push(t.name);
+  }
+  const able = [];
+  await Promise.all(
+    tags
+      .filter((t) => !skip.has(t.name.toLowerCase()) && !out.includes(t.name))
+      .slice(0, 40)
+      .map(async (t) => {
+        const c = await ollamaCapabilities(baseUrl, t.name);
+        if (c && c.includes("tools") && !c.includes("embedding")) able.push(t);
+      })
+  );
+  const coder = (n) => /coder|code|devstral|gpt-oss|qwen3|deepseek|codestral/i.test(n);
+  const cur = installed.get(String(current || "").toLowerCase());
+  const curSize = cur ? cur.size : 0;
+  // A switch should be an upgrade: models larger than the current one first, coding models first
+  // within that, larger first; smaller models only as a last resort.
+  able.sort((x, y) => ((y.size > curSize) - (x.size > curSize)) || (coder(y.name) - coder(x.name)) || y.size - x.size || x.name.localeCompare(y.name));
+  return [...out, ...able.map((t) => t.name)];
+}
+
 /**
  * Advice for a weak agent model on Ollama: "" when it can call tools, else a status line that names
  * installed models which can (best guess at coding models first).
@@ -500,6 +548,8 @@ async function chatLocal({ backend, model, messages, tools, maxTokens = 2048, te
 module.exports = {
   ollamaCapabilities,
   ollamaToolAdvice,
+  ollamaSwitchCandidates,
+  paramBillions,
   retry,
   PROVIDERS,
   ToolsUnsupported,

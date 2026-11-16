@@ -121,5 +121,29 @@
   "name": "Trinity Manifold",
   "subdir": "object",
   "subject": "vertical staff of three braided metal pipes, one glowing orange, one glowing blue, one dark violet, meeting at a bright white gem chamber at the top, mage weapon"
+ },
+ {
+  "short_name": "SMOG_DEVIL_APPRENTICE",
+  "name": "soot-choked apprentice",
+  "subdir": "npc",
+  "subject": "young human warlock apprentice in a scorched green-grey robe, coughing, holding a small brass steam-staff, thin green smoke around the hands"
+ },
+ {
+  "short_name": "SMOG_DEVIL_WARLOCK",
+  "name": "smog devil",
+  "subdir": "npc",
+  "subject": "hooded human warlock in dark green robes with a small brass boiler strapped to the back, pipes venting green smog, holding a pipe-hafted steam-staff with a violet gem"
+ },
+ {
+  "short_name": "SMOG_DEVIL_VATKEEPER",
+  "name": "smog devil vatkeeper",
+  "subdir": "npc",
+  "subject": "stooped human warlock in a stained leather apron over green robes, brass goggles, holding a steam-staff, a tiny hunched figure of green smog at the feet"
+ },
+ {
+  "short_name": "SMOG_DEVIL_VASHKA",
+  "name": "Vashka Sootmouth, the Flue-Warden",
+  "subdir": "npc",
+  "subject": "tall gaunt human woman sorceress with soot-blackened mouth and chin, dark violet robes with brass fittings, holding a soot-black chimney-pipe staff leaking green smoke"
  }
 ]

@@ -1078,7 +1078,7 @@ class AgentViewProvider {
    * chats — on different models — can work at the same time. Events carry the chat id (sid);
    * the panel shows those of the chat on screen, the rest land in each chat's log.
    */
-  async send(text, sid, mode) {
+  async send(text, sid, mode, opts = {}) {
     text = String(text || "").trim();
     if (!text) return;
     const s = sid ? this.session(sid) : this.active();
@@ -1124,6 +1124,11 @@ class AgentViewProvider {
     // /compress [focus] (or /compact): summarise this chat's history instead of running a turn.
     const cmd = compress.parseCommand(text);
     if (cmd) return this.compressChat(s, cmd.focus);
+    // Auto-compact: when the carried-over history would fill too much of the context window, the
+    // chat is compacted first and this message then runs on the summary.
+    if (!opts.noAutoCompact && !this.runs.has(s.id) && (await this.autoCompactDue(s))) {
+      return this.compressChat(s, "", { auto: true, then: text });
+    }
     const limit = cfg().get("maxParallel", 4);
     if (limit > 0 && this.runs.size >= limit) {
       vscode.window.showWarningMessage(this.runs.size + " chats are already running (localAgentBridge.agent.maxParallel = " + limit + "). Stop one or wait for it to finish.");
@@ -1330,10 +1335,16 @@ class AgentViewProvider {
       }
     }
     try {
-      const result = backend.provider === "claude-code" ? await this.runClaudeCode({ backend, model, text, c, env, tools, lim, signal: controller.signal, onEvent, steer: steerSource }) : await runAgent({
+      // Auto-switch: on Ollama, a model that clearly struggles with the request hands it to a stronger
+      // installed model, which gets the chat so far plus what the first model tried.
+      const switchMode = a.get("autoSwitch", "ollama");
+      const canSwitch = backend.provider === "ollama" && switchMode !== "off";
+      const turnStart = c.log.length;
+      const runOpts = {
         backend,
         model,
         contextTokens: ctxTokens,
+        switchOnStruggle: canSwitch,
         maxOutputTokens: lim.maxOutputTokens,
         effort: backend.provider === "anthropic" ? lim.effort : "",
         maxRounds: lim.maxRounds,
@@ -1353,7 +1364,59 @@ class AgentViewProvider {
         signal: controller.signal,
         steer: steerSource,
         onEvent,
-      });
+      };
+      let result = backend.provider === "claude-code" ? await this.runClaudeCode({ backend, model, text, c, env, tools, lim, signal: controller.signal, onEvent, steer: steerSource }) : await runAgent(runOpts);
+      const tried = [model];
+      while (result && result.struggling && canSwitch && tried.length <= Math.max(0, a.get("autoSwitchMax", 2))) {
+        const from = tried[tried.length - 1];
+        const cands = await llm.ollamaSwitchCandidates(backend.baseUrl, from, { prefer: a.get("autoSwitchModels", []) || [], exclude: tried });
+        if (!cands.length) {
+          const none = "No other installed Ollama model can call tools, so " + from + " could not hand this over. Pull a stronger coding model (e.g. ollama pull qwen2.5-coder:14b) or list one in localAgentBridge.agent.autoSwitchModels.";
+          c.log.push({ cls: "sys", text: none });
+          post({ type: "status", text: none });
+          break;
+        }
+        const next = cands[0];
+        tried.push(next);
+        // What the struggling model did this turn, for the next one to read first.
+        const attempt = compress.turnText({ user: text, items: c.log.slice(turnStart) }, 1, 2).replace(/^### Turn 1 \(recent\)\n/, "");
+        const note = "Switched " + from + " → " + next + ": " + result.struggling + ". " + next + " gets this chat and " + from + "'s attempt, and takes the request over.";
+        c.log.push({ cls: "sys", text: note, switched: { from, to: next, why: result.struggling } });
+        post({ type: "status", text: note });
+        await this.setSessionModel(s, { provider: backend.provider, baseUrl: s.baseUrl || "", model: next });
+        const r2 = await this.resolveFor(s, false);
+        const lim2 = sessionLimits.resolve({ limits: s.limits, provider: backend.provider, get: (k, d) => a.get(k, d), modelMaxOut: r2.maxOut, ctxTokens: r2.ctxTokens });
+        tools.model = next;
+        try {
+          tools.vision = await llm.supportsVision(backend, next, a.get("vision", "auto"));
+        } catch {
+          /* keep */
+        }
+        if (s.id === this.activeId) {
+          this.model = next;
+          this.ctxTokens = r2.ctxTokens;
+          this.postHeader();
+        }
+        const handoff =
+          "\n\n[Handoff] Another model (" + from + ") worked on this request first and was switched out because " + result.struggling + ". " +
+          "Read what it did below; reuse what it found, do not repeat what failed, and finish the request. Files it changed are already changed on disk.\n" +
+          "<previous_attempt>\n" + attempt.slice(-12000) + "\n</previous_attempt>";
+        result = await runAgent({
+          ...runOpts,
+          model: next,
+          contextTokens: r2.ctxTokens,
+          maxOutputTokens: lim2.maxOutputTokens,
+          maxRounds: lim2.maxRounds,
+          prompt: prompt + handoff,
+          prior: result.progress || c.progress,
+          switchOnStruggle: tried.length <= Math.max(0, a.get("autoSwitchMax", 2)),
+        });
+      }
+      if (result && result.struggling) {
+        result.text = "Stopped early: " + result.struggling + ". " + (tried.length > 1 ? "Tried " + tried.join(" → ") + "." : "") + " Try a stronger model or narrow the request.";
+        c.log.push({ cls: "assistant", text: result.text });
+        post({ type: "assistant", text: result.text });
+      }
       // Messages taken in while it worked are part of this turn's request.
       c.history.push({ role: "user", content: steer.withSteering(text, run.steered) }, { role: "assistant", content: result.text });
       if (result.sessionId) c.ccSession = result.sessionId; // Claude Code keeps the conversation itself
@@ -1488,7 +1551,21 @@ class AgentViewProvider {
    * /compress [focus]: replace a chat's history with a summary written by the chat's own model,
    * brief on older turns and detailed on the recent ones. Shown and stoppable like a turn.
    */
-  async compressChat(s, focus) {
+  /** localAgentBridge.agent.autoCompactPercent of the context window is filled by the history alone. */
+  async autoCompactDue(s) {
+    const pct = Number(cfg().get("autoCompactPercent", 60)) || 0;
+    if (pct <= 0 || !s || !(s.history || []).length) return false;
+    try {
+      const r = await this.resolveFor(s, false);
+      // Claude Code compacts its own sessions.
+      if (!r || !r.backend || r.backend.provider === "claude-code") return false;
+      return compress.autoCompactDue(s.history, r.ctxTokens, pct);
+    } catch {
+      return false;
+    }
+  }
+
+  async compressChat(s, focus, opts = {}) {
     if (!s) return;
     const post = (m) => this.post({ ...m, sid: s.id });
     if (this.runs.has(s.id) || this.store().runningElsewhere(s.id)) {
@@ -1507,9 +1584,11 @@ class AgentViewProvider {
     run.poll = setInterval(() => this.pullInbox(s), 1000);
     let outcome = "done";
     const was = s.status;
-    const label = "/compress" + (focus ? " " + focus : "");
-    s.log.push({ cls: "user", text: label, command: true });
-    post({ type: "user", text: label });
+    const label = opts.auto ? "" : "/compress" + (focus ? " " + focus : "");
+    if (label) {
+      s.log.push({ cls: "user", text: label, command: true });
+      post({ type: "user", text: label });
+    } else post({ type: "status", text: "Auto-compacting: this chat's history is nearing the context limit (localAgentBridge.agent.autoCompactPercent). Your message runs right after." });
     post({ type: "busy" });
     const a = cfg();
     try {
@@ -1519,7 +1598,14 @@ class AgentViewProvider {
       const maxChars = Math.max(8000, Math.min(200000, Math.floor((ctxTokens || 16384) * 0.6 * 3.5)));
       const tr = compress.buildTranscript(s, { recentTurns: a.get("compressRecentTurns", 3), maxChars });
       post({ type: "status", transient: true, text: "Compressing " + tr.turns + " turn" + (tr.turns === 1 ? "" : "s") + " with " + model + "…" });
-      const messages = compress.summaryMessages(tr.text, focus);
+      // "Compact instructions" in AGENTS.md / CLAUDE.md / project rules shape every summary.
+      let instructions = "";
+      try {
+        instructions = compress.compactInstructions(editorEnv().rules);
+      } catch {
+        instructions = "";
+      }
+      const messages = compress.summaryMessages(tr.text, focus, { instructions });
       const maxTokens = Math.max(1024, Math.min(8000, Math.floor((ctxTokens || 16384) / 4)));
       let summary = "";
       if (backend.provider === "claude-code") {
@@ -1536,15 +1622,16 @@ class AgentViewProvider {
           signal: controller.signal,
           onEvent: () => {},
         });
-        summary = String(res.text || "").trim();
+        summary = compress.extractSummary(res.text);
       } else {
         const res = await llm.chat({ backend, model, messages, maxTokens, temperature: 0.2, numCtx: ctxTokens, signal: controller.signal });
-        summary = String(res.content || "").replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+        summary = compress.extractSummary(res.content);
       }
       if (controller.signal.aborted) throw new Error("stopped");
       if (!summary) throw new Error("The model returned an empty summary; the history was left as it was.");
       const before = (s.history || []).reduce((n, h) => n + String(h.content || "").length, 0);
-      s.history = compress.summaryHistory(summary, tr.turns);
+      const files = compress.workingFiles(s.progress);
+      s.history = compress.summaryHistory(summary, tr.turns, { todos: s.todos || [], files, auto: !!opts.auto });
       s.ccSession = ""; // Claude Code chats start a fresh session that is handed the summary
       // The progress index's per-turn notes, searches and errors repeat what the summary now
       // covers; keep only its file and command index.
@@ -1556,11 +1643,10 @@ class AgentViewProvider {
           /* progress.md is a convenience */
         }
       }
-      const note = "Chat compressed: " + tr.turns + " turn" + (tr.turns === 1 ? "" : "s") + " summarised by " + model + " (" + before + " → " + summary.length + " chars of history). Recent turns are kept in more detail.";
-      s.log.push({ cls: "sys", text: note, compressed: true, summary });
-      s.log.push({ cls: "assistant", text: summary, compressSummary: true });
-      post({ type: "status", text: note });
-      post({ type: "assistant", text: summary });
+      // One boundary row: the turns above it are no longer sent to the model; the summary is.
+      const row = { cls: "compact", compressed: true, summary, turns: tr.turns, auto: !!opts.auto, model, before, after: summary.length, files: files.length };
+      s.log.push(row);
+      post({ type: "compact", ...row });
       s.status = was === "running" ? "done" : was || "done";
     } catch (e) {
       const msg = String((e && e.message) || e);
@@ -1576,6 +1662,15 @@ class AgentViewProvider {
       const next = this.nextFollowUp(s, null, outcome);
       await this.saveConv(s);
       post({ type: "idle" });
+      if (opts.then && outcome !== "stopped") {
+        // The message that triggered the auto-compact runs first, then anything queued meanwhile.
+        if (outcome === "error") post({ type: "status", text: "Auto-compact failed; sending your message on the full history." });
+        const fail = (e) => post({ type: "error", text: String((e && e.message) || e) });
+        setTimeout(() => this.send(opts.then, s.id, undefined, { noAutoCompact: true }).then(() => next && this.send(next, s.id)).catch(fail), 0);
+        return;
+      }
+      // Stopped: the message was not sent; it goes back into the input box.
+      if (opts.then) post({ type: "unsent", text: opts.then });
       if (next) {
         post({ type: "status", transient: true, text: "Sending your next message…" });
         setTimeout(() => this.send(next, s.id).catch((e) => post({ type: "error", text: String((e && e.message) || e) })), 0);
