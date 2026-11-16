@@ -1096,11 +1096,11 @@ An HD missile definition (`hd/missiles/<name>.json`) points at `.particles`
 files (compiled binaries). A particle file names its textures by path, and most
 of an effect's colour comes from small uncompressed gradient textures.
 
-1. Every texture the effect's particle files name is read. Uncompressed (RGBA8)
-   textures that really hold colour are recoloured and written under a new file
-   name **of the same length** (the first characters become the look's `tag`).
-2. The particle file is copied under a new name with those paths swapped. The
-   length is unchanged, so nothing else in the binary moves.
+1. Every texture the effect's particle files name is read. Textures that really
+   hold colour, uncompressed (RGBA8) or block-compressed (BC1, BC3), are recoloured
+   and written under a new file name (the first characters become the look's `tag`).
+2. The particle file is copied under a new name with those paths swapped, through
+   `PopcornBaked.py`; the copy must pass its `check`.
 3. A manifest (old particle path → new, plus the new textures) is written into
    the mod's `mod.js` between the `<recolor-manifest>` markers (`-PatchMod`).
 
@@ -1134,14 +1134,23 @@ of an effect's colour comes from small uncompressed gradient textures.
 ### Limits
 
 - **Grey data ramps are left alone** (alpha remap, fresnel, linear gradients):
-  their channels are numbers, not colour.
-- **Block-compressed textures are left alone.** The format codes seen are
-  0x3f (8 bytes per block, single-channel masks), 0x3d / 0x3e / 0x41 (16 bytes
-  per block). BC1 / BC3 recolouring is implemented but off, because the codes
-  have not been matched to formats: enable it per code with
-  `"blockFormats": { "0x3e": "bc3" }` only once that is known.
+  their channels are numbers, not colour. Block textures get the same test on
+  their blocks' end points (`White`, `Black`, `Default_AlphaMap` stay).
+- **Normal, material and distortion maps are left alone**, by name (`_NRM`, `_N`,
+  `NMap`, `_ORM`, `Distort`, `debug`): their channels are not grey but are not
+  colour either. Every such texture the game's effects use has one of these names.
+- **Block formats** (codes from `HdTexture.py`, 2026-11-16): 0x3A BC1 and 0x3D / 0x3E
+  BC3 are recoloured (end points of each block, every mip); 0x3F BC4 and 0x41 BC5
+  (one or two channels: masks, noise, distortion) are left alone. A preset can
+  override a code: `"blockFormats": { "0x3d": "keep" }` (or `"bc1"`, `"bc3"`).
+  The three presets here come out as before: the BC3 textures their effects use
+  are all grey or data. Effects with BC3 colour (`_ALB` decals and models,
+  `T_FX_Geo_Ice`, `_C` blood) now recolour, e.g. `glacial_spike`.
 - **Colour set inside the particle file** (a constant, not a texture) is not
   changed. `poison_sparks` is such an effect; `poison_smoke_puff` recolours.
+  The scripts store into numbered particle-stream slots and the field names are
+  not in the file, so which constant is a colour (not a speed) is not known yet;
+  see the `CLayerCompileCacheField` notes in `PopcornBaked.py`.
 - Models keep their own textures (`bone_spirit`'s skull, the Death Mauler's fingers).
 - Run `-Audit` first: an effect with nothing to recolour comes out unchanged.
 

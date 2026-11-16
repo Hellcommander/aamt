@@ -38,7 +38,17 @@ What the fields mean, as far as it is known:
   CLayerGraphCompileCache         f0 platform name (PC, Switch, PS4, PS5); the objects of that
                                   platform's copy follow it, up to the next one (platform_range)
   CLayerCompileCache              one layer: f20 name, f17 parent layer, f9 its scripts
+  CLayerCompileCacheField         one field of a layer's particle stream (the layer's f2 lists them):
+                                  f0 0x80000000 + a running number, f1 type (31 float, 33 float3,
+                                  34 float4, 25 int, 5, 1 ...), f2 size in bytes. Field names are
+                                  not in the file; scripts load and store fields by slot ("0", "A",
+                                  "1F" in f5), so what a stored value means (colour, velocity ...)
+                                  is not known yet (2026-11-16)
   CLayerCompileCacheRenderer      f1 particle input objects, f2 property objects, f4 material (.pkma)
+  CLayerCompileCacheRendererParticleInput
+                                  the stream inputs a renderer reads: f0 a running number from 100,
+                                  f2 the CLayerCompileCacheField object, f3 its type (as field f1);
+                                  f1 not understood
   CLayerCompileCacheRendererProperty
                                   f0 name ("Blend.TextureBase", "General.Mesh", "Transparent.Type" ...),
                                   f1 type code (3 int, 7 float, 14 path, ...), f2 four 32-bit values,
