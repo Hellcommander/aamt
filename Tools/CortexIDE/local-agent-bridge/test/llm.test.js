@@ -233,10 +233,18 @@ test("discover + pickModel + contextWindow on the Claude provider (paginated mod
 
 test("discover: no credentials is a clear error, generic apiKey counts when it is an Anthropic key", async () => {
   await ready;
-  await assert.rejects(
-    llm.discover({ provider: "anthropic", baseUrl: base(), apiKey: "some-vllm-key", anthropicApiKey: "" }),
-    /no credentials/
-  );
+  // Hide this machine's own credentials (env vars, and `ant` on PATH) so only the arguments count.
+  const hidden = ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "PATH", "Path"];
+  const saved = Object.fromEntries(hidden.map((k) => [k, process.env[k]]));
+  for (const k of hidden) delete process.env[k];
+  try {
+    await assert.rejects(
+      llm.discover({ provider: "anthropic", baseUrl: base(), apiKey: "some-vllm-key", anthropicApiKey: "" }),
+      /no credentials/
+    );
+  } finally {
+    for (const k of hidden) if (saved[k] !== undefined) process.env[k] = saved[k];
+  }
   const b = await llm.discover({ provider: "anthropic", baseUrl: base(), apiKey: "sk-ant-test" });
   assert.strictEqual(b.provider, "anthropic");
 });

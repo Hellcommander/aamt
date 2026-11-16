@@ -170,6 +170,34 @@ $chkInstallMod.AutoSize = $true
 $chkInstallMod.Checked = $true
 $grpTile.Controls.Add($chkInstallMod)
 
+$chkLayered = New-Object System.Windows.Forms.CheckBox
+$chkLayered.Text = "Mutation layers"
+$chkLayered.Location = New-Object System.Drawing.Point(340, 108)
+$chkLayered.AutoSize = $true
+$chkLayered.Checked = $true
+$grpTile.Controls.Add($chkLayered)
+
+$lblHeadStyle = New-Object System.Windows.Forms.Label
+$lblHeadStyle.Text = "Head:"
+$lblHeadStyle.Location = New-Object System.Drawing.Point(340, 238)
+$lblHeadStyle.AutoSize = $true
+$grpTile.Controls.Add($lblHeadStyle)
+
+$cmbHeadStyle = New-Object System.Windows.Forms.ComboBox
+$cmbHeadStyle.Location = New-Object System.Drawing.Point(400, 234)
+$cmbHeadStyle.Size = New-Object System.Drawing.Size(120, 24)
+$cmbHeadStyle.DropDownStyle = "DropDownList"
+[void]$cmbHeadStyle.Items.AddRange(@("auto", "cat", "plain", "canine", "equine", "avian", "reptile", "insect", "fish", "robot", "skull", "fungal", "plant"))
+$cmbHeadStyle.SelectedIndex = 0
+$grpTile.Controls.Add($cmbHeadStyle)
+
+$chkBrightPalette = New-Object System.Windows.Forms.CheckBox
+$chkBrightPalette.Text = "Bright Qud palette"
+$chkBrightPalette.Location = New-Object System.Drawing.Point(360, 60)
+$chkBrightPalette.AutoSize = $true
+$chkBrightPalette.Checked = $false
+$grpTile.Controls.Add($chkBrightPalette)
+
 $lblBase = New-Object System.Windows.Forms.Label
 $lblBase.Text = "Base: (auto-pin on first bake)"
 $lblBase.Location = New-Object System.Drawing.Point(12, 134)
@@ -472,6 +500,9 @@ $btnTile.Add_Click({
         $modeKey = @("classic", "truecolor")[$cmbMode.SelectedIndex]
         $tileArgs = @($paths.Json, "-o", $paths.Dir, "--size", $sizeKey, "--color-mode", $modeKey)
         if ($chkAnimated.Checked) { $tileArgs += "--animated" }
+        if ($chkLayered.Checked) { $tileArgs += "--layered" }
+        if ($chkLayered.Checked -and $cmbHeadStyle.SelectedIndex -gt 0) { $tileArgs += @("--head-style", [string]$cmbHeadStyle.SelectedItem) }
+        if ($chkBrightPalette.Checked) { $tileArgs += "--bright-palette" }
         if ($chkKeepDetail.Checked) {
             if ($modeKey -eq "truecolor" -and -not $chkUpdateGear.Checked) { $tileArgs += "--sd" }
         } else {

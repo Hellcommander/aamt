@@ -26,6 +26,46 @@ def find_casclib(game_path, explicit=None):
         'CascLib.dll not found. Pass --casclib, or set D2R_CASCLIB (D2RMM has one in its tools folder).')
 
 
+def game_build(game_path):
+    """The game's version from .build.info (e.g. 3.1.91636), or None."""
+    try:
+        with open(os.path.join(game_path, '.build.info'), encoding='latin1') as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return None
+    head = [h.split('!')[0] for h in lines[0].split('|')] if lines else []
+    if len(lines) > 1 and 'Version' in head:
+        return lines[1].split('|')[head.index('Version')] or None
+    return None
+
+
+def check_cache(cache, game_path):
+    """A folder of files copied from the archive (`<cache>/global/...`) goes stale when the game is
+    patched: empties its game folders when it was filled from another build, and stamps it with the
+    current one (`<cache>/.game-build`). Returns True when it was emptied."""
+    import shutil
+    build = game_build(game_path)
+    if not build:
+        return False
+    stamp = os.path.join(cache, '.game-build')
+    try:
+        with open(stamp, encoding='utf-8') as f:
+            if f.read().strip() == build:
+                return False
+    except OSError:
+        pass
+    emptied = False
+    for top in ('global', 'local', 'hd'):
+        p = os.path.join(cache, top)
+        if os.path.isdir(p):
+            shutil.rmtree(p)
+            emptied = True
+    os.makedirs(cache, exist_ok=True)
+    with open(stamp, 'w', encoding='utf-8') as f:
+        f.write(build)
+    return emptied
+
+
 class D2RArchive:
     """Opens the game archive at `game_path` (the folder that contains D2R.exe)."""
 

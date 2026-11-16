@@ -2,9 +2,9 @@
 .SYNOPSIS
     Command line of the particle effect editor: list, show, apply a recipe (see README.md).
 .EXAMPLE
-    .\Edit-D2REffect.ps1 -Root 'D:\games\Diablo II Resurrected' show data/hd/vfx/particles/missiles/mephisto_missile/vfx_mephisto_missile.particles
+    .\Edit-D2REffect.ps1 -Root 'D:\games\Steam\steamapps\common\Diablo II Resurrected' show data/hd/vfx/particles/missiles/mephisto_missile/vfx_mephisto_missile.particles
 .EXAMPLE
-    .\Edit-D2REffect.ps1 -Root 'D:\games\Diablo II Resurrected' apply recipe.json -OutDir 'D:\mods\MyMod'
+    .\Edit-D2REffect.ps1 -Root 'D:\games\Steam\steamapps\common\Diablo II Resurrected' apply recipe.json -OutDir 'D:\mods\MyMod'
 #>
 [CmdletBinding()]
 param(

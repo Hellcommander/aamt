@@ -22,6 +22,11 @@ from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from PIL import Image, ImageFilter, ImageOps
 
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+import elin_keep  # noqa: E402  (existing mod files are kept unless --force)
+from elin_keep import may_write  # noqa: E402
+
 try:
     from openpyxl import Workbook
 except ImportError as exc:  # pragma: no cover
@@ -145,6 +150,8 @@ def _fit_square(im: Image.Image, size: int) -> Image.Image:
 
 
 def write_png(src: Path, dest: Path, size: int) -> None:
+    if not may_write(dest):
+        return
     dest.parent.mkdir(parents=True, exist_ok=True)
     with Image.open(src) as im:
         out = _fit_square(im, size)
@@ -352,7 +359,8 @@ def deploy_textures(mod: Path, heroes: List[Dict[str, Any]], spells: List[Dict[s
             dest = ui_dir / name
             dest.parent.mkdir(parents=True, exist_ok=True)
             # keep native res for UI chrome; also emit 48 widget where useful
-            shutil.copy2(png, dest)
+            if may_write(dest):
+                shutil.copy2(png, dest)
             counts["ui"] += 1
         print(f"[tex] UI chrome {counts['ui']} -> Texture/UI/")
     return counts
@@ -379,11 +387,16 @@ def deploy_element(mod: Path, spells: List[Dict[str, str]]) -> int:
         rows.append(spell_to_element(sp, next_id))
         next_id += 1
 
-    write_element_sheet(en / "Element.tsv", en / "Element.xlsx", rows)
-    # JP mirror names for now (real JP can be filled later)
-    write_element_sheet(jp / "Element.tsv", jp / "Element.xlsx", rows)
+    # A sheet is written as a whole (tsv + xlsx together), so it is kept or replaced as a whole.
+    for folder in (en, jp):   # JP mirrors the English names (real JP can be filled later)
+        tsv_ok, xlsx_ok = may_write(folder / "Element.tsv"), may_write(folder / "Element.xlsx")
+        if tsv_ok and xlsx_ok:
+            write_element_sheet(folder / "Element.tsv", folder / "Element.xlsx", rows)
+        elif tsv_ok or xlsx_ok:
+            print(f"[element] {folder.name}: one of Element.tsv / Element.xlsx exists, so neither is written")
     # keep csv sync for tooling that reads it
-    shutil.copy2(en / "Element.tsv", en / "Element.csv")
+    if (en / "Element.tsv").is_file() and may_write(en / "Element.csv"):
+        shutil.copy2(en / "Element.tsv", en / "Element.csv")
     print(f"[element] {len(rows)} rows (feats+spells) -> LangMod/EN|JP/Element.xlsx")
     return len(rows)
 
@@ -402,7 +415,8 @@ This mod now uses the same folders real Workshop mods use:
 Do **not** rely on `Assets/AssetBundles/Windows/*` for gameplay icons or SFX.
 Those Unity Editor bundles are authoring leftovers; Elin loads `Texture/` PNGs, `Sound/` clips, and `Asset/` UnityFS FX.
 """
-    (mod / "ASSET_LAYOUT.md").write_text(text, encoding="utf-8")
+    if may_write(mod / "ASSET_LAYOUT.md"):
+        (mod / "ASSET_LAYOUT.md").write_text(text, encoding="utf-8")
 
 
 def main() -> int:
@@ -410,6 +424,7 @@ def main() -> int:
     ap.add_argument("--mod-path", default=str(_DEFAULT_MOD))
     ap.add_argument("--skip-textures", action="store_true")
     ap.add_argument("--skip-element", action="store_true")
+    elin_keep.add_arguments(ap)
     args = ap.parse_args()
     mod = Path(args.mod_path)
     if not mod.is_dir():
@@ -429,7 +444,8 @@ def main() -> int:
 
     # Ensure Workshop folders exist
     for d in ("Texture", "Portrait", "Sound", "Asset"):
-        (mod / d).mkdir(parents=True, exist_ok=True)
+        if not elin_keep.DRY_RUN:
+            (mod / d).mkdir(parents=True, exist_ok=True)
 
     if not args.skip_textures:
         deploy_textures(mod, heroes, spells)

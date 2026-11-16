@@ -85,7 +85,7 @@ test("settings read by the code are all contributed", () => {
   const props = Object.keys(pkg.contributes.configuration.properties);
   assert.ok(props.every((p) => p.startsWith("localAgentBridge.")), props.join(", "));
   const src = ["extension.js", "lib/agent-view.js"].map((f) => fs.readFileSync(path.join(EXT, f), "utf8")).join("\n");
-  const agentKeys = [...src.matchAll(/(?:c|cfg\(\))\.get\("([\w.]+)"/g)].map((m) => m[1]);
+  const agentKeys = [...src.matchAll(/(?:\b[ac]|cfg\(\))\.get\("([\w.]+)"/g)].map((m) => m[1]);
   assert.ok(agentKeys.length > 5, "found keys " + agentKeys);
   for (const k of agentKeys) {
     assert.ok(props.includes("localAgentBridge." + k) || props.includes("localAgentBridge.agent." + k), k);
@@ -95,7 +95,9 @@ test("settings read by the code are all contributed", () => {
 test("no Cursor branding left in names, titles or ids", () => {
   const walk = (v, at) => {
     if (typeof v === "string") {
-      // Allowed: factual references to Cursor's file formats and chat exports.
+      // Allowed: factual references to Cursor's file formats and chat exports, and mcpImport's
+      // "cursor" value, which names the ~/.cursor/mcp.json file it reads.
+      if (/\.mcpImport\.items\.enum\.\d+$/.test(at) && v === "cursor") return;
       if (/cursor/i.test(v) && !/import_cursor_chat|Cursor export|from Cursor|Cursor exports|\.cursor[\\/]|Cursor built-in|a Cursor chat/i.test(v)) {
         throw new Error(at + ": " + v);
       }
@@ -127,6 +129,38 @@ test("second sync keeps a single managed .voidrules section", async () => {
   await stub.commands.get("localAgentBridge.sync")();
   const rules = fs.readFileSync(path.join(ws, ".voidrules"), "utf8");
   assert.strictEqual(rules.split("# BEGIN LOCAL-AGENT-BRIDGE").length, 2, rules);
+});
+
+test("a folder that cannot be written is skipped; mcp.json and the other folders still sync", async () => {
+  // Like C:\Program Files\7-Zip as a workspace root: mkdir fails there. A path under a file fails the same way.
+  const blocker = path.join(ws, "not-a-folder.txt");
+  fs.writeFileSync(blocker, "x");
+  const bad = path.join(blocker, "root");
+  const folders = stub.vscode.workspace.workspaceFolders;
+  stub.vscode.workspace.workspaceFolders = [{ uri: stub.vscode.Uri.file(bad) }, ...folders];
+  fs.rmSync(path.join(ws, ".cortexide", "rules"), { recursive: true, force: true });
+  stub.messages.length = 0;
+  try {
+    await stub.commands.get("localAgentBridge.sync")();
+  } finally {
+    stub.vscode.workspace.workspaceFolders = folders;
+  }
+  const entry = JSON.parse(fs.readFileSync(mcpPath, "utf8")).mcpServers["local-agent-bridge"];
+  assert.strictEqual(entry.env.AGENT_BRIDGE_WORKSPACE, bad + ";" + ws);
+  assert.ok(fs.existsSync(path.join(ws, ".cortexide", "rules", "00-local-agent.md")), "folder after the bad one synced");
+  const info = stub.messages.find((m) => m.kind === "info");
+  assert.ok(info && info.text.includes("Not writable, skipped: " + bad), JSON.stringify(stub.messages));
+  assert.ok(!stub.messages.some((m) => m.kind === "error"), JSON.stringify(stub.messages));
+});
+
+test("mcp.json with a UTF-8 BOM keeps its other servers", async () => {
+  // Windows PowerShell 5.1 `Set-Content -Encoding UTF8` writes a BOM; JSON.parse rejects it.
+  const j = JSON.parse(fs.readFileSync(mcpPath, "utf8"));
+  j.mcpServers.rea = { command: "rea" };
+  fs.writeFileSync(mcpPath, "\uFEFF" + JSON.stringify(j, null, 2));
+  await stub.commands.get("localAgentBridge.sync")();
+  const servers = JSON.parse(fs.readFileSync(mcpPath, "utf8")).mcpServers;
+  assert.deepStrictEqual(Object.keys(servers).sort(), ["local-agent-bridge", "other", "rea"]);
 });
 
 test("Agent webview renders", () => {

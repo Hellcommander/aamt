@@ -44,9 +44,42 @@ test("jsonObjects ignores braces inside strings", () => {
   assert.deepStrictEqual(jsonObjects('a {"s": "}{"} b {"t": 1}'), ['{"s": "}{"}', '{"t": 1}']);
 });
 
-test("narration strips call markup and think tags", () => {
+test("narration strips call markup and reasoning", () => {
   assert.strictEqual(narration('Let me look.\n<tool_call>{"name":"Read","arguments":{}}</tool_call>'), "Let me look.");
-  assert.strictEqual(narration('<think>Checking.</think> {"name": "LS", "arguments": {"path": "."}}'), "Checking.");
+  assert.strictEqual(narration('<think>Checking.</think> Listing files. {"name": "LS", "arguments": {"path": "."}}'), "Listing files.");
+  assert.strictEqual(narration("I should read it first.</think>Reading a.js."), "Reading a.js.");
+});
+
+test("calls inside <think> are not run", () => {
+  const c = parseTextCalls('<think>maybe {"name": "Delete", "arguments": {"path": "a.js"}}?</think>{"name": "Read", "arguments": {"path": "a.js"}}');
+  assert.deepStrictEqual(c.map((x) => x.name), ["Read"]);
+  assert.strictEqual(parseTextCalls('<think>I could {"name": "Delete", "arguments": {"path": "a.js"}} but the output stopped').length, 0);
+});
+
+test("raw newlines, tabs and odd escapes inside code strings are repaired", () => {
+  const raw = '<tool_call>{"name": "Write", "arguments": {"path": "a.py", "contents": "def f():\n\treturn re.match(\'\\d+\', s)\n"}}</tool_call>';
+  const c = parseTextCalls(raw);
+  assert.strictEqual(c.length, 1, raw);
+  assert.strictEqual(c[0].args.contents, "def f():\n\treturn re.match('\\d+', s)\n");
+});
+
+test("trailing commas and a call cut off at the output limit", () => {
+  assert.deepStrictEqual(parseTextCalls('{"name": "LS", "arguments": {"path": ".",},}'), [{ name: "LS", args: { path: "." } }]);
+  const cut = parseTextCalls('<tool_call>{"name": "Write", "arguments": {"path": "a.txt", "contents": "line one\nline tw');
+  assert.deepStrictEqual(cut, [{ name: "Write", args: { path: "a.txt", contents: "line one\nline tw" } }]);
+});
+
+test("Qwen3-Coder XML function format", () => {
+  const c = parseTextCalls('Fixing.\n<tool_call>\n<function=StrReplace>\n<parameter=path>\nmath.js\n</parameter>\n<parameter=old_string>\n  return a - b;\n</parameter>\n<parameter=new_string>\n  return a + b;\n</parameter>\n</function>\n</tool_call>');
+  assert.deepStrictEqual(c, [{ name: "StrReplace", args: { path: "math.js", old_string: "  return a - b;", new_string: "  return a + b;" } }]);
+  assert.strictEqual(narration('Fixing.\n<tool_call>\n<function=LS>\n<parameter=path>\n.\n</parameter>\n</function>\n</tool_call>'), "Fixing.");
+});
+
+test("Llama <function=…>{json}, <|python_tag|>, Mistral [TOOL_CALLS], flat args", () => {
+  assert.deepStrictEqual(parseTextCalls('<function=read_file>{"path": "a.js"}</function>'), [{ name: "Read", args: { path: "a.js" } }]);
+  assert.deepStrictEqual(parseTextCalls('<|python_tag|>{"name": "Grep", "parameters": {"pattern": "add"}}'), [{ name: "Grep", args: { pattern: "add" } }]);
+  assert.deepStrictEqual(parseTextCalls('[TOOL_CALLS] [{"name": "LS", "arguments": {"path": "src"}}, {"name": "Read", "arguments": {"path": "a.js"}}]').map((x) => x.name), ["LS", "Read"]);
+  assert.deepStrictEqual(parseTextCalls('{"tool": "Read", "path": "b.js"}'), [{ name: "Read", args: { path: "b.js" } }]);
 });
 
 test("tutor detection", () => {

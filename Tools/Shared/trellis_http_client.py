@@ -177,6 +177,10 @@ def start_server(wait_seconds: float = STARTUP_TIMEOUT, log_path: Optional[Path]
         "expandable_segments:True,garbage_collection_threshold:0.65,max_split_size_mb:128",
     )
     env.setdefault("CUDA_MODULE_LOADING", "LAZY")
+    # Agent shells set this; with it cmd.exe stops looking in the current folder, and the launcher's
+    # "call projectorz-internal.bat" (a bare name, after its cd) fails with "is not recognized".
+    for _k in [k for k in env if k.lower() == "nodefaultcurrentdirectoryinexepath"]:
+        env.pop(_k)   # os.environ keys are upper-case on Windows; a pop by the mixed-case name misses
 
     precision = _precision()
     extra = ["--precision", precision]

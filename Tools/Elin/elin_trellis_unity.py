@@ -29,6 +29,9 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import elin_keep  # noqa: E402  (deploy-ui / deploy-icons keep existing files unless --force)
+
 _ELIN = Path(__file__).resolve().parent
 _TOOLS = _ELIN.parent
 _SHARED = _TOOLS / "Shared"
@@ -283,10 +286,13 @@ def deploy_ui(cat: Dict[str, Any]) -> int:
     paths = cfg_paths(cat)
     ui_src = paths["out"] / "Concepts" / "UI"
     dest = paths["mod"] / "Assets" / "Resources" / "UI" / "Textures" / "Chrome"
-    dest.mkdir(parents=True, exist_ok=True)
+    if not elin_keep.DRY_RUN:
+        dest.mkdir(parents=True, exist_ok=True)
     n = 0
     for png in ui_src.glob("elin_ui_*.png"):
         target = dest / png.name.replace("elin_", "", 1)
+        if not elin_keep.may_write(target):
+            continue
         shutil.copy2(png, target)
         try:
             from unity_meta import write_texture_meta
@@ -298,9 +304,11 @@ def deploy_ui(cat: Dict[str, Any]) -> int:
         print(f"[ui] {target.name}")
     # also publish UI concepts to Starfield art folder for reference
     sf_ui = paths["sf_concepts"] / "ElinUI"
-    sf_ui.mkdir(parents=True, exist_ok=True)
+    if not elin_keep.DRY_RUN:
+        sf_ui.mkdir(parents=True, exist_ok=True)
     for png in ui_src.glob("elin_ui_*.png"):
-        shutil.copy2(png, sf_ui / png.name)
+        if elin_keep.may_write(sf_ui / png.name):
+            shutil.copy2(png, sf_ui / png.name)
     return n
 
 
@@ -322,8 +330,11 @@ def deploy_icons(cat: Dict[str, Any]) -> int:
         # filename pattern elin_{System}_icon
         system = stem[len("elin_") : -len("_icon")]
         dest_dir = paths["mod"] / "Assets" / "Resources" / system / "Icons"
-        dest_dir.mkdir(parents=True, exist_ok=True)
+        if not elin_keep.DRY_RUN:
+            dest_dir.mkdir(parents=True, exist_ok=True)
         target = dest_dir / f"{system}_icon.png"
+        if not elin_keep.may_write(target):
+            continue
         shutil.copy2(png, target)
         try:
             from unity_meta import write_texture_meta
@@ -334,7 +345,8 @@ def deploy_icons(cat: Dict[str, Any]) -> int:
         # Starfield reference copy beside concept
         aid = asset_id(system)
         sf_icon = paths["sf_concepts"] / f"{aid}_icon.png"
-        shutil.copy2(png, sf_icon)
+        if elin_keep.may_write(sf_icon):
+            shutil.copy2(png, sf_icon)
         n += 1
         print(f"[icon] {system} -> {target}")
     return n
@@ -362,8 +374,8 @@ def main() -> int:
     sub.add_parser("stage")
     sub.add_parser("publish-concepts")
     sub.add_parser("status")
-    sub.add_parser("deploy-ui")
-    sub.add_parser("deploy-icons")
+    elin_keep.add_arguments(sub.add_parser("deploy-ui"))
+    elin_keep.add_arguments(sub.add_parser("deploy-icons"))
     p_t = sub.add_parser("trellis")
     p_t.add_argument("--id", action="append", default=[])
     p_t.add_argument("--all", action="store_true")

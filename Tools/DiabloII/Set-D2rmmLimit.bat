@@ -1,7 +1,7 @@
 @echo off
 rem Defaults to the game folder when called without arguments.
 if "%~1"=="" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Set-D2rmmLimit.ps1" -Root "D:\games\Diablo II Resurrected"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Set-D2rmmLimit.ps1" -Root "D:\games\Steam\steamapps\common\Diablo II Resurrected"
 ) else (
     powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Set-D2rmmLimit.ps1" %*
 )

@@ -49,6 +49,16 @@ param(
 
     [switch]$AllowSilhouette,
 
+    # Base body + one PNG per mutation feature; Arendeth_CYFTiles stacks the ones the player has in game
+    [switch]$Layered,
+
+    # Head drawn on layered sheets; auto = the fighter's headStyle, cat for feline fighters, else from its name/genotype/mutations
+    [ValidateSet("auto", "cat", "plain", "canine", "equine", "avian", "reptile", "insect", "fish", "robot", "skull", "fungal", "plant")]
+    [string]$HeadStyle = "auto",
+
+    # Truecolor: bake in Bright Qud's palette (Bright Qud then only adds its outline/shadow)
+    [switch]$BrightPalette,
+
     # Unfiltered art (UncensoredCharacterImageGenerator)
     [switch]$GenerateDetailedArt,
     [switch]$GenerateMinionArt,
@@ -60,6 +70,11 @@ param(
     [string]$MinionFilter = "all",
 
     [switch]$GeneratePortrait, # alias of GenerateDetailedArt
+
+    # Character-sheet portrait for Arendeth_CYFTiles (Install / Tile -InstallMod): any PNG, e.g.
+    # SD art from -Action Art or cyf_compose_fighter.py --portrait; installed as Textures\Portraits\<id>.png.
+    # Without it, Install copies the work folder's own Textures\Portraits\<id>.png if there is one.
+    [string]$PortraitImage,
 
     [switch]$Pretty,
 
@@ -141,7 +156,9 @@ function Rebuild-CYFModXml {
         $fg = if ($man.foreground) { [string]$man.foreground } else { "y" }
         $det = if ($man.detail) { [string]$man.detail } else { "W" }
         $mode = if ($man.colorMode) { [string]$man.colorMode } else { "classic" }
+        $layerSet = $man.layerSet
         $entries += [pscustomobject]@{
+            LayerSet    = $layerSet
             Id          = $id
             Name        = $name
             Genotype    = $geno
@@ -171,9 +188,56 @@ function Rebuild-CYFModXml {
         if ($e.AnimFrames) {
             $line += (' TileAnimationFrames="{0}"' -f (Escape-XmlAttr $e.AnimFrames))
         }
+        $ls = $e.LayerSet
+        $plans = @()
+        if ($ls) { $plans = @(@($ls.plans) | Where-Object { $_ -and $_.id -and $_.sheet }) }
+        if ($plans.Count -gt 0) {
+            $size = @(@($ls.tileSize) | Where-Object { $_ })
+            if ($size.Count -eq 2) {
+                $line += (' LayerTileWidth="{0}" LayerTileHeight="{1}"' -f [int]$size[0], [int]$size[1])
+            }
+            if ($ls.brightQudFallback -eq $false) { $line += ' BrightQudFallback="false"' }
+            $hide = @(@($ls.hideLayers) | Where-Object { $_ } | ForEach-Object { [string]$_ })
+            if ($hide.Count -gt 0) { $line += (' HideLayers="{0}"' -f (Escape-XmlAttr ($hide -join ","))) }
+            $tileHide = @(@($ls.tileHideLayers) | Where-Object { $_ } | ForEach-Object { [string]$_ })
+            if ($tileHide.Count -gt 0) { $line += (' TileHideLayers="{0}"' -f (Escape-XmlAttr ($tileHide -join ","))) }
+        }
         $line += ">"
         [void]$fighterXml.AppendLine($line)
         [void]$fighterXml.AppendLine(('    <description>{0}</description>' -f (Escape-XmlText $e.Description)))
+        # Layered fighters: one <plan> per body-plan sheet (Textures/<sheet>), one
+        # <layer> per sheet row; the mod picks the plan from the player's anatomy.
+        foreach ($pl in $plans) {
+            $anat = @(@($pl.anatomies) | Where-Object { $_ } | ForEach-Object { [string]$_ })
+            $baseFrames = 1
+            if ($pl.base -and [int]$pl.base.frames -gt 0) { $baseFrames = [int]$pl.base.frames }
+            $grips = @(@($pl.grips) | Where-Object { $null -ne $_ } | ForEach-Object { '{0},{1}' -f [int]$_[0], [int]$_[1] }) -join ";"
+            $gripAttr = ""
+            if ($grips) { $gripAttr = ' Grips="{0}"' -f $grips }
+            [void]$fighterXml.AppendLine(('    <plan ID="{0}" Sheet="{1}" Anatomies="{2}" BaseFrames="{3}"{4}>' -f @(
+                (Escape-XmlAttr ([string]$pl.id)),
+                (Escape-XmlAttr ([string]$pl.sheet)),
+                (Escape-XmlAttr ($anat -join ",")),
+                $baseFrames,
+                $gripAttr
+            )))
+            foreach ($l in @(@($pl.layers) | Where-Object { $_ })) {
+                $ll = '      <layer ID="{0}" Z="{1}"' -f (Escape-XmlAttr ([string]$l.id)), (Escape-XmlAttr ([string]$l.z))
+                if ($null -ne $l.row) { $ll += (' Row="{0}" Frames="{1}"' -f [int]$l.row, [Math]::Max(1, [int]$l.frames)) }
+                foreach ($k in @("mutations", "equipped", "effects", "limbs", "covers", "unless")) {
+                    $vals = @(@($l.$k) | Where-Object { $_ } | ForEach-Object { [string]$_ })
+                    if ($vals.Count -gt 0) {
+                        $attr = $k.Substring(0, 1).ToUpper() + $k.Substring(1)
+                        $ll += (' {0}="{1}"' -f $attr, (Escape-XmlAttr ($vals -join ",")))
+                    }
+                }
+                if ([int]$l.minLevel -gt 0) { $ll += (' MinLevel="{0}"' -f [int]$l.minLevel) }
+                if ($l.requires) { $ll += (' Requires="{0}"' -f (Escape-XmlAttr ([string]$l.requires))) }
+                if ([int]$l.fade -gt 0) { $ll += (' Fade="{0}"' -f [int]$l.fade) }
+                [void]$fighterXml.AppendLine($ll + ' />')
+            }
+            [void]$fighterXml.AppendLine('    </plan>')
+        }
         [void]$fighterXml.AppendLine('  </fighter>')
     }
     [void]$fighterXml.AppendLine('</cyffighters>')
@@ -206,7 +270,7 @@ function Rebuild-CYFModXml {
     $cyfXml = New-Object System.Text.StringBuilder
     [void]$cyfXml.AppendLine('<?xml version="1.0" encoding="utf-8"?>')
     [void]$cyfXml.AppendLine('<KernelmethodChooseYourFighter Encoding="utf-8">')
-    [void]$cyfXml.AppendLine('  <group ID="Arendeth_CYFTiles" Name="- Arendeth CYF Tiles">')
+    [void]$cyfXml.AppendLine('  <group ID="Arendeth_CYFTiles" Name="- Arendeth Character Looks">')
     foreach ($e in $entries) {
         $modelId = "Arendeth_CYF_" + $e.Id
         [void]$cyfXml.AppendLine(('    <model ID="{0}" Name="{1}">' -f (Escape-XmlAttr $modelId), (Escape-XmlAttr $e.Name)))
@@ -259,8 +323,49 @@ function Install-CYFOutput {
         Copy-Item $_.FullName (Join-Path $texDst $_.Name) -Force
         $copied += $_.Name
     }
+    # Layered fighters: one sheet per body plan under Textures\Layers\<id>\.
+    $layerSrc = Join-Path $work "Textures\Layers\$id"
+    if (Test-Path $layerSrc) {
+        $layerDst = Join-Path $root "Textures\Layers\$id"
+        New-Item -ItemType Directory -Path $layerDst -Force | Out-Null
+        Get-ChildItem $layerSrc -Filter "*.png" -File | ForEach-Object {
+            Copy-Item $_.FullName (Join-Path $layerDst $_.Name) -Force
+            $copied += "Layers/$id/" + $_.Name
+        }
+    }
     if ($copied.Count -lt 1) {
         throw "No $id.png / $id`_frame*.png under $texSrc"
+    }
+    # Character-sheet portrait (CYFPortrait.cs): -PortraitImage wins over the work folder's own.
+    $portraitSrc = $null
+    if (-not [string]::IsNullOrWhiteSpace($PortraitImage)) {
+        if (-not (Test-Path $PortraitImage -PathType Leaf)) { throw "PortraitImage not found: $PortraitImage" }
+        if ([IO.Path]::GetExtension($PortraitImage) -ne ".png") { throw "PortraitImage must be a PNG: $PortraitImage" }
+        $portraitSrc = (Resolve-Path $PortraitImage).Path
+    } else {
+        $own = Join-Path $work "Textures\Portraits\$id.png"
+        if (Test-Path $own -PathType Leaf) { $portraitSrc = $own }
+    }
+    if ($portraitSrc) {
+        $portraitDst = Join-Path $root "Textures\Portraits"
+        New-Item -ItemType Directory -Path $portraitDst -Force | Out-Null
+        Copy-Item $portraitSrc (Join-Path $portraitDst "$id.png") -Force
+        $copied += "Portraits/$id.png"
+    }
+    # Layered portrait (cyf_portrait_layers.py): Textures\Portraits\<id>\portrait.xml + layer PNGs,
+    # including the items\ subfolder of equipment layers (cyf_portrait_items.py --fitted).
+    $layeredSrc = Join-Path $work "Textures\Portraits\$id"
+    if (Test-Path (Join-Path $layeredSrc "portrait.xml")) {
+        $layeredDst = Join-Path $root "Textures\Portraits\$id"
+        New-Item -ItemType Directory -Path $layeredDst -Force | Out-Null
+        $srcFull = (Resolve-Path $layeredSrc).Path.TrimEnd('\') + '\'
+        Get-ChildItem $layeredSrc -File -Recurse | Where-Object { $_.Extension -in ".png", ".xml" } | ForEach-Object {
+            $rel = $_.FullName.Substring($srcFull.Length)
+            $dst = Join-Path $layeredDst $rel
+            New-Item -ItemType Directory -Path (Split-Path $dst) -Force | Out-Null
+            Copy-Item $_.FullName $dst -Force
+            $copied += "Portraits/$id/" + ($rel -replace '\\', '/')
+        }
     }
     $meta = Join-Path $root "Fighters\$id"
     New-Item -ItemType Directory -Path $meta -Force | Out-Null
@@ -502,11 +607,19 @@ if ($Action -eq "Tile") {
     if ($NoAutoOverlays) { $tileArgs += "--no-auto-overlays" }
     if ($NoSD) { $tileArgs += "--no-sd" }
     if ($AllowSilhouette) { $tileArgs += "--allow-silhouette" }
+    if ($Layered) { $tileArgs += "--layered" }
+    if ($HeadStyle -and $HeadStyle -ne "auto") { $tileArgs += @("--head-style", $HeadStyle) }
+    if ($BrightPalette) { $tileArgs += "--bright-palette" }
 
     $animNote = if ($Animated) { ', animated' } else { '' }
     Write-Host "Generating CoQ tile ($ColorMode, $TileSize$animNote - detailed art / kitty layout)..." -ForegroundColor Cyan
     & (Get-PythonExe) $tiler @tileArgs
     if ($LASTEXITCODE -ne 0) { throw "Tile generation failed." }
+    if ($Layered) {
+        # Crystal Delight body (no head, no feet, 4 prism arms): a crystal layer over the biped person.
+        & (Get-PythonExe) (Join-Path $here "cyf_crystal_layer.py") $workOut
+        if ($LASTEXITCODE -ne 0) { Write-Warning "Crystal layer not added." }
+    }
     Write-Host "Output: $workOut" -ForegroundColor Green
     if ($InstallMod) {
         [void](Install-CYFOutput -WorkOut $workOut)

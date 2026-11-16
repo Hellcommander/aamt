@@ -5,7 +5,7 @@
     Appends the lines to script.txt in the run folder, waits until the plugin has carried them out, and prints the new
     part of result.log. Without -Run it uses the newest run folder.
 .EXAMPLE
-    .\Send-D2RBotCommand.ps1 -Root 'D:\games\Diablo II Resurrected' 'console god 1', 'screenshot town'
+    .\Send-D2RBotCommand.ps1 -Root 'D:\games\Steam\steamapps\common\Diablo II Resurrected' 'console god 1', 'screenshot town'
 #>
 [CmdletBinding()]
 param(

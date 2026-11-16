@@ -2,7 +2,7 @@
 .SYNOPSIS
     Opens the particle effect editor in the browser (see README.md).
 .EXAMPLE
-    .\Start-D2REffectEditor.ps1 -Root 'D:\games\Diablo II Resurrected' -OutDir 'D:\mods\MyMod'
+    .\Start-D2REffectEditor.ps1 -Root 'D:\games\Steam\steamapps\common\Diablo II Resurrected' -OutDir 'D:\mods\MyMod'
 #>
 [CmdletBinding()]
 param(

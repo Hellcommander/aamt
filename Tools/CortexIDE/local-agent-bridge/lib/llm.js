@@ -155,8 +155,93 @@ async function contextWindow(backend, model, { override = 0, ollamaNumCtx = 1638
   return (m && m.ctx) || providerOf(backend.provider).defaultCtx;
 }
 
+/** Model names of OpenAI-compatible / local models that take images. */
+const VISION_RE = /(^|[\/:_.-])(vl|vlm|vision|llava|bakllava|pixtral|minicpm-?v|moondream|internvl|cogvlm|idefics|smolvlm|paligemma|molmo|gemma-?3|gemma3n|llama-?3\.2-?\d*b?-?vision|llama-?4|mistral-small-3\.[1-9]|qwen2(\.5)?-?(vl|omni)|qwen3-?(vl|omni)|qvq|kimi-vl|glm-4(\.\d)?v|phi-?3\.5-vision|phi-?4-multimodal|granite-vision|gpt-4o|gpt-4\.1|gpt-5|o3|o4|claude|gemini)/i;
+const visionCache = new Map();
+
+/**
+ * Whether the model can take images. mode "on"/"off" overrides; "auto": Claude and Claude Code yes,
+ * Ollama from /api/show capabilities (or a vision projector), others from the model name.
+ */
+async function supportsVision(backend, model, mode = "auto") {
+  if (mode === "on") return true;
+  if (mode === "off") return false;
+  if (!backend) return false;
+  if (backend.provider === "anthropic" || backend.provider === "claude-code") return true;
+  const key = backend.provider + "|" + backend.baseUrl + "|" + model;
+  if (visionCache.has(key)) return visionCache.get(key);
+  let yes = VISION_RE.test(String(model || ""));
+  if (backend.provider === "ollama") {
+    try {
+      const res = await request(ollamaRoot(backend.baseUrl) + "/api/show", { method: "POST", body: { model }, timeout: 5000 });
+      const j = res.json || {};
+      if (Array.isArray(j.capabilities)) yes = j.capabilities.includes("vision");
+      else if (j.projector_info || Object.keys(j.model_info || {}).some((k) => /\.vision\./.test(k))) yes = true;
+    } catch {
+      /* keep the name guess */
+    }
+  }
+  visionCache.set(key, yes);
+  return yes;
+}
+
+function imageNote(img) {
+  return "[image" + (img.path ? ": " + img.path : "") + (img.width ? " (" + img.width + "x" + img.height + ")" : "") + "]";
+}
+
+/**
+ * Loop messages → OpenAI chat format. A user message with images becomes a content array with
+ * image_url parts. Tool messages must stay text there, so the images of a round's tool results go
+ * in one user message right after that round's results.
+ */
+function toOpenAIMessages(messages) {
+  const out = [];
+  let pending = [];
+  const flush = () => {
+    if (!pending.length) return;
+    out.push({
+      role: "user",
+      content: [{ type: "text", text: "Images from the tool results above:" }, ...pending.flatMap((img) => [{ type: "text", text: imageNote(img) }, { type: "image_url", image_url: { url: "data:" + img.mime + ";base64," + img.data } }])],
+    });
+    pending = [];
+  };
+  for (const m of messages) {
+    if (m.role !== "tool") flush();
+    const { images, blocks, ...rest } = m;
+    const imgs = Array.isArray(images) ? images : [];
+    if (m.role === "tool") {
+      out.push(rest);
+      pending.push(...imgs);
+    } else if (m.role === "user" && imgs.length) {
+      out.push({ ...rest, content: [{ type: "text", text: String(m.content == null ? "" : m.content) }, ...imgs.map((img) => ({ type: "image_url", image_url: { url: "data:" + img.mime + ";base64," + img.data } }))] });
+    } else out.push(rest);
+  }
+  flush();
+  return out;
+}
+
 function toOllamaMessages(messages) {
-  return messages.map((m) => {
+  const out = [];
+  let pending = [];
+  const flush = () => {
+    if (!pending.length) return;
+    out.push({ role: "user", content: "Images from the tool results above: " + pending.map(imageNote).join(" "), images: pending.map((i) => i.data) });
+    pending = [];
+  };
+  for (const m of messages) {
+    if (m.role !== "tool") flush();
+    const imgs = Array.isArray(m.images) ? m.images : [];
+    const conv = toOllamaMessage(m);
+    if (m.role === "tool") pending.push(...imgs);
+    else if (imgs.length) conv.images = imgs.map((i) => i.data);
+    out.push(conv);
+  }
+  flush();
+  return out;
+}
+
+function toOllamaMessage(m) {
+  return ((m) => {
     if (m.role === "assistant" && Array.isArray(m.tool_calls) && m.tool_calls.length) {
       return {
         role: "assistant",
@@ -176,7 +261,7 @@ function toOllamaMessages(messages) {
     }
     if (m.role === "tool") return { role: "tool", content: String(m.content || ""), tool_name: m.name };
     return { role: m.role, content: String(m.content == null ? "" : m.content) };
-  });
+  })(m);
 }
 
 let callSeq = 0;
@@ -193,61 +278,141 @@ function newId() {
  * ThinkingMismatch when Claude rejects replayed thinking blocks after the history changed.
  * effort / replayThinking / onText are Claude-only; temperature is not sent to Claude.
  */
-async function chat({ backend, model, messages, tools, maxTokens = 2048, temperature = 0.2, numCtx, signal, effort = "", replayThinking = true, onText }) {
+/** Socket idle limit for local backends: a big prompt on a CPU-offloaded model can take minutes before its first token. */
+const LOCAL_TIMEOUT = 15 * 60 * 1000;
+
+async function chat({ backend, model, messages, tools, maxTokens = 2048, temperature = 0.2, numCtx, signal, effort = "", replayThinking = true, onText, onReasoning }) {
   if (backend.provider === "anthropic") {
     return anthropic.chat({ baseUrl: backend.baseUrl, cred: backend.cred, model, messages, tools, maxTokens, effort, replayThinking, signal, onText });
   }
   const isOllama = backend.provider === "ollama";
+  const say = (t) => {
+    if (t && onText) onText(t);
+  };
+  const think = (t) => {
+    if (t && onReasoning) onReasoning(t);
+  };
+  // Streamed, so a slow (CPU-offloaded) model never idles the socket into a timeout and the panel
+  // can show progress. A server that ignores `stream` answers with plain JSON, handled below.
   let res;
+  const acc = { content: "", reasoning: "", calls: [], usage: null, done: "", error: "" };
   if (isOllama) {
     const body = {
       model,
       messages: toOllamaMessages(messages),
-      stream: false,
+      stream: true,
       options: { temperature, num_predict: maxTokens, ...(numCtx ? { num_ctx: numCtx } : {}) },
     };
     if (tools && tools.length) body.tools = tools;
-    res = await request(ollamaRoot(backend.baseUrl) + "/api/chat", { method: "POST", body, signal });
+    res = await request(ollamaRoot(backend.baseUrl) + "/api/chat", {
+      method: "POST",
+      body,
+      signal,
+      timeout: LOCAL_TIMEOUT,
+      onEvent: (_e, chunk) => {
+        if (!chunk || typeof chunk !== "object") return;
+        if (chunk.error) acc.error = typeof chunk.error === "string" ? chunk.error : JSON.stringify(chunk.error);
+        const m = chunk.message || {};
+        if (m.content) {
+          acc.content += m.content;
+          say(m.content);
+        }
+        if (m.thinking) {
+          acc.reasoning += m.thinking;
+          think(m.thinking);
+        }
+        for (const tc of m.tool_calls || []) acc.calls.push(tc);
+        if (chunk.done) {
+          acc.done = chunk.done_reason || "stop";
+          acc.usage = { prompt_tokens: chunk.prompt_eval_count || 0, completion_tokens: chunk.eval_count || 0 };
+        }
+      },
+    });
   } else {
-    const body = { model, messages, stream: false, temperature, max_tokens: maxTokens };
+    const body = { model, messages: toOpenAIMessages(messages), stream: true, stream_options: { include_usage: true }, temperature, max_tokens: maxTokens };
     if (tools && tools.length) {
       body.tools = tools;
       body.tool_choice = "auto";
     }
+    const byIndex = new Map();
     res = await request(trimBase(backend.baseUrl) + "/chat/completions", {
       method: "POST",
       body,
       signal,
       apiKey: backend.apiKey,
+      timeout: LOCAL_TIMEOUT,
+      onEvent: (_e, data) => {
+        if (!data || typeof data !== "object") return; // "[DONE]"
+        if (data.error) acc.error = typeof data.error === "string" ? data.error : data.error.message || JSON.stringify(data.error);
+        if (data.usage) acc.usage = data.usage;
+        const ch = (data.choices || [])[0];
+        if (!ch) return;
+        const d = ch.delta || ch.message || {};
+        if (d.content) {
+          acc.content += d.content;
+          say(d.content);
+        }
+        const r = d.reasoning_content || d.reasoning;
+        if (r) {
+          acc.reasoning += r;
+          think(r);
+        }
+        for (const tc of d.tool_calls || []) {
+          // Tool calls arrive in fragments keyed by index: the name once, the arguments in pieces.
+          const k = tc.index != null ? tc.index : byIndex.size;
+          const cur = byIndex.get(k) || { id: "", type: "function", function: { name: "", arguments: "" } };
+          if (tc.id) cur.id = tc.id;
+          if (tc.function && tc.function.name) cur.function.name += tc.function.name;
+          if (tc.function && tc.function.arguments != null) {
+            cur.function.arguments += typeof tc.function.arguments === "string" ? tc.function.arguments : JSON.stringify(tc.function.arguments);
+          }
+          byIndex.set(k, cur);
+        }
+        if (ch.finish_reason) acc.done = ch.finish_reason;
+      },
     });
+    acc.calls = [...byIndex.values()];
   }
-  if (res.status >= 400 || !res.json) {
+  const streamed = res.status === 200 && res.events != null;
+  if (!streamed && (res.status >= 400 || !res.json)) {
     const msg = errText(res);
     if (tools && tools.length && /tool|function/i.test(msg)) throw new ToolsUnsupported(msg);
     throw new Error(msg);
   }
-  if (isOllama) {
-    const m = res.json.message || {};
-    return {
-      content: m.content || "",
-      tool_calls: (m.tool_calls || []).map((tc) => ({
-        id: newId(),
-        type: "function",
-        function: {
-          name: tc.function && tc.function.name,
-          arguments: JSON.stringify((tc.function && tc.function.arguments) || {}),
-        },
-      })),
-      usage: { prompt_tokens: res.json.prompt_eval_count || 0, completion_tokens: res.json.eval_count || 0 },
-    };
+  if (acc.error) {
+    if (tools && tools.length && /tool|function/i.test(acc.error) && !acc.content) throw new ToolsUnsupported(acc.error);
+    throw new Error(acc.error);
   }
-  const choice = (res.json.choices || [])[0] || {};
-  const m = choice.message || {};
-  return {
-    content: m.content || "",
-    tool_calls: (m.tool_calls || []).map((tc) => ({ ...tc, id: tc.id || newId() })),
-    usage: res.json.usage || {},
-  };
+  if (!streamed) {
+    // The server ignored `stream` and sent one JSON answer.
+    if (isOllama) {
+      const m = res.json.message || {};
+      acc.content = m.content || "";
+      acc.reasoning = m.thinking || "";
+      acc.calls = m.tool_calls || [];
+      acc.done = res.json.done_reason || "stop";
+      acc.usage = { prompt_tokens: res.json.prompt_eval_count || 0, completion_tokens: res.json.eval_count || 0 };
+    } else {
+      const choice = (res.json.choices || [])[0] || {};
+      const m = choice.message || {};
+      acc.content = m.content || "";
+      acc.reasoning = m.reasoning_content || m.reasoning || "";
+      acc.calls = m.tool_calls || [];
+      acc.done = choice.finish_reason || "";
+      acc.usage = res.json.usage || {};
+    }
+  }
+  const tool_calls = acc.calls
+    .filter((tc) => tc && tc.function && tc.function.name)
+    .map((tc) => ({
+      id: tc.id || newId(),
+      type: "function",
+      function: {
+        name: tc.function.name,
+        arguments: typeof tc.function.arguments === "string" ? tc.function.arguments : JSON.stringify(tc.function.arguments || {}),
+      },
+    }));
+  return { content: acc.content, reasoning: acc.reasoning, tool_calls, usage: acc.usage || {}, truncated: acc.done === "length" };
 }
 
 module.exports = {
@@ -261,6 +426,10 @@ module.exports = {
   listModels,
   pickModel,
   contextWindow,
+  supportsVision,
+  toOpenAIMessages,
+  toOllamaMessages,
+  VISION_RE,
   chat,
   qudlabKey,
   newId,

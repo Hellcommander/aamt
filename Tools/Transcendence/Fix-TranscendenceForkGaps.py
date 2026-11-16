@@ -7,14 +7,18 @@ Groups (all idempotent; each patch is skipped when its result is already present
 
   features        sealed sound archive (Resources\\sounds.mtsa, SealedArchive.h overlay + generated SealedKey.h)
                   isBound TLisp primitive  (isBound 'symbol) -> True/Nil
+                  unvIsExtensionLoaded primitive  (unvIsExtensionLoaded unid) -> True/Nil (mods detect each other)
+                  test-bot mode: TX_TESTBOT env var starts a new game with no menus (tx_testbot.py drives it)
   upstream-fixes  OPTIONAL fixes for upstream bugs, kept until an official fix lands:
                     CCAtomTable GetEntry INT_PTR (x64 compile error C2664)
                     ICCItem refcount / free-list link pointer-sized (x64 truncation)
                     CCodeChain::Lookup public (needed by isBound)
                     WndProc signatures LRESULT/WPARAM/LPARAM (x64 truncation of lParam)
                     TLisp object refs pointer-sized (sysFindObject lists, gPlayerShip, gSource: x64 crashes)
+                    escorts of a removed squadron leader discarded (idle escorts, "Unable to add ship order 9")
                     nebula CTile child-section pointer (save format unchanged), smart-pointer NULL compares
-  diagnostics     OPTIONAL: native crashes inside TLisp primitives are logged with function/file/line
+  diagnostics     OPTIONAL: native crashes inside TLisp primitives are logged with function/file/line;
+                  any native crash goes to TxCrash.log; test-bot runs can request a hang dump (TxHang.log)
   build-config    LibJPEGTurboUtil (no PCH, link turbojpeg.lib), zlibstat static debug CRT,
                   TSUI Hexarc stub excludes for x64, Transcendence.sln Debug For Contributors mapping
 
@@ -309,6 +313,185 @@ def feature_isbound(t: Tree) -> None:
     lookup_public(t, "isBound: CCodeChain::Lookup public")
 
 
+def feature_extension_loaded(t: Tree) -> None:
+    """(unvIsExtensionLoaded unid) -> True/Nil: is that extension, adventure or library bound in this game. Extensions
+    are not design types, so typFind/typGetProperty cannot see them; mods use this to detect each other."""
+    rel = "Mammoth/TSE/CCExtensions.cpp"
+    t.edit(rel, "unvIsExtensionLoaded: primitive", chain(
+        regex_sub(r"(#define FN_UNIVERSE_SET_ACHIEVEMENT[ \t]+11[^\n]*\n)",
+                  r"\1#define FN_UNIVERSE_EXTENSION_LOADED\t12\n", r"FN_UNIVERSE_EXTENSION_LOADED\t12"),
+        regex_sub(r'(\t\t\{\t"unvGetExtensionData",)',
+                  '\t\t{\t"unvIsExtensionLoaded",\t\t\tfnUniverseGet,\tFN_UNIVERSE_EXTENSION_LOADED,\n'
+                  '\t\t\t"(unvIsExtensionLoaded unid) -> True if that extension, adventure or library is bound in this game",\n'
+                  '\t\t\t"i",\t0,\t},\n\n\\1',
+                  r'"unvIsExtensionLoaded"'),
+        regex_sub(r"(\t\tcase FN_UNIVERSE_SET_ACHIEVEMENT:\n)",
+                  "\t\tcase FN_UNIVERSE_EXTENSION_LOADED:\n\t\t\t{\n"
+                  "\t\t\tDWORD dwUNID = (DWORD)pArgs->GetElement(0)->GetIntegerValue();\n"
+                  "\t\t\treturn pCC->CreateBool(pCtx->GetUniverse().GetDesignCollection().FindExtension(dwUNID) != NULL);\n"
+                  "\t\t\t}\n\n\\1",
+                  r"case FN_UNIVERSE_EXTENSION_LOADED:"),
+    ))
+
+
+TESTBOT_HELPERS = r'''
+// TX_TESTBOT: when the TX_TESTBOT environment variable is set, the game skips its menus: it picks the adventure
+// (TX_TESTBOT_ADVENTURE, hex; default: last adventure), that adventure's default extensions plus TX_TESTBOT_EXTENSIONS
+// (comma-separated hex UNIDs), the starting ship (TX_TESTBOT_SHIP, hex; default: last ship if valid), creates the
+// game and skips the prologue. Used by the toolkit's tx_testbot.py; nothing changes when the variable is unset.
+
+static bool TxTestBotActive (void)
+	{
+	char szBuf[8];
+	return (::GetEnvironmentVariableA("TX_TESTBOT", szBuf, sizeof(szBuf)) > 0);
+	}
+
+static void TxTestBotEnvList (const char *pszName, TArray<DWORD> *retList)
+	{
+	char szBuf[2048];
+	DWORD dwLen = ::GetEnvironmentVariableA(pszName, szBuf, sizeof(szBuf));
+	if (dwLen == 0 || dwLen >= sizeof(szBuf))
+		return;
+	char *pPos = szBuf;
+	while (*pPos)
+		{
+		char *pEnd;
+		DWORD dwValue = (DWORD)strtoul(pPos, &pEnd, 16);
+		if (pEnd == pPos)
+			pPos++;
+		else
+			{
+			if (dwValue)
+				retList->Insert(dwValue);
+			pPos = pEnd;
+			}
+		}
+	}
+
+static DWORD TxTestBotEnvHex (const char *pszName, DWORD dwDefault)
+	{
+	TArray<DWORD> List;
+	TxTestBotEnvList(pszName, &List);
+	return (List.GetCount() > 0 ? List[0] : dwDefault);
+	}
+
+static bool TxTestBotAdventure (CGameSettings &Settings, SAdventureSettings *retAdventure)
+	{
+	DWORD dwAdventure = TxTestBotEnvHex("TX_TESTBOT_ADVENTURE", (DWORD)Settings.GetInteger(CGameSettings::lastAdventure));
+
+	TArray<CExtension *> Adventures;
+	g_pUniverse->GetAllAdventures(&Adventures);
+	retAdventure->pAdventure = NULL;
+	for (int i = 0; i < Adventures.GetCount(); i++)
+		if (Adventures[i]->GetUNID() == dwAdventure)
+			retAdventure->pAdventure = Adventures[i];
+
+	if (retAdventure->pAdventure == NULL)
+		{
+		kernelDebugLogPattern("TXBOT: adventure %x not found (%d adventures available)", dwAdventure, Adventures.GetCount());
+		return false;
+		}
+
+	TArray<CExtension *> Available;
+	CString sError;
+	if (g_pUniverse->GetExtensionCollection().ComputeAvailableExtensions(retAdventure->pAdventure,
+			(g_pUniverse->InDebugMode() ? (CExtensionCollection::FLAG_DEBUG_MODE | CExtensionCollection::FLAG_INCLUDE_AUTO) : 0),
+			TArray<DWORD>(),
+			&Available,
+			&sError) != NOERROR)
+		{
+		kernelDebugLogPattern("TXBOT: cannot list extensions: %s", sError);
+		return false;
+		}
+
+	TArray<DWORD> Wanted;
+	Settings.GetDefaultExtensions(dwAdventure, Available, g_pUniverse->InDebugMode(), &Wanted);
+	TxTestBotEnvList("TX_TESTBOT_EXTENSIONS", &Wanted);
+
+	for (int i = 0; i < Available.GetCount(); i++)
+		if (Wanted.Find(Available[i]->GetUNID()) && !Available[i]->IsDisabled())
+			{
+			retAdventure->Extensions.Insert(Available[i]);
+			kernelDebugLogPattern("TXBOT: extension %x %s", Available[i]->GetUNID(), Available[i]->GetName());
+			}
+
+	kernelDebugLogPattern("TXBOT: adventure %x %s, %d extensions", dwAdventure, retAdventure->pAdventure->GetName(), retAdventure->Extensions.GetCount());
+	return true;
+	}
+'''
+
+TESTBOT_CREATE = (
+    "\t\t//\tTX_TESTBOT: create the game directly\n\n\t\tif (TxTestBotActive())\n\t\t\t{\n"
+    "\t\t\tTSortMap<CString, CShipClass *> TxShips;\n"
+    "\t\t\tCString sTxError;\n"
+    "\t\t\tDWORD dwTxShip = TxTestBotEnvHex(\"TX_TESTBOT_SHIP\", Defaults.dwPlayerShip);\n"
+    "\t\t\tbool bTxFound = false;\n"
+    "\t\t\tif (m_Model.GetUniverse().GetCurrentAdventureDesc().GetStartingShipClasses(&TxShips, &sTxError) == NOERROR)\n"
+    "\t\t\t\t{\n"
+    "\t\t\t\tCString sTxList;\n"
+    "\t\t\t\tfor (int i = 0; i < TxShips.GetCount(); i++)\n"
+    "\t\t\t\t\t{\n"
+    "\t\t\t\t\tsTxList.Append(strPatternSubst(CONSTLIT(\" %x\"), TxShips[i]->GetUNID()));\n"
+    "\t\t\t\t\tif (TxShips[i]->GetUNID() == dwTxShip)\n"
+    "\t\t\t\t\t\tbTxFound = true;\n"
+    "\t\t\t\t\t}\n"
+    "\t\t\t\tkernelDebugLogPattern(\"TXBOT: SHIPS%s\", sTxList);\n"
+    "\t\t\t\tif (!bTxFound && TxShips.GetCount() > 0)\n"
+    "\t\t\t\t\tdwTxShip = TxShips[0]->GetUNID();\n"
+    "\t\t\t\t}\n"
+    "\t\t\tDefaults.dwPlayerShip = dwTxShip;\n"
+    "\t\t\tkernelDebugLogPattern(\"TXBOT: creating game with ship %x\", dwTxShip);\n"
+    "\t\t\tm_iState = stateNewGame;\n"
+    "\t\t\tHICommand(CMD_GAME_CREATE, &Defaults);\n"
+    "\t\t\treturn NOERROR;\n"
+    "\t\t\t}\n\n"
+)
+
+TESTBOT_INTRO = (
+    "\n\t\t//\tTX_TESTBOT: skip the menus\n\n\t\tif (TxTestBotActive())\n\t\t\t{\n"
+    "\t\t\tSAdventureSettings TxAdventure;\n\t\t\tif (TxTestBotAdventure(m_Settings, &TxAdventure))\n"
+    "\t\t\t\tHICommand(CMD_GAME_ADVENTURE, &TxAdventure);\n\t\t\t}\n"
+)
+
+
+def feature_testbot(t: Tree) -> None:
+    """TX_TESTBOT environment variable: start a new game with no menus, for the toolkit's test bot (tx_testbot.py)."""
+    rel = "Transcendence/Transcendence/CTranscendenceController.cpp"
+    t.edit(rel, "testbot: menu-free new game (TX_TESTBOT)", chain(
+        regex_sub(r'(#include "Transcendence\.h"\n)', lambda m: m.group(1) + TESTBOT_HELPERS,
+                  r"static bool TxTestBotActive \(void\)"),
+        # 1. right after the opening intro starts: choose the adventure and extensions
+        regex_sub(r"(\t\tm_HI\.ShowSession\(new CIntroSession\(m_SessionCtx, CIntroSession::isOpeningTitles\)\);\n"
+                  r"(?:.*\n)*?\t\tm_Soundtrack\.SetGameState\(CSoundtrackManager::stateProgramIntro\);\n)",
+                  lambda m: m.group(1) + TESTBOT_INTRO, r"TX_TESTBOT: skip the menus"),
+        # 2. adventure ready: create the game instead of showing the new-game screen
+        regex_sub(r"(\t\t//\tNew game screen\n\n\t\tif \(error = m_HI\.ShowSession\(new CNewGameSession)",
+                  lambda m: TESTBOT_CREATE + m.group(1), r"TX_TESTBOT: create the game directly"),
+        # 2b. trees patched before the starting-ship list was logged: upgrade the loop in place
+        regex_sub(r"\t\t\t\tfor \(int i = 0; i < TxShips\.GetCount\(\); i\+\+\)\n\t\t\t\t\tif \(TxShips\[i\]->GetUNID\(\) == dwTxShip\)\n\t\t\t\t\t\tbTxFound = true;\n",
+                  lambda m: "\t\t\t\tCString sTxList;\n\t\t\t\tfor (int i = 0; i < TxShips.GetCount(); i++)\n\t\t\t\t\t{\n"
+                  "\t\t\t\t\tsTxList.Append(strPatternSubst(CONSTLIT(\" %x\"), TxShips[i]->GetUNID()));\n"
+                  "\t\t\t\t\tif (TxShips[i]->GetUNID() == dwTxShip)\n\t\t\t\t\t\tbTxFound = true;\n\t\t\t\t\t}\n"
+                  "\t\t\t\tkernelDebugLogPattern(\"TXBOT: SHIPS%s\", sTxList);\n",
+                  r"TXBOT: SHIPS%s"),
+        # 3. skip the prologue crawl
+        regex_sub(r"(\t\tm_iState = statePrologue;\n\t\tm_Soundtrack\.SetGameState\(CSoundtrackManager::stateGamePrologue, m_Model\.GetCrawlSoundtrack\(\)\);\n)",
+                  lambda m: m.group(1) + "\n\t\tif (TxTestBotActive())\n\t\t\tHICommand(CMD_SESSION_PROLOGUE_DONE);\t// TX_TESTBOT\n",
+                  r"HICommand\(CMD_SESSION_PROLOGUE_DONE\);\t// TX_TESTBOT"),
+        # 4. no Multiverse collection download in test runs (network, and it holds the universe lock during the init)
+        regex_sub(r"if \(((?:m_Multiverse\.IsLoadCollectionNeeded\(\) && )?m_Service\.HasCapability\(ICIService::canLoadUserCollection\))\)",
+                  r"if (!TxTestBotActive() && \1)",
+                  r"if \(!TxTestBotActive\(\) && "),
+    ))
+    # 5. every message popup is logged in test runs, so a run never waits on a dialog nobody can see
+    t.edit("Mammoth/TSUI/CMessageSession.cpp", "testbot: log message popups (TXBOT: POPUP)",
+           regex_sub(r"(ALERROR CMessageSession::OnInit \(CString \*retsError\)\n(?:.*\n)*?\tSetTransparent\(\);\n)",
+                     lambda m: m.group(1) + "\n\t//\tTX_TESTBOT: tx_testbot.py stops the run and reports the text\n\n"
+                     "\t{\n\tchar szTxBot[8];\n\tif (::GetEnvironmentVariableA(\"TX_TESTBOT\", szTxBot, sizeof(szTxBot)) > 0)\n"
+                     "\t\t::kernelDebugLogPattern(\"TXBOT: POPUP %s: %s\", m_sTitle, m_sMessage);\n\t}\n",
+                     r"TXBOT: POPUP %s: %s"))
+
+
 def lookup_public(t: Tree, name: str) -> None:
     decl = "\t\tICCItemPtr Lookup (CEvalContext *pCtx, ICCItem &Item);\n"
 
@@ -357,6 +540,41 @@ def upstream_fixes(t: Tree) -> None:
            ("Mammoth/TSUI/CMCIMixer.cpp", "CMCIMixer::ParentWndProc"),
            ("Mammoth/TSUI/Run.cpp", "CHumanInterface::MainWndProc")]
     objref_fix(t)
+    # CItem <-> TLisp list: the count/flags word was read as ((DWORD *)this)[1], i.e. right after a 4-byte type
+    # pointer. On x64 that is the high half of the pointer: itmCreate gave every item count 0 (objAddItem then does
+    # nothing) and reading an item back wrote into the pointer. Pack the bitfields explicitly (same value as x86).
+    t.edit("Mammoth/TSE/CItem.cpp", "fix: CItem count/flags word in TLisp item lists (x64)", chain(
+        replace_once("\tDWORD *pSource = (DWORD *)this;\n\tpList->AppendInteger(pSource[1]);",
+                     "\tpList->AppendInteger((int)(m_dwCount | (m_dwFlags << 16) | (m_dwUnused << 24)));\t// TX_X64_ITEM_WORD",
+                     "// TX_X64_ITEM_WORD"),
+        replace_once("\t\tDWORD *pDest = (DWORD *)this;\n\t\tpDest[1] = dwSavedData;",
+                     "\t\tm_dwCount = LOWORD(dwSavedData);\t// TX_X64_ITEM_WORD (was ((DWORD *)this)[1])\n"
+                     "\t\tm_dwFlags = (dwSavedData >> 16) & 0xff;\n\t\tm_dwUnused = (dwSavedData >> 24) & 0xff;",
+                     "// TX_X64_ITEM_WORD (was"),
+    ))
+    # Orphaned escorts: a station's squadron controller removes a batch of ships that overshoots its challenge
+    # rating, but only the principals (escorts are not in its result list). During system creation the escorts get
+    # their orders later (CShip::OnSystemCreated -> FinishCreation), find a removed leader, log "Unable to add ship
+    # order 9 ... no target specified" (~700 per new game, vanilla content too) and sit idle forever, adding strength
+    # the challenge rating had rejected. An escort/follower whose leader is already gone is discarded with it.
+    t.edit("Mammoth/TSE/CShip.cpp", "fix: discard escorts of a removed squadron leader (idle escorts)", chain(
+        regex_sub(r"(\t\t\tcase IShipController::orderEscort:\n\t\t\tcase IShipController::orderFollow:\n"
+                  r"\t\t\t\tif \(Ctx\.pBase && !Ctx\.pBase->IsDestroyed\(\)\)\n\t\t\t\t\tCtx\.OrderDesc\.SetTarget\(Ctx\.pBase\);\n)",
+                  lambda m: m.group(1)
+                  + "\t\t\t\telse if (Ctx.pBase)\t// TX_ORPHAN_ESCORT: the leader was removed before we finished creation\n"
+                  + "\t\t\t\t\t{\n\t\t\t\t\tRemove(DestructionTypes::removedFromSystem, CDamageSource());\n\t\t\t\t\treturn;\n\t\t\t\t\t}\n",
+                  r"TX_ORPHAN_ESCORT: the leader was removed"),
+        regex_sub(r"(\tif \(pCtx\)\n\t\tSetOrdersFromGenerator\(\*pCtx\);\n)",
+                  lambda m: m.group(1) + "\tif (IsDestroyed())\t// TX_ORPHAN_ESCORT\n\t\treturn;\n",
+                  r"SetOrdersFromGenerator\(\*pCtx\);\n\tif \(IsDestroyed\(\)\)\t// TX_ORPHAN_ESCORT"),
+    ))
+    # sysAddObjRecurringTimerEvent on an object that is not in a system yet (e.g. called from its own OnCreate,
+    # before the engine places it) dereferenced a NULL system and crashed natively (0xc0000005). Fall back to the
+    # current system's tick; fnSystemAddStationTimerEvent has already checked that one exists.
+    t.edit("Mammoth/TSE/Events.cpp", "fix: recurring timer on an object with no system yet (null deref)",
+           replace_once("\t\tCSystemEvent(pObj->GetSystem()->GetTick() + mathRandom(0, iInterval)),",
+                        "\t\tCSystemEvent((pObj->GetSystem() ? pObj->GetSystem() : pObj->GetUniverse().GetCurrentSystem())->GetTick()"
+                        " + mathRandom(0, iInterval)),\t//\tTX_TIMER_NO_SYSTEM"))
     for rel, fname in wnd:
         esc = re.escape(fname)
         t.edit(rel, f"fix: {fname} LRESULT/WPARAM/LPARAM (x64)",
@@ -380,6 +598,10 @@ OBJREF_PATTERNS = [
     # pCC->CreateInteger((int) pObj)   (CreateInteger already takes INT_PTR)
     (re.compile(r"\bCreateInteger\(\(int\) ?(p\w+)\)"),
      r"CreateInteger((INT_PTR)\1)"),
+    # reading one back: (CType *)pArg->GetIntegerValue() keeps 32 bits -> GetIntPtrValue()
+    #   (gPlayer in every ply* function, dock screens, item-list manipulators; found by the TX Test Bot)
+    (re.compile(r"(\((?:const )?[A-Z]\w*(?:::\w+)? ?\*\) ?[\w\.\->()]*?(?:->|\.))GetIntegerValue\(\)"),
+     r"\1GetIntPtrValue()"),
 ]
 
 
@@ -493,6 +715,183 @@ static ICCItem *TxInvokePrimitive (PRIMITIVEPROC pfFunction, CEvalContext *pCtx,
 '''
 
 
+VEH_LOGGER = r'''
+//	TX_FORKGAPS_VEH_LOG: native crashes outside TLisp primitives (binding, type creation, painting) end the process
+//	with no trace, and the buffered debug log is lost with it. A vectored handler sees every exception first: it
+//	writes the first few access violations / stack overflows and their frames straight to TxCrash.log (unbuffered,
+//	current folder), then lets normal handling continue.
+static void TxCrashWrite (HANDLE hFile, const char *pszLine)
+	{
+	DWORD dwWritten;
+	::WriteFile(hFile, pszLine, (DWORD)strlen(pszLine), &dwWritten, NULL);
+	::WriteFile(hFile, "\r\n", 2, &dwWritten, NULL);
+	}
+
+struct STxCrashWalk
+	{
+	HANDLE hFile;
+	HANDLE hThread;
+	CONTEXT Context;
+	};
+
+//	Walks the crashed thread's stack. Runs on a helper thread, because after a stack overflow the crashed thread has
+//	no stack left for dbghelp. A recursion shows as the same frames repeating, so the top frames are logged plus a
+//	sample of deeper ones.
+static DWORD WINAPI TxCrashWalkThread (LPVOID pData)
+	{
+#if defined(_M_X64)
+	STxCrashWalk *pWalk = (STxCrashWalk *)pData;
+	HANDLE hProcess = ::GetCurrentProcess();
+	static bool bSymInit = false;
+	if (!bSymInit)
+		{
+		::SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
+		::SymInitialize(hProcess, NULL, TRUE);
+		bSymInit = true;
+		}
+	char szLine[1024];
+	CONTEXT Context = pWalk->Context;
+	STACKFRAME64 Frame = { 0 };
+	Frame.AddrPC.Offset = Context.Rip;		Frame.AddrPC.Mode = AddrModeFlat;
+	Frame.AddrFrame.Offset = Context.Rbp;	Frame.AddrFrame.Mode = AddrModeFlat;
+	Frame.AddrStack.Offset = Context.Rsp;	Frame.AddrStack.Mode = AddrModeFlat;
+	for (int i = 0; i < 4000; i++)
+		{
+		if (!::StackWalk64(IMAGE_FILE_MACHINE_AMD64, hProcess, pWalk->hThread, &Frame, &Context, NULL,
+				::SymFunctionTableAccess64, ::SymGetModuleBase64, NULL) || Frame.AddrPC.Offset == 0)
+			break;
+		if (i >= 40 && (i % 200) != 0)
+			continue;
+		char Buffer[sizeof(SYMBOL_INFO) + 256] = { 0 };
+		SYMBOL_INFO *pSym = (SYMBOL_INFO *)Buffer;
+		pSym->SizeOfStruct = sizeof(SYMBOL_INFO);
+		pSym->MaxNameLen = 255;
+		DWORD64 dwDisp = 0;
+		const char *pszFn = (::SymFromAddr(hProcess, Frame.AddrPC.Offset, &dwDisp, pSym) ? pSym->Name : "?");
+		IMAGEHLP_LINE64 Line = { sizeof(IMAGEHLP_LINE64) };
+		DWORD dwLineDisp = 0;
+		if (::SymGetLineFromAddr64(hProcess, Frame.AddrPC.Offset, &dwLineDisp, &Line))
+			sprintf_s(szLine, "  %4d: %s  %s:%d", i, pszFn, Line.FileName, (int)Line.LineNumber);
+		else
+			sprintf_s(szLine, "  %4d: %s", i, pszFn);
+		TxCrashWrite(pWalk->hFile, szLine);
+		}
+#endif
+	return 0;
+	}
+
+static LONG CALLBACK TxVectoredCrashLog (EXCEPTION_POINTERS *pInfo)
+	{
+	static volatile LONG iLogged = 0;
+	DWORD dwCode = pInfo->ExceptionRecord->ExceptionCode;
+	if (!(dwCode == EXCEPTION_ACCESS_VIOLATION || dwCode == EXCEPTION_STACK_OVERFLOW
+				|| dwCode == EXCEPTION_ILLEGAL_INSTRUCTION || dwCode == EXCEPTION_INT_DIVIDE_BY_ZERO)
+			|| ::InterlockedIncrement(&iLogged) > 4)
+		return EXCEPTION_CONTINUE_SEARCH;
+
+	static STxCrashWalk Walk;		//	static: no stack to spare after an overflow
+	Walk.hFile = ::CreateFileA("TxCrash.log", FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (Walk.hFile == INVALID_HANDLE_VALUE)
+		return EXCEPTION_CONTINUE_SEARCH;
+
+	static char szLine[256];
+	sprintf_s(szLine, "exception 0x%08x at %p (thread %u)", (unsigned)dwCode,
+			pInfo->ExceptionRecord->ExceptionAddress, (unsigned)::GetCurrentThreadId());
+	TxCrashWrite(Walk.hFile, szLine);
+
+	Walk.Context = *pInfo->ContextRecord;
+	::DuplicateHandle(::GetCurrentProcess(), ::GetCurrentThread(), ::GetCurrentProcess(), &Walk.hThread, 0, FALSE, DUPLICATE_SAME_ACCESS);
+	HANDLE hWalker = ::CreateThread(NULL, 1024 * 1024, TxCrashWalkThread, &Walk, 0, NULL);
+	if (hWalker)
+		{
+		::WaitForSingleObject(hWalker, 30000);
+		::CloseHandle(hWalker);
+		}
+	::CloseHandle(Walk.hThread);
+	::CloseHandle(Walk.hFile);
+	return EXCEPTION_CONTINUE_SEARCH;
+	}
+
+static struct STxCrashLogInit
+	{
+	STxCrashLogInit (void) { ::AddVectoredExceptionHandler(1, TxVectoredCrashLog); }
+	} g_TxCrashLogInit;
+'''
+
+HANG_DUMPER = r'''
+#include <tlhelp32.h>
+//	TX_FORKGAPS_HANG_DUMP: in test-bot runs (TX_TESTBOT set) a sleeping thread waits for the event
+//	"Local\TxHangDump_<pid>"; tx_testbot.py signals it when a run stalls, and every other thread's stack is appended
+//	to TxHang.log (current folder). Normal play never starts the thread.
+static DWORD WINAPI TxHangDumpThread (LPVOID)
+	{
+	char szName[64];
+	sprintf_s(szName, "Local\\TxHangDump_%u", (unsigned)::GetCurrentProcessId());
+	HANDLE hEvent = ::CreateEventA(NULL, FALSE, FALSE, szName);
+	if (hEvent == NULL)
+		return 0;
+
+	while (::WaitForSingleObject(hEvent, INFINITE) == WAIT_OBJECT_0)
+		{
+		static STxCrashWalk Walk;
+		Walk.hFile = ::CreateFileA("TxHang.log", FILE_APPEND_DATA, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		if (Walk.hFile == INVALID_HANDLE_VALUE)
+			continue;
+		TxCrashWrite(Walk.hFile, "=== hang dump ===");
+
+		DWORD dwSelf = ::GetCurrentThreadId();
+		DWORD dwPid = ::GetCurrentProcessId();
+		HANDLE hSnap = ::CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+		THREADENTRY32 Entry = { sizeof(THREADENTRY32) };
+		if (hSnap != INVALID_HANDLE_VALUE && ::Thread32First(hSnap, &Entry))
+			{
+			do
+				{
+				if (Entry.th32OwnerProcessID != dwPid || Entry.th32ThreadID == dwSelf)
+					continue;
+				HANDLE hThread = ::OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION, FALSE, Entry.th32ThreadID);
+				if (hThread == NULL)
+					continue;
+				char szLine[64];
+				sprintf_s(szLine, "thread %u", (unsigned)Entry.th32ThreadID);
+				TxCrashWrite(Walk.hFile, szLine);
+				if (::SuspendThread(hThread) != (DWORD)-1)
+					{
+					Walk.Context.ContextFlags = CONTEXT_FULL;
+					if (::GetThreadContext(hThread, &Walk.Context))
+						{
+						Walk.hThread = hThread;
+						TxCrashWalkThread(&Walk);
+						}
+					::ResumeThread(hThread);
+					}
+				::CloseHandle(hThread);
+				}
+			while (::Thread32Next(hSnap, &Entry));
+			}
+		if (hSnap != INVALID_HANDLE_VALUE)
+			::CloseHandle(hSnap);
+		TxCrashWrite(Walk.hFile, "=== end ===");
+		::CloseHandle(Walk.hFile);
+		}
+	return 0;
+	}
+
+static struct STxHangDumpInit
+	{
+	STxHangDumpInit (void)
+		{
+		char szBuf[8];
+		if (::GetEnvironmentVariableA("TX_TESTBOT", szBuf, sizeof(szBuf)) == 0)
+			return;
+		HANDLE hThread = ::CreateThread(NULL, 256 * 1024, TxHangDumpThread, NULL, 0, NULL);
+		if (hThread)
+			::CloseHandle(hThread);
+		}
+	} g_TxHangDumpInit;
+'''
+
+
 def diagnostics(t: Tree) -> None:
     rel = "Alchemy/CodeChain/CCPrimitive.cpp"
     t.edit(rel, "diag: log native crashes in TLisp primitives (function/file/line)", chain(
@@ -500,6 +899,11 @@ def diagnostics(t: Tree) -> None:
         replace_once("pResult = ((PRIMITIVEPROC)m_pfFunction)(pCtx, pEvalArgs, m_dwData);",
                      "pResult = TxInvokePrimitive((PRIMITIVEPROC)m_pfFunction, pCtx, pEvalArgs, m_dwData, m_sName.GetASCIIZPointer());"),
     ))
+    t.edit(rel, "diag: log any native crash in the process (vectored handler)",
+           insert_after("\t__except (TxLogPrimitiveCrash(GetExceptionInformation(), pszName))\n\t\t{\n\t\treturn NULL;\n\t\t}\n\t}\n",
+                        VEH_LOGGER, "TX_FORKGAPS_VEH_LOG"))
+    t.edit(rel, "diag: on-demand hang dump for test-bot runs (TxHang.log)",
+           insert_after("\t} g_TxCrashLogInit;\n", HANG_DUMPER, "TX_FORKGAPS_HANG_DUMP"))
 
 
 # ---------------------------------------------------------------- build config
@@ -602,6 +1006,8 @@ def main() -> int:
         t.log.append("features:")
         feature_sealed_sounds(t, Path(a.seal_key))
         feature_isbound(t)
+        feature_extension_loaded(t)
+        feature_testbot(t)
     if "diagnostics" in groups:
         t.log.append("diagnostics (optional):")
         diagnostics(t)

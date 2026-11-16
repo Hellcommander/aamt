@@ -2,9 +2,9 @@
 .SYNOPSIS
     Raises D2RMM's 512 MiB D2RLoader package limit; rerun after every D2RMM update (see README.md).
 .EXAMPLE
-    .\Set-D2rmmLimit.ps1 -Root 'D:\games\Diablo II Resurrected'
+    .\Set-D2rmmLimit.ps1 -Root 'D:\games\Steam\steamapps\common\Diablo II Resurrected'
 .EXAMPLE
-    .\Set-D2rmmLimit.ps1 -Root 'D:\games\Diablo II Resurrected' -Check
+    .\Set-D2rmmLimit.ps1 -Root 'D:\games\Steam\steamapps\common\Diablo II Resurrected' -Check
 #>
 [CmdletBinding()]
 param(

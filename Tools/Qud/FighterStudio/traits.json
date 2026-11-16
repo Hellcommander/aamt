@@ -1,0 +1,668 @@
+{
+ "_about": [
+  "How a character's build shows in its art. Fighter Studio reads this to write the picture prompt.",
+  "traits: 'match' tokens are lowercase letters/digits, matched as substrings of a mutation's Name+Variant or a",
+  "natural body item's blueprint (the same matching the layered tile uses). The longest matching token wins.",
+  "kind: body = changes the whole body; part = an extra body part; effect = an aura or emission (never in the",
+  "base picture, it becomes a portrait effect layer); none = not visible.",
+  "separate: the part should stand clear of the torso so it can be cut into its own portrait layer.",
+  "covers: limb classes (head, arm, leg, tail, wing, tentacle, fin, roots) this trait already describes.",
+  "layer: how refart finds and cuts the part (phrase for Grounding DINO, tile layer it follows, z, fill).",
+  "Entries saved from the program's Character tab are appended to 'traits'.",
+  "brief: a shorter wording used when 'Short wording' is on (Designer cuts long prompts off)."
+ ],
+ "style": "chunky stylized video game character art, bold dark outline, cel shading with simple shaded materials, bright saturated colours",
+ "world": "a retro-futurist post-apocalyptic desert world",
+ "colors": {
+  "r": "dark red",
+  "R": "bright red",
+  "o": "burnt orange",
+  "O": "orange",
+  "w": "brown",
+  "W": "golden yellow",
+  "g": "dark green",
+  "G": "bright green",
+  "b": "deep blue",
+  "B": "sky blue",
+  "c": "teal",
+  "C": "cyan",
+  "m": "purple",
+  "M": "magenta",
+  "k": "very dark teal",
+  "K": "dark grey",
+  "y": "pale grey",
+  "Y": "white"
+ },
+ "limbs": {
+  "head": {
+   "min": 2,
+   "phrase": "{n} heads side by side, each on its own neck",
+   "layer": {
+    "phrase": "head",
+    "z": "back",
+    "fill": "transparent",
+    "stump": true,
+    "follow": "head{i}"
+   },
+   "brief": "{n} heads side by side"
+  },
+  "arm": {
+   "min": 3,
+   "phrase": "{n} arms, the extra arms set below the first pair and held away from the body",
+   "separate": true
+  },
+  "leg": {
+   "min": 3,
+   "phrase": "{n} legs"
+  },
+  "tail": {
+   "min": 1,
+   "phrase": "a tail curving out to one side, clear of the legs",
+   "separate": true,
+   "layer": {
+    "phrase": "tail",
+    "z": "back",
+    "fill": "transparent",
+    "follow": "tail"
+   },
+   "brief": "a tail curving out to one side"
+  },
+  "wing": {
+   "min": 1,
+   "phrase": "a pair of wings spread wide behind the shoulders",
+   "separate": true,
+   "layer": {
+    "phrase": "wing",
+    "z": "back",
+    "fill": "transparent",
+    "follow": "wings"
+   }
+  },
+  "tentacle": {
+   "min": 1,
+   "phrase": "{n} tentacles growing from the shoulders, held away from the body",
+   "separate": true
+  },
+  "fin": {
+   "min": 1,
+   "phrase": "fins along the back and forearms"
+  },
+  "roots": {
+   "min": 1,
+   "phrase": "a mass of thick roots in place of legs"
+  }
+ },
+ "parts": {
+  "oral arm": {
+   "needs_children": true,
+   "covers": [
+    "tentacle"
+   ],
+   "separate": true,
+   "short": "slime limb",
+   "phrase": "one thick slime limb growing up from the top of its {side} shoulder, forking into {children}, held up and away from the head",
+   "children": {
+    "tentacle": [
+     "a tentacle",
+     "tentacles"
+    ],
+    "pseudopod": [
+     "a club-like pseudopod",
+     "club-like pseudopods"
+    ]
+   },
+   "brief": "a slime limb rising from its {side} shoulder, forking into {children}"
+  }
+ },
+ "traits": [
+  {
+   "id": "gelatinous_poison",
+   "match": [
+    "gelatinousformpoison"
+   ],
+   "kind": "body",
+   "color": "poison green",
+   "phrase": "a body of glossy translucent poison-green slime with a darker core, dripping slightly",
+   "brief": "glossy translucent poison-green slime body"
+  },
+  {
+   "id": "gelatinous_acid",
+   "match": [
+    "gelatinousformacid"
+   ],
+   "kind": "body",
+   "color": "acid yellow-green",
+   "phrase": "a body of glossy translucent acid-yellow slime with a darker core, dripping slightly",
+   "brief": "glossy translucent acid-yellow slime body"
+  },
+  {
+   "id": "gelatinous",
+   "match": [
+    "gelatinous"
+   ],
+   "kind": "body",
+   "color": "slime green",
+   "phrase": "a body of glossy translucent slime with a darker core, dripping slightly",
+   "brief": "glossy translucent slime body"
+  },
+  {
+   "id": "slime_glands",
+   "match": [
+    "slimeglands",
+    "soggyglands",
+    "acidslimeglands"
+   ],
+   "kind": "body",
+   "phrase": "skin glistening with dripping slime"
+  },
+  {
+   "id": "ovipositor",
+   "match": [
+    "ovipositor"
+   ],
+   "kind": "part",
+   "separate": true,
+   "covers": [
+    "tail"
+   ],
+   "phrase": "a thick segmented ovipositor tail with a swollen egg-laying tip, curving out to one side clear of the legs",
+   "layer": {
+    "phrase": "tail",
+    "z": "back",
+    "fill": "transparent",
+    "follow": "tail"
+   },
+   "brief": "thick segmented ovipositor tail with a swollen tip, out to one side"
+  },
+  {
+   "id": "seed_cannon",
+   "match": [
+    "seedcannon"
+   ],
+   "kind": "part",
+   "separate": true,
+   "covers": [
+    "tail"
+   ],
+   "phrase": "a prehensile tail ending in an organic seed-cannon pod, curving out to one side clear of the legs",
+   "layer": {
+    "phrase": "tail",
+    "z": "back",
+    "fill": "transparent",
+    "follow": "tail"
+   },
+   "brief": "prehensile tail ending in an organic seed-cannon pod, out to one side"
+  },
+  {
+   "id": "stinger",
+   "match": [
+    "stinger"
+   ],
+   "kind": "part",
+   "separate": true,
+   "covers": [
+    "tail"
+   ],
+   "phrase": "a segmented scorpion tail ending in a stinger, arched out to one side",
+   "layer": {
+    "phrase": "tail",
+    "z": "back",
+    "fill": "transparent",
+    "follow": "tail"
+   },
+   "brief": "scorpion tail with a stinger, arched to one side"
+  },
+  {
+   "id": "paws",
+   "match": [
+    "pedestrianpaws",
+    "pawfeet",
+    "pawedfeet"
+   ],
+   "kind": "part",
+   "phrase": "large clawed animal paws for feet",
+   "brief": "clawed animal paws for feet"
+  },
+  {
+   "id": "hooves",
+   "match": [
+    "hooves",
+    "hoof",
+    "hooksforfeet"
+   ],
+   "kind": "part",
+   "phrase": "hooked talons in place of feet"
+  },
+  {
+   "id": "gills",
+   "match": [
+    "amphibious",
+    "gills"
+   ],
+   "kind": "part",
+   "phrase": "gill slits on both sides of the neck",
+   "brief": "neck gill slits"
+  },
+  {
+   "id": "glow_eyes",
+   "match": [
+    "darkvision",
+    "nightvision"
+   ],
+   "kind": "part",
+   "phrase": "softly glowing eyes",
+   "layer": {
+    "phrase": "glowing eye",
+    "z": "front",
+    "fill": "dark",
+    "only": "bright",
+    "follow": "glow_eyes",
+    "group": "head"
+   },
+   "brief": "glowing eyes"
+  },
+  {
+   "id": "horns_single",
+   "match": [
+    "hornssingle",
+    "hornsspiral",
+    "hornsplussingle",
+    "hornsplusspiral",
+    "unihorn"
+   ],
+   "kind": "part",
+   "phrase": "a single pale horn on the forehead{onhead}",
+   "layer": {
+    "phrase": "white horn",
+    "z": "front",
+    "fill": "inpaint",
+    "within": "head",
+    "follow": "unihorn"
+   },
+   "brief": "one pale horn per forehead"
+  },
+  {
+   "id": "horns",
+   "match": [
+    "horns"
+   ],
+   "kind": "part",
+   "phrase": "a pair of pale curved horns{onhead}",
+   "layer": {
+    "phrase": "white horn",
+    "z": "front",
+    "fill": "inpaint",
+    "within": "head",
+    "follow": "horns"
+   },
+   "brief": "pale curved horns"
+  },
+  {
+   "id": "two_headed",
+   "match": [
+    "twoheaded",
+    "multiplehead",
+    "hydrahead"
+   ],
+   "kind": "part",
+   "covers": [
+    "head"
+   ],
+   "phrase": "{heads} heads side by side, each on its own neck",
+   "layer": {
+    "phrase": "head",
+    "z": "back",
+    "fill": "transparent",
+    "stump": true,
+    "follow": "head{i}"
+   },
+   "brief": "{heads} heads side by side"
+  },
+  {
+   "id": "multiple_arms",
+   "match": [
+    "multiplearms"
+   ],
+   "kind": "part",
+   "separate": true,
+   "covers": [
+    "arm"
+   ],
+   "phrase": "{arms} arms, the second pair set below the first and held away from the body"
+  },
+  {
+   "id": "multiple_legs",
+   "match": [
+    "multiplelegs"
+   ],
+   "kind": "part",
+   "covers": [
+    "leg"
+   ],
+   "phrase": "{legs} legs"
+  },
+  {
+   "id": "wings",
+   "match": [
+    "wings"
+   ],
+   "kind": "part",
+   "separate": true,
+   "covers": [
+    "wing"
+   ],
+   "phrase": "a pair of large wings spread wide behind the shoulders",
+   "layer": {
+    "phrase": "wing",
+    "z": "back",
+    "fill": "transparent",
+    "follow": "wings"
+   },
+   "brief": "large wings spread behind the shoulders"
+  },
+  {
+   "id": "carapace",
+   "match": [
+    "carapace"
+   ],
+   "kind": "body",
+   "phrase": "thick chitinous carapace plates over the torso and back",
+   "brief": "chitinous carapace on torso and back"
+  },
+  {
+   "id": "exoskeleton",
+   "match": [
+    "exoskeleton"
+   ],
+   "kind": "body",
+   "phrase": "bony exoskeleton plates on the shoulders, forearms and shins",
+   "brief": "bony plates on shoulders, forearms and shins"
+  },
+  {
+   "id": "double_muscled",
+   "match": [
+    "doublemuscled",
+    "heightenedstrength"
+   ],
+   "kind": "body",
+   "phrase": "a hulking, heavily muscled build",
+   "brief": "hulking muscular build"
+  },
+  {
+   "id": "gigantism",
+   "match": [
+    "gigantism"
+   ],
+   "kind": "body",
+   "phrase": "a towering giant with a massive frame",
+   "brief": "towering giant"
+  },
+  {
+   "id": "thick_fur",
+   "match": [
+    "thickfur"
+   ],
+   "kind": "body",
+   "phrase": "covered in thick shaggy fur"
+  },
+  {
+   "id": "quills",
+   "match": [
+    "quills",
+    "thorny",
+    "burs"
+   ],
+   "kind": "part",
+   "follow": "quills",
+   "phrase": "long quills bristling from the back and shoulders"
+  },
+  {
+   "id": "photosynthetic",
+   "match": [
+    "photosyntheticskin"
+   ],
+   "kind": "body",
+   "color": "leaf green",
+   "phrase": "green leaf-textured skin"
+  },
+  {
+   "id": "scales",
+   "match": [
+    "coldblooded",
+    "scales",
+    "chitinousskin"
+   ],
+   "kind": "body",
+   "phrase": "fine scales over the skin"
+  },
+  {
+   "id": "albino",
+   "match": [
+    "albino"
+   ],
+   "kind": "body",
+   "color": "chalk white",
+   "phrase": "chalk-white skin and pink eyes"
+  },
+  {
+   "id": "beak",
+   "match": [
+    "beak"
+   ],
+   "kind": "part",
+   "phrase": "a hooked bird beak in place of mouth and nose"
+  },
+  {
+   "id": "burrowing_claws",
+   "match": [
+    "burrowingclaws",
+    "claws",
+    "talons"
+   ],
+   "kind": "part",
+   "phrase": "large heavy claws on the hands"
+  },
+  {
+   "id": "ears",
+   "match": [
+    "heightenedhearing"
+   ],
+   "kind": "part",
+   "phrase": "large pointed ears"
+  },
+  {
+   "id": "fangs",
+   "match": [
+    "carnivorous"
+   ],
+   "kind": "part",
+   "phrase": "sharp fangs"
+  },
+  {
+   "id": "nerve_poppies",
+   "match": [
+    "nervepoppy"
+   ],
+   "kind": "part",
+   "phrase": "small red poppies growing from the scalp and shoulders"
+  },
+  {
+   "id": "spinnerets",
+   "match": [
+    "spinnerets"
+   ],
+   "kind": "part",
+   "phrase": "a bulbous spinneret at the base of the spine"
+  },
+  {
+   "id": "broodmother",
+   "match": [
+    "broodmother"
+   ],
+   "kind": "part",
+   "separate": true,
+   "short": "brood sack",
+   "follow": "brood",
+   "phrase": "a large chitinous brood sack on the back, showing behind one shoulder",
+   "layer": {
+    "phrase": "fleshy sack",
+    "z": "back",
+    "fill": "transparent",
+    "grow": 4,
+    "follow": "brood"
+   },
+   "brief": "chitinous brood sack behind one shoulder"
+  },
+  {
+   "id": "quadruped",
+   "match": [
+    "quadruped"
+   ],
+   "kind": "body",
+   "covers": [
+    "leg"
+   ],
+   "phrase": "an animal's four-legged body, standing on all fours",
+   "brief": "four-legged animal body"
+  },
+  {
+   "id": "conjoined",
+   "match": [
+    "conjoin"
+   ],
+   "kind": "part",
+   "phrase": "a smaller creature fused into the side of the torso",
+   "brief": "small creature fused into the torso"
+  },
+  {
+   "id": "fx_gas",
+   "match": [
+    "gasgeneration",
+    "poisongas",
+    "corrosivegas",
+    "sleepgas",
+    "confusiongas",
+    "breath",
+    "plasma",
+    "steam"
+   ],
+   "kind": "effect",
+   "phrase": "breath or gas cloud",
+   "follow": "gas_toxic"
+  },
+  {
+   "id": "fx_sparks",
+   "match": [
+    "electricalgeneration",
+    "electromagneticpulse",
+    "electromagneticimpulse"
+   ],
+   "kind": "effect",
+   "phrase": "electric sparks",
+   "follow": "sparks"
+  },
+  {
+   "id": "fx_regen",
+   "match": [
+    "regeneration"
+   ],
+   "kind": "effect",
+   "phrase": "healing shimmer",
+   "follow": "regen"
+  },
+  {
+   "id": "fx_vortex",
+   "match": [
+    "spacetimevortex",
+    "vortex"
+   ],
+   "kind": "effect",
+   "phrase": "spacetime vortex",
+   "follow": "vortex"
+  },
+  {
+   "id": "fx_orbit",
+   "match": [
+    "telekinesis"
+   ],
+   "kind": "effect",
+   "phrase": "objects held in the air by telekinesis",
+   "follow": "orbit"
+  },
+  {
+   "id": "fx_fire",
+   "match": [
+    "flamingray",
+    "flaminghands",
+    "pyrokinesis"
+   ],
+   "kind": "effect",
+   "phrase": "flames"
+  },
+  {
+   "id": "fx_ice",
+   "match": [
+    "freezingray",
+    "freezinghands",
+    "cryokinesis"
+   ],
+   "kind": "effect",
+   "phrase": "frost"
+  },
+  {
+   "id": "fx_webs",
+   "match": [
+    "webs",
+    "spinweb"
+   ],
+   "kind": "effect",
+   "phrase": "webs",
+   "follow": "webs"
+  },
+  {
+   "id": "fx_phase",
+   "match": [
+    "phasing",
+    "astral",
+    "incorporeal"
+   ],
+   "kind": "effect",
+   "phrase": "ghostly phase shimmer",
+   "follow": "astral"
+  },
+  {
+   "id": "hidden",
+   "kind": "none",
+   "phrase": "",
+   "match": [
+    "amnesia",
+    "analgesia",
+    "biographer",
+    "flexiblegenome",
+    "sociallyrepugnant",
+    "vitaintuita",
+    "shapeshifting",
+    "brittlebones",
+    "irritablegenome",
+    "tonicallergy",
+    "spontaneouscombustion",
+    "triplejointed",
+    "twohearted",
+    "adrenalcontrol",
+    "heightenedspeed",
+    "metamorphosis",
+    "myopic",
+    "ttbackground",
+    "eviltwin",
+    "narcolepsy",
+    "psionicmigraines",
+    "dystechnia",
+    "blinkingtic",
+    "quantumjitters",
+    "myopi",
+    "companion"
+   ]
+  }
+ ],
+ "style_brief": "chunky stylized game character art, bold dark outline, cel shading, bright colours"
+}

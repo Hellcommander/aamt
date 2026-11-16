@@ -17,6 +17,10 @@ is made from a Spike Fiend without a new model. See README.md.
 Output (under --out, normally a D2RMM mod folder):
     hd/character/enemy/<name>.json      one per variant
     hd/character/props/<prop>.json      one per prop used
+    hd/character/enemy/<name>/*.model   the donor's models, edited, for a variant with "reshape"
+    hd/model_lod_desc.bin               the game's model index with the new models added (only with "reshape")
+    model_index.json                    which models were added and from which game build; Update-D2RModelIndex.ps1
+                                        rebuilds the index from it after a game patch
     scaled_monsters.report.json         what was built + the animation audit
 
 The mod then copies `hd` into the game data and points its monsters at the
@@ -147,6 +151,14 @@ def build_scaled_definition(archive, donor_hd, name, scale):
     return definition
 
 
+def multiply_root_scale(definition, factor):
+    for entity in definition['entities']:
+        if any(c['type'] == 'UnitRootComponent' for c in entity['components']):
+            transform = next(c for c in entity['components'] if c['type'] == 'TransformDefinitionComponent')
+            for axis in ('x', 'y', 'z'):
+                transform['scale'][axis] = round(transform['scale'][axis] * factor, 4)
+
+
 def prop_path(prop_name):
     return f'hd/character/props/{prop_name}.json'
 
@@ -196,7 +208,22 @@ def expand_attachments(attach):
     into the body is hidden by it.
     """
     out = []
-    for index, entry in enumerate(attach):
+    flat = []
+    for entry in attach:
+        # "bones": one copy of the entry per bone, each a little different in size.
+        names = entry.get('bones')
+        if not names:
+            flat.append(entry)
+            continue
+        jitter = float(entry.get('scaleJitter', 0.0))
+        for k, bone in enumerate(names):
+            factor = 1.0 + jitter * (((k * 37) % 11) / 10.0 - 0.5)
+            scale = scale_vector(entry.get('scale', 1.0))
+            copy = {key: value for key, value in entry.items() if key not in ('bones', 'scaleJitter')}
+            copy['bone'] = bone
+            copy['scale'] = {axis: round(v * factor, 3) for axis, v in scale.items()}
+            flat.append(copy)
+    for index, entry in enumerate(flat):
         base = {
             'prop': entry['prop'], 'bone': entry.get('bone', ''),
             'translation': vector(entry.get('translation')),
@@ -261,6 +288,266 @@ def donor_part(definition):
     return 'torso', 'lit'
 
 
+def reshape_models(archive, definition, variant, out_dir, write, index):
+    """Rewrites the donor's body models with the variant's "reshape" edit.
+
+    Every model the definition names (and each of its LOD files) is read from
+    the archive, edited with GrannyMesh.reshape against the donor's skeleton,
+    and written under hd/character/enemy/<variant>/. The definition is pointed
+    at the new files. The skeleton and animations stay the donor's.
+    `index` collects {"model", "donor"} for the model index the caller writes
+    afterwards.
+    """
+    import tempfile
+    import GrannyMesh
+    import GrannyPreview
+    name = variant['name']
+    spec = variant['reshape']
+    files = archive.list()
+    skeleton = next((c['filename'] for e in definition['entities'] for c in e['components']
+                     if c['type'] == 'SkeletonDefinitionComponent'), None)
+    if skeleton is None:
+        raise ValueError(f'{name}: the donor has no skeleton, so it cannot be reshaped')
+    written = []
+    with tempfile.TemporaryDirectory() as work:
+        def fetch(archive_path):
+            target = os.path.join(work, archive_path.replace('/', '_'))
+            with open(target, 'wb') as f:
+                f.write(archive.read(archive_path))
+            return target
+        bones, _ = GrannyPreview.load_bones(fetch(skeleton[len('data/'):]))
+        renamed = {}
+        for entity in definition['entities']:
+            for component in entity['components']:
+                if component['type'] != 'ModelDefinitionComponent':
+                    continue
+                stem = component['filename'][len('data/'):-len('.model')]
+                sources = [f for f in files if f == f'{stem}.model' or (f.startswith(f'{stem}_lod') and f.endswith('.model'))]
+                if not sources:
+                    raise FileNotFoundError(f"{name}: no model files for {component['filename']}")
+                new_stem = f"hd/character/enemy/{name}/{stem.split('/')[-1]}"
+                for source in sorted(sources):
+                    model = GrannyMesh.Model(fetch(source))
+                    report = GrannyMesh.reshape(model, bones, spec.get('quills'), spec.get('bulk'), spec.get('shape'))
+                    report += point_textures(model, variant.get('retexture', []))
+                    target = new_stem + source[len(stem):]
+                    if write:
+                        model.save(os.path.join(out_dir, *target.split('/')))
+                    written.append({'file': target, 'from': source, 'edits': report})
+                # The game only draws models listed in hd/model_lod_desc.bin (see ModelLodDesc.py).
+                index.append({'model': f'data/{new_stem}.model', 'donor': component['filename']})
+                renamed[component['filename']] = f'data/{new_stem}.model'
+                component['filename'] = f'data/{new_stem}.model'
+        for dep in definition['dependencies'].get('models', []):
+            dep['path'] = renamed.get(dep['path'], dep['path'])
+    return written
+
+
+def point_textures(model, retexture):
+    """Points a rewritten model's materials at the variant's own textures.
+
+    A model names its textures by path (Textures[].FromFileName). The new path must have the
+    old one's length, so the string is swapped in place and nothing else in the file moves.
+    """
+    out = []
+    for item in retexture:
+        old, new = item['from'].encode('ascii'), item['to'].encode('ascii')
+        if len(old) != len(new):
+            raise ValueError(f"retexture: {item['to']} must be as long as {item['from']} ({len(old)} characters)")
+        hits = 0
+        for section in model.g.sections:
+            count = section.count(old + b'\0')
+            if count:
+                section[:] = section.replace(old + b'\0', new + b'\0')
+                hits += count
+        out.append(f"texture {item['from'].rsplit('/', 1)[-1]} -> {item['to'].rsplit('/', 1)[-1]}: {hits} reference(s)")
+    return out
+
+
+def write_textures(archive, definition, variant, out_dir, write):
+    """Writes the variant's recoloured textures ("retexture") and lists them in the definition.
+
+    Each entry: {"from": "data/hd/.../x_alb.texture", "to": "data/hd/character/enemy/<name>/textures/...",
+    "format": "bc3" | "bc1" | "rgba8", "recolor": {"hue", "minSat", "hueShift", "sat", "value"}}.
+    Block textures are recoloured block by block (RecolorEffect.py: the two end colours of every
+    4x4 block, every mip), so the file keeps its format, size and mips.
+    """
+    import RecolorEffect
+    out = []
+    for item in variant.get('retexture', []):
+        tex = RecolorEffect.Texture(archive.read(item['from'][len('data/'):]))
+        kind = item.get('format', 'bc3')
+        _, size, w, h = tex.mips[0]
+        per_block = {'bc1': 8, 'bc3': 16}.get(kind)
+        if kind == 'rgba8':
+            if tex.kind() != 'rgba8':
+                raise ValueError(f"retexture: {item['from']} is not RGBA8 ({tex.describe()})")
+            data = RecolorEffect.recolor_rgba8(tex, item['recolor'])
+        elif per_block and size == max(1, (w + 3) // 4) * max(1, (h + 3) // 4) * per_block:
+            data = RecolorEffect.recolor_blocks(tex, item['recolor'], kind)
+        else:
+            raise ValueError(f"retexture: {item['from']} does not look like {kind} ({tex.describe()})")
+        if write:
+            target = os.path.join(out_dir, *item['to'][len('data/'):].split('/'))
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with open(target, 'wb') as f:
+                f.write(data)
+        textures = definition['dependencies'].setdefault('textures', [])
+        for dep in textures:
+            if dep['path'] == item['from']:
+                dep['path'] = item['to']
+        if not any(dep['path'] == item['to'] for dep in textures):
+            textures.append({'path': item['to']})
+        out.append({'file': item['to'][len('data/'):], 'from': item['from'][len('data/'):], 'texture': tex.describe(), 'recolor': item['recolor']})
+    return out
+
+
+def included_models(out_dir, folders):
+    """Model index entries of other mods ("modelIndexIncludes": mod folders relative to this one).
+
+    Both mods ship the whole hd/model_lod_desc.bin and the one installed last wins, so the
+    index this mod ships also carries the other mod's models (bounding boxes read from that
+    mod's own model files). Each entry keeps "source" so a rebuild finds the files again.
+    """
+    import ModelLodDesc
+    out, notes = [], []
+    seen = set()
+    for folder in folders:
+        manifest = ModelLodDesc.read_manifest(os.path.normpath(os.path.join(out_dir, folder)))
+        if manifest is None:
+            notes.append(f'{folder}: no {ModelLodDesc.MANIFEST}, nothing included')
+            continue
+        count = 0
+        for item in manifest['models']:
+            # An entry the other mod itself carries from a third mod ("source", relative to the other
+            # mod) is resolved to that third mod, whose folder holds the model files.
+            source = os.path.join(folder, item['source']) if item.get('source') else folder
+            if item['model'] in seen:
+                continue
+            seen.add(item['model'])
+            out.append({'model': item['model'], 'donor': item['donor'], 'source': os.path.normpath(source).replace('\\', '/')})
+            count += 1
+        notes.append(f"{folder}: {count} model(s) included")
+    return out, notes
+
+
+MODE_STATES = {'DT': 'State_Death', 'NU': 'State_Neutral', 'WL': 'State_Walk', 'GH': 'State_GetHit', 'A1': 'State_Attack1',
+               'A2': 'State_Attack2', 'BL': 'State_Block', 'SC': 'State_Cast', 'S1': 'State_Skill1', 'S2': 'State_Skill2',
+               'S3': 'State_Skill3', 'S4': 'State_Skill4', 'DD': 'State_Dead', 'KB': 'State_Knockback', 'RN': 'State_Run'}
+
+
+def add_sequence_state(machine):
+    """Adds a state for the sequence mode (SQ, mode 14), which many monsters' state machines lack.
+
+    Shaped like the stock ones (act2hire's Jab_Sequence): next free stateId, modeId 14, with a
+    transition group of its own and a transition to it from every other state.
+    """
+    new_id = max(st['stateId'] for st in machine['states']) + 1
+    template = next(st for st in machine['states'] if st['name'] == 'State_Attack1')
+    state = json.loads(json.dumps(template))
+    state.update({'name': 'State_Sequence', '_name': 'Sequence', 'stateId': new_id, 'modeId': 14, 'loopCount': 1})
+    machine['states'].append(state)
+    names = {st['stateId']: st['_name'] for st in machine['states']}
+    seconds = machine['transitions'][0]['settings'][0]['crossfadeSeconds']
+    for group in machine['transitions']:
+        group['settings'].append({'type': 'AnimationTransitionItem', 'name': f"{names[group['from']]}_transition_to_Sequence",
+                                  'crossfadeSeconds': seconds, 'to': new_id})
+    machine['transitions'].append({
+        'type': 'AnimationTransitionGroup', 'name': 'Sequence_transitions', 'from': new_id,
+        'settings': [{'type': 'AnimationTransitionItem', 'name': f'Sequence_transition_to_{names[i]}', 'crossfadeSeconds': seconds, 'to': i}
+                     for i in sorted(names) if i != new_id]})
+    return state
+
+
+def own_animations(archive, definition, variant, out_dir, write):
+    """Gives a variant its own skeleton, state machine and animation file, with new clips added.
+
+    The donor's `animation/combined.animations` is copied to
+    hd/character/enemy/<name>/animation/ with the clips described in the
+    variant's "animations" added (GrannyAnim.build_clip), the donor's state
+    machine is copied with its clip paths pointed there, and the donor's
+    skeleton is copied to hd/character/enemy/<name>/skeleton/<name>.skeleton.
+    The state machine already has a state for every mode (run, cast, skill1-4,
+    block, ...); a mode works as soon as a clip of that name exists.
+    """
+    import GrannyAnim
+    name = variant['name']
+    root = next(c for e in definition['entities'] for c in e['components'] if c['type'] == 'UnitRootComponent')
+    skeleton_component = next(c for e in definition['entities'] for c in e['components'] if c['type'] == 'SkeletonDefinitionComponent')
+    old_machine = root['state_machine_filename']
+    old_folder = old_machine[:old_machine.rindex('/')]                  # data/hd/character/enemy/<donor>
+    new_folder = f'data/hd/character/enemy/{name}'
+    skeleton_bytes = archive.read(skeleton_component['filename'][len('data/'):])
+    skeleton = GrannyAnim.Skeleton(skeleton_bytes)
+    animations = GrannyAnim.load(archive.read(f"{old_folder[len('data/'):]}/animation/combined.animations"))
+    stock = animations.names()
+    added = []
+    for spec in variant['animations']:
+        keys = GrannyAnim.build_clip(animations, skeleton, spec)
+        added.append({'clip': spec['name'], 'base': spec.get('base') or '+'.join(part['base'] for part in spec['parts']), 'seconds': round(keys.duration, 3), 'keys': len(keys.times),
+                      'mode': spec.get('mode')})
+    machine = json.loads(archive.read(old_machine[len('data/'):]).decode('utf-8'))
+    text = json.dumps(machine, separators=(',', ':')).replace(f'{old_folder}/animation/', f'{new_folder}/animation/')
+    machine = json.loads(text)
+    machine['name'] = f'{name}_statemachine'
+    # A clip with "mode" is bound to that mode's state under its own name (a clip called
+    # "charge" on S3), instead of having to be named after the state's stock clip.
+    for spec in variant['animations']:
+        if not spec.get('mode'):
+            continue
+        state_name = MODE_STATES.get(spec['mode'].upper())
+        state = next((st for st in machine['states'] if st['name'] == state_name), None)
+        if state is None and spec['mode'].upper() == 'SQ':
+            state = add_sequence_state(machine)
+        if state is None:
+            raise ValueError(f"{name}: clip {spec['name']} asks for mode {spec['mode']}, which the state machine has no state for")
+        state['animationBindings'] = {key: [spec['name']] for key in state['animationBindings']}
+        if 'loop' in spec:
+            state['loopCount'] = 0 if spec['loop'] else 1
+    # Every new clip is listed as an AnimationItem (bound to a state or not), so a mod can bind it
+    # by name in states of its own, e.g. skill-indexed states its install script adds.
+    for spec in variant['animations']:
+        clip_path = f"{new_folder}/animation/{spec['name']}.animation"
+        if not any(a['name'] == spec['name'] for a in machine['animations']):
+            machine['animations'].append({'type': 'AnimationItem', 'name': spec['name'], 'filename': clip_path})
+            machine['dependencies']['animations'].append({'path': clip_path})
+    new_machine = f'{new_folder}/{name}_state_machine.json'
+    new_skeleton = f'{new_folder}/skeleton/{name}.skeleton'
+    root['state_machine_filename'] = new_machine
+    skeleton_component['filename'] = new_skeleton
+    for dep in definition['dependencies'].get('json', []):
+        if dep['path'] == old_machine:
+            dep['path'] = new_machine
+    for dep in definition['dependencies'].get('skeletons', []):
+        dep['path'] = new_skeleton
+    if write:
+        animations.save(os.path.join(out_dir, *f"{new_folder[len('data/'):]}/animation/combined.animations".split('/')))
+        write_json(out_dir, new_machine[len('data/'):], machine)
+        target = os.path.join(out_dir, *new_skeleton[len('data/'):].split('/'))
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, 'wb') as f:
+            f.write(skeleton_bytes)
+    return {'stockClips': stock, 'added': added, 'stateMachine': new_machine[len('data/'):], 'skeleton': new_skeleton[len('data/'):]}
+
+
+def sprite_scale(archive, variant, audit, definition_models_height=None):
+    """Root scale that makes the donor's HD body as tall as a sprite monster.
+
+    variant["scale"] = {"sprite": "<token>"}: the sprite monster's neutral pose
+    height over the donor's own sprite height (both from their COF boxes), so
+    the HD body gets the size the original art has next to its donor.
+    "reshapedHeight" / "donorHeight" (model units) correct for a reshape that
+    made the mesh taller, so the result still matches the sprite.
+    """
+    import LegacyToHd
+    sources = LegacyToHd.Sources(archive)
+    target = LegacyToHd.measure(sources, variant['scale']['sprite'])
+    donor = LegacyToHd.measure(sources, audit['token'])
+    scale = target['height'] / donor['height']
+    return scale, {'sprite': variant['scale']['sprite'], 'spriteHeightPx': target['height'],
+                   'donorToken': audit['token'], 'donorHeightPx': donor['height']}
+
+
 def write_json(out_dir, relative, value):
     target = os.path.join(out_dir, *relative.split('/'))
     os.makedirs(os.path.dirname(target), exist_ok=True)
@@ -278,6 +565,7 @@ def run(preset, game_path, casclib, out_dir, audit_only):
             head = [h.split('!')[0] for h in lines[0].split('|')]
             if 'Version' in head:
                 report['gameBuild'] = lines[1].split('|')[head.index('Version')]
+    index = []
     with D2RArchive(game_path, casclib) as archive:
         for variant in preset['variants']:
             donor = variant['donor']
@@ -286,11 +574,17 @@ def run(preset, game_path, casclib, out_dir, audit_only):
             audit = report['audits'][donor]
             if not audit['hdHasModel']:
                 raise ValueError(f'{donor} has no HD model in the archive, so it cannot be a donor')
+            scale = variant['scale']
+            sized = None
+            if isinstance(scale, dict) and 'sprite' in scale:
+                scale, sized = sprite_scale(archive, variant, audit)
             entry = {
                 'name': variant['name'], 'donor': donor, 'donorHd': audit['hdDefinition'],
-                'scale': variant['scale'], 'playableModes': audit['playable'],
+                'scale': scale, 'playableModes': audit['playable'],
                 'file': f"hd/character/enemy/{variant['name']}.json",
             }
+            if sized:
+                entry['sizedFromSprite'] = sized
             attachments = expand_attachments(variant.get('attach', []))
             used_props = sorted({a['prop'] for a in attachments})
             for prop_name in used_props:
@@ -299,10 +593,30 @@ def run(preset, game_path, casclib, out_dir, audit_only):
             if attachments:
                 entry['attachments'] = len(attachments)
                 entry['props'] = [prop_path(name) for name in used_props]
-            definition = build_scaled_definition(archive, audit['hdDefinition'], variant['name'], variant['scale'])
+            definition = build_scaled_definition(archive, audit['hdDefinition'], variant['name'], scale)
             if attachments:
                 part, part_variant = donor_part(definition)
                 attach_props(definition, variant['name'], attachments, part, part_variant)
+            if variant.get('retexture') and not variant.get('reshape'):
+                raise ValueError(f"{variant['name']}: \"retexture\" needs \"reshape\" (the variant's own model files to point at the textures)")
+            if variant.get('reshape'):
+                entry['models'] = reshape_models(archive, definition, variant, out_dir, not audit_only, index)
+            if variant.get('retexture'):
+                entry['textures'] = write_textures(archive, definition, variant, out_dir, not audit_only)
+            if sized and variant.get('reshape') and not audit_only:
+                # A reshape that made the mesh taller would overshoot the sprite's size: take it back out of the root scale.
+                import ModelLodDesc
+                donor_model = index[-1]['donor']
+                new_boxes = ModelLodDesc.model_boxes(out_dir, index[-1]['model'])[0]
+                desc = ModelLodDesc.ModelLodDesc(archive.read(ModelLodDesc.INDEX)).describe(donor_model)
+                donor_height = max(m['box'][4] for m in desc['lods'][0]) - min(m['box'][1] for m in desc['lods'][0])
+                new_height = max(high[1] for _, high in new_boxes) - min(low[1] for low, _ in new_boxes)
+                multiply_root_scale(definition, donor_height / new_height)
+                scale = round(scale * donor_height / new_height, 3)
+                sized.update({'donorMeshHeight': round(donor_height, 3), 'reshapedMeshHeight': round(new_height, 3)})
+                entry['scale'] = scale
+            if variant.get('animations'):
+                entry['animations'] = own_animations(archive, definition, variant, out_dir, not audit_only)
             prop_definitions = {name: build_prop_definition(archive, name, preset['props'][name]) for name in used_props}
             if not audit_only:
                 write_json(out_dir, entry['file'], definition)
@@ -311,6 +625,22 @@ def run(preset, game_path, casclib, out_dir, audit_only):
             report['variants'].append(entry)
         for extra in preset.get('auditOnly', []):
             report['audits'][extra] = audit_animations(archive, extra)
+        if index:
+            report['modelIndex'] = {'file': 'hd/model_lod_desc.bin', 'manifest': 'model_index.json',
+                                    'added': [item['model'] for item in index]}
+            if not audit_only:
+                # Writes model_index.json (what this mod adds) and the index built from this game build's.
+                # Entries other tools put in the mod's manifest (effect meshes, ...) are kept; entries
+                # taken from other mods ("source") are read again from those mods.
+                import ModelLodDesc
+                existing = ModelLodDesc.read_manifest(out_dir) or {'models': []}
+                included, notes = included_models(out_dir, preset.get('modelIndexIncludes', []))
+                mine = {item['model'] for item in index}
+                kept = [item for item in existing['models'] if item['model'] not in mine and 'source' not in item]
+                merged = index + kept
+                merged += [item for item in included if item['model'] not in {m['model'] for m in merged}]
+                report['modelIndex']['included'] = notes
+                ModelLodDesc.build_for_mod(archive, out_dir, merged, report['gameBuild'])
     if not audit_only:
         with open(os.path.join(out_dir, 'scaled_monsters.report.json'), 'w', encoding='utf-8', newline='\n') as f:
             json.dump(report, f, indent=2)
@@ -329,6 +659,13 @@ def print_report(report, audit_only):
                 print(f"  {mode}: {e['cof']['frames']} frames, {t['type']} on frame {t['frame']}")
     for v in report['variants']:
         extra = f", {v['attachments']} props attached" if v.get('attachments') else ''
+        if v.get('sizedFromSprite'):
+            z = v['sizedFromSprite']
+            extra += f", sized from sprite {z['sprite']} ({z['spriteHeightPx']} px over {z['donorToken']} {z['donorHeightPx']} px)"
+        if v.get('animations'):
+            extra += f", own animations: +{' +'.join(a['clip'] for a in v['animations']['added'])}"
+        if v.get('models'):
+            extra += f", {len(v['models'])} model files reshaped"
         print(f"{'would build' if audit_only else 'built'} {v['file']}  ({v['donor']} x{v['scale']}{extra})")
 
 

@@ -1,36 +1,41 @@
 @echo off
-REM Compile game_and_dlc_source packs into Collection (+ core Transcendence.tdb)
-REM Run from anywhere; uses absolute paths. Requires TransCompiler.exe + Transcendence.tdb in game root.
+REM Compile game_and_dlc_source packs to Tools\Transcendence\Output\CompiledTdb for TESTING ONLY.
+REM
+REM It never writes into the game folder: Transcendence.tdb and Collection\*.tdb must stay exactly as Steam ships them.
+REM A recompiled core/DLC TDB gets a different digest, so the game no longer treats it as the registered DLC (DLC
+REM adventures vanish) and edits to core content break Stars of the Pilgrim and Corporate Command. Change official
+REM content only through a separate extension in Extensions\.
 
 set "TX=D:\games\Steam\steamapps\common\Transcendence"
 set "SRC=%TX%\game_and_dlc_source"
-set "COL=%TX%\Collection"
+set "OUT=%~dp0Output\CompiledTdb"
 set "TC=%TX%\TransCompiler.exe"
-cd /d "%TX%" || exit /b 1
+if not exist "%OUT%" mkdir "%OUT%"
+cd /d "%OUT%" || exit /b 1
 
 echo === Transcendence.tdb (core) ===
-"%TC%" /input:"%SRC%\Transcendence_Source\Transcendence.xml" /output:"%TX%\Transcendence.tdb" /digest
+"%TC%" /input:"%SRC%\Transcendence_Source\Transcendence.xml" /output:"%OUT%\Transcendence.tdb" /digest
 if errorlevel 1 exit /b 1
 
 echo === CorporateHierarchyVol1UNIDs.tdb ===
-"%TC%" /input:"%SRC%\CorporateHierarchyVol1UNIDs_Source\CorporateHierarchyVol1UNIDs.xml" /output:"%COL%\CorporateHierarchyVol1UNIDs.tdb" /digest
+"%TC%" /input:"%SRC%\CorporateHierarchyVol1UNIDs_Source\CorporateHierarchyVol1UNIDs.xml" /output:"%OUT%\CorporateHierarchyVol1UNIDs.tdb" /digest
 if errorlevel 1 exit /b 1
 
 echo === CorporateHierarchyVol01.tdb ===
-"%TC%" /input:"%SRC%\CorporateHierarchyVol01_Source\CorporateHierarchyVol01.xml" /output:"%COL%\CorporateHierarchyVol01.tdb" /digest
+"%TC%" /input:"%SRC%\CorporateHierarchyVol01_Source\CorporateHierarchyVol01.xml" /output:"%OUT%\CorporateHierarchyVol01.tdb" /digest
 if errorlevel 1 exit /b 1
 
 echo === CorporateCommand.tdb ===
-"%TC%" /input:"%SRC%\CorporateCommand_Source\CorporateCommand.xml" /entities:"%COL%\CorporateHierarchyVol01.tdb" /output:"%COL%\CorporateCommand.tdb" /digest
+"%TC%" /input:"%SRC%\CorporateCommand_Source\CorporateCommand.xml" /entities:"%OUT%\CorporateHierarchyVol01.tdb" /output:"%OUT%\CorporateCommand.tdb" /digest
 if errorlevel 1 exit /b 1
 
 echo === StarsOfThePilgrimHD.tdb ===
-"%TC%" /input:"%SRC%\StarsOfThePilgrimHD_Source\StarsOfThePilgrimHD.xml" /output:"%COL%\StarsOfThePilgrimHD.tdb" /digest
+"%TC%" /input:"%SRC%\StarsOfThePilgrimHD_Source\StarsOfThePilgrimHD.xml" /output:"%OUT%\StarsOfThePilgrimHD.tdb" /digest
 if errorlevel 1 exit /b 1
 
 echo === StarsOfThePilgrimSoundtrack.tdb ===
-"%TC%" /input:"%SRC%\StarsOfThePilgrimSoundtrack_Source\StarsOfThePilgrimSoundtrack.xml" /output:"%COL%\StarsOfThePilgrimSoundtrack.tdb" /digest
+"%TC%" /input:"%SRC%\StarsOfThePilgrimSoundtrack_Source\StarsOfThePilgrimSoundtrack.xml" /output:"%OUT%\StarsOfThePilgrimSoundtrack.tdb" /digest
 if errorlevel 1 exit /b 1
 
-echo All packs compiled OK.
+echo All packs compiled OK to %OUT% (game folder untouched).
 exit /b 0

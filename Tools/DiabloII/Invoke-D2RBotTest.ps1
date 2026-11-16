@@ -6,10 +6,10 @@
     D2RLoader with BOTHARNESS_DIR pointing at it. The plugin writes result.log and screenshots to the same folder.
     Exit code: 0 = RESULT PASS, 1 = RESULT FAIL, 2 = no result (crash, timeout, plugin not loaded).
 .EXAMPLE
-    .\Invoke-D2RBotTest.ps1 -Root 'D:\games\Diablo II Resurrected' -Script .\BotScripts\smoke-menu.txt
+    .\Invoke-D2RBotTest.ps1 -Root 'D:\games\Steam\steamapps\common\Diablo II Resurrected' -Script .\BotScripts\smoke-menu.txt
 .EXAMPLE
     # Step by step: start the game, then add lines to script.txt in the printed folder and read result.log.
-    .\Invoke-D2RBotTest.ps1 -Root 'D:\games\Diablo II Resurrected' -Commands 'waitfor menu','screenshot menu' -NoWait
+    .\Invoke-D2RBotTest.ps1 -Root 'D:\games\Steam\steamapps\common\Diablo II Resurrected' -Commands 'waitfor menu','screenshot menu' -NoWait
 #>
 [CmdletBinding()]
 param(

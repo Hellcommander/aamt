@@ -1,0 +1,5454 @@
+{
+ "generated": "2026-11-07T10:12:37",
+ "note": "anatomyPlans and mutations are rewritten on every scan; edit 'manual' ({\"AnatomyName\": \"plan\"}) to move an anatomy to another plan.",
+ "plans": [
+  "quadruped",
+  "biped",
+  "serpent",
+  "fish",
+  "blob",
+  "radial",
+  "robot",
+  "tree",
+  "flower",
+  "fungus",
+  "cactus",
+  "chair",
+  "table",
+  "door",
+  "vessel"
+ ],
+ "mods": 607,
+ "manual": {},
+ "anatomyPlans": {
+  "AirWell": {
+   "plan": "vessel",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "AnatomyAstralKitty": {
+   "plan": "quadruped",
+   "source": "astral_kitty_fork",
+   "why": "4 legs",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 4
+   }
+  },
+  "AnimalBed": {
+   "plan": "table",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#leg": 4
+   }
+  },
+  "AnimalChair": {
+   "plan": "chair",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 2,
+    "#leg": 4
+   }
+  },
+  "AnimateStatue_Eroded": {
+   "plan": "blob",
+   "source": "Animatable Statues",
+   "why": "no limbs that pick a plan",
+   "limbs": {}
+  },
+  "AnimateStatue_SixArmedHumanoid": {
+   "plan": "biped",
+   "source": "Animatable Statues",
+   "why": "6 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 6,
+    "#leg": 2
+   }
+  },
+  "Arendeth_Giant_Mutant_Spider_Body_Assassin": {
+   "plan": "quadruped",
+   "source": "Arendeth_SpiderformManticores",
+   "why": "8 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 8
+   }
+  },
+  "Arendeth_Giant_Mutant_Spider_Body_Cold": {
+   "plan": "quadruped",
+   "source": "Arendeth_SpiderformManticores",
+   "why": "8 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 8
+   }
+  },
+  "Arendeth_Giant_Mutant_Spider_Body_Psionic": {
+   "plan": "quadruped",
+   "source": "Arendeth_SpiderformManticores",
+   "why": "8 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 8
+   }
+  },
+  "Arendeth_Silver_Null_Falcon_Body": {
+   "plan": "biped",
+   "source": "ArendethSilverNullFalconPet",
+   "why": "0 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 2
+   }
+  },
+  "AstralPlanula": {
+   "plan": "blob",
+   "source": "Snakefangox_AstralMedusae",
+   "why": "name has 'planula'",
+   "limbs": {
+    "#tentacle": 4
+   }
+  },
+  "Batfolk": {
+   "plan": "biped",
+   "source": "cpnk_chiromorphs",
+   "why": "0 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#wing": 3,
+    "#leg": 2
+   }
+  },
+  "Bed": {
+   "plan": "table",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#leg": 4
+   }
+  },
+  "BipedalMechMk3": {
+   "plan": "biped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#leg": 2
+   }
+  },
+  "BipedalRobot": {
+   "plan": "biped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#leg": 2
+   }
+  },
+  "BipedalRobotWithArmatures": {
+   "plan": "biped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "Bird": {
+   "plan": "biped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 2
+   }
+  },
+  "BirdDragon_Burgeoning_LunchPottery": {
+   "plan": "vessel",
+   "source": "BirdDragon_Burgeoning",
+   "why": "name has 'pottery'",
+   "limbs": {}
+  },
+  "BirdDragon_Burgeoning_MadpoleTree": {
+   "plan": "tree",
+   "source": "BirdDragon_Burgeoning",
+   "why": "name has 'tree'",
+   "limbs": {
+    "#head": 3,
+    "#roots": 1
+   }
+  },
+  "BoneWall": {
+   "plan": "door",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "BroodlingAugerling": {
+   "plan": "biped",
+   "source": "Arendeth_Broodmother",
+   "why": "2 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "BroodlingBiped": {
+   "plan": "biped",
+   "source": "Arendeth_Broodmother",
+   "why": "2 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "BroodlingGloomsting": {
+   "plan": "quadruped",
+   "source": "Arendeth_Broodmother",
+   "why": "6 legs",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 6
+   }
+  },
+  "BroodlingIchorling": {
+   "plan": "quadruped",
+   "source": "Arendeth_Broodmother",
+   "why": "6 legs",
+   "limbs": {
+    "#head": 1,
+    "#leg": 6
+   }
+  },
+  "BroodlingLeechling": {
+   "plan": "quadruped",
+   "source": "Arendeth_Broodmother",
+   "why": "6 legs",
+   "limbs": {
+    "#head": 1,
+    "#leg": 6
+   }
+  },
+  "BroodlingMandibore": {
+   "plan": "quadruped",
+   "source": "Arendeth_Broodmother",
+   "why": "8 legs",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 8
+   }
+  },
+  "BroodlingMimic": {
+   "plan": "quadruped",
+   "source": "Arendeth_Broodmother",
+   "why": "6 legs",
+   "limbs": {
+    "#head": 1,
+    "#leg": 6
+   }
+  },
+  "BroodlingMindling": {
+   "plan": "quadruped",
+   "source": "Arendeth_Broodmother",
+   "why": "6 legs",
+   "limbs": {
+    "#head": 1,
+    "#leg": 6
+   }
+  },
+  "BroodlingNeonsting": {
+   "plan": "quadruped",
+   "source": "Arendeth_Broodmother",
+   "why": "6 legs",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 6
+   }
+  },
+  "BroodlingPrismfly": {
+   "plan": "quadruped",
+   "source": "Arendeth_Broodmother",
+   "why": "6 legs",
+   "limbs": {
+    "#head": 1,
+    "#leg": 6
+   }
+  },
+  "BroodlingSaltling": {
+   "plan": "quadruped",
+   "source": "Arendeth_Broodmother",
+   "why": "6 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 6
+   }
+  },
+  "BroodlingTabby": {
+   "plan": "biped",
+   "source": "Arendeth_Broodmother",
+   "why": "2 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#tail": 1,
+    "#leg": 2
+   }
+  },
+  "Bush": {
+   "plan": "tree",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "Cactus": {
+   "plan": "cactus",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "Chair": {
+   "plan": "chair",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 2,
+    "#leg": 4
+   }
+  },
+  "Chalkboard": {
+   "plan": "table",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#leg": 4
+   }
+  },
+  "Clam": {
+   "plan": "blob",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "clau_AnatomyLuminary": {
+   "plan": "tree",
+   "source": "CavesOfQudModJam2024PetsAndPresets",
+   "why": "roots",
+   "limbs": {
+    "#roots": 2,
+    "#leg": 2
+   }
+  },
+  "ClayOven": {
+   "plan": "vessel",
+   "source": "Animatable Ovens",
+   "why": "name has 'oven'",
+   "limbs": {}
+  },
+  "Cleo_TerraFirma_BoarVessel": {
+   "plan": "quadruped",
+   "source": "Cleo_TerraFirmaBeta",
+   "why": "4 legs",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 4
+   }
+  },
+  "Cleo_TerraFirma_Mockette": {
+   "plan": "blob",
+   "source": "Cleo_TerraFirmaBeta",
+   "why": "name has 'mockette'",
+   "limbs": {}
+  },
+  "ClothWall": {
+   "plan": "door",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "Crab": {
+   "plan": "quadruped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 6
+   }
+  },
+  "CrystalHeart": {
+   "plan": "biped",
+   "source": "CavesOfQudModJam2024PetsAndPresets",
+   "why": "1 arms, 0 legs",
+   "limbs": {
+    "#arm": 1
+   }
+  },
+  "Door": {
+   "plan": "door",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "DroneSwarm": {
+   "plan": "robot",
+   "source": "qudRogueRobots",
+   "why": "name has 'drone'",
+   "limbs": {}
+  },
+  "Echinoid": {
+   "plan": "radial",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "Faerie": {
+   "plan": "blob",
+   "source": "Tychos_Tangent",
+   "why": "no limbs that pick a plan",
+   "limbs": {
+    "#head": 1
+   }
+  },
+  "Fish": {
+   "plan": "fish",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#fin": 4
+   }
+  },
+  "FloatingRangedWeapon": {
+   "plan": "blob",
+   "source": "Arendeth_TelekinesisCompat",
+   "why": "no limbs that pick a plan",
+   "limbs": {}
+  },
+  "FloatingWeapon": {
+   "plan": "blob",
+   "source": "3173434628",
+   "why": "no limbs that pick a plan",
+   "limbs": {}
+  },
+  "Flower": {
+   "plan": "flower",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "Frog": {
+   "plan": "quadruped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#leg": 4
+   }
+  },
+  "FSS_pet_jam Hampster Anatomy": {
+   "plan": "blob",
+   "source": "CavesOfQudModJam2024PetsAndPresets",
+   "why": "name has 'hampster'",
+   "limbs": {}
+  },
+  "Fungus": {
+   "plan": "fungus",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "FungusWall": {
+   "plan": "fungus",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "GlassWall": {
+   "plan": "door",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "HDBrownie_Sundirge_Mast": {
+   "plan": "biped",
+   "source": "CavesOfQudModJam2024PetsAndPresets",
+   "why": "0 arms, 1 legs",
+   "limbs": {
+    "#head": 1,
+    "#leg": 1
+   }
+  },
+  "HeadWithFeet": {
+   "plan": "biped",
+   "source": "Umbral_SusanTaxpayer",
+   "why": "0 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#leg": 2
+   }
+  },
+  "HexapedalRobot": {
+   "plan": "quadruped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#leg": 6
+   }
+  },
+  "Hexapod": {
+   "plan": "quadruped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 6
+   }
+  },
+  "HoverRobot": {
+   "plan": "robot",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 2
+   }
+  },
+  "HoverRobotWithFourArms": {
+   "plan": "robot",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 4
+   }
+  },
+  "Humanoid": {
+   "plan": "biped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "HumanoidOctohedron": {
+   "plan": "radial",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "HumanoidRobot": {
+   "plan": "biped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "HumanoidWithHandsFace": {
+   "plan": "biped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "Hunterseeker_Alternative_Body": {
+   "plan": "quadruped",
+   "source": "Arendeth_SpiderformManticores",
+   "why": "8 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 8
+   }
+  },
+  "Insect": {
+   "plan": "quadruped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#leg": 6
+   }
+  },
+  "IronMaiden": {
+   "plan": "door",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2
+   }
+  },
+  "Jelly": {
+   "plan": "blob",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#tentacle": 10
+   }
+  },
+  "LeatherWall": {
+   "plan": "door",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "ManyArmsRobot": {
+   "plan": "robot",
+   "source": "qudRogueRobots",
+   "why": "name has 'robot'",
+   "limbs": {
+    "#arm": 6
+   }
+  },
+  "Mechaworm": {
+   "plan": "robot",
+   "source": "qudRogueRobots",
+   "why": "name has 'mech'",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1
+   }
+  },
+  "MeercatRL_Pet_Jeff": {
+   "plan": "biped",
+   "source": "MeercatRL_Pet_Jeff",
+   "why": "2 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#fin": 2,
+    "#arm": 2,
+    "#tail": 1,
+    "#leg": 2
+   }
+  },
+  "MetalBed": {
+   "plan": "table",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#leg": 4
+   }
+  },
+  "MetalChair": {
+   "plan": "chair",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 2,
+    "#leg": 4
+   }
+  },
+  "MetalDoor": {
+   "plan": "door",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "MetalWall": {
+   "plan": "door",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "Mirror": {
+   "plan": "door",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "Motes": {
+   "plan": "blob",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "Motorbike": {
+   "plan": "robot",
+   "source": "Cycles of Qud",
+   "why": "name has 'motorbike'",
+   "limbs": {}
+  },
+  "MotorbikeSidecarred": {
+   "plan": "robot",
+   "source": "Cycles of Qud",
+   "why": "name has 'motorbike'",
+   "limbs": {}
+  },
+  "MUNDANITY_MotorizedSpongeBody": {
+   "plan": "blob",
+   "source": "Mundanity",
+   "why": "name has 'sponge'",
+   "limbs": {}
+  },
+  "MushyHydra": {
+   "plan": "fungus",
+   "source": "AllRedsPets",
+   "why": "name has 'mushy'",
+   "limbs": {
+    "#head": 8
+   }
+  },
+  "MutantVenomHoundQuadruped": {
+   "plan": "quadruped",
+   "source": "Kinach the Venomhound",
+   "why": "4 legs",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 4
+   }
+  },
+  "MWW_Ankipodi_Body": {
+   "plan": "quadruped",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "4 legs",
+   "limbs": {
+    "#head": 1,
+    "#leg": 4
+   }
+  },
+  "MWW_BareHumanoid_Body": {
+   "plan": "biped",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "2 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "MWW_BladeWing_Body": {
+   "plan": "biped",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "0 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 2
+   }
+  },
+  "MWW_Centumpede_Body": {
+   "plan": "quadruped",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "12 legs",
+   "limbs": {
+    "#head": 3,
+    "#leg": 12
+   }
+  },
+  "MWW_Crawler_Body": {
+   "plan": "quadruped",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "8 legs",
+   "limbs": {
+    "#leg": 8
+   }
+  },
+  "MWW_Decempede_Body": {
+   "plan": "quadruped",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "6 legs",
+   "limbs": {
+    "#head": 2,
+    "#leg": 6
+   }
+  },
+  "MWW_Dyofidi_Body": {
+   "plan": "serpent",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "name has 'dyofidi'",
+   "limbs": {
+    "#head": 2,
+    "#tail": 1
+   }
+  },
+  "MWW_FulfilledRollingFractus_Body": {
+   "plan": "flower",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "name has 'fractus'",
+   "limbs": {
+    "#arm": 6
+   }
+  },
+  "MWW_LeftDyofidi_Body": {
+   "plan": "serpent",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "name has 'dyofidi'",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1
+   }
+  },
+  "MWW_Millipede_Body": {
+   "plan": "quadruped",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "24 legs",
+   "limbs": {
+    "#head": 4,
+    "#leg": 24
+   }
+  },
+  "MWW_ObjectHandle_Body": {
+   "plan": "biped",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "0 arms, 1 legs",
+   "limbs": {
+    "#leg": 1
+   }
+  },
+  "MWW_Parasite_Body": {
+   "plan": "biped",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "4 arms, 0 legs",
+   "limbs": {
+    "#arm": 4
+   }
+  },
+  "MWW_RightDyofidi_Body": {
+   "plan": "serpent",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "name has 'dyofidi'",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1
+   }
+  },
+  "MWW_RollingFracti_Body": {
+   "plan": "blob",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "no limbs that pick a plan",
+   "limbs": {}
+  },
+  "MWW_Sawtilus_Body": {
+   "plan": "serpent",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "name has 'sawtilus'",
+   "limbs": {
+    "#fin": 1,
+    "#tail": 1
+   }
+  },
+  "MWW_ShufflingFracti_Body": {
+   "plan": "biped",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "4 arms, 0 legs",
+   "limbs": {
+    "#arm": 4
+   }
+  },
+  "MWW_Skewskoul_Body": {
+   "plan": "blob",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "no limbs that pick a plan",
+   "limbs": {
+    "#head": 1
+   }
+  },
+  "MWW_TestaVermis_Body": {
+   "plan": "serpent",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "name has 'vermis'",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1
+   }
+  },
+  "Nest": {
+   "plan": "blob",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "Octohedron": {
+   "plan": "radial",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "Oddity": {
+   "plan": "blob",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "Ooze": {
+   "plan": "blob",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#tentacle": 6
+   }
+  },
+  "Phils_Belongings": {
+   "plan": "quadruped",
+   "source": "CavesOfQudModJam2024PetsAndPresets",
+   "why": "6 legs",
+   "limbs": {
+    "#leg": 6
+   }
+  },
+  "Pillow": {
+   "plan": "table",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "PilotingLattice_BraidedVine": {
+   "plan": "tree",
+   "source": "aebrer_PilotingLattice",
+   "why": "name has 'vine'",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "PilotingLattice_CrownedTrellis": {
+   "plan": "tree",
+   "source": "aebrer_PilotingLattice",
+   "why": "name has 'lattice'",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "PilotingLattice_ForkedVine": {
+   "plan": "tree",
+   "source": "aebrer_PilotingLattice",
+   "why": "name has 'vine'",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "PilotingLattice_Rootling": {
+   "plan": "tree",
+   "source": "aebrer_PilotingLattice",
+   "why": "name has 'lattice'",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "PK_ActualCentipede": {
+   "plan": "quadruped",
+   "source": "actual-centipedes",
+   "why": "100 legs",
+   "limbs": {
+    "#head": 1,
+    "#leg": 100
+   }
+  },
+  "PlantWall": {
+   "plan": "tree",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "PlasticBed": {
+   "plan": "table",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#leg": 4
+   }
+  },
+  "PlasticChair": {
+   "plan": "chair",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 2,
+    "#leg": 4
+   }
+  },
+  "Porpoise": {
+   "plan": "fish",
+   "source": "Porpoise Templar - Putus Expansion",
+   "why": "name has 'porpoise'",
+   "limbs": {
+    "#head": 1,
+    "#fin": 4,
+    "#tail": 1
+   }
+  },
+  "Pottery": {
+   "plan": "vessel",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "PsionicAdept": {
+   "plan": "biped",
+   "source": "QudExpandedCommunityEdition",
+   "why": "2 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "PyramidBody": {
+   "plan": "robot",
+   "source": "qudRogueRobots",
+   "why": "name has 'pyramid'",
+   "limbs": {}
+  },
+  "Quadruped": {
+   "plan": "quadruped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 4
+   }
+  },
+  "QuadrupedalRobot": {
+   "plan": "quadruped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#leg": 4
+   }
+  },
+  "RailedMechanism": {
+   "plan": "robot",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 2
+   }
+  },
+  "RoboCube": {
+   "plan": "robot",
+   "source": "qudRogueRobots",
+   "why": "name has 'cube'",
+   "limbs": {}
+  },
+  "RockingChair": {
+   "plan": "chair",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 2
+   }
+  },
+  "Serpent_Body_More_Wearables": {
+   "plan": "serpent",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "why": "name has 'serpent'",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1
+   }
+  },
+  "Sibs_CatsDogs_FeralTransformation": {
+   "plan": "biped",
+   "source": "Sibs_CatsDogs",
+   "why": "2 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "Slug": {
+   "plan": "serpent",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1
+   }
+  },
+  "SlugWithHands": {
+   "plan": "serpent",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1
+   }
+  },
+  "SmallProblems": {
+   "plan": "fungus",
+   "source": "Freehold_Pet_SmallProblems",
+   "why": "name has 'smallproblems'",
+   "limbs": {
+    "#head": 3
+   }
+  },
+  "Snail": {
+   "plan": "serpent",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1
+   }
+  },
+  "Snake": {
+   "plan": "serpent",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1
+   }
+  },
+  "Spider": {
+   "plan": "quadruped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#leg": 8
+   }
+  },
+  "Star": {
+   "plan": "radial",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 5
+   }
+  },
+  "Svardym": {
+   "plan": "biped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "Table": {
+   "plan": "table",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#leg": 4
+   }
+  },
+  "TailedBiped": {
+   "plan": "biped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#tail": 1,
+    "#leg": 2
+   }
+  },
+  "Three-Pointed Star": {
+   "plan": "radial",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 3
+   }
+  },
+  "TreadedRobot": {
+   "plan": "robot",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 2
+   }
+  },
+  "Tree": {
+   "plan": "tree",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "TreeBot": {
+   "plan": "tree",
+   "source": "qudRogueRobots",
+   "why": "name has 'tree'",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "TripedalRobot": {
+   "plan": "quadruped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#leg": 3
+   }
+  },
+  "TrueKin": {
+   "plan": "biped",
+   "source": "QudExpandedCommunityEdition",
+   "why": "2 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "Turret": {
+   "plan": "robot",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "UpliftArachnidAnatomy": {
+   "plan": "quadruped",
+   "source": "Animal Uplifts!!",
+   "why": "6 legs",
+   "limbs": {
+    "#head": 1,
+    "#leg": 6
+   }
+  },
+  "UpliftEquineAnatomy": {
+   "plan": "quadruped",
+   "source": "Animal Uplifts!!",
+   "why": "4 legs",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 4
+   }
+  },
+  "UpliftFelineAnatomy": {
+   "plan": "quadruped",
+   "source": "Animal Uplifts!!",
+   "why": "4 legs",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1,
+    "#leg": 4
+   }
+  },
+  "UpliftSalthopperAnatomy": {
+   "plan": "quadruped",
+   "source": "Animal Uplifts!!",
+   "why": "4 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 4
+   }
+  },
+  "UrnDusterBody": {
+   "plan": "biped",
+   "source": "qudRogueRobots",
+   "why": "1 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 1,
+    "#leg": 2
+   }
+  },
+  "VanedMechanism": {
+   "plan": "robot",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 2
+   }
+  },
+  "Vine": {
+   "plan": "tree",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#roots": 1
+   }
+  },
+  "Wall": {
+   "plan": "door",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "WallBody": {
+   "plan": "door",
+   "source": "Tychos_Tangent",
+   "why": "name has 'wall'",
+   "limbs": {}
+  },
+  "WheeledCreature": {
+   "plan": "biped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#tail": 1
+   }
+  },
+  "WheeledRobot": {
+   "plan": "robot",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#arm": 2
+   }
+  },
+  "WheelRobot": {
+   "plan": "robot",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "Wiz_MossBall": {
+   "plan": "blob",
+   "source": "Icy Glaciers",
+   "why": "name has 'moss'",
+   "limbs": {}
+  },
+  "Wiz_PipePlant": {
+   "plan": "tree",
+   "source": "Icy Glaciers",
+   "why": "name has 'plant'",
+   "limbs": {}
+  },
+  "Wiz_WheeledRobotArmless": {
+   "plan": "robot",
+   "source": "wiz_fireman",
+   "why": "name has 'robot'",
+   "limbs": {}
+  },
+  "WM-Doll-Like Shell": {
+   "plan": "biped",
+   "source": "WMAnesheymOfRhemHexQen",
+   "why": "2 arms, 2 legs",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "WoodenHumanoid": {
+   "plan": "biped",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#arm": 2,
+    "#leg": 2
+   }
+  },
+  "WoodWall": {
+   "plan": "door",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {}
+  },
+  "Worm": {
+   "plan": "serpent",
+   "source": "vanilla",
+   "why": "vanilla table",
+   "limbs": {
+    "#head": 1,
+    "#tail": 1
+   }
+  }
+ },
+ "mutations": {
+  "AcidicBlood": {
+   "name": "Acidic Blood",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "slime"
+   ],
+   "shownBy": ""
+  },
+  "AcidSlimeGlands": {
+   "name": "Acid Slime Glands",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "slime"
+   ],
+   "shownBy": ""
+  },
+  "AdrenalControl2": {
+   "name": "Adrenal Control",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "speed"
+   ],
+   "shownBy": ""
+  },
+  "Albino": {
+   "name": "Albino",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "albino",
+    "albino_head"
+   ],
+   "shownBy": ""
+  },
+  "Amalgamize": {
+   "name": "Amalgamate Infection",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMAnesheymOfRhemHexQen",
+   "layers": [],
+   "shownBy": ""
+  },
+  "AmmoFabricator": {
+   "name": "Bullet Fabricator",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Amnesia": {
+   "name": "Amnesia",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Amphibious": {
+   "name": "Amphibious",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gills"
+   ],
+   "shownBy": ""
+  },
+  "Analgesia": {
+   "name": "Nerve Poppy",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "AnimalLegs": {
+   "name": "Animal Legs",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "Animancy": {
+   "name": "Genetic Memory",
+   "category": "Hybrid",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [],
+   "shownBy": ""
+  },
+  "AnimateWeapon": {
+   "name": "Animate Weapon",
+   "category": "Mental",
+   "variants": "",
+   "source": "3173434628",
+   "layers": [
+    "orbit"
+   ],
+   "shownBy": ""
+  },
+  "AntiRust": {
+   "name": "Laquered Coating",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Arendeth_Broodmother": {
+   "name": "Broodmother",
+   "category": "Physical",
+   "variants": "",
+   "source": "Arendeth_Broodmother",
+   "layers": [
+    "brood"
+   ],
+   "shownBy": ""
+  },
+  "Arendeth_SpacetimeVortex": {
+   "name": "Spacetime Vortex",
+   "category": "Mental",
+   "variants": "",
+   "source": "ImprovedSpaceTimeVortex",
+   "layers": [
+    "vortex"
+   ],
+   "shownBy": ""
+  },
+  "Armless": {
+   "name": "Armless",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "Astral": {
+   "name": "Astral",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "astral"
+   ],
+   "shownBy": ""
+  },
+  "AstralClaws": {
+   "name": "Astral Claws",
+   "category": "Physical",
+   "variants": "",
+   "source": "astral_kitty_fork",
+   "layers": [
+    "astral",
+    "claws"
+   ],
+   "shownBy": ""
+  },
+  "AutoRepair": {
+   "name": "Auto Repair",
+   "category": "Physical",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [
+    "regen"
+   ],
+   "shownBy": ""
+  },
+  "Battoujutsu": {
+   "name": "Battoujutsu",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMAnesheymOfRhemHexQen",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Beak": {
+   "name": "Beak",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "beak"
+   ],
+   "shownBy": ""
+  },
+  "Beguiling": {
+   "name": "Beguiling",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "BioCore": {
+   "name": "Biological Core",
+   "category": "Cores",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "BioScanner": {
+   "name": "Internal Bioscanner",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "antenna"
+   ],
+   "shownBy": ""
+  },
+  "BlinkingTic": {
+   "name": "Blinking Tic",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "blink"
+   ],
+   "shownBy": ""
+  },
+  "BloodIsFuel": {
+   "name": "VX Engine",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "BonyProtrusions": {
+   "name": "Bony Protrusions",
+   "category": "Physical",
+   "variants": "",
+   "source": "gigantism_Plus",
+   "layers": [
+    "quills"
+   ],
+   "shownBy": ""
+  },
+  "BrittleBones": {
+   "name": "Brittle Bones",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Burgeoning": {
+   "name": "Burgeoning",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "leaves"
+   ],
+   "shownBy": ""
+  },
+  "Burrowing": {
+   "name": "Burrowing",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "wings"
+   ],
+   "shownBy": ""
+  },
+  "BurrowingClaws": {
+   "name": "Burrowing Claws",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "wings",
+    "claws"
+   ],
+   "shownBy": ""
+  },
+  "BustedLocomotion": {
+   "name": "Busted Locomotion",
+   "category": "Microdefects",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Capacitors": {
+   "name": "Capacitors",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "sparks"
+   ],
+   "shownBy": ""
+  },
+  "Carapace": {
+   "name": "Carapace",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "carapace"
+   ],
+   "shownBy": ""
+  },
+  "Carnivorous": {
+   "name": "Carnivorous",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "CheapArmor": {
+   "name": "Cheap Armor",
+   "category": "Microdefects",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Chimera": {
+   "name": "Chimera",
+   "category": "Morphotypes",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "ChimeraShadowGarden": {
+   "name": "Chimera Shadow Garden",
+   "category": "CursedTechniques",
+   "variants": "",
+   "source": "ChimeraShadowGarden",
+   "layers": [],
+   "shownBy": ""
+  },
+  "ChitinousSkin": {
+   "name": "Chitinous Skin",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "scales"
+   ],
+   "shownBy": ""
+  },
+  "Clairvoyance": {
+   "name": "Clairvoyance",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "third_eye"
+   ],
+   "shownBy": ""
+  },
+  "Cleo_TerraFirma_CalcifiedWrists": {
+   "name": "Calcified Wrists",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "Cleo_TerraFirmaBeta",
+   "layers": [
+    "scales"
+   ],
+   "shownBy": ""
+  },
+  "Cleo_TerraFirma_Calcify": {
+   "name": "Calcify",
+   "category": "Physical",
+   "variants": "",
+   "source": "Cleo_TerraFirmaBeta",
+   "layers": [
+    "scales"
+   ],
+   "shownBy": ""
+  },
+  "Cleo_TerraFirma_CapriciousDevotion": {
+   "name": "Capricious Devotion",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "Cleo_TerraFirmaBeta",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Cleo_TerraFirma_CovetousPsyche": {
+   "name": "Covetous Psyche",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "Cleo_TerraFirmaBeta",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Cleo_TerraFirma_EarthenBarrage": {
+   "name": "Earthen Barrage",
+   "category": "Physical",
+   "variants": "",
+   "source": "Cleo_TerraFirmaBeta",
+   "layers": [
+    "orbit"
+   ],
+   "shownBy": ""
+  },
+  "Cleo_TerraFirma_Fissure": {
+   "name": "Fissure",
+   "category": "Physical",
+   "variants": "",
+   "source": "Cleo_TerraFirmaBeta",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Cleo_TerraFirma_Geomancy": {
+   "name": "Geomancy",
+   "category": "Mental",
+   "variants": "",
+   "source": "Cleo_TerraFirmaBeta",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Cleo_TerraFirma_GorgonsGaze": {
+   "name": "Gorgon's Gaze",
+   "category": "Physical",
+   "variants": "",
+   "source": "Cleo_TerraFirmaBeta",
+   "layers": [
+    "glow_eyes"
+   ],
+   "shownBy": ""
+  },
+  "Cleo_TerraFirma_Iconoclast": {
+   "name": "Iconoclast",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "Cleo_TerraFirmaBeta",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Cleo_TerraFirma_Shift": {
+   "name": "Shift",
+   "category": "Physical",
+   "variants": "",
+   "source": "Cleo_TerraFirmaBeta",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Cleo_TerraFirma_Stoneshaper": {
+   "name": "Stoneshaper",
+   "category": "Mental",
+   "variants": "",
+   "source": "Cleo_TerraFirmaBeta",
+   "layers": [],
+   "shownBy": ""
+  },
+  "ColdBlooded": {
+   "name": "Cold-Blooded",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "scales"
+   ],
+   "shownBy": ""
+  },
+  "Collapse": {
+   "name": "Collapse",
+   "category": "Mental",
+   "variants": "",
+   "source": "3334625003",
+   "layers": [],
+   "shownBy": ""
+  },
+  "CombustionBlast": {
+   "name": "Combustion Blast",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "Confusion": {
+   "name": "Confusion",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "ConfusionBreather": {
+   "name": "Confusing Breath",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_mind",
+    "breath"
+   ],
+   "shownBy": ""
+  },
+  "ConfusionGasGeneration": {
+   "name": "Confusion Gas Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_mind"
+   ],
+   "shownBy": ""
+  },
+  "Conjoined": {
+   "name": "Conjoined",
+   "category": "Physical",
+   "variants": "",
+   "source": "Conjoined",
+   "layers": [
+    "conjoined",
+    "conjoined2"
+   ],
+   "shownBy": ""
+  },
+  "CorrosiveBreather": {
+   "name": "Corrosive Breath",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_toxic",
+    "breath"
+   ],
+   "shownBy": ""
+  },
+  "CorrosiveGasGeneration": {
+   "name": "Corrosive Gas Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_toxic"
+   ],
+   "shownBy": ""
+  },
+  "CrungleGaze": {
+   "name": "Crungling Gaze",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "glow_eyes"
+   ],
+   "shownBy": ""
+  },
+  "Cryokinesis": {
+   "name": "Cryokinesis",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "frost"
+   ],
+   "shownBy": ""
+  },
+  "CrystalGrow": {
+   "name": "Crystal",
+   "category": "Nuclear Throne",
+   "variants": "",
+   "source": "Mosni_NuclearThrone",
+   "layers": [
+    "scales"
+   ],
+   "shownBy": ""
+  },
+  "Crystallinity": {
+   "name": "Crystallinity",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "scales"
+   ],
+   "shownBy": ""
+  },
+  "DarkVision": {
+   "name": "Night Vision",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "glow_eyes"
+   ],
+   "shownBy": ""
+  },
+  "Decarbonizer": {
+   "name": "Decarbonizer",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "DefensiveChromatophores": {
+   "name": "Defensive Chromatophores",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "light"
+   ],
+   "shownBy": ""
+  },
+  "DefoliantGeneration": {
+   "name": "Defoliant Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_toxic"
+   ],
+   "shownBy": ""
+  },
+  "DiploCore": {
+   "name": "Diplomatic Core",
+   "category": "Cores",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Disintegration": {
+   "name": "Disintegration",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "DJKFlamingRay": {
+   "name": "[DJK] Flaming Ray",
+   "category": "Physical",
+   "variants": "",
+   "source": "DJK_SoarBear",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "Domination": {
+   "name": "Domination",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "DuelistCore": {
+   "name": "Duelist's Core",
+   "category": "Cores",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Dystechnia": {
+   "name": "Dystechnia",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "EatersInterdiction": {
+   "name": "Cryo Ray",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMAnesheymOfRhemHexQen",
+   "layers": [
+    "frost"
+   ],
+   "shownBy": ""
+  },
+  "EatersKindle": {
+   "name": "Kindle",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMAnesheymOfRhemHexQen",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "EdgeCase": {
+   "name": "Achillean Fault",
+   "category": "Manudefects",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "ElectricalGeneration": {
+   "name": "Electrical Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "sparks"
+   ],
+   "shownBy": ""
+  },
+  "ElectromagneticImpulse": {
+   "name": "Electromagnetic Impulse",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "sparks"
+   ],
+   "shownBy": ""
+  },
+  "ElectromagneticPulse": {
+   "name": "Electromagnetic Pulse",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "sparks"
+   ],
+   "shownBy": ""
+  },
+  "ElongatedPaws": {
+   "name": "Elongated Paws",
+   "category": "Physical",
+   "variants": "",
+   "source": "gigantism_Plus",
+   "layers": [
+    "claws"
+   ],
+   "shownBy": ""
+  },
+  "EMShield": {
+   "name": "Electromagnetic Hardening",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "sparks"
+   ],
+   "shownBy": ""
+  },
+  "ESM_ConfusionGasGeneration": {
+   "name": "Confusion Gas Emission",
+   "category": "Physical",
+   "variants": "",
+   "source": "A_few_extra_mutations",
+   "layers": [
+    "gas_mind"
+   ],
+   "shownBy": ""
+  },
+  "ESM_DefoliantGeneration": {
+   "name": "Defoliant Gas Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "A_few_extra_mutations",
+   "layers": [
+    "gas_toxic"
+   ],
+   "shownBy": ""
+  },
+  "ESM_FungicideGeneration": {
+   "name": "Fungicide Gas Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "A_few_extra_mutations",
+   "layers": [
+    "gas_toxic"
+   ],
+   "shownBy": ""
+  },
+  "ESM_GlitterDustGeneration": {
+   "name": "Glitter Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "A_few_extra_mutations",
+   "layers": [
+    "gas_mind"
+   ],
+   "shownBy": ""
+  },
+  "ESM_NormalityGasGeneration": {
+   "name": "Normality Gas Emission",
+   "category": "Physical",
+   "variants": "",
+   "source": "A_few_extra_mutations",
+   "layers": [
+    "gas_mind"
+   ],
+   "shownBy": ""
+  },
+  "ESM_PlasmaGeneration": {
+   "name": "Plasma Gas Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "A_few_extra_mutations",
+   "layers": [
+    "gas_steam"
+   ],
+   "shownBy": ""
+  },
+  "ESM_PoisonGasGeneration": {
+   "name": "Poison Gas Emission",
+   "category": "Physical",
+   "variants": "",
+   "source": "A_few_extra_mutations",
+   "layers": [
+    "gas_toxic"
+   ],
+   "shownBy": ""
+  },
+  "Esper": {
+   "name": "Esper",
+   "category": "Morphotypes",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "EvilTwin": {
+   "name": "Evil Twin",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "EvolvingExoskeleton": {
+   "name": "Evolving Exoskeleton",
+   "category": "Physical",
+   "variants": "",
+   "source": "Evolving Exoskeleton",
+   "layers": [
+    "carapace"
+   ],
+   "shownBy": ""
+  },
+  "FattyHump": {
+   "name": "FattyHump",
+   "category": "EquipGranted",
+   "variants": "",
+   "source": "Ssnakes_Items_More_Backpacks",
+   "layers": [
+    "humps"
+   ],
+   "shownBy": ""
+  },
+  "FearAura": {
+   "name": "Fear Aura",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "shadow"
+   ],
+   "shownBy": ""
+  },
+  "Fins": {
+   "name": "Fins",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "fin"
+   ],
+   "shownBy": ""
+  },
+  "FireBreather": {
+   "name": "Fire Breath",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "breath",
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "FlamingRay": {
+   "name": "Flaming Ray",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "FlexibleGenome": {
+   "name": "Flexible Genome",
+   "category": "Morphotypes",
+   "variants": "",
+   "source": "Arendeth_FlexibleGenome",
+   "layers": [],
+   "shownBy": ""
+  },
+  "FluffyTail": {
+   "name": "Fluffy Tail",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "tail"
+   ],
+   "shownBy": ""
+  },
+  "FocusPsi": {
+   "name": "Focus Psi",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "ForceAegis": {
+   "name": "Force Aegis",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [
+    "force"
+   ],
+   "shownBy": ""
+  },
+  "ForceArmor": {
+   "name": "Force Armor",
+   "category": "Mental",
+   "variants": "",
+   "source": "3173434628",
+   "layers": [
+    "force"
+   ],
+   "shownBy": ""
+  },
+  "ForceBubble": {
+   "name": "Force Bubble",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "force"
+   ],
+   "shownBy": ""
+  },
+  "ForcePunch": {
+   "name": "Force Punch",
+   "category": "Mental",
+   "variants": "",
+   "source": "3173434628",
+   "layers": [],
+   "shownBy": ""
+  },
+  "ForceWall": {
+   "name": "Force Wall",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "force"
+   ],
+   "shownBy": ""
+  },
+  "FreezeBreath": {
+   "name": "Freezing Ultraray",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "breath",
+    "frost"
+   ],
+   "shownBy": ""
+  },
+  "FreezingRay": {
+   "name": "Freezing Ray",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "frost"
+   ],
+   "shownBy": ""
+  },
+  "FrostWebs": {
+   "name": "Frost Webs",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "webs",
+    "frost"
+   ],
+   "shownBy": ""
+  },
+  "FungicideGeneration": {
+   "name": "Fungicide Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_toxic"
+   ],
+   "shownBy": ""
+  },
+  "GalgalCore": {
+   "name": "Defense Core",
+   "category": "Cores",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "GelatinousFormAcid": {
+   "name": "Gelatinous Form (Acid)",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "tendril"
+   ],
+   "shownBy": ""
+  },
+  "GelatinousFormPoison": {
+   "name": "Gelatinous Form (Poison)",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "tendril"
+   ],
+   "shownBy": ""
+  },
+  "GelatinousFormSlime": {
+   "name": "Gelatinous Form (Slime)",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "tendril"
+   ],
+   "shownBy": ""
+  },
+  "GigantismPlus": {
+   "name": "Gigantism",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "gigantism_Plus",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "Gills": {
+   "name": "Gills",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gills"
+   ],
+   "shownBy": ""
+  },
+  "GlimmerSupernova": {
+   "name": "Glimmer Supernova",
+   "category": "Mental",
+   "variants": "",
+   "source": "Glimmer Supernova",
+   "layers": [
+    "light"
+   ],
+   "shownBy": ""
+  },
+  "GlitterDustGeneration": {
+   "name": "Glitter Dust Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_mind"
+   ],
+   "shownBy": ""
+  },
+  "Gnarf_FeyFire": {
+   "name": "Fey Fire",
+   "category": "Mental",
+   "variants": "",
+   "source": "Underdark Mutation  Cave Dweller Pack",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "Gnarf_Sense_Walls": {
+   "name": "Dweller's Sight",
+   "category": "Physical",
+   "variants": "",
+   "source": "Underdark Mutation  Cave Dweller Pack",
+   "layers": [
+    "glow_eyes"
+   ],
+   "shownBy": ""
+  },
+  "Gnarf_Sunlight_Sensitivity": {
+   "name": "Sunlight Sensitivity",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "Underdark Mutation  Cave Dweller Pack",
+   "layers": [],
+   "shownBy": ""
+  },
+  "GyreStigmataChoshekh": {
+   "name": "Gyre Stigmata (Choshekh)",
+   "category": "Physical",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "GyreStigmataMakatBechorot": {
+   "name": "Gyre Stigmata (Makat Bechorot)",
+   "category": "Physical",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Haruspicy": {
+   "name": "Haruspicy",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [
+    "third_eye"
+   ],
+   "shownBy": ""
+  },
+  "HeatAbsorption": {
+   "name": "Heat Absorption",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "frost"
+   ],
+   "shownBy": ""
+  },
+  "HeatVent": {
+   "name": "Heat Vent",
+   "category": "Nuclear Throne",
+   "variants": "",
+   "source": "Mosni_NuclearThrone",
+   "layers": [
+    "gas_steam"
+   ],
+   "shownBy": ""
+  },
+  "HeavyCore": {
+   "name": "Heavy Core",
+   "category": "Cores",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "HeightenedAgility": {
+   "name": "Triple-jointed",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "HeightenedHearing": {
+   "name": "Heightened Hearing",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "ears"
+   ],
+   "shownBy": ""
+  },
+  "HeightenedSmell": {
+   "name": "Heightened Smell",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "HeightenedSpeed": {
+   "name": "Heightened Quickness",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "speed"
+   ],
+   "shownBy": ""
+  },
+  "HeightenedStrength": {
+   "name": "Double-muscled",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "muscle"
+   ],
+   "shownBy": ""
+  },
+  "HooksForFeet": {
+   "name": "Hooks for Feet",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "hooks"
+   ],
+   "shownBy": ""
+  },
+  "Horns": {
+   "name": "Horns",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "horns"
+   ],
+   "shownBy": ""
+  },
+  "HydraHeads": {
+   "name": "Hydra Heads",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "Hydropartum": {
+   "name": "Hydropartum",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "slime"
+   ],
+   "shownBy": ""
+  },
+  "IceBreather": {
+   "name": "Ice Breath",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "breath",
+    "frost"
+   ],
+   "shownBy": ""
+  },
+  "IDSpoof": {
+   "name": "ID Spoofing",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "antenna"
+   ],
+   "shownBy": ""
+  },
+  "Ignite": {
+   "name": "Ignite",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "Immunocompromised": {
+   "name": "Immunocompromised",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Improved_Beak": {
+   "name": "Beak",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "beak"
+   ],
+   "shownBy": ""
+  },
+  "Improved_Carapace": {
+   "name": "Carapace",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "carapace"
+   ],
+   "shownBy": ""
+  },
+  "Improved_FlamingRay": {
+   "name": "Flaming Ray",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "Improved_FreezingRay": {
+   "name": "Freezing Ray",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "frost"
+   ],
+   "shownBy": ""
+  },
+  "Improved_HooksForFeet": {
+   "name": "Hooks for Feet",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "hooks"
+   ],
+   "shownBy": ""
+  },
+  "Improved_Horns": {
+   "name": "Horns",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "horns"
+   ],
+   "shownBy": ""
+  },
+  "Improved_MultipleArms": {
+   "name": "Multiple Arms (4)",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "Improved_Quills": {
+   "name": "Quills",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "quills"
+   ],
+   "shownBy": ""
+  },
+  "Improved_Spinnerets": {
+   "name": "Spinnerets",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "webs"
+   ],
+   "shownBy": ""
+  },
+  "Improved_ThickFur": {
+   "name": "Thick Fur",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "fur"
+   ],
+   "shownBy": ""
+  },
+  "ImprovedComputing": {
+   "name": "Efficient Computing",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "ImprovedReactor": {
+   "name": "Improved Reactor",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "IncorporealForm": {
+   "name": "Incorporeal Form",
+   "category": "Metaphysical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "astral",
+    "phase"
+   ],
+   "shownBy": ""
+  },
+  "Infiltrate": {
+   "name": "Infiltrate",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Interdiction": {
+   "name": "Interdiction",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "InternalCharger": {
+   "name": "Internal Charger",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Invisibility": {
+   "name": "Invisibility",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "shadow"
+   ],
+   "shownBy": ""
+  },
+  "IrisdualBeam": {
+   "name": "Irisdual Beam",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "glow_eyes"
+   ],
+   "shownBy": ""
+  },
+  "IrritableGenome": {
+   "name": "Irritable Genome",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Kindle": {
+   "name": "Kindle",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "LatchingJaws": {
+   "name": "Latching Jaws",
+   "category": "Physical",
+   "variants": "",
+   "source": "Madpole Jaws Mutation",
+   "layers": [
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "LeadSnout": {
+   "name": "Lead Snout",
+   "category": "Physical",
+   "variants": "",
+   "source": "SlugsnoutSlugMutation",
+   "layers": [
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "Levitation": {
+   "name": "Levitation",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [
+    "levitate"
+   ],
+   "shownBy": ""
+  },
+  "LeyShifting": {
+   "name": "Ley Shifting",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "vortex"
+   ],
+   "shownBy": ""
+  },
+  "LifeDrain": {
+   "name": "Syphon Vim",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "LightManipulation": {
+   "name": "Light Manipulation",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "light"
+   ],
+   "shownBy": ""
+  },
+  "LiquidFont": {
+   "name": "Liquid Font",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "slime"
+   ],
+   "shownBy": ""
+  },
+  "LiquidSpitter": {
+   "name": "Liquid Spitter",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "breath"
+   ],
+   "shownBy": ""
+  },
+  "LoversGaze": {
+   "name": "Limerent Gaze",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMAnesheymOfRhemHexQen",
+   "layers": [
+    "glow_eyes"
+   ],
+   "shownBy": ""
+  },
+  "LustHooves": {
+   "name": "Hooves",
+   "category": "Physical",
+   "variants": "",
+   "source": "Lust_NaturalWeaponsPack",
+   "layers": [
+    "hooks"
+   ],
+   "shownBy": ""
+  },
+  "LustMonstrousMaw": {
+   "name": "Monstrous Maw",
+   "category": "Physical",
+   "variants": "",
+   "source": "Lust_NaturalWeaponsPack",
+   "layers": [
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "LustrousFeathers": {
+   "name": "Lustrously Feathered",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "feathers"
+   ],
+   "shownBy": ""
+  },
+  "LustSeedCannon": {
+   "name": "Seed Cannon",
+   "category": "Physical",
+   "variants": "",
+   "source": "Lust_NaturalWeaponsPack",
+   "layers": [],
+   "shownBy": ""
+  },
+  "MagneticPulse": {
+   "name": "Magnetic Pulse",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "sparks"
+   ],
+   "shownBy": ""
+  },
+  "MassMind": {
+   "name": "Mass Mind",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "MemoryLeak": {
+   "name": "Memory Leak",
+   "category": "Manudefects",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "MentalMirror": {
+   "name": "Mental Mirror",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Metamorphosis": {
+   "name": "Metamorphosis",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "MirrorRemembers": {
+   "name": "Mirror Remembers",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "MissileStrike": {
+   "name": "Missile Strike",
+   "category": "Physical",
+   "variants": "",
+   "source": "3334625003",
+   "layers": [],
+   "shownBy": ""
+  },
+  "MMM_DefectChemicalAddiction": {
+   "name": "Chemical addiction",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "1511228072",
+   "layers": [],
+   "shownBy": ""
+  },
+  "MMM_Dynakineticism": {
+   "name": "Dynakinesis",
+   "category": "Mental",
+   "variants": "",
+   "source": "1511228072",
+   "layers": [
+    "sparks"
+   ],
+   "shownBy": ""
+  },
+  "MMM_GravityField": {
+   "name": "Gravity Field",
+   "category": "Mental",
+   "variants": "",
+   "source": "1511228072",
+   "layers": [
+    "levitate"
+   ],
+   "shownBy": ""
+  },
+  "MMM_Levitation": {
+   "name": "Levitation",
+   "category": "Mental",
+   "variants": "",
+   "source": "1511228072",
+   "layers": [
+    "levitate"
+   ],
+   "shownBy": ""
+  },
+  "MMM_Obfuscate": {
+   "name": "Obfuscate",
+   "category": "Mental",
+   "variants": "",
+   "source": "1511228072",
+   "layers": [
+    "shadow"
+   ],
+   "shownBy": ""
+  },
+  "MMM_Presence": {
+   "name": "Presence",
+   "category": "Mental",
+   "variants": "",
+   "source": "1511228072",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "MMM_Telekinesis": {
+   "name": "Telekinesis",
+   "category": "Mental",
+   "variants": "",
+   "source": "1511228072",
+   "layers": [
+    "orbit"
+   ],
+   "shownBy": ""
+  },
+  "MMMX_ChemicalAddiction": {
+   "name": "Chemical addiction",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "MoreMentalMutations_Extended",
+   "layers": [],
+   "shownBy": ""
+  },
+  "MMMX_Dynakinesis": {
+   "name": "Dynakinesis",
+   "category": "Mental",
+   "variants": "",
+   "source": "MoreMentalMutations_Extended",
+   "layers": [
+    "sparks"
+   ],
+   "shownBy": ""
+  },
+  "MMMX_GravityField": {
+   "name": "Gravity Field",
+   "category": "Mental",
+   "variants": "",
+   "source": "MoreMentalMutations_Extended",
+   "layers": [
+    "levitate"
+   ],
+   "shownBy": ""
+  },
+  "MMMX_Levitation": {
+   "name": "Levitation",
+   "category": "Mental",
+   "variants": "",
+   "source": "MoreMentalMutations_Extended",
+   "layers": [
+    "levitate"
+   ],
+   "shownBy": ""
+  },
+  "MMMX_Obfuscate": {
+   "name": "Obfuscate",
+   "category": "Mental",
+   "variants": "",
+   "source": "MoreMentalMutations_Extended",
+   "layers": [
+    "shadow"
+   ],
+   "shownBy": ""
+  },
+  "MMMX_Presence": {
+   "name": "Presence",
+   "category": "Mental",
+   "variants": "",
+   "source": "MoreMentalMutations_Extended",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "MMMX_Psychokinesis": {
+   "name": "Psychokinesis",
+   "category": "Mental",
+   "variants": "",
+   "source": "MoreMentalMutations_Extended",
+   "layers": [
+    "orbit"
+   ],
+   "shownBy": ""
+  },
+  "MultiHorns": {
+   "name": "Multiple Horns",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "horns"
+   ],
+   "shownBy": ""
+  },
+  "MultipleArms": {
+   "name": "Multiple Arms",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "MultipleHeads": {
+   "name": "Two-headed",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "MultipleLegs": {
+   "name": "Multiple Legs",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "Muzzle": {
+   "name": "Muzzle",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "MWW_BoxingBaboonTail": {
+   "name": "Boxing Baboon Tail",
+   "category": "Physical",
+   "variants": "",
+   "source": "MoreWearableWeapons_DarthMercenary",
+   "layers": [
+    "tail"
+   ],
+   "shownBy": ""
+  },
+  "Myopia": {
+   "name": "Myopic",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "spectacles"
+   ],
+   "shownBy": ""
+  },
+  "Narcolepsy": {
+   "name": "Narcolepsy",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "NephalChoirAgolgot": {
+   "name": "Chordal Node (Agolgot)",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "NephalChoirBethsaida": {
+   "name": "Chordal Node (Bethsaida)",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "NephalChoirEhalcodon": {
+   "name": "Chordal Node (Ehalcodon)",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "NephalChoirQas": {
+   "name": "Chordal Node (Qas)",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "NephalChoirQon": {
+   "name": "Chordal Node (Qon)",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "NephalChoirRermadon": {
+   "name": "Chordal Node (Rermadon)",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "NightVision": {
+   "name": "Dark Vision",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "glow_eyes"
+   ],
+   "shownBy": ""
+  },
+  "NineLivesParadox": {
+   "name": "Nine-Lives Paradox",
+   "category": "Metaphysical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [],
+   "shownBy": ""
+  },
+  "NoAutoRepair": {
+   "name": "Faulty Auto-Repair",
+   "category": "Manudefects",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "regen"
+   ],
+   "shownBy": ""
+  },
+  "NormalityBreather": {
+   "name": "Normality Breath",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_mind",
+    "breath"
+   ],
+   "shownBy": ""
+  },
+  "NormalityGasGeneration": {
+   "name": "Normality Gas Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_mind"
+   ],
+   "shownBy": ""
+  },
+  "Nyyen_LiquidFont": {
+   "name": "Nyyen_LiquidFont",
+   "category": "Physical",
+   "variants": "",
+   "source": "MutationCompat_Extended",
+   "layers": [
+    "slime"
+   ],
+   "shownBy": ""
+  },
+  "OmniScanner": {
+   "name": "Internal Omniscanner",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "antenna"
+   ],
+   "shownBy": ""
+  },
+  "Ovipositor": {
+   "name": "Ovipositor",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "brood"
+   ],
+   "shownBy": ""
+  },
+  "PackRat": {
+   "name": "Pack Rat",
+   "category": "Physical",
+   "variants": "",
+   "source": "A_few_extra_mutations",
+   "layers": [],
+   "shownBy": ""
+  },
+  "pBarkflesh": {
+   "name": "Barkflesh",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "leaves"
+   ],
+   "shownBy": ""
+  },
+  "pDendrovox": {
+   "name": "Dendrovoxy",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "leaves"
+   ],
+   "shownBy": ""
+  },
+  "PeculiarPedestrians_Feet": {
+   "name": "Hooks for Feet",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "AstralKitty_PeculiarPedestrians",
+   "layers": [
+    "hooks"
+   ],
+   "shownBy": ""
+  },
+  "PersonalNormality": {
+   "name": "Normality Anchor",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "pExplosiveBurs": {
+   "name": "Explosive Burs",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "quills"
+   ],
+   "shownBy": ""
+  },
+  "pFibrousPlantars": {
+   "name": "Fibrous Roots",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "roots"
+   ],
+   "shownBy": ""
+  },
+  "pFruitingBodies": {
+   "name": "Fruiting Bodies",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "leaves"
+   ],
+   "shownBy": ""
+  },
+  "Phasing": {
+   "name": "Phasing",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": "effect"
+  },
+  "PhasingTongue": {
+   "name": "Phasing Tongue",
+   "category": "Physical",
+   "variants": "",
+   "source": "3334625003",
+   "layers": [
+    "tongue"
+   ],
+   "shownBy": "effect"
+  },
+  "PhotosyntheticSkin": {
+   "name": "Photosynthetic Skin",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "leaves"
+   ],
+   "shownBy": ""
+  },
+  "PlasmaGeneration": {
+   "name": "Plasma Emission",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_steam"
+   ],
+   "shownBy": ""
+  },
+  "PoisonBreather": {
+   "name": "Poison Breath",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_toxic",
+    "breath"
+   ],
+   "shownBy": ""
+  },
+  "PoisonGasGeneration": {
+   "name": "Poison Gas Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_toxic"
+   ],
+   "shownBy": ""
+  },
+  "PoisonousFangs": {
+   "name": "Poisonous Fangs",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "Precognition": {
+   "name": "Precognition",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "third_eye"
+   ],
+   "shownBy": ""
+  },
+  "PrescienceCovenant": {
+   "name": "Prescience",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [
+    "third_eye"
+   ],
+   "shownBy": ""
+  },
+  "PsionicMigraines": {
+   "name": "Psionic Migraines",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Psybrachiomancy": {
+   "name": "Psybrachiomancy",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [],
+   "shownBy": ""
+  },
+  "PsychicAscension": {
+   "name": "Ascension",
+   "category": "Mental",
+   "variants": "",
+   "source": "PsychicFingerGuns",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "PsychicBlades": {
+   "name": "Orbiting Blades",
+   "category": "Mental",
+   "variants": "",
+   "source": "PsychicFingerGuns",
+   "layers": [
+    "orbit"
+   ],
+   "shownBy": ""
+  },
+  "PsychicEmotion": {
+   "name": "Bottled Emotion",
+   "category": "Mental",
+   "variants": "",
+   "source": "PsychicFingerGuns",
+   "layers": [],
+   "shownBy": ""
+  },
+  "PsychicFingerGuns": {
+   "name": "Finger Guns",
+   "category": "Mental",
+   "variants": "",
+   "source": "PsychicFingerGuns",
+   "layers": [
+    "orbit"
+   ],
+   "shownBy": ""
+  },
+  "PsychicHollowCrown": {
+   "name": "Lord of Flies",
+   "category": "Mental",
+   "variants": "",
+   "source": "PsychicFingerGuns",
+   "layers": [],
+   "shownBy": ""
+  },
+  "PsychicLightning": {
+   "name": "Psychic Lightning",
+   "category": "Mental",
+   "variants": "",
+   "source": "PsychicFingerGuns",
+   "layers": [
+    "sparks"
+   ],
+   "shownBy": ""
+  },
+  "PsychicMindscar": {
+   "name": "Mindscar Singularity",
+   "category": "Mental",
+   "variants": "",
+   "source": "PsychicFingerGuns",
+   "layers": [],
+   "shownBy": ""
+  },
+  "PsychicNeuralquake": {
+   "name": "Neuralquake",
+   "category": "Mental",
+   "variants": "",
+   "source": "PsychicFingerGuns",
+   "layers": [],
+   "shownBy": ""
+  },
+  "PsychicSeventhSeal": {
+   "name": "The Seventh Seal",
+   "category": "Mental",
+   "variants": "",
+   "source": "PsychicFingerGuns",
+   "layers": [],
+   "shownBy": ""
+  },
+  "PsychicTelekinesis": {
+   "name": "Telekinesis",
+   "category": "Mental",
+   "variants": "",
+   "source": "PsychicFingerGuns",
+   "layers": [
+    "orbit"
+   ],
+   "shownBy": ""
+  },
+  "Psychomateriartis": {
+   "name": "Psychomateriartis",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Psychometry": {
+   "name": "Psychometry",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "third_eye"
+   ],
+   "shownBy": ""
+  },
+  "PsychoplethoricDeterioration": {
+   "name": "Psychoplethoric Deterioration",
+   "category": "Hybrid",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [],
+   "shownBy": ""
+  },
+  "pThorny": {
+   "name": "Thorny",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "quills"
+   ],
+   "shownBy": ""
+  },
+  "pXylemicblood": {
+   "name": "Xylembic Blood",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "leaves"
+   ],
+   "shownBy": ""
+  },
+  "Pyrokinesis": {
+   "name": "Pyrokinesis",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "QuantumFugue": {
+   "name": "Quantum Fugue",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "vortex"
+   ],
+   "shownBy": ""
+  },
+  "QuantumJitters": {
+   "name": "Quantum Jitters",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "vortex"
+   ],
+   "shownBy": ""
+  },
+  "Quills": {
+   "name": "Quills",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "quills"
+   ],
+   "shownBy": ""
+  },
+  "RadarMutation": {
+   "name": "Penetrating Radar",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "antenna"
+   ],
+   "shownBy": ""
+  },
+  "RC_AbyssalWidow": {
+   "name": "The Abyssal Widow",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "shadow"
+   ],
+   "shownBy": ""
+  },
+  "RC_AuroraFall": {
+   "name": "Aurora Fall",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "light"
+   ],
+   "shownBy": ""
+  },
+  "RC_Brand": {
+   "name": "The Brand",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Censer": {
+   "name": "The Censer",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_ChainsOfDamned": {
+   "name": "Chains of the Damned",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Champion": {
+   "name": "The Champion",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_ChiefMourner": {
+   "name": "The Chief Mourner",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_ChoirOfEmbers": {
+   "name": "Choir of Embers",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "RC_ClockworkPilgrim": {
+   "name": "The Clockwork Pilgrim",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_DarkLord": {
+   "name": "The Dark Lord",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "shadow"
+   ],
+   "shownBy": ""
+  },
+  "RC_Dawnknight": {
+   "name": "The Dawnknight",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "halo"
+   ],
+   "shownBy": ""
+  },
+  "RC_DrownedKing": {
+   "name": "The Drowned King",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Echo": {
+   "name": "The Echo",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Equilibrium": {
+   "name": "Equilibrium",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_EternalHero": {
+   "name": "The Eternal Hero",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_EvilEye": {
+   "name": "The Evil Eye",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "third_eye"
+   ],
+   "shownBy": ""
+  },
+  "RC_Fallen": {
+   "name": "The Fallen",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_FallingStar": {
+   "name": "The Falling Star",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "light"
+   ],
+   "shownBy": ""
+  },
+  "RC_Ferryman": {
+   "name": "The Ferryman",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_FirstCandle": {
+   "name": "The First Candle",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "RC_FlamingSword": {
+   "name": "The Flaming Sword",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "RC_FontOfMercy": {
+   "name": "Font of Mercy",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "halo"
+   ],
+   "shownBy": ""
+  },
+  "RC_GreyHour": {
+   "name": "The Grey Hour",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Halo": {
+   "name": "The Halo",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "halo"
+   ],
+   "shownBy": ""
+  },
+  "RC_Hellmouth": {
+   "name": "Hellmouth",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "RC_HerosBanner": {
+   "name": "The Hero's Banner",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Hourglass": {
+   "name": "The Hourglass",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_HourOfJudgment": {
+   "name": "The Hour of Judgment",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Huntsman": {
+   "name": "The Huntsman",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_JacobsLadder": {
+   "name": "Jacob's Ladder",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "sparks"
+   ],
+   "shownBy": ""
+  },
+  "RC_LanternsVigil": {
+   "name": "The Lantern's Vigil",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "light"
+   ],
+   "shownBy": ""
+  },
+  "RC_LastEmber": {
+   "name": "The Last Ember Dies",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "RC_LastTrumpet": {
+   "name": "The Last Trumpet",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Leviathan": {
+   "name": "The Leviathan",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Lich": {
+   "name": "The Lich",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "shadow"
+   ],
+   "shownBy": ""
+  },
+  "RC_Limbo": {
+   "name": "Limbo",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Lionheart": {
+   "name": "The Lionheart",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_LongNight": {
+   "name": "The Long Night",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "shadow"
+   ],
+   "shownBy": ""
+  },
+  "RC_Martyr": {
+   "name": "The Martyr",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "halo"
+   ],
+   "shownBy": ""
+  },
+  "RC_Mirror": {
+   "name": "The Mirror",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_MorningBell": {
+   "name": "Morning Bell",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "light"
+   ],
+   "shownBy": ""
+  },
+  "RC_NarrowGate": {
+   "name": "The Narrow Gate",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_NineCircles": {
+   "name": "The Nine Circles",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Oathblade": {
+   "name": "The Oathblade",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Paladin": {
+   "name": "The Paladin",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "halo"
+   ],
+   "shownBy": ""
+  },
+  "RC_Paradise": {
+   "name": "Paradise Regained",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "halo"
+   ],
+   "shownBy": ""
+  },
+  "RC_Penitent": {
+   "name": "The Penitent",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Phoenix": {
+   "name": "The Phoenix",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "RC_PitLord": {
+   "name": "The Pit Lord",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_PoisonedChalice": {
+   "name": "The Poisoned Chalice",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Promise": {
+   "name": "The Promise",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Psychopomp": {
+   "name": "The Psychopomp",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Purgatory": {
+   "name": "Purgatory",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Seraph": {
+   "name": "The Seraph",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "halo"
+   ],
+   "shownBy": ""
+  },
+  "RC_ShadowKing": {
+   "name": "The Shadow King",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "shadow"
+   ],
+   "shownBy": ""
+  },
+  "RC_Shieldwall": {
+   "name": "The Shieldwall",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "force"
+   ],
+   "shownBy": ""
+  },
+  "RC_SinEater": {
+   "name": "The Sin-Eater",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Skinchanger": {
+   "name": "The Skinchanger",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Smite": {
+   "name": "Smite",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "halo"
+   ],
+   "shownBy": ""
+  },
+  "RC_Stillkeeper": {
+   "name": "The Stillkeeper",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Trickster": {
+   "name": "The Trickster",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_TyrantsDecree": {
+   "name": "The Tyrant's Decree",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Unforgiven": {
+   "name": "The Unforgiven",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Unwritten": {
+   "name": "The Unwritten",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_VampireLord": {
+   "name": "The Vampire Lord",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "RC_Wanderer": {
+   "name": "The Wanderer",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_WeightOfYears": {
+   "name": "The Weight of Years",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_Wheel": {
+   "name": "Turning of the Wheel",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_WitchingHour": {
+   "name": "The Witching Hour",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "shadow"
+   ],
+   "shownBy": ""
+  },
+  "RC_Witness": {
+   "name": "The Witness",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [
+    "third_eye"
+   ],
+   "shownBy": ""
+  },
+  "RC_WorldSerpent": {
+   "name": "The World Serpent",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RC_WorldWithoutMorning": {
+   "name": "World Without Morning",
+   "category": "Mental",
+   "variants": "",
+   "source": "RealmtsCodices",
+   "layers": [],
+   "shownBy": ""
+  },
+  "ReactiveArmor": {
+   "name": "Reflective Coating",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "ReactiveHumps": {
+   "name": "Reactive Humps",
+   "category": "Physical",
+   "variants": "",
+   "source": "3743436860",
+   "layers": [
+    "humps"
+   ],
+   "shownBy": ""
+  },
+  "RebelBackup": {
+   "name": "Backup",
+   "category": "Nuclear Throne",
+   "variants": "",
+   "source": "Mosni_NuclearThrone",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RecursiveBrain": {
+   "name": "Recursive Logic",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "ReflectShame": {
+   "name": "Reflect Shame",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Regeneration": {
+   "name": "Regeneration",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "regen"
+   ],
+   "shownBy": ""
+  },
+  "RepellingForce": {
+   "name": "Repelling Force",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "force"
+   ],
+   "shownBy": ""
+  },
+  "RewriteOutcome": {
+   "name": "Rewrite Outcome",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RitaBioDecoy": {
+   "name": "Bio-Decoy",
+   "category": "Physical",
+   "variants": "",
+   "source": "ritamod",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RitaFins": {
+   "name": "Fins",
+   "category": "Physical",
+   "variants": "",
+   "source": "ritamod",
+   "layers": [
+    "fin"
+   ],
+   "shownBy": ""
+  },
+  "RitaHivePresence": {
+   "name": "Hive Presence",
+   "category": "Mental",
+   "variants": "",
+   "source": "ritamod",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "RitaTentacles": {
+   "name": "Tentacles",
+   "category": "Physical",
+   "variants": "",
+   "source": "ritamod",
+   "layers": [
+    "tentacles"
+   ],
+   "shownBy": ""
+  },
+  "RobotArms": {
+   "name": "Extra Armatures",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "RobotGroundSlam": {
+   "name": "Hydraulic Slam",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "RootTrap": {
+   "name": "Roottrap",
+   "category": "Nuclear Throne",
+   "variants": "",
+   "source": "Mosni_NuclearThrone",
+   "layers": [
+    "roots"
+   ],
+   "shownBy": ""
+  },
+  "RoughScales": {
+   "name": "Rough Scales",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "scales"
+   ],
+   "shownBy": ""
+  },
+  "RunDown": {
+   "name": "Rushdown Protocol",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "speed"
+   ],
+   "shownBy": ""
+  },
+  "RustedHulk": {
+   "name": "Rust Adaptation",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "S_MutationNecromancy": {
+   "name": "S_Necromancy",
+   "category": "Mental",
+   "variants": "",
+   "source": "S_Necromancy",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Scaley": {
+   "name": "Scales",
+   "category": "Physical",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "scales"
+   ],
+   "shownBy": ""
+  },
+  "Sciophagia": {
+   "name": "Sciophagia",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "shadow"
+   ],
+   "shownBy": ""
+  },
+  "ScrapEater": {
+   "name": "Salvage Engine",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "SensePsychic": {
+   "name": "Sense Psychic",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "third_eye"
+   ],
+   "shownBy": ""
+  },
+  "SerpentineForm": {
+   "name": "Serpentine Form",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "ShameBreather": {
+   "name": "Shame Breath",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_mind",
+    "breath"
+   ],
+   "shownBy": ""
+  },
+  "Sibs_FeralMutation": {
+   "name": "Feral Jaws",
+   "category": "Physical",
+   "variants": "",
+   "source": "Sibs_CatsDogs",
+   "layers": [
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "Sibs_Tortoises_FreezingGasGeneration": {
+   "name": "Freezing Gas Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "Sibs_Tortoises",
+   "layers": [
+    "gas_steam",
+    "frost"
+   ],
+   "shownBy": ""
+  },
+  "SleepBreather": {
+   "name": "Sleep Breath",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_mind",
+    "breath"
+   ],
+   "shownBy": ""
+  },
+  "SleepGasGeneration": {
+   "name": "Sleep Gas Generation",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_mind"
+   ],
+   "shownBy": ""
+  },
+  "SlimeGlands": {
+   "name": "Slime Glands",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "slime"
+   ],
+   "shownBy": ""
+  },
+  "SlogGlands": {
+   "name": "Bilge Sphincter",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_toxic"
+   ],
+   "shownBy": ""
+  },
+  "Snakefangox_AstralMedusae_AxonemicSnare": {
+   "name": "Axonemic Snare",
+   "category": "Medusic",
+   "variants": "",
+   "source": "Snakefangox_AstralMedusae",
+   "layers": [
+    "astral",
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "Snakefangox_AstralMedusae_Vessel": {
+   "name": "Vessel",
+   "category": "Medusic",
+   "variants": "",
+   "source": "Snakefangox_AstralMedusae",
+   "layers": [
+    "astral",
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "SnakeTail": {
+   "name": "Snake Tail",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "1207623704",
+   "layers": [
+    "tail"
+   ],
+   "shownBy": ""
+  },
+  "SociallyRepugnant": {
+   "name": "Socially Repugnant",
+   "category": "MentalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "SoggyGlands": {
+   "name": "Water Glands",
+   "category": "Physical",
+   "variants": "",
+   "source": "Gladiators of Qud",
+   "layers": [
+    "slime"
+   ],
+   "shownBy": ""
+  },
+  "SoggyGlandsAcid": {
+   "name": "Acid Glands",
+   "category": "Physical",
+   "variants": "",
+   "source": "Gladiators of Qud",
+   "layers": [
+    "slime"
+   ],
+   "shownBy": ""
+  },
+  "SoggyGlandsHealing": {
+   "name": "Convalessence Glands",
+   "category": "Physical",
+   "variants": "",
+   "source": "Gladiators of Qud",
+   "layers": [
+    "slime"
+   ],
+   "shownBy": ""
+  },
+  "SoggyGlandsSteam": {
+   "name": "Steam Glands",
+   "category": "Physical",
+   "variants": "",
+   "source": "Gladiators of Qud",
+   "layers": [
+    "gas_steam",
+    "slime"
+   ],
+   "shownBy": ""
+  },
+  "SpacetimeVortex": {
+   "name": "Spacetime Vortex",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "vortex"
+   ],
+   "shownBy": ""
+  },
+  "SpiderWebs": {
+   "name": "Spider Webs",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "webs"
+   ],
+   "shownBy": ""
+  },
+  "Spinnerets": {
+   "name": "Spinnerets",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "webs"
+   ],
+   "shownBy": ""
+  },
+  "SpontaneousCombustion": {
+   "name": "Spontaneous Combustion",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "SporePuffer": {
+   "name": "Spore Puff",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_toxic"
+   ],
+   "shownBy": ""
+  },
+  "Statrando": {
+   "name": "Unstable Prototype",
+   "category": "Manudefects",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "SteamBreath": {
+   "name": "Steam Vents",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "gas_steam",
+    "breath"
+   ],
+   "shownBy": ""
+  },
+  "StickyTongue": {
+   "name": "Sticky Tongue",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "tongue"
+   ],
+   "shownBy": ""
+  },
+  "Stinger": {
+   "name": "Stinger (Confusing Venom)",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "stinger"
+   ],
+   "shownBy": ""
+  },
+  "StinkyBreather": {
+   "name": "Sulfuric Breath",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMAnesheymOfRhemHexQen_Extended",
+   "layers": [
+    "gas_toxic",
+    "breath"
+   ],
+   "shownBy": ""
+  },
+  "StoneGaze": {
+   "name": "Lithifying Gaze",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "glow_eyes"
+   ],
+   "shownBy": ""
+  },
+  "StructureScanner": {
+   "name": "Internal Structural Scanner",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "antenna"
+   ],
+   "shownBy": ""
+  },
+  "StunBreather": {
+   "name": "Stun Breath",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "gas_mind",
+    "breath"
+   ],
+   "shownBy": ""
+  },
+  "StunningForce": {
+   "name": "Stunning Force",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "force"
+   ],
+   "shownBy": ""
+  },
+  "Sturgeoning": {
+   "name": "Sturgeoning",
+   "category": "Mental",
+   "variants": "",
+   "source": "3795764139",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Sublimation": {
+   "name": "Sublimation",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "SubscriptionService": {
+   "name": "Sentience Plus",
+   "category": "Manudefects",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "SunderMind": {
+   "name": "Sunder Mind",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "TargetingSystems": {
+   "name": "Targeting Subsystems",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "antenna"
+   ],
+   "shownBy": ""
+  },
+  "TechScanner": {
+   "name": "Internal Technoscanner",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "antenna"
+   ],
+   "shownBy": ""
+  },
+  "Telekinesis": {
+   "name": "Telekinesis",
+   "category": "Mental",
+   "variants": "",
+   "source": "2206226863",
+   "layers": [
+    "orbit"
+   ],
+   "shownBy": ""
+  },
+  "TelekineticBarrage": {
+   "name": "Telekinetic Barrage",
+   "category": "Mental",
+   "variants": "",
+   "source": "3173434628",
+   "layers": [
+    "orbit"
+   ],
+   "shownBy": ""
+  },
+  "Telepathy": {
+   "name": "Telepathy",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "Teleportation": {
+   "name": "Teleportation",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "vortex"
+   ],
+   "shownBy": ""
+  },
+  "TeleportOther": {
+   "name": "Teleport Other",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "vortex"
+   ],
+   "shownBy": ""
+  },
+  "TemporalFugue": {
+   "name": "Temporal Fugue",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "vortex"
+   ],
+   "shownBy": ""
+  },
+  "ThermalWeakness": {
+   "name": "Thermal Weakness",
+   "category": "Microdefects",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Thermokinesis": {
+   "name": "Thermokinesis",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "flames"
+   ],
+   "shownBy": ""
+  },
+  "Thermoregulation": {
+   "name": "Thermoregulation",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "ThickFur": {
+   "name": "Thick Fur",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "fur"
+   ],
+   "shownBy": ""
+  },
+  "ThickTail": {
+   "name": "Thick Tail",
+   "category": "Synergy",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "tail"
+   ],
+   "shownBy": ""
+  },
+  "ThirdEye": {
+   "name": "Third Eye",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [
+    "third_eye"
+   ],
+   "shownBy": ""
+  },
+  "ThoughtThief": {
+   "name": "Thought Thief",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [],
+   "shownBy": ""
+  },
+  "TimeDilation": {
+   "name": "Time Dilation",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "vortex"
+   ],
+   "shownBy": ""
+  },
+  "TinkerCore": {
+   "name": "Tinker Core",
+   "category": "Cores",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "TonicAllergy": {
+   "name": "Tonic Allergy",
+   "category": "PhysicalDefects",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "TTBackground": {
+   "name": "MechanimistNovice",
+   "category": "Backgrounds and Alignments",
+   "variants": "",
+   "source": "TT_ExtraBackgrounds",
+   "layers": [],
+   "shownBy": ""
+  },
+  "TwoHeaded": {
+   "name": "Two-headed",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "TwoHearted": {
+   "name": "Two-hearted",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "heart"
+   ],
+   "shownBy": ""
+  },
+  "UD_Blink": {
+   "name": "Blink",
+   "category": "Physical",
+   "variants": "",
+   "source": "UD_Blink_Mutation",
+   "layers": [],
+   "shownBy": ""
+  },
+  "UD_HornsPlus": {
+   "name": "Horns",
+   "category": "Physical",
+   "variants": "",
+   "source": "gigantism_Plus",
+   "layers": [
+    "horns"
+   ],
+   "shownBy": ""
+  },
+  "UD_ManagedBurrowingClaws": {
+   "name": "Burrowing Claws",
+   "category": "Physical",
+   "variants": "",
+   "source": "gigantism_Plus",
+   "layers": [
+    "wings",
+    "claws"
+   ],
+   "shownBy": ""
+  },
+  "UD_ManagedCrystallinity": {
+   "name": "Crystallinity",
+   "category": "Physical",
+   "variants": "",
+   "source": "gigantism_Plus",
+   "layers": [
+    "scales"
+   ],
+   "shownBy": ""
+  },
+  "UD_QuillsPlus": {
+   "name": "Quills",
+   "category": "Physical",
+   "variants": "",
+   "source": "gigantism_Plus",
+   "layers": [
+    "quills"
+   ],
+   "shownBy": ""
+  },
+  "UD_SlogGlands": {
+   "name": "Bilge Sphincter",
+   "category": "Physical",
+   "variants": "",
+   "source": "gigantism_Plus",
+   "layers": [
+    "gas_toxic"
+   ],
+   "shownBy": ""
+  },
+  "UmbralEyes": {
+   "name": "Umbral Sight",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [
+    "glow_eyes"
+   ],
+   "shownBy": ""
+  },
+  "Umbrameum": {
+   "name": "Light Occlusion",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "shadow"
+   ],
+   "shownBy": ""
+  },
+  "Unbound": {
+   "name": "Mental Conduit",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "UnformattedCore": {
+   "name": "Unformatted Core",
+   "category": "Cores",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [],
+   "shownBy": ""
+  },
+  "Unphasing": {
+   "name": "Astral Walker",
+   "category": "Physical",
+   "variants": "",
+   "source": "astral_kitty_fork",
+   "layers": [
+    "astral"
+   ],
+   "shownBy": "effect"
+  },
+  "UnstableGenome": {
+   "name": "Unstable Genome",
+   "category": "Morphotypes",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "UnstablerGenome": {
+   "name": "Unstabler Genome",
+   "category": "Morphotypes",
+   "variants": "",
+   "source": "restercor_Unstabler_Genome",
+   "layers": [],
+   "shownBy": ""
+  },
+  "UrchinBelcher": {
+   "name": "Urchin Belching",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "quills",
+    "breath"
+   ],
+   "shownBy": ""
+  },
+  "Ursa_ViciousBite": {
+   "name": "Vicious Bite",
+   "category": "Physical",
+   "variants": "",
+   "source": "Ursa_ViciousBite",
+   "layers": [
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "UVVision": {
+   "name": "UV Vision",
+   "category": "Modifications",
+   "variants": "",
+   "source": "qudRogueRobots",
+   "layers": [
+    "glow_eyes"
+   ],
+   "shownBy": ""
+  },
+  "Vampirism": {
+   "name": "Vampirism",
+   "category": "Physical",
+   "variants": "",
+   "source": "vampirism",
+   "layers": [
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "VitaIntuita": {
+   "name": "Vita Intuita",
+   "category": "Mental",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "regen"
+   ],
+   "shownBy": ""
+  },
+  "Vixy_Fangs": {
+   "name": "Fangs",
+   "category": "Physical",
+   "variants": "",
+   "source": "QudExpandedCommunityEdition",
+   "layers": [
+    "fangs"
+   ],
+   "shownBy": ""
+  },
+  "Vixy_Tail": {
+   "name": "Tail",
+   "category": "Physical",
+   "variants": "",
+   "source": "QudExpandedCommunityEdition",
+   "layers": [
+    "tail"
+   ],
+   "shownBy": ""
+  },
+  "WallWalker": {
+   "name": "Wall Climber",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "WaveformWorm": {
+   "name": "Waveform",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [],
+   "shownBy": ""
+  },
+  "WeftTear": {
+   "name": "Weft Tear",
+   "category": "Mental",
+   "variants": "",
+   "source": "Becoming",
+   "layers": [
+    "vortex"
+   ],
+   "shownBy": ""
+  },
+  "Who_Shapeshifting": {
+   "name": "Shapeshifting",
+   "category": "Physical",
+   "variants": "",
+   "source": "Who_ShapeShifting2",
+   "layers": [],
+   "shownBy": "body"
+  },
+  "WillForce": {
+   "name": "Ego Projection",
+   "category": "Mental",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "psi"
+   ],
+   "shownBy": ""
+  },
+  "Wings": {
+   "name": "Wings",
+   "category": "Physical",
+   "variants": "",
+   "source": "vanilla",
+   "layers": [
+    "wings"
+   ],
+   "shownBy": ""
+  },
+  "WizSteamGeneration": {
+   "name": "WizSteamGeneration",
+   "category": "Physical",
+   "variants": "",
+   "source": "Icy Glaciers",
+   "layers": [
+    "gas_steam"
+   ],
+   "shownBy": ""
+  },
+  "WizSteamGenerationWet": {
+   "name": "WizSteamGenerationWet",
+   "category": "Physical",
+   "variants": "",
+   "source": "Icy Glaciers",
+   "layers": [
+    "gas_steam"
+   ],
+   "shownBy": ""
+  },
+  "wmGills": {
+   "name": "wmGills",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMexMutationsStable",
+   "layers": [
+    "gills"
+   ],
+   "shownBy": ""
+  },
+  "wmGlareBurst": {
+   "name": "Glare Burst",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMAnesheymOfRhemHexQen_Extended",
+   "layers": [
+    "quills",
+    "glow_eyes"
+   ],
+   "shownBy": ""
+  },
+  "wmSpitSulfur": {
+   "name": "Spit Sulfur",
+   "category": "Physical",
+   "variants": "",
+   "source": "WMAnesheymOfRhemHexQen_Extended",
+   "layers": [
+    "gas_toxic",
+    "breath"
+   ],
+   "shownBy": ""
+  }
+ }
+}

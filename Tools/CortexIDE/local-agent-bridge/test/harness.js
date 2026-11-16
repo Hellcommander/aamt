@@ -9,6 +9,15 @@ const EXT = path.resolve(__dirname, "..");
 const tests = [];
 const cleanups = [];
 let scheduled = false;
+let current = null; // the test now running
+
+// A test awaiting a promise that can never settle lets node drain its event loop and exit 0
+// silently. Report that as a failure instead of a pass.
+process.on("beforeExit", () => {
+  if (!current) return;
+  console.log("FAIL " + current + "\n     never finished: it awaited a promise that can no longer settle");
+  process.exit(1);
+});
 
 function test(name, fn, { skip } = {}) {
   tests.push({ name, fn, skip });
@@ -32,6 +41,7 @@ async function runAll() {
       console.log("skip " + t.name + " (" + t.skip + ")");
       continue;
     }
+    current = t.name;
     try {
       await t.fn();
       pass++;
@@ -41,6 +51,7 @@ async function runAll() {
       console.log("FAIL " + t.name + "\n     " + String((e && e.message) || e).replace(/\n/g, "\n     "));
     }
   }
+  current = null;
   for (const fn of cleanups) {
     try {
       await fn();

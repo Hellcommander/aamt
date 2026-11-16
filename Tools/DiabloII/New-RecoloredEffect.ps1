@@ -2,9 +2,9 @@
 .SYNOPSIS
     Builds recoloured copies of HD missile effects for a Diablo II: Resurrected mod (see README.md).
 .EXAMPLE
-    .\New-RecoloredEffect.ps1 -GamePath 'D:\games\Diablo II Resurrected' -OutDir '<D2RMM>\mods\DarknessMagicNecro' -PatchMod
+    .\New-RecoloredEffect.ps1 -GamePath 'D:\games\Steam\steamapps\common\Diablo II Resurrected' -OutDir '<D2RMM>\mods\DarknessMagicNecro' -PatchMod
 .EXAMPLE
-    .\New-RecoloredEffect.ps1 -GamePath 'D:\games\Diablo II Resurrected' -Audit
+    .\New-RecoloredEffect.ps1 -GamePath 'D:\games\Steam\steamapps\common\Diablo II Resurrected' -Audit
 #>
 [CmdletBinding()]
 param(

@@ -53,13 +53,18 @@ typedef struct sa_config {
 	int32_t        log_probes;           /* 1: log the game's opens/attribute checks under sound\\ and music\\ */
 	int32_t        max_probe_lines;      /* default 200 */
 	int32_t        log_imports;          /* 1: list the file functions the executable imports */
+	/* added in core 1.2 (older hosts pass a smaller size and get the defaults) */
+	int32_t        patch_system;         /* 1: also redirect kernel32's file export stubs, process-wide, for executables that resolve the
+	                                        file functions at run time instead of importing them (packed games: Diablo II Resurrected) */
+	const wchar_t* probe_prefixes;       /* semicolon list of data-relative folders whose opens are sound probes; default L"sound;music" */
 } sa_config;
 
 /* Fills a config with defaults (size set, hooks on, patch_modules 1); then set what differs. */
 SA_API void sa_config_init(sa_config* config);
 
-/* Mounts the archives and installs the hooks. Returns the number of file imports hooked in the executable (0 means
- * nothing is served), or a negative value: -1 bad config, -2 already initialized, -3 archive folder unreadable. */
+/* Mounts the archives and installs the hooks. Returns the number of file imports hooked in the executable, plus the
+ * kernel32 stubs redirected with patch_system (0 means nothing is served), or a negative value: -1 bad config, -2 already
+ * initialized, -3 archive folder unreadable. */
 SA_API int32_t sa_init(const sa_config* config);
 
 /* Patches modules loaded since sa_init (script extenders load plugins in order). Returns imports hooked. */

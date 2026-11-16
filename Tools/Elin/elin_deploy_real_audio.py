@@ -385,6 +385,8 @@ def main() -> int:
     ap.add_argument("--only", default="", help="Comma-separated sound ids")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--status", action="store_true")
+    ap.add_argument("--summary", action="store_true",
+                    help="how many of the wanted clips are in the mod's Sound folder, and which are missing; loads no model")
     args = ap.parse_args()
 
     if args.status:
@@ -394,6 +396,17 @@ def main() -> int:
 
     mod = Path(args.mod_path)
     sound_dir = mod / "Sound"
+    if args.summary:
+        jobs = build_jobs()
+        have = [j for j in jobs if (sound_dir / f"{j['id']}.wav").is_file() and (sound_dir / f"{j['id']}.wav").stat().st_size > 2048]
+        missing = [j["id"] for j in jobs if j not in have]
+        no_json = [j["id"] for j in have if not (sound_dir / f"{j['id']}.json").is_file()]
+        extra = len(list(sound_dir.glob("*.wav"))) - len(have) if sound_dir.is_dir() else 0
+        print(f"sound clips: {len(have)} / {len(jobs)} wanted clips are in {sound_dir}")
+        print(f"  missing {len(missing)}" + (": " + ", ".join(missing[:30]) + (" ..." if len(missing) > 30 else "") if missing else ""))
+        print(f"  without a .json sidecar {len(no_json)}" + (": " + ", ".join(no_json[:30]) if no_json else ""))
+        print(f"  other .wav files in the folder {extra}")
+        return 0
     sound_dir.mkdir(parents=True, exist_ok=True)
     _OUTPUT.mkdir(parents=True, exist_ok=True)
 

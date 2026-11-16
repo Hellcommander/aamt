@@ -16,7 +16,7 @@
             "key": "General.EnableWeaponStarbornCasting",
             "label": "Enable Weapon Starborn Casting",
             "type": "bool",
-            "default": false
+            "default": true
           },
           {
             "key": "General.ReplaceNormalFire",
@@ -37,7 +37,7 @@
             "label": "Drain Essence",
             "type": "bool",
             "default": true,
-            "hint": "Spend Arc_AV_Essence on the pilot in addition to Star Power."
+            "hint": "Spend Arc_AV_Essence on the pilot in addition to Star Power. Starborn Solar Lance rows pass essenceCost=0 so they skip Essence."
           },
           {
             "key": "General.DefaultEssenceCost",
@@ -66,18 +66,18 @@
             "key": "Hooks.UseWeaponFiredEventFallback",
             "label": "Use Weapon Fired Event Fallback",
             "type": "bool",
-            "default": true,
-            "hint": "Interim hook: listen for WeaponFiredEvent until the ship-fire AOB detour is wired."
+            "default": false,
+            "hint": "Off while the 105260 probe is the thing under test. WeaponFiredEvent is a handheld/ship mix and would muddy the log. Turn it back on only if the probe stays silent on player shots."
           },
           {
             "key": "Hooks.FireHookProbe",
             "label": "Fire Hook Probe",
             "type": "int",
-            "default": 0,
+            "default": 1,
             "min": 0,
             "max": 10,
             "step": 1,
-            "hint": "Diagnostic only: hooks the ship-weapon fire request and logs each call to Documents\\My Games\\Starfield\\SFSE\\Logs\\MadScience.log. Casts nothing and changes no behaviour, and installs even when EnableWeaponStarbornCasting=0. Purpose: confirm the player's trigger reaches this function. Reverse engin..."
+            "hint": "Log-only entry detour at SpaceshipWeapon::Fire (ID 105260, RVA 0x1B67B30 on 1.16.244.0). Prologue 40 53 48 83 EC 50 was verified against Starfield.exe and the Address Library. Casts nothing; installs even when EnableWeaponStarbornCasting=0. Test: fly with no other ships, pull the trigger. Hits go..."
           },
           {
             "key": "Hooks.FireHookID",
@@ -113,7 +113,7 @@
             "label": "Require Seat Ability",
             "type": "bool",
             "default": true,
-            "hint": "Pilot must be seated in a cockpit module that grants this ability. Granted/removed by the Papyrus companion (plugins/ShipWeaponPowers/Papyrus). This Editor ID MUST match the ability's Editor ID and the script property."
+            "hint": "Pilot must be seated in a cockpit. Native check is GetSpaceshipPilot(); furniture scripts can still add the keyword/ability."
           },
           {
             "key": "Requirements.SeatAbilityEditorID",
@@ -149,6 +149,63 @@
             "max": 100,
             "step": 1,
             "hint": "Default drain per shot if a weapon mapping omits starPowerCost (percent of max meter)"
+          }
+        ]
+      },
+      {
+        "id": "weaponpowermap",
+        "label": "WeaponPowerMap",
+        "settings": [
+          {
+            "key": "WeaponPowerMap.Arc_GBFM_SolarLance",
+            "label": "Arc gbfm Solar Lance",
+            "type": "string",
+            "default": "Arc_Spell_Solarlance, 100, 8, 25, 0, Photonics, 0",
+            "maxLength": 81,
+            "hint": "weapon = spell[,chance][,cooldown][,starPowerCost][,shipPowerCost][,school][,essenceCost][,minRank][,material] weapon and spell may be a Form ID (0x...) or an editor ID. school: Atmospherics | Bindings | Cryonics | Entropy | Gravitics | Kinetics | Osmotics | Phasics | Photonics | Pyrolysis | Synt..."
+          },
+          {
+            "key": "WeaponPowerMap.SMC_Weapon_StarbornWeapon_SolarFlareBeam01_lvl16",
+            "label": "SMC Weapon Starborn Weapon Solar Flare Beam01 lvl16",
+            "type": "string",
+            "default": "Arc_Spell_Solarlance, 100, 8, 25, 0, Photonics, 0",
+            "maxLength": 81
+          },
+          {
+            "key": "WeaponPowerMap.SMC_Weapon_StarbornWeapon_SolarFlareBeam02_lvl30",
+            "label": "SMC Weapon Starborn Weapon Solar Flare Beam02 lvl30",
+            "type": "string",
+            "default": "Arc_Spell_Solarlance, 100, 8, 25, 0, Photonics, 0",
+            "maxLength": 81
+          },
+          {
+            "key": "WeaponPowerMap.SMC_Weapon_StarbornWeapon_SolarFlareBeam03_lvl56",
+            "label": "SMC Weapon Starborn Weapon Solar Flare Beam03 lvl56",
+            "type": "string",
+            "default": "Arc_Spell_Solarlance, 100, 8, 25, 0, Photonics, 0",
+            "maxLength": 81
+          },
+          {
+            "key": "WeaponPowerMap.SWP_Weap_BoltEmitter",
+            "label": "SWP Weap Bolt Emitter",
+            "type": "string",
+            "default": "Arc_Spell_BallLightning, 100, 3, 15, 0, Voltaics, 12, 1, plasma",
+            "maxLength": 95,
+            "hint": "Cloned Solar Flare GBFMs via XEditAssist/tools/build_ship_weapons.py (ShipWeaponPowers.esp). Spells stay in the Conduit catalog. essenceCost > 0 so they run organ compile + Aether spend."
+          },
+          {
+            "key": "WeaponPowerMap.SWP_Weap_RiftProjector",
+            "label": "SWP Weap Rift Projector",
+            "type": "string",
+            "default": "Arc_Spell_DimensionalRift, 100, 14, 35, 0, Phasics, 28, 3, prismatic_solvent",
+            "maxLength": 108
+          },
+          {
+            "key": "WeaponPowerMap.SWP_Weap_OrbLauncher",
+            "label": "SWP Weap Orb Launcher",
+            "type": "string",
+            "default": "Arc_Spell_ElectricOrb, 100, 8, 22, 0, Voltaics, 22, 2, plasma",
+            "maxLength": 93
           }
         ]
       },
@@ -218,6 +275,2166 @@
             "min": 0.0,
             "max": 4.8,
             "step": 0.1
+          },
+          {
+            "key": "Scaling.ShipLevelDamageScale",
+            "label": "Ship Level Damage Scale",
+            "type": "float",
+            "default": 1.5,
+            "min": 0.0,
+            "max": 6.0,
+            "step": 0.1
+          },
+          {
+            "key": "Scaling.ShipRankRadiusScale",
+            "label": "Ship Rank Radius Scale",
+            "type": "float",
+            "default": 2.0,
+            "min": 0.0,
+            "max": 8.0,
+            "step": 0.1
+          },
+          {
+            "key": "Scaling.VascularCooldownPerLevel",
+            "label": "Vascular Cooldown Per Level",
+            "type": "float",
+            "default": 0.02,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Scaling.MantleCooldownPerLevel",
+            "label": "Mantle Cooldown Per Level",
+            "type": "float",
+            "default": 0.015,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Scaling.MinCooldownFraction",
+            "label": "Min Cooldown Fraction",
+            "type": "float",
+            "default": 0.4,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Scaling.BaseInstabilityPercent",
+            "label": "Base Instability Percent",
+            "type": "float",
+            "default": 12.0,
+            "min": 0.0,
+            "max": 48.0,
+            "step": 0.1
+          },
+          {
+            "key": "Scaling.InstabilityCapPerRank",
+            "label": "Instability Cap Per Rank",
+            "type": "float",
+            "default": 2.5,
+            "min": 0.0,
+            "max": 10.0,
+            "step": 0.1
+          }
+        ]
+      },
+      {
+        "id": "biometal",
+        "label": "Biometal",
+        "settings": [
+          {
+            "key": "Biometal.RequireHull",
+            "label": "Require Hull",
+            "type": "bool",
+            "default": true,
+            "hint": "Crafted Conduit ship weapons (essenceCost > 0) need a living hull. Starborn powers with essenceCost 0 skip this gate. Rank 1 Hatchling, 2 Juvenile, 3 Mature, 4 Elder, 5 Ancient (at sRankAtLevels)."
+          },
+          {
+            "key": "Biometal.HullKeyword",
+            "label": "Hull Keyword",
+            "type": "string",
+            "default": "KW_BiometalHull",
+            "maxLength": 64
+          },
+          {
+            "key": "Biometal.LevelActorValue",
+            "label": "Level Actor Value",
+            "type": "string",
+            "default": "Arc_AV_BiometalLevel",
+            "maxLength": 64
+          },
+          {
+            "key": "Biometal.RankAtLevels",
+            "label": "Rank At Levels",
+            "type": "string",
+            "default": "5,10,15,20",
+            "maxLength": 64
+          },
+          {
+            "key": "Biometal.MaxLevel",
+            "label": "Max Level",
+            "type": "int",
+            "default": 20,
+            "min": 0,
+            "max": 80,
+            "step": 1
+          },
+          {
+            "key": "Biometal.GrowFromCombat",
+            "label": "Grow From Combat",
+            "type": "bool",
+            "default": true,
+            "hint": "Growth XP from combat (cast / loaded pulse / overload / hull wound)."
+          },
+          {
+            "key": "Biometal.XpPerLevel",
+            "label": "Xp Per Level",
+            "type": "float",
+            "default": 120.0,
+            "min": 0.0,
+            "max": 480.0,
+            "step": 1.0
+          },
+          {
+            "key": "Biometal.XpLevelCurve",
+            "label": "Xp Level Curve",
+            "type": "float",
+            "default": 0.18,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Biometal.XpCast",
+            "label": "Xp Cast",
+            "type": "float",
+            "default": 12.0,
+            "min": 0.0,
+            "max": 48.0,
+            "step": 0.1
+          },
+          {
+            "key": "Biometal.XpPulseLoad",
+            "label": "Xp Pulse Load",
+            "type": "float",
+            "default": 0.4,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Biometal.XpOverload",
+            "label": "Xp Overload",
+            "type": "float",
+            "default": 40.0,
+            "min": 0.0,
+            "max": 160.0,
+            "step": 0.1
+          },
+          {
+            "key": "Biometal.XpDamage",
+            "label": "Xp Damage",
+            "type": "float",
+            "default": 30.0,
+            "min": 0.0,
+            "max": 120.0,
+            "step": 0.1
+          },
+          {
+            "key": "Biometal.XpHostileDamage",
+            "label": "Xp Hostile Damage",
+            "type": "float",
+            "default": 45.0,
+            "min": 0.0,
+            "max": 180.0,
+            "step": 0.1,
+            "hint": "Hunt XP: hull dealt to hostiles, sitting their seat, wrecking them, and keeping the captain off (then destroy pays the wreck too)."
+          },
+          {
+            "key": "Biometal.XpCapture",
+            "label": "Xp Capture",
+            "type": "float",
+            "default": 90.0,
+            "min": 0.0,
+            "max": 360.0,
+            "step": 0.1
+          },
+          {
+            "key": "Biometal.XpDestroy",
+            "label": "Xp Destroy",
+            "type": "float",
+            "default": 75.0,
+            "min": 0.0,
+            "max": 300.0,
+            "step": 0.1
+          },
+          {
+            "key": "Biometal.XpCaptainOff",
+            "label": "Xp Captain Off",
+            "type": "float",
+            "default": 55.0,
+            "min": 0.0,
+            "max": 220.0,
+            "step": 0.1
+          },
+          {
+            "key": "Biometal.HuntRange",
+            "label": "Hunt Range",
+            "type": "float",
+            "default": 12000.0,
+            "min": 0.0,
+            "max": 48000.0,
+            "step": 1.0
+          },
+          {
+            "key": "Biometal.HeartPerLevel",
+            "label": "Heart Per Level",
+            "type": "float",
+            "default": 0.04,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01,
+            "hint": "Per-level organ metabolism (level 1 = 1.00, stacked additively)."
+          },
+          {
+            "key": "Biometal.LungsPerLevel",
+            "label": "Lungs Per Level",
+            "type": "float",
+            "default": 0.03,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Biometal.VascularPerLevel",
+            "label": "Vascular Per Level",
+            "type": "float",
+            "default": 0.035,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Biometal.MantlePerLevel",
+            "label": "Mantle Per Level",
+            "type": "float",
+            "default": 0.03,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Biometal.InstabilityCapPerLevel",
+            "label": "Instability Cap Per Level",
+            "type": "float",
+            "default": 0.02,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Biometal.GlandPerLevel",
+            "label": "Gland Per Level",
+            "type": "float",
+            "default": 0.04,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          }
+        ]
+      },
+      {
+        "id": "organs",
+        "label": "Organs",
+        "settings": [
+          {
+            "key": "Organs.EnableRuntime",
+            "label": "Enable Runtime",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Organs.HeartMaterial",
+            "label": "Heart Material",
+            "type": "string",
+            "default": "liquidiron",
+            "maxLength": 64
+          },
+          {
+            "key": "Organs.LungsMaterial",
+            "label": "Lungs Material",
+            "type": "string",
+            "default": "gel",
+            "maxLength": 64
+          },
+          {
+            "key": "Organs.MantleMaterial",
+            "label": "Mantle Material",
+            "type": "string",
+            "default": "plasma_thread",
+            "maxLength": 64
+          },
+          {
+            "key": "Organs.VascularMaterial",
+            "label": "Vascular Material",
+            "type": "string",
+            "default": "liquidiron",
+            "maxLength": 64
+          },
+          {
+            "key": "Organs.GlandsMaterial",
+            "label": "Glands Material",
+            "type": "string",
+            "default": "gel",
+            "maxLength": 64
+          },
+          {
+            "key": "Organs.MeshMaterial",
+            "label": "Mesh Material",
+            "type": "string",
+            "default": "gel",
+            "maxLength": 64
+          },
+          {
+            "key": "Organs.EggMaterial",
+            "label": "Egg Material",
+            "type": "string",
+            "default": "plasma_thread",
+            "maxLength": 64
+          },
+          {
+            "key": "Organs.PulseHz",
+            "label": "Pulse Hz",
+            "type": "float",
+            "default": 1.15,
+            "min": 0.0,
+            "max": 4.6,
+            "step": 0.1
+          },
+          {
+            "key": "Organs.InstabilityDecay",
+            "label": "Instability Decay",
+            "type": "float",
+            "default": 0.08,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.CastInstability",
+            "label": "Cast Instability",
+            "type": "float",
+            "default": 0.06,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.ThrustInstability",
+            "label": "Thrust Instability",
+            "type": "float",
+            "default": 0.03,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.DamageInstability",
+            "label": "Damage Instability",
+            "type": "float",
+            "default": 0.2,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.RegenPerPulse",
+            "label": "Regen Per Pulse",
+            "type": "float",
+            "default": 0.035,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.OrganRegenPerPulse",
+            "label": "Organ Regen Per Pulse",
+            "type": "float",
+            "default": 0.04,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.InstabilityRepairPerPulse",
+            "label": "Instability Repair Per Pulse",
+            "type": "float",
+            "default": 0.05,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.OverloadHullDamage",
+            "label": "Overload Hull Damage",
+            "type": "float",
+            "default": 0.08,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.VascularOverload",
+            "label": "Vascular Overload",
+            "type": "float",
+            "default": 0.92,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.MutationAt",
+            "label": "Mutation At",
+            "type": "float",
+            "default": 0.45,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.CatastropheAt",
+            "label": "Catastrophe At",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.MeshLerp",
+            "label": "Mesh Lerp",
+            "type": "float",
+            "default": 2.4,
+            "min": 0.0,
+            "max": 9.6,
+            "step": 0.1
+          },
+          {
+            "key": "Organs.DefaultPressure",
+            "label": "Default Pressure",
+            "type": "float",
+            "default": 0.55,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.MinThrust",
+            "label": "Min Thrust",
+            "type": "float",
+            "default": 0.25,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.MaxThrust",
+            "label": "Max Thrust",
+            "type": "float",
+            "default": 2.1,
+            "min": 0.0,
+            "max": 8.4,
+            "step": 0.1
+          },
+          {
+            "key": "Organs.ParasiticLeech",
+            "label": "Parasitic Leech",
+            "type": "float",
+            "default": 0.08,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.HavokThrust",
+            "label": "Havok Thrust",
+            "type": "bool",
+            "default": true,
+            "hint": "Heartbeat Havok kick along look while Shift / RT / Space is held. Does not replace vanilla flight — one impulse per pulse."
+          },
+          {
+            "key": "Organs.BioMeshInput",
+            "label": "Bio Mesh Input",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Organs.ThrustKick",
+            "label": "Thrust Kick",
+            "type": "float",
+            "default": 28.0,
+            "min": 0.0,
+            "max": 112.0,
+            "step": 0.1
+          },
+          {
+            "key": "Organs.BoostPressure",
+            "label": "Boost Pressure",
+            "type": "float",
+            "default": 0.92,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Organs.CruisePressure",
+            "label": "Cruise Pressure",
+            "type": "float",
+            "default": 0.7,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          }
+        ]
+      },
+      {
+        "id": "transcendence",
+        "label": "Transcendence",
+        "settings": [
+          {
+            "key": "Transcendence.EnableRegistry",
+            "label": "Enable Registry",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Transcendence.RegistryPath",
+            "label": "Registry Path",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          },
+          {
+            "key": "Transcendence.DefaultFamily",
+            "label": "Default Family",
+            "type": "string",
+            "default": "scBiometalDragon",
+            "maxLength": 64
+          },
+          {
+            "key": "Transcendence.SharkKeyword",
+            "label": "Shark Keyword",
+            "type": "string",
+            "default": "KW_BiometalShark",
+            "maxLength": 64
+          },
+          {
+            "key": "Transcendence.VoidSharkKeyword",
+            "label": "Void Shark Keyword",
+            "type": "string",
+            "default": "KW_BiometalVoidShark",
+            "maxLength": 64
+          }
+        ]
+      },
+      {
+        "id": "armor",
+        "label": "Armor",
+        "settings": [
+          {
+            "key": "Armor.EnableArmor",
+            "label": "Enable Armor",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Armor.PlateCount",
+            "label": "Plate Count",
+            "type": "int",
+            "default": 6,
+            "min": 0,
+            "max": 24,
+            "step": 1
+          },
+          {
+            "key": "Armor.AbsorbFraction",
+            "label": "Absorb Fraction",
+            "type": "float",
+            "default": 0.85,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.ArmorRegenPerPulse",
+            "label": "Armor Regen Per Pulse",
+            "type": "float",
+            "default": 0.06,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.RuptureInstability",
+            "label": "Rupture Instability",
+            "type": "float",
+            "default": 0.12,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.SpillInstabilityMul",
+            "label": "Spill Instability Mul",
+            "type": "float",
+            "default": 1.15,
+            "min": 0.0,
+            "max": 4.6,
+            "step": 0.1
+          },
+          {
+            "key": "Armor.SpillOrganLoad",
+            "label": "Spill Organ Load",
+            "type": "float",
+            "default": 0.18,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.RegenIron",
+            "label": "Regen Iron",
+            "type": "float",
+            "default": 0.8,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.RegenGel",
+            "label": "Regen Gel",
+            "type": "float",
+            "default": 1.25,
+            "min": 0.0,
+            "max": 5.0,
+            "step": 0.1
+          },
+          {
+            "key": "Armor.RegenCryo",
+            "label": "Regen Cryo",
+            "type": "float",
+            "default": 0.7,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.RegenRift",
+            "label": "Regen Rift",
+            "type": "float",
+            "default": 0.85,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.RegenPlasma",
+            "label": "Regen Plasma",
+            "type": "float",
+            "default": 0.9,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.AbsorbIron",
+            "label": "Absorb Iron",
+            "type": "float",
+            "default": 1.2,
+            "min": 0.0,
+            "max": 4.8,
+            "step": 0.1
+          },
+          {
+            "key": "Armor.AbsorbGel",
+            "label": "Absorb Gel",
+            "type": "float",
+            "default": 0.75,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.AbsorbCryo",
+            "label": "Absorb Cryo",
+            "type": "float",
+            "default": 0.9,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.AbsorbRift",
+            "label": "Absorb Rift",
+            "type": "float",
+            "default": 0.95,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.AbsorbPlasma",
+            "label": "Absorb Plasma",
+            "type": "float",
+            "default": 0.9,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.CryoHpCap",
+            "label": "Cryo Hp Cap",
+            "type": "float",
+            "default": 0.88,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Armor.VeilAbsorbFraction",
+            "label": "Veil Absorb Fraction",
+            "type": "float",
+            "default": 0.3,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          }
+        ]
+      },
+      {
+        "id": "mutagen",
+        "label": "Mutagen",
+        "settings": [
+          {
+            "key": "Mutagen.EnableOnset",
+            "label": "Enable Onset",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Mutagen.InjectInstability",
+            "label": "Inject Instability",
+            "type": "float",
+            "default": 0.12,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Mutagen.OnsetSeconds",
+            "label": "Onset Seconds",
+            "type": "float",
+            "default": 4.0,
+            "min": 0.0,
+            "max": 16.0,
+            "step": 0.1
+          },
+          {
+            "key": "Mutagen.BurstFx",
+            "label": "Burst Fx",
+            "type": "bool",
+            "default": true
+          }
+        ]
+      },
+      {
+        "id": "resize",
+        "label": "Resize",
+        "settings": [
+          {
+            "key": "Resize.EnableResize",
+            "label": "Enable Resize",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Resize.ScaleOccupants",
+            "label": "Scale Occupants",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Resize.MinScale",
+            "label": "Min Scale",
+            "type": "float",
+            "default": 0.6,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Resize.MaxScale",
+            "label": "Max Scale",
+            "type": "float",
+            "default": 2.5,
+            "min": 0.0,
+            "max": 10.0,
+            "step": 0.1
+          },
+          {
+            "key": "Resize.BlendPerSecond",
+            "label": "Blend Per Second",
+            "type": "float",
+            "default": 1.2,
+            "min": 0.0,
+            "max": 4.8,
+            "step": 0.1
+          },
+          {
+            "key": "Resize.GrowthSurgeMul",
+            "label": "Growth Surge Mul",
+            "type": "float",
+            "default": 1.2,
+            "min": 0.0,
+            "max": 4.8,
+            "step": 0.1
+          },
+          {
+            "key": "Resize.GrowthSurgeSeconds",
+            "label": "Growth Surge Seconds",
+            "type": "float",
+            "default": 5.0,
+            "min": 0.0,
+            "max": 20.0,
+            "step": 0.1
+          }
+        ]
+      },
+      {
+        "id": "shipcast",
+        "label": "ShipCast",
+        "settings": [
+          {
+            "key": "ShipCast.EnableShipCastGate",
+            "label": "Enable Ship Cast Gate",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "ShipCast.ForbidEditorIDs",
+            "label": "Forbid Editor I Ds",
+            "type": "string",
+            "default": "",
+            "maxLength": 64
+          }
+        ]
+      },
+      {
+        "id": "swallow",
+        "label": "Swallow",
+        "settings": [
+          {
+            "key": "Swallow.EnableSwallow",
+            "label": "Enable Swallow",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Swallow.Range",
+            "label": "Range",
+            "type": "float",
+            "default": 1100.0,
+            "min": 0.0,
+            "max": 4400.0,
+            "step": 1.0
+          },
+          {
+            "key": "Swallow.DigestSeconds",
+            "label": "Digest Seconds",
+            "type": "float",
+            "default": 8.0,
+            "min": 0.0,
+            "max": 32.0,
+            "step": 0.1
+          },
+          {
+            "key": "Swallow.EscapeNeed",
+            "label": "Escape Need",
+            "type": "float",
+            "default": 0.18,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Swallow.Cooldown",
+            "label": "Cooldown",
+            "type": "float",
+            "default": 12.0,
+            "min": 0.0,
+            "max": 48.0,
+            "step": 0.1
+          },
+          {
+            "key": "Swallow.AetherCost",
+            "label": "Aether Cost",
+            "type": "float",
+            "default": 18.0,
+            "min": 0.0,
+            "max": 72.0,
+            "step": 0.1
+          },
+          {
+            "key": "Swallow.AetherGrant",
+            "label": "Aether Grant",
+            "type": "float",
+            "default": 24.0,
+            "min": 0.0,
+            "max": 96.0,
+            "step": 0.1
+          },
+          {
+            "key": "Swallow.PreyWoundPerSecond",
+            "label": "Prey Wound Per Second",
+            "type": "float",
+            "default": 0.04,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Swallow.PullImpulse",
+            "label": "Pull Impulse",
+            "type": "float",
+            "default": 22.0,
+            "min": 0.0,
+            "max": 88.0,
+            "step": 0.1
+          },
+          {
+            "key": "Swallow.StunSeconds",
+            "label": "Stun Seconds",
+            "type": "float",
+            "default": 2.0,
+            "min": 0.0,
+            "max": 8.0,
+            "step": 0.1
+          }
+        ]
+      },
+      {
+        "id": "spine",
+        "label": "Spine",
+        "settings": [
+          {
+            "key": "Spine.EnableSpine",
+            "label": "Enable Spine",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Spine.SegmentEditorID",
+            "label": "Segment Editor ID",
+            "type": "string",
+            "default": "Arc_STAT_scLeviathanSegment",
+            "maxLength": 64
+          },
+          {
+            "key": "Spine.SegPerLevel",
+            "label": "Seg Per Level",
+            "type": "int",
+            "default": 5,
+            "min": 0,
+            "max": 20,
+            "step": 1
+          },
+          {
+            "key": "Spine.MaxSegments",
+            "label": "Max Segments",
+            "type": "int",
+            "default": 12,
+            "min": 0,
+            "max": 48,
+            "step": 1
+          },
+          {
+            "key": "Spine.Spacing",
+            "label": "Spacing",
+            "type": "float",
+            "default": 2.8,
+            "min": 0.0,
+            "max": 11.2,
+            "step": 0.1
+          },
+          {
+            "key": "Spine.HeadSpacing",
+            "label": "Head Spacing",
+            "type": "float",
+            "default": 5.5,
+            "min": 0.0,
+            "max": 22.0,
+            "step": 0.1
+          },
+          {
+            "key": "Spine.SegScale",
+            "label": "Seg Scale",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Spine.BlendPerSecond",
+            "label": "Blend Per Second",
+            "type": "float",
+            "default": 8.0,
+            "min": 0.0,
+            "max": 32.0,
+            "step": 0.1
+          },
+          {
+            "key": "Spine.ClaimRange",
+            "label": "Claim Range",
+            "type": "float",
+            "default": 48.0,
+            "min": 0.0,
+            "max": 192.0,
+            "step": 0.1
+          }
+        ]
+      },
+      {
+        "id": "shield",
+        "label": "Shield",
+        "settings": [
+          {
+            "key": "Shield.EnableShield",
+            "label": "Enable Shield",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Shield.HealthAV",
+            "label": "Health AV",
+            "type": "string",
+            "default": "SpaceshipShieldHealth",
+            "maxLength": 64
+          },
+          {
+            "key": "Shield.MaxAV",
+            "label": "Max AV",
+            "type": "string",
+            "default": "ShieldMaxHealth",
+            "maxLength": 64
+          },
+          {
+            "key": "Shield.RegenPerSecond",
+            "label": "Regen Per Second",
+            "type": "float",
+            "default": 0.035,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.DamageInstability",
+            "label": "Damage Instability",
+            "type": "float",
+            "default": 0.16,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.CollapseInstability",
+            "label": "Collapse Instability",
+            "type": "float",
+            "default": 0.22,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.CollapseHullWound",
+            "label": "Collapse Hull Wound",
+            "type": "float",
+            "default": 0.04,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.OverloadAt",
+            "label": "Overload At",
+            "type": "float",
+            "default": 0.85,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.FlickerAt",
+            "label": "Flicker At",
+            "type": "float",
+            "default": 0.4,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.CatastrophicAt",
+            "label": "Catastrophic At",
+            "type": "float",
+            "default": 0.95,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.PhaseHealFrac",
+            "label": "Phase Heal Frac",
+            "type": "float",
+            "default": 0.35,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.ParasiticLeech",
+            "label": "Parasitic Leech",
+            "type": "float",
+            "default": 0.04,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.CryoShatterTaken",
+            "label": "Cryo Shatter Taken",
+            "type": "float",
+            "default": 0.12,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.ArmorIronMaxMul",
+            "label": "Armor Iron Max Mul",
+            "type": "float",
+            "default": 1.15,
+            "min": 0.0,
+            "max": 4.6,
+            "step": 0.1
+          },
+          {
+            "key": "Shield.ArmorGelRegenMul",
+            "label": "Armor Gel Regen Mul",
+            "type": "float",
+            "default": 1.25,
+            "min": 0.0,
+            "max": 5.0,
+            "step": 0.1
+          },
+          {
+            "key": "Shield.ArmorCryoRegenMul",
+            "label": "Armor Cryo Regen Mul",
+            "type": "float",
+            "default": 0.7,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.ArmorRiftPhaseMul",
+            "label": "Armor Rift Phase Mul",
+            "type": "float",
+            "default": 1.35,
+            "min": 0.0,
+            "max": 5.4,
+            "step": 0.1
+          },
+          {
+            "key": "Shield.ArmorPlasmaSensMul",
+            "label": "Armor Plasma Sens Mul",
+            "type": "float",
+            "default": 1.2,
+            "min": 0.0,
+            "max": 4.8,
+            "step": 0.1
+          },
+          {
+            "key": "Shield.RegenIron",
+            "label": "Regen Iron",
+            "type": "float",
+            "default": 0.75,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.RegenGel",
+            "label": "Regen Gel",
+            "type": "float",
+            "default": 1.4,
+            "min": 0.0,
+            "max": 5.6,
+            "step": 0.1
+          },
+          {
+            "key": "Shield.RegenCryo",
+            "label": "Regen Cryo",
+            "type": "float",
+            "default": 0.65,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.RegenRift",
+            "label": "Regen Rift",
+            "type": "float",
+            "default": 0.9,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.RegenPlasma",
+            "label": "Regen Plasma",
+            "type": "float",
+            "default": 0.85,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.MaxIron",
+            "label": "Max Iron",
+            "type": "float",
+            "default": 1.25,
+            "min": 0.0,
+            "max": 5.0,
+            "step": 0.1
+          },
+          {
+            "key": "Shield.MaxGel",
+            "label": "Max Gel",
+            "type": "float",
+            "default": 0.8,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.MaxCryo",
+            "label": "Max Cryo",
+            "type": "float",
+            "default": 0.95,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.MaxRift",
+            "label": "Max Rift",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Shield.MaxPlasma",
+            "label": "Max Plasma",
+            "type": "float",
+            "default": 0.9,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          }
+        ]
+      },
+      {
+        "id": "eggchamber",
+        "label": "EggChamber",
+        "settings": [
+          {
+            "key": "EggChamber.EnableEggChamber",
+            "label": "Enable Egg Chamber",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "EggChamber.EggMaterial",
+            "label": "Egg Material",
+            "type": "string",
+            "default": "plasma_thread",
+            "maxLength": 64
+          },
+          {
+            "key": "EggChamber.RebuildSeconds",
+            "label": "Rebuild Seconds",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "EggChamber.BaseCap",
+            "label": "Base Cap",
+            "type": "int",
+            "default": 8,
+            "min": 0,
+            "max": 32,
+            "step": 1
+          },
+          {
+            "key": "EggChamber.CapPerRank",
+            "label": "Cap Per Rank",
+            "type": "int",
+            "default": 8,
+            "min": 0,
+            "max": 32,
+            "step": 1
+          },
+          {
+            "key": "EggChamber.HardCap",
+            "label": "Hard Cap",
+            "type": "int",
+            "default": 48,
+            "min": 0,
+            "max": 192,
+            "step": 1
+          },
+          {
+            "key": "EggChamber.HatchAether",
+            "label": "Hatch Aether",
+            "type": "float",
+            "default": 4.5,
+            "min": 0.0,
+            "max": 18.0,
+            "step": 0.1
+          },
+          {
+            "key": "EggChamber.BarrageSpend",
+            "label": "Barrage Spend",
+            "type": "int",
+            "default": 3,
+            "min": 0,
+            "max": 12,
+            "step": 1
+          },
+          {
+            "key": "EggChamber.OrbSpend",
+            "label": "Orb Spend",
+            "type": "int",
+            "default": 1,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          }
+        ]
+      },
+      {
+        "id": "voidsquid",
+        "label": "VoidSquid",
+        "settings": [
+          {
+            "key": "VoidSquid.EnableVoidSquid",
+            "label": "Enable Void Squid",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "VoidSquid.Keyword",
+            "label": "Keyword",
+            "type": "string",
+            "default": "KW_BiometalVoidSquid",
+            "maxLength": 64
+          },
+          {
+            "key": "VoidSquid.TentacleCount",
+            "label": "Tentacle Count",
+            "type": "int",
+            "default": 6,
+            "min": 0,
+            "max": 24,
+            "step": 1
+          },
+          {
+            "key": "VoidSquid.JetMul",
+            "label": "Jet Mul",
+            "type": "float",
+            "default": 1.35,
+            "min": 0.0,
+            "max": 5.4,
+            "step": 0.1
+          },
+          {
+            "key": "VoidSquid.TentacleCooldown",
+            "label": "Tentacle Cooldown",
+            "type": "float",
+            "default": 2.8,
+            "min": 0.0,
+            "max": 11.2,
+            "step": 0.1
+          },
+          {
+            "key": "VoidSquid.LashCost",
+            "label": "Lash Cost",
+            "type": "float",
+            "default": 8.0,
+            "min": 0.0,
+            "max": 32.0,
+            "step": 0.1
+          },
+          {
+            "key": "VoidSquid.WhipCost",
+            "label": "Whip Cost",
+            "type": "float",
+            "default": 22.0,
+            "min": 0.0,
+            "max": 88.0,
+            "step": 0.1
+          },
+          {
+            "key": "VoidSquid.PulseCost",
+            "label": "Pulse Cost",
+            "type": "float",
+            "default": 28.0,
+            "min": 0.0,
+            "max": 112.0,
+            "step": 0.1
+          },
+          {
+            "key": "VoidSquid.GrabCost",
+            "label": "Grab Cost",
+            "type": "float",
+            "default": 18.0,
+            "min": 0.0,
+            "max": 72.0,
+            "step": 0.1
+          },
+          {
+            "key": "VoidSquid.ChannelCost",
+            "label": "Channel Cost",
+            "type": "float",
+            "default": 14.0,
+            "min": 0.0,
+            "max": 56.0,
+            "step": 0.1
+          },
+          {
+            "key": "VoidSquid.GraspCost",
+            "label": "Grasp Cost",
+            "type": "float",
+            "default": 24.0,
+            "min": 0.0,
+            "max": 96.0,
+            "step": 0.1
+          },
+          {
+            "key": "VoidSquid.GraspDuration",
+            "label": "Grasp Duration",
+            "type": "float",
+            "default": 4.5,
+            "min": 0.0,
+            "max": 18.0,
+            "step": 0.1
+          },
+          {
+            "key": "VoidSquid.GraspRange",
+            "label": "Grasp Range",
+            "type": "float",
+            "default": 1800.0,
+            "min": 0.0,
+            "max": 7200.0,
+            "step": 1.0
+          },
+          {
+            "key": "VoidSquid.GraspCone",
+            "label": "Grasp Cone",
+            "type": "float",
+            "default": 0.5,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "VoidSquid.GraspTentacles",
+            "label": "Grasp Tentacles",
+            "type": "int",
+            "default": 3,
+            "min": 0,
+            "max": 12,
+            "step": 1
+          },
+          {
+            "key": "VoidSquid.BeakCost",
+            "label": "Beak Cost",
+            "type": "float",
+            "default": 20.0,
+            "min": 0.0,
+            "max": 80.0,
+            "step": 0.1
+          },
+          {
+            "key": "VoidSquid.BeakDamage",
+            "label": "Beak Damage",
+            "type": "float",
+            "default": 85.0,
+            "min": 0.0,
+            "max": 340.0,
+            "step": 0.1
+          },
+          {
+            "key": "VoidSquid.BeakMaxInstability",
+            "label": "Beak Max Instability",
+            "type": "float",
+            "default": 0.72,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "VoidSquid.BeakCooldown",
+            "label": "Beak Cooldown",
+            "type": "float",
+            "default": 5.0,
+            "min": 0.0,
+            "max": 20.0,
+            "step": 0.1
+          },
+          {
+            "key": "VoidSquid.BeakPullImpulse",
+            "label": "Beak Pull Impulse",
+            "type": "float",
+            "default": 36.0,
+            "min": 0.0,
+            "max": 144.0,
+            "step": 0.1
+          }
+        ]
+      },
+      {
+        "id": "aether",
+        "label": "Aether",
+        "settings": [
+          {
+            "key": "Aether.EnableAether",
+            "label": "Enable Aether",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "Aether.MaxAether",
+            "label": "Max Aether",
+            "type": "float",
+            "default": 100.0,
+            "min": 0.0,
+            "max": 400.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.MaxPerLevel",
+            "label": "Max Per Level",
+            "type": "float",
+            "default": 8.0,
+            "min": 0.0,
+            "max": 32.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.MaxPerRank",
+            "label": "Max Per Rank",
+            "type": "float",
+            "default": 12.0,
+            "min": 0.0,
+            "max": 48.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.RegenBase",
+            "label": "Regen Base",
+            "type": "float",
+            "default": 5.5,
+            "min": 0.0,
+            "max": 22.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.LungOxygenBias",
+            "label": "Lung Oxygen Bias",
+            "type": "float",
+            "default": 0.4,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.LungOxygenScale",
+            "label": "Lung Oxygen Scale",
+            "type": "float",
+            "default": 0.6,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.GlandPassive",
+            "label": "Gland Passive",
+            "type": "float",
+            "default": 1.2,
+            "min": 0.0,
+            "max": 4.8,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.InstabilityFactor",
+            "label": "Instability Factor",
+            "type": "float",
+            "default": 0.7,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.CurveLowUntil",
+            "label": "Curve Low Until",
+            "type": "float",
+            "default": 0.22,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01,
+            "hint": "Fill 0..1: below LowUntil = overdrive regen, above HighFrom = saturated."
+          },
+          {
+            "key": "Aether.CurveHighFrom",
+            "label": "Curve High From",
+            "type": "float",
+            "default": 0.78,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.CurveLow",
+            "label": "Curve Low",
+            "type": "float",
+            "default": 1.55,
+            "min": 0.0,
+            "max": 6.2,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.CurveMid",
+            "label": "Curve Mid",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.CurveHigh",
+            "label": "Curve High",
+            "type": "float",
+            "default": 0.4,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.OverdriveInstability",
+            "label": "Overdrive Instability",
+            "type": "float",
+            "default": 0.1,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.SpellCost",
+            "label": "Spell Cost",
+            "type": "float",
+            "default": 12.0,
+            "min": 0.0,
+            "max": 48.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.SpellCostPerHex",
+            "label": "Spell Cost Per Hex",
+            "type": "float",
+            "default": 4.0,
+            "min": 0.0,
+            "max": 16.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.MisfireRefund",
+            "label": "Misfire Refund",
+            "type": "float",
+            "default": 0.35,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.StarveShotFrac",
+            "label": "Starve Shot Frac",
+            "type": "float",
+            "default": 0.35,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.InstabilityPerSpent",
+            "label": "Instability Per Spent",
+            "type": "float",
+            "default": 0.004,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.IdleCost",
+            "label": "Idle Cost",
+            "type": "float",
+            "default": 0.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.CruiseCost",
+            "label": "Cruise Cost",
+            "type": "float",
+            "default": 2.5,
+            "min": 0.0,
+            "max": 10.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.BoostCost",
+            "label": "Boost Cost",
+            "type": "float",
+            "default": 8.0,
+            "min": 0.0,
+            "max": 32.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.KickCost",
+            "label": "Kick Cost",
+            "type": "float",
+            "default": 6.0,
+            "min": 0.0,
+            "max": 24.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.HopCost",
+            "label": "Hop Cost",
+            "type": "float",
+            "default": 22.0,
+            "min": 0.0,
+            "max": 88.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.RiftDiveCost",
+            "label": "Rift Dive Cost",
+            "type": "float",
+            "default": 38.0,
+            "min": 0.0,
+            "max": 152.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.ThrustCostInstability",
+            "label": "Thrust Cost Instability",
+            "type": "float",
+            "default": 0.8,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.StarveAt",
+            "label": "Starve At",
+            "type": "float",
+            "default": 0.12,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.StarveThrustMul",
+            "label": "Starve Thrust Mul",
+            "type": "float",
+            "default": 0.45,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.RepairCost",
+            "label": "Repair Cost",
+            "type": "float",
+            "default": 3.5,
+            "min": 0.0,
+            "max": 14.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.RepairSkipBelow",
+            "label": "Repair Skip Below",
+            "type": "float",
+            "default": 0.08,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.AbsorbFraction",
+            "label": "Absorb Fraction",
+            "type": "float",
+            "default": 0.35,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.AbsorbMaxPerHit",
+            "label": "Absorb Max Per Hit",
+            "type": "float",
+            "default": 18.0,
+            "min": 0.0,
+            "max": 72.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.RiftAmbient",
+            "label": "Rift Ambient",
+            "type": "float",
+            "default": 1.35,
+            "min": 0.0,
+            "max": 5.4,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.RiftRange",
+            "label": "Rift Range",
+            "type": "float",
+            "default": 8000.0,
+            "min": 0.0,
+            "max": 32000.0,
+            "step": 1.0
+          },
+          {
+            "key": "Aether.BloomCost",
+            "label": "Bloom Cost",
+            "type": "float",
+            "default": 18.0,
+            "min": 0.0,
+            "max": 72.0,
+            "step": 0.1,
+            "hint": "Glandular bloom (V) dumps instability and heals. Emergency rift eject (C) hops along look and opens a DimRift mouth. Rank 3+ or Void-Touched. No Steal."
+          },
+          {
+            "key": "Aether.BloomDump",
+            "label": "Bloom Dump",
+            "type": "float",
+            "default": 0.4,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.BloomHeal",
+            "label": "Bloom Heal",
+            "type": "float",
+            "default": 0.055,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.BloomCooldown",
+            "label": "Bloom Cooldown",
+            "type": "float",
+            "default": 7.5,
+            "min": 0.0,
+            "max": 30.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.RiftVentCost",
+            "label": "Rift Vent Cost",
+            "type": "float",
+            "default": 42.0,
+            "min": 0.0,
+            "max": 168.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.RiftVentDump",
+            "label": "Rift Vent Dump",
+            "type": "float",
+            "default": 0.72,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.RiftVentCooldown",
+            "label": "Rift Vent Cooldown",
+            "type": "float",
+            "default": 12.0,
+            "min": 0.0,
+            "max": 48.0,
+            "step": 0.1
+          },
+          {
+            "key": "Aether.RiftVentWound",
+            "label": "Rift Vent Wound",
+            "type": "float",
+            "default": 0.08,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "Aether.VentInput",
+            "label": "Vent Input",
+            "type": "bool",
+            "default": true
+          }
+        ]
+      },
+      {
+        "id": "weaponcompiler",
+        "label": "WeaponCompiler",
+        "settings": [
+          {
+            "key": "WeaponCompiler.EnableCompiler",
+            "label": "Enable Compiler",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "WeaponCompiler.DamageScale",
+            "label": "Damage Scale",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "WeaponCompiler.RangeScale",
+            "label": "Range Scale",
+            "type": "float",
+            "default": 1.0,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "WeaponCompiler.DurationScale",
+            "label": "Duration Scale",
+            "type": "float",
+            "default": 0.5,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "WeaponCompiler.HexCellMeters",
+            "label": "Hex Cell Meters",
+            "type": "float",
+            "default": 400.0,
+            "min": 0.0,
+            "max": 1600.0,
+            "step": 1.0
+          },
+          {
+            "key": "WeaponCompiler.HexCooldown",
+            "label": "Hex Cooldown",
+            "type": "float",
+            "default": 2.5,
+            "min": 0.0,
+            "max": 10.0,
+            "step": 0.1
+          },
+          {
+            "key": "WeaponCompiler.DiminishPerRepeat",
+            "label": "Diminish Per Repeat",
+            "type": "float",
+            "default": 0.12,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "WeaponCompiler.ActiveDecay",
+            "label": "Active Decay",
+            "type": "float",
+            "default": 0.35,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "WeaponCompiler.BaseActiveCap",
+            "label": "Base Active Cap",
+            "type": "int",
+            "default": 2,
+            "min": 0,
+            "max": 10,
+            "step": 1
+          },
+          {
+            "key": "WeaponCompiler.BoltAether",
+            "label": "Bolt Aether",
+            "type": "float",
+            "default": 0.55,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "WeaponCompiler.LanceAether",
+            "label": "Lance Aether",
+            "type": "float",
+            "default": 1.45,
+            "min": 0.0,
+            "max": 5.8,
+            "step": 0.1
+          },
+          {
+            "key": "WeaponCompiler.OrbAether",
+            "label": "Orb Aether",
+            "type": "float",
+            "default": 1.1,
+            "min": 0.0,
+            "max": 4.4,
+            "step": 0.1
+          },
+          {
+            "key": "WeaponCompiler.BarrageAether",
+            "label": "Barrage Aether",
+            "type": "float",
+            "default": 0.85,
+            "min": 0.0,
+            "max": 1.0,
+            "step": 0.01
+          },
+          {
+            "key": "WeaponCompiler.RiftAether",
+            "label": "Rift Aether",
+            "type": "float",
+            "default": 1.8,
+            "min": 0.0,
+            "max": 7.2,
+            "step": 0.1
+          },
+          {
+            "key": "WeaponCompiler.FieldAether",
+            "label": "Field Aether",
+            "type": "float",
+            "default": 1.25,
+            "min": 0.0,
+            "max": 5.0,
+            "step": 0.1
+          },
+          {
+            "key": "WeaponCompiler.TetherAether",
+            "label": "Tether Aether",
+            "type": "float",
+            "default": 1.2,
+            "min": 0.0,
+            "max": 4.8,
+            "step": 0.1
+          },
+          {
+            "key": "WeaponCompiler.ChaosAether",
+            "label": "Chaos Aether",
+            "type": "float",
+            "default": 1.35,
+            "min": 0.0,
+            "max": 5.4,
+            "step": 0.1
+          }
+        ]
+      },
+      {
+        "id": "novadriftoption",
+        "label": "NovaDriftOption",
+        "settings": [
+          {
+            "key": "NovaDriftOption.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "NovaDriftOption.RegisterWeapons",
+            "label": "Register Weapons",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "NovaDriftOption.RegisterShields",
+            "label": "Register Shields",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "NovaDriftOption.RegisterMods",
+            "label": "Register Mods",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "NovaDriftOption.RegisterShips",
+            "label": "Register Ships",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "NovaDriftOption.AssetRoot",
+            "label": "Asset Root",
+            "type": "string",
+            "default": "ArcaneConduit/assets/NovaDriftOption",
+            "maxLength": 68
+          },
+          {
+            "key": "NovaDriftOption.RegistryPath",
+            "label": "Registry Path",
+            "type": "string",
+            "default": "Data/SFSE/Plugins/MadScience/NovaDriftOption/weapon_registry.json",
+            "maxLength": 97
+          },
+          {
+            "key": "NovaDriftOption.DefaultChamber",
+            "label": "Default Chamber",
+            "type": "string",
+            "default": "lwBlasterChamber",
+            "maxLength": 64
+          },
+          {
+            "key": "NovaDriftOption.UseDataTextures",
+            "label": "Use Data Textures",
+            "type": "bool",
+            "default": true
           }
         ]
       },

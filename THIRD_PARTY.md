@@ -21,9 +21,17 @@ access-gated. See `Tools/Qud/QudLab/Fetch-PrivatePack.ps1`.
 | `Tools/FrankyCLI` | https://github.com/kaosnyrb/FrankyCLI | MIT (Bryn Stringer) | `Fetch-ThirdParty.ps1 -FrankyCLI` |
 | `Tools/GrimDawn/arzedit/arzedit-master` | https://gitlab.com/QuasiMod/arzedit | Upstream (see clone) | `Fetch-ThirdParty.ps1 -Arzedit` |
 | `Tools/GrimDawn/renodx-src` | https://github.com/clshortfuse/renodx | MIT + nested third-party | `Fetch-ThirdParty.ps1 -RenoDx` |
+| `Tools/DiabloII/thirdparty/ooz` | https://github.com/powzix/ooz (`bitknit.cpp`, the BitKnit decoder) | No licence file upstream (checked 2026-11-13); the Diablo II notes treat it as GPLv3. Not MIT either way | `Fetch-ThirdParty.ps1 -BitKnit` (reference source only) |
+| `%LOCALAPPDATA%\D2RModAssets\thirdparty\bitknit.py` (outside the repo) | Python port of that decoder, `decompress(data, size)`; `Tools/DiabloII/Granny.py` and `GrannyFile.py` load it to unpack D2R's Granny files | Derived from the above; same terms | Make or place it yourself; `D2R_BITKNIT` names another folder |
+| `%LOCALAPPDATA%\D2RModAssets\thirdparty\TripoSR` (outside the repo) | https://github.com/VAST-AI-Research/TripoSR, `git clone --depth 1`; weights `stabilityai/TripoSR` from Hugging Face on first use (about 1.7 GB, in the Hugging Face cache) | MIT (code and weights) | `Tools/DiabloII/SpriteMeshAI.py` imports it from there; its `torchmcubes` and `rembg` imports are replaced by stand-ins in that file, so nothing needs compiling. pip: omegaconf, einops, transformers, trimesh, scikit-image |
+| `%LOCALAPPDATA%\D2RModAssets\pluginsdk\<ref>-<commit>` (outside the repo) | https://github.com/D2RLoader/PluginSDK, downloaded by `Tools/DiabloII/PluginSdk.py` (zip from codeload); `apply` copies its `include\`, `README.md` and `LICENSE` into the game's `mods\SkillTab4\sdk` | MIT (D2RLoader contributors) | `Update-D2RPlugins.ps1 -SdkDiff` / `-SdkApply` (downloads on use) |
+| Python package `capstone` (pip) | https://www.capstone-engine.org, x86-64 disassembler used by `Tools/DiabloII/PluginAddresses.py` to mask relative operands when finding moved game routines | BSD-3-Clause | `pip install capstone` |
 | `Tools/Logs/pixelorama/pxo_src` | Do **not** vendor. Install Pixelorama. | MIT (Orama Interactive) | Install to `D:\tools\Orama Interactive\Pixelorama` |
 | `Tools/Transcendence/_x64_workspace` | Official TranscendenceDev tree | Kronosaur (non-commercial; keep notice) | `Prepare-X64Workspace.py --api-root <official>` |
 | `Tools/ReferenceAssets` | Optional art/reference packs | Each pack's own file | Copy locally; never required to run tools |
+| `Tools/Shared/third_party/node/node_modules/rea-agents` | https://www.npmjs.com/package/rea-agents (REA, Reverse Engineer Anything; source https://github.com/morluto/rea) and its npm dependencies | MIT (dependencies MIT / ISC / Apache-2.0 / BSD / BlueOak) | `Fetch-ThirdParty.ps1 -AgentBridge`; started as an MCP server by the agent bridge at run time, never bundled into the `.vsix` |
+| `Tools/Shared/third_party/node/node_modules/pdfjs-dist` | https://github.com/mozilla/pdf.js (npm `pdfjs-dist`) | Apache-2.0 (Mozilla) | `Fetch-ThirdParty.ps1 -AgentBridge`; imported by the agent bridge's `AnalyzeFile` at run time, never bundled |
+| 7-Zip (installed program, outside the repo) | https://www.7-zip.org | LGPL-2.1 + unRAR restriction | Install it yourself; the agent bridge only runs `7z.exe` as a separate process (no code linked or copied) |
 | `Tools/CortexIDE/local-agent-bridge/media/react*.production.min.js` | React 18.3.1 UMD builds (https://unpkg.com/react@18.3.1, `react-dom@18.3.1`) | MIT (Meta) | `Tools/CortexIDE/local-agent-bridge/Build-Vsix.ps1` (SHA-256 pinned; shipped inside the built `.vsix`) |
 
 MPL-2.0 (TES5Edit) is file-level copyleft. Do not copy `.pas` definitions into
@@ -91,6 +99,12 @@ The public repo stays ~22 MB; local workspaces can be tens of GB. Do not commit:
 - Soulash workshop fix snapshots under `SkillCreator/workshop_patches/`
 
 Regenerate with the tools on your machine.
+
+## Design credits (ideas only, no code copied)
+
+| AAMT files | Inspired by | License | What was taken |
+|---|---|---|---|
+| `Tools/CortexIDE/local-agent-bridge/lib/permissions.js`, `agents.js`, `commands.js`, `instructions.js`, `tool-output.js` | opencode, https://github.com/anomalyco/opencode | MIT, Copyright (c) 2025 opencode | Design of permission rules (last match wins, allow / ask / deny), named build / plan / explore agents and Markdown agent files, Markdown slash commands (`$ARGUMENTS`, `$1`, `` !`cmd` ``), `AGENTS.md` instruction loading, saving cut tool output to a file. Written from opencode's documentation; each file names opencode in its header. Not affiliated with or endorsed by opencode. |
 
 ## Notices already in-tree
 

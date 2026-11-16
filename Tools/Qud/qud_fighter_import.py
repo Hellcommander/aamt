@@ -1009,8 +1009,80 @@ def discover_sources(userdata: Optional[Path] = None) -> Dict[str, List[Dict[str
     return {"recur": recur, "saves": saves}
 
 
+GAME_DIR = Path("D:/games/Steam/steamapps/common/Caves of Qud")
+WORKSHOP_DIR = Path("D:/games/Steam/steamapps/workshop/content/333640")
+
+
+def _mutation_classes(userdata: Optional[Path] = None) -> Dict[str, str]:
+    """Mutation Name -> Class from the game's and every mod's Mutations.xml (later files win)."""
+    out: Dict[str, str] = {}
+    roots = [GAME_DIR / "CoQ_Data" / "StreamingAssets" / "Base", WORKSHOP_DIR, coq_userdata(userdata) / "Mods"]
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for f in root.rglob("Mutations*.xml"):
+            try:
+                text = f.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            for m in re.finditer(r"<mutation\b[^>]*>", text):
+                tag = m.group(0)
+                name = re.search(r'\bName="([^"]*)"', tag)
+                cls = re.search(r'\bClass="([^"]*)"', tag)
+                if name and cls:
+                    out[name.group(1)] = cls.group(1)
+    return out
+
+
+def is_build_code(path: Path) -> bool:
+    try:
+        return path.is_file() and path.stat().st_size < 1_000_000 and path.read_bytes().lstrip()[:4] == b"H4sI"
+    except OSError:
+        return False
+
+
+def parse_build_code(path: Path, userdata: Optional[Path] = None) -> Fighter:
+    """A character build code (lastcharacter.txt or a pasted code: base64 gzip of the embark modules).
+    It has the choices, not the embarked character: no gear, stats are purchased points only."""
+    import base64
+    import gzip
+    data = json.loads(gzip.decompress(base64.b64decode(path.read_text(encoding="utf-8").strip())))
+    mods: Dict[str, Any] = {}
+    for m in data.get("modules", []):
+        short = (m.get("moduleType") or "").split(",")[0].rsplit(".", 1)[-1]
+        mods[short] = m.get("data") or {}
+    classes = _mutation_classes(userdata)
+    muts = []
+    for sel in mods.get("QudMutationsModule", {}).get("selections", []):
+        name = sel.get("Mutation") or ""
+        muts.append(FighterMutation(name=classes.get(name, name.replace(" ", "")), variant=sel.get("Variant")))
+    cust = mods.get("QudCustomizeCharacterModule", {})
+    name = strip_qud_markup(cust.get("name") or "") or path.stem
+    genotype = mods.get("QudGenotypeModule", {}).get("Genotype", "")
+    plan = (mods.get("QudBodyPlanModule", {}).get("Selection") or {}).get("Anatomy", "")
+    notes = [f"Imported from build code ({path.name}); gear and final stats come from a Recur export or save once embarked."]
+    if plan:
+        notes.append(f"Body plan: {plan}")
+    bg = mods.get("TTBackgroundsModule", {}).get("Selection")
+    if bg:
+        notes.append(f"Background: {bg}")
+    pet = cust.get("pet")
+    if pet:
+        notes.append(f"Pet: {pet}")
+    return Fighter(
+        id=slugify(name), name=name, source="buildcode", source_path=str(path),
+        genotype=genotype, subtype=mods.get("QudSubtypeModule", {}).get("Subtype", ""),
+        gender=cust.get("gender") or "", game_version=data.get("gameversion", ""),
+        location=mods.get("QudChooseStartingLocationModule", {}).get("StartingLocation", ""),
+        stats=dict(mods.get("QudAttributesModule", {}).get("PointsPurchased", {})),
+        mutations=muts, fidelity="partial", notes=notes,
+    )
+
+
 def import_any(path: Path) -> Fighter:
     path = Path(path)
+    if is_build_code(path):
+        return parse_build_code(path)
     if path.is_file() and path.suffix.lower() == ".xml":
         return parse_recur_export(path)
     if path.is_dir() and (path / "Primary.json").is_file():

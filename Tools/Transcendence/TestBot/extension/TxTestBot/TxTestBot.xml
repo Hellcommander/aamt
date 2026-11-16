@@ -1,0 +1,387 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!DOCTYPE TranscendenceExtension
+[
+<!ENTITY unidTxTestBot			"0xE7E57000">
+<!ENTITY evTxTestBot			"0xE7E57001">
+]>
+
+<!--	TX Test Bot - driven by the toolkit's tx_testbot.py, which adds this folder to Settings.xml only for a test run
+		and starts the game with TX_TESTBOT set (the engine then skips its menus).
+
+		Each second (OnGlobalUpdate) the bot runs one step and logs "TXBOT: ..." lines to Debug.log:
+			ext		expected extensions are loaded (txBotExpect)
+			types	every type answers typGetProperty name (catches broken binds)
+			items	each focus item type is created, added and, if a device, installed and removed
+			ships	focus ship classes are spawned far from the player in pairs that fight, then removed
+			stations	focus station types are created far away, then destroyed
+			wlabs	WeaponLabs 51 custom builds (if loaded), each fired with sysCreateWeaponFire
+			gates	the player jumps through txBotHops stargates
+		then "TXBOT: DONE pass=N fail=N". Every check runs inside errblock, so one failure never stops the run.
+		Settings come from TxTestBotConfig.xml (written by tx_testbot.py for each run).
+-->
+
+<TranscendenceExtension
+	UNID=			"&unidTxTestBot;"
+	apiVersion=		"59"
+	name=			"TX Test Bot"
+	version=		"1.0"
+	>
+
+	<Module filename="TxTestBotConfig.xml"/>
+
+	<Globals>
+		(block Nil
+		(setq txBotLog (lambda (kind msg)
+			(printTo 'log (cat "TXBOT: " kind " " msg))
+			))
+
+		(setq txBotPass (lambda () (typIncData &evTxTestBot; 'pass 1)))
+
+		(setq txBotFail (lambda (what err)
+			(block Nil
+			(typIncData &evTxTestBot; 'fail 1)
+			(txBotLog "FAIL" (cat what " :: " err))
+			)
+			))
+
+		;	Runs fn; logs a failure if it returns an error, or Nil when mustReturn is True. Returns fn's value or Nil.
+		(setq txBotTry (lambda (what fn mustReturn)
+			(block (result)
+			(setq result (errblock (err) (fn) (block Nil (txBotFail what err) 'txBotFailed)))
+			(switch
+				(eq result 'txBotFailed)
+					Nil
+
+				(and mustReturn (not result))
+					(block Nil (txBotFail what "returned Nil") Nil)
+
+				(block Nil (txBotPass) result)
+				)
+			)
+			))
+
+		;	UNIDs are logged as #int; tx_testbot.py turns them into hex in its report
+		(setq txBotHex (lambda (u) (cat "#" u)))
+		(setq txBotName (lambda (u) (cat (txBotHex u) " " (or (typGetProperty u 'name) ""))))
+
+		(setq txBotInFocus (lambda (u)
+			(filter txBotFocus r (and (geq u (@ r 0)) (leq u (@ r 1))))
+			))
+
+		(setq txBotFar (lambda (angle dist) (sysVectorPolarOffset gPlayerShip angle dist)))
+
+		(setq txBotGet (lambda (key) (typGetData &evTxTestBot; key)))
+		(setq txBotSet (lambda (key value) (typSetData &evTxTestBot; key value)))
+		(setq txBotNext (lambda (phase)
+			(block Nil
+			(txBotSet 'phase phase)
+			(txBotSet 'idx 0)
+			(txBotLog "PHASE" phase)
+			)
+			))
+
+		;	Removes everything the bot spawned that still exists.
+		(setq txBotCleanup (lambda ()
+			(block Nil
+			(enum (txBotGet 'spawned) id
+				(block (obj)
+				(setq obj (objGetObjByID id))
+				(if obj (errblock (err) (objRemove obj) Nil))
+				))
+			(txBotSet 'spawned Nil)
+			)
+			))
+
+		(setq txBotTrack (lambda (obj)
+			(if obj (txBotSet 'spawned (append (txBotGet 'spawned) (list (objGetID obj)))))
+			))
+
+		;	--- immortal (default): each second the damage taken is counted, then armor is repaired and shields
+		;	recharged, so the run is not ended by the player dying (tx_testbot.py --mortal turns this off)
+		(setq txBotKeepAlive (lambda ()
+			(if (and gPlayerShip (isBound 'txBotImmortal) txBotImmortal)
+				(block (dmg)
+				(setq dmg 0)
+				(for seg 0 (subtract (shpGetArmorCount gPlayerShip) 1)
+					(block (d)
+					(setq d (or (objGetArmorDamage gPlayerShip seg) 0))
+					(if (gr d 0)
+						(block Nil (setq dmg (add dmg d)) (objRepairArmor gPlayerShip seg)))
+					))
+				(if (gr dmg 0) (txBotSet 'damageTaken (add (or (txBotGet 'damageTaken) 0) dmg)))
+				(shpRechargeShield gPlayerShip)
+				))
+			))
+
+		;	--- one step per OnGlobalUpdate
+		(setq txBotStep (lambda ()
+			(block (phase idx)
+			(setq phase (txBotGet 'phase))
+			(setq idx (or (txBotGet 'idx) 0))
+			(switch
+				(not gPlayerShip)
+					Nil
+
+				(not phase)
+					(block Nil
+					(txBotSet 'pass 0)
+					(txBotSet 'fail 0)
+					(txBotLog "START" (cat "system " (sysGetName) " node " (sysGetNode) ", ship " (txBotName (objGetType gPlayerShip))))
+					(txBotNext (if (eq txBotMode "ship") "shipcheck" "ext"))
+					)
+
+				;	--- ship-selection mode: the chosen starting ship must be usable
+				(eq phase "shipcheck")
+					(block (cls armor devices)
+					(setq cls (objGetType gPlayerShip))
+					(if (and txBotShip (!= cls txBotShip))
+						(txBotFail "ship selection" (cat "asked for " (txBotHex txBotShip) ", got " (txBotName cls))))
+					(if (typGetImageDesc cls)
+						(txBotPass)
+						(txBotFail (cat "ship " (txBotName cls)) "has no image"))
+					(setq armor (count (objGetItems gPlayerShip "aI")))
+					(setq devices (count (objGetItems gPlayerShip "dI")))
+					(if (gr armor 0) (txBotPass) (txBotFail (cat "ship " (txBotName cls)) "no armor installed"))
+					(if (gr devices 0) (txBotPass) (txBotFail (cat "ship " (txBotName cls)) "no devices installed"))
+					;	a new game must start with a full (or nearly full) reactor
+					(block (fuel maxFuel)
+						(setq fuel (objGetProperty gPlayerShip 'fuelLeftExact))
+						(setq maxFuel (objGetProperty gPlayerShip 'maxFuelExact))
+						(txBotLog "FUEL" (cat (txBotName cls) ": " fuel " / " maxFuel))
+						(if (and maxFuel (gr maxFuel 0) (ls (* fuel 10) (* maxFuel 9)))
+							(txBotFail (cat "ship " (txBotName cls)) (cat "starts with low fuel " fuel " / " maxFuel))
+							(txBotPass)))
+					(txBotLog "SHIP" (cat (txBotName cls) ": " armor " armor segments, " devices " devices, "
+						(count (objGetItems gPlayerShip "wI")) " weapons, cargo " (objGetCargoSpaceLeft gPlayerShip)))
+					(txBotSet 'wait txBotSurvive)
+					(txBotNext "survive")
+					)
+
+				(eq phase "survive")
+					(if (gr (or (txBotGet 'wait) 0) 0)
+						(txBotSet 'wait (subtract (txBotGet 'wait) 1))
+						(block Nil
+						(txBotLog "SURVIVED" (cat txBotSurvive " s with " (txBotName (objGetType gPlayerShip))))
+						(txBotNext "done")
+						))
+
+				(eq phase "ext")
+					(block Nil
+					(enum txBotExpect u
+						(if (unvIsExtensionLoaded u)
+							(block Nil (txBotPass) (txBotLog "EXT" (cat (txBotHex u) " loaded")))
+							(txBotFail (cat "extension " (txBotHex u)) "not loaded")
+							))
+					(txBotNext "types")
+					)
+
+				(eq phase "types")
+					(block (all bad)
+					(setq all (typFind "*"))
+					(enum all u
+						(if (isError (errblock (err) (typGetProperty u 'name) err))
+							(block Nil (setq bad (add (or bad 0) 1)) (txBotFail (cat "type " (txBotHex u)) "typGetProperty name failed"))
+							))
+					(txBotLog "TYPES" (cat (count all) " types, " (or bad 0) " failed"))
+					(txBotSet 'items (filter (typFind "i") u (txBotInFocus u)))
+					;	a ship class with no image crashes the engine (CIntegralRotation::Update) as soon as one updates
+					(txBotSet 'ships (filter (typFind "s") u
+						(and (txBotInFocus u)
+							(or (typGetImageDesc u)
+								(block Nil (txBotFail (cat "ship class " (txBotName u)) "has no image (spawning it crashes the game); not spawned") Nil)
+								)
+							)))
+					(txBotSet 'stations (filter (typFind "t") u (txBotInFocus u)))
+					(txBotLog "FOCUS" (cat (count (txBotGet 'items)) " items, " (count (txBotGet 'ships)) " ships, " (count (txBotGet 'stations)) " stations"))
+					(txBotNext "items")
+					)
+
+				(eq phase "items")
+					(block (list)
+					(setq list (txBotGet 'items))
+					(for i idx (min (add idx 19) (subtract (count list) 1))
+						(block (u item)
+						(setq u (@ list i))
+						(setq item (txBotTry (cat "itmCreate " (txBotName u))
+							(lambda () (block (it) (setq it (itmCreate u 1)) (if (eq (itmGetCount it) 1) it (cat "count is " (itmGetCount it) ", not 1"))))
+							True))
+						(if (not (isAtom item)) Nil (if item (block Nil (txBotFail (cat "itmCreate " (txBotName u)) item) (setq item Nil))))
+						(if (and item (gr (itmGetMass item) (objGetCargoSpaceLeft gPlayerShip)))
+							(block Nil
+							(txBotSet 'skipped (add (or (txBotGet 'skipped) 0) 1))
+							(setq item Nil)
+							))
+						(if item
+							(block Nil
+							(txBotTry (cat "objAddItem " (txBotName u)) (lambda () (objAddItem gPlayerShip item)) True)
+							(if (and (itmMatches item "d") (@ (objCanInstallItem gPlayerShip item) 0))
+								(block (installed)
+								(setq installed (txBotTry (cat "shpInstallDevice " (txBotName u)) (lambda () (shpInstallDevice gPlayerShip item)) True))
+								(if installed
+									(txBotTry (cat "shpRemoveDevice " (txBotName u)) (lambda () (shpRemoveDevice gPlayerShip installed)) Nil))
+								))
+							(errblock (err) (objRemoveItem gPlayerShip item) Nil)
+							))
+						))
+					(if (geq (add idx 20) (count list))
+						(block Nil (txBotLog "ITEMS" (cat (count list) " item types done, " (or (txBotGet 'skipped) 0) " too heavy for the hold (add/install not tested)")) (txBotNext "ships"))
+						(txBotSet 'idx (add idx 20)))
+					)
+
+				;	ships: even idx spawns a pair, odd idx (8 s later) removes it
+				(eq phase "ships")
+					(block (list wait)
+					(setq list (txBotGet 'ships))
+					(setq wait (txBotGet 'wait))
+					(switch
+						(geq idx (count list))
+							(block Nil (txBotCleanup) (txBotLog "SHIPS" (cat (count list) " ship classes done")) (txBotNext "stations"))
+
+						(and wait (gr wait 0))
+							(txBotSet 'wait (subtract wait 1))
+
+						(txBotGet 'spawned)
+							(block Nil (txBotCleanup) (txBotSet 'idx (add idx 2)))
+
+						(block (a b uA uB)
+						(setq uA (@ list idx))
+						(setq uB (@ list (min (add idx 1) (subtract (count list) 1))))
+						(setq a (txBotTry (cat "sysCreateShip " (txBotName uA)) (lambda () (sysCreateShip uA (txBotFar 30 220) 0x00001003)) True))
+						(setq b (txBotTry (cat "sysCreateShip " (txBotName uB)) (lambda () (sysCreateShip uB (txBotFar 30 260) 0x00001005)) True))
+						(txBotTrack a)
+						(txBotTrack b)
+						(if (and a b)
+							(block Nil
+							(txBotTry (cat "attack order " (txBotName uA)) (lambda () (shpOrder a 'attack b)) Nil)
+							(txBotTry (cat "attack order " (txBotName uB)) (lambda () (shpOrder b 'attack a)) Nil)
+							))
+						(txBotSet 'wait 8)
+						)
+						)
+					)
+
+				(eq phase "stations")
+					(block (list)
+					(setq list (txBotGet 'stations))
+					(txBotCleanup)
+					(for i idx (min (add idx 4) (subtract (count list) 1))
+						(block (u st)
+						(setq u (@ list i))
+						(setq st (txBotTry (cat "sysCreateStation " (txBotName u)) (lambda () (sysCreateStation u (txBotFar (multiply 20 (subtract i idx)) 300))) True))
+						(txBotTrack st)
+						(if (and st (not (objIsAbandoned st)))
+							(txBotTry (cat "objDestroy " (txBotName u)) (lambda () (objDestroy st)) Nil))
+						))
+					(if (geq (add idx 5) (count list))
+						(block Nil (txBotCleanup) (txBotLog "STATIONS" (cat (count list) " station types done")) (txBotNext "wlabs"))
+						(txBotSet 'idx (add idx 5)))
+					)
+
+				(eq phase "wlabs")
+					(block Nil
+					(if (unvIsExtensionLoaded 0xD7897000) (txBotWeaponLabs) (txBotLog "WLABS" "WeaponLabs 51 not loaded, skipped"))
+					(txBotNext "gates")
+					)
+
+				(eq phase "gates")
+					(block (gates dest)
+					(switch
+						(geq idx txBotHops)
+							(txBotNext "done")
+
+						(and (txBotGet 'wait) (gr (txBotGet 'wait) 0))
+							(txBotSet 'wait (subtract (txBotGet 'wait) 1))
+
+						(block Nil
+						(setq gates (sysGetStargates))
+						(if gates
+							(block Nil
+							(setq dest (sysGetStargateDestination (@ gates (random 0 (subtract (count gates) 1)))))
+							(txBotLog "GATE" (cat "hop " (add idx 1) ": " (sysGetName) " to " (@ dest 0)))
+							(txBotTry (cat "objGateTo " (@ dest 0)) (lambda () (objGateTo gPlayerShip (@ dest 0) (@ dest 1))) True)
+							)
+							(txBotLog "GATE" (cat "no stargates in " (sysGetName)))
+							)
+						(txBotSet 'idx (add idx 1))
+						(txBotSet 'wait 6)
+						)
+						)
+					)
+
+				(eq phase "done")
+					(block Nil
+					(txBotLog "DONE" (cat "pass=" (txBotGet 'pass) " fail=" (txBotGet 'fail) " damageTaken=" (or (txBotGet 'damageTaken) 0) " system=" (sysGetName)))
+					(txBotSet 'phase "finished")
+					)
+
+				Nil
+				)
+			)
+			))
+
+		;	WeaponLabs 51 custom builds: the mod's own action codes and CreateWeapon event, one build per chamber,
+		;	then each weapon is fired once with sysCreateWeaponFire at a spawned target (exercises effect XML).
+		(setq txBotWeaponLabs (lambda ()
+			(block (savedCursor built target)
+			(setq savedCursor scrGetListCursor)
+			(setq scrGetListCursor (lambda (s) 0))
+			(setq target (txBotTry "WeaponLabs target ship"
+				(lambda () (sysCreateShip (or (@ (txBotGet 'ships) 0) (objGetType gPlayerShip)) (txBotFar 200 150) 0x00001005))
+				True))
+			(txBotTrack target)
+			(for c 0x10 0x1F
+				(block (u)
+				(setq u (txBotTry (cat "WeaponLabs build chamber " (txBotHex (add 0xD7897000 c)))
+					(lambda ()
+						(block Nil
+						(rpgD789ClearCBSetWeapon)
+						(CBSetWeapon 'powerUse 0)
+						(CBSetWeapon 'theCost 0)
+						(CBSetWeapon 'listToRem (list))
+						(rpgD789SetWeaponUNIDs)
+						(rpgD789WeaponMountActionCode 0xD7897020)
+						(rpgD789FireModuleActionCode 0xD7897023)
+						(rpgD789WeaponChamberActionCode (add 0xD7897000 c))
+						(rpgD789LevelCalibratorActionCode 0xD7897035)
+						(CBSetWeapon 'damage2 (CBGetWeapon 'damage))
+						(CBSetWeapon 'name (cat "TXBOT test " (CBGetWeapon 'damageText)))
+						(CBSetWeapon 'launcher Nil)
+						(CBSetWeapon 'theFinalCost 5000)
+						(CBSetWeapon 'powerUse3 (multiply (CBGetWeapon 'powerUse2) (CBGetWeapon 'bodyNum2)))
+						(CBSetWeapon 'attributes (rpgIWLSetAttributes (CBGetWeapon 'damageNum) (CBGetWeapon "damg")))
+						(CBSetWeapon 'repeating "false")
+						(typFireEvent 0xD7897008 "CreateWeapon")
+						(typGetProperty (CBGetWeapon 'unidToUse) 'unid)
+						))
+					True))
+				(if (and u (typGetProperty u 'unid) target)
+					(block Nil
+					(setq built (add (or built 0) 1))
+					(txBotTry (cat "fire " (typGetProperty u 'name))
+						(lambda () (sysCreateWeaponFire u gPlayerShip (txBotFar 200 140) 0 100 target))
+						True)
+					))
+				))
+			(setq scrGetListCursor savedCursor)
+			(txBotLog "WLABS" (cat (or built 0) " custom weapons built and fired"))
+			)
+			))
+		)
+	</Globals>
+
+	<Type UNID="&evTxTestBot;">
+		<Events>
+			<OnGlobalUpdate>
+				(block Nil
+					(errblock (err) (txBotKeepAlive) (txBotFail "keep-alive" err))
+					(errblock (err)
+						(txBotStep)
+						(txBotFail (cat "step " (txBotGet 'phase)) err)
+						)
+					)
+			</OnGlobalUpdate>
+		</Events>
+	</Type>
+
+</TranscendenceExtension>

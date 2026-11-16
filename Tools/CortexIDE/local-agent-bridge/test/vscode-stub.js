@@ -45,6 +45,8 @@ function install({ workspace, settings = {}, appRoot = process.env.CORTEXIDE_APP
     TreeItemCollapsibleState: { None: 0 },
     ConfigurationTarget: { Global: 1 },
     ViewColumn: { Beside: -2 },
+    ProgressLocation: { Notification: 15 },
+    QuickPickItemKind: { Separator: -1 },
     ColorThemeKind: { Light: 1, Dark: 2 },
     TreeItem: class {
       constructor(label) {
@@ -52,7 +54,7 @@ function install({ workspace, settings = {}, appRoot = process.env.CORTEXIDE_APP
       }
     },
     ThemeColor: class {},
-    env: { appRoot, clipboard: { writeText: async () => {} } },
+    env: { appRoot, clipboard: { writeText: async () => {} }, openExternal: async () => true },
     languages: { getDiagnostics: () => [] },
     workspace: {
       workspaceFolders: workspace ? [{ uri: Uri.file(workspace) }] : undefined,

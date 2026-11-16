@@ -1,0 +1,79 @@
+{
+  "_readme": "'My mod list' rules for converted mods (ConvertDataMod.py / the converter's Update read this file). Each rule becomes a checkbox in the converted mod's settings, OFF by default, and acts only when a mod in 'when' is enabled in D2RMM ('above': only when it comes before the converted mod). mods: converted mod ids it is for (none = all). earlier: table/string paths where the mods above keep their values. skip: regex patterns on file/table paths to leave out. switches: switch ids to turn off. props: item property codes taken off items. option: true = an Options checkbox for a part of the mod itself, ON by default, needs no 'when', and its actions apply when switched OFF. Rerun Update-D2RConvertedMod.ps1 after editing. Format: Tools\\DiabloII\\modlist-rules.example.json.",
+  "rules": [
+    {
+      "id": "optSpellMultishot",
+      "name": "Spell Multishot",
+      "mods": ["VanillaDeluxe"],
+      "option": true,
+      "description": "Items with Spell Multishot fire 3 projectiles instead of 1 with supported spells: Bone Spear, Holy Bolt, Fire Ball, Ice Blast, Fire Bolt, Ice Bolt, Glacial Spike, Tornado and Miasma Bolt (the Triune prefix, some uniques, set items and the Echoing Dawn runeword). The R3niSpellProcs plugin stays on for its other spell procs.",
+      "props": ["r3ni-multishot"]
+    },
+    {
+      "id": "listClassless",
+      "name": "Classless above: keep its skill and character changes",
+      "when": ["Classless"],
+      "above": true,
+      "description": "Classless goes at the top and changes the skill, skill description, character and stat tables; this mod then only changes what Classless left alone in them.",
+      "earlier": [
+        "global\\excel\\skills.txt", "global\\excel\\base\\skills.txt",
+        "global\\excel\\skilldesc.txt", "global\\excel\\base\\skilldesc.txt",
+        "global\\excel\\charstats.txt", "global\\excel\\base\\charstats.txt",
+        "global\\excel\\itemstatcost.txt", "global\\excel\\base\\itemstatcost.txt",
+        "local\\lng\\strings\\skills.json"
+      ]
+    },
+    {
+      "id": "listNecromancerV16",
+      "name": "Necromancer V1.6 above: keep its Necromancer changes",
+      "when": ["Necromancer_V1.6"],
+      "above": true,
+      "description": "Necromancer V1.6 goes above the conversion (Best Of order) and changes Necromancer skills, missiles, summons and pet types; this mod then only changes what it left alone in those tables.",
+      "earlier": [
+        "global\\excel\\skills.txt", "global\\excel\\base\\skills.txt",
+        "global\\excel\\skilldesc.txt", "global\\excel\\base\\skilldesc.txt",
+        "global\\excel\\missiles.txt", "global\\excel\\base\\missiles.txt",
+        "global\\excel\\monstats.txt", "global\\excel\\base\\monstats.txt",
+        "global\\excel\\monstats2.txt", "global\\excel\\base\\monstats2.txt",
+        "global\\excel\\pettype.txt", "global\\excel\\base\\pettype.txt",
+        "local\\lng\\strings\\skills.json"
+      ]
+    },
+    {
+      "id": "listInventory10x8",
+      "name": "Inventory 10x8: leave out this mod's inventory panel",
+      "when": ["Inventory10x8"],
+      "description": "Inventory 10x8 changes the stock inventory panel; this mod's own inventory layouts and panel art would not fit its 10x8 grid. Stash and cube changes stay.",
+      "skip": [
+        "\\\\playerinventory(expansion|original)layout(hd)?\\.json$",
+        "^hd\\\\global\\\\ui\\\\panel\\\\inventory$"
+      ]
+    },
+    {
+      "id": "listExpandedCube",
+      "name": "Expanded Cube: leave out this mod's Horadric Cube panel",
+      "when": ["ExpandedCube"],
+      "description": "Expanded Cube makes the cube bigger with its own panel; this mod's cube layouts and art would not fit it.",
+      "skip": [
+        "\\\\horadriccubelayout(hd)?\\.json$",
+        "^hd\\\\global\\\\ui\\\\panel\\\\horadric_cube$"
+      ]
+    },
+    {
+      "id": "listWiderMaggotLair",
+      "name": "Wider Maggot Lair mod: no WiderMaggotLair plugin",
+      "mods": ["VanillaDeluxe"],
+      "when": ["WiderMaggotLair"],
+      "description": "The Wider Maggot Lair mod already widens the Maggot Lair; this mod's WiderMaggotLair plugin does the same job.",
+      "switches": ["plugin_widermaggotlair"]
+    },
+    {
+      "id": "listMonsterDensity",
+      "name": "Increase Monster Density: no MonsterDensity plugin",
+      "mods": ["VanillaDeluxe"],
+      "when": ["IncreaseMonsterDensity"],
+      "description": "Increase Monster Density already raises density; this mod's MonsterDensity plugin (x2 in the end game) would stack with it.",
+      "switches": ["plugin_monsterdensity"]
+    }
+  ]
+}

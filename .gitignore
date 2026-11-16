@@ -148,6 +148,8 @@ Tools/FrankyCLI/
 
 Tools/GrimDawn/renodx-src/
 Tools/GrimDawn/arzedit/arzedit-master/
+Tools/DiabloII/thirdparty/
+Tools/Shared/third_party/
 Tools/GrimDawn/bin/
 Tools/GrimDawn/work/
 Tools/GrimDawn/_smoke_extract/
@@ -219,3 +221,5 @@ Tools/Qud/canvases/cortexide-docs-canvas.canvas.tsx
 # sealed sound archive key: readers carry it, the repo never does
 Tools/Shared/audio_seal.key
 Tools/Shared/archive.key
+/Tools/Qud/_cache
+Tools/DiabloII/third_party/D2RBinTool/

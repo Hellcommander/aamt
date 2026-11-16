@@ -6,6 +6,11 @@
 const fs = require("fs");
 const path = require("path");
 const { spawn } = require("child_process");
+const fa = require("./file-analyze");
+const mcpc = require("./mcp-client");
+const perms = require("./permissions");
+const instructions = require("./instructions");
+const toolOutput = require("./tool-output");
 
 let vscode = null;
 try {
@@ -37,33 +42,60 @@ function tool(name, description, properties, required) {
   };
 }
 
+const TODO_STATUS = ["pending", "in_progress", "completed"];
+
 const TOOL_DEFS = [
-  tool("Read", "Read a text file. Returns up to 400 lines; pass offset (1-based line) and limit for more.", {
+  tool("Read", "Read a text file. Lines come back numbered as '  N\\tline' (the number and tab are not part of the file). Returns up to 400 lines; pass offset (1-based line) and limit for more. An image is shown to you as with ReadImage; another binary file gets an AnalyzeFile summary.", {
     path: { type: "string", description: "Absolute path, or relative to the first workspace folder" },
     offset: { type: "number" },
     limit: { type: "number" },
   }, ["path"]),
+  tool("ReadImage", "Look at an image: a screenshot, UI mockup, texture, icon or diagram (PNG, JPEG, GIF, WebP, BMP, TGA, DDS, TIFF, ICO), from a path or an http(s) URL. The image is attached to the result so you can see it; large ones are scaled down. Use it whenever the user mentions or links an image.", {
+    path: { type: "string", description: "File path or http(s) URL of the image" },
+  }, ["path"]),
+  tool("AnalyzeFile", "Structured summary of a binary file instead of raw bytes: file type (magic bytes); .NET assemblies (references, types, methods, fields); native DLL/EXE imports and exports; ZIP/JAR/VSIX/DOCX/TAR/GZ (and 7z/RAR/XZ when 7-Zip is installed) listings; PDF text; image size; hex + strings for anything else.", {
+    path: { type: "string" },
+    pages: { type: "string", description: "PDF pages to read, e.g. \"5\", \"10-20\", \"1,3,7-\" (default: from the start until the output is full)" },
+    filter: { type: "string", description: "Only types / members / exports whose name contains this text (DLLs)" },
+    entry: { type: "string", description: "Archive entry to read (text is shown, images are attached, binaries are analysed)" },
+  }, ["path"]),
   tool("LS", "List a directory (folders end with /).", { path: { type: "string" } }, ["path"]),
-  tool("Glob", "Find files by glob pattern, e.g. **/*.cs or **/Mutations/*.xml.", {
+  tool("Glob", "Find files by glob pattern, e.g. **/*.cs or **/Mutations/*.xml. Newest files first.", {
     pattern: { type: "string" },
     path: { type: "string", description: "Folder to search (default: workspace)" },
   }, ["pattern"]),
-  tool("Grep", "Search file contents with ripgrep. Returns path:line: text.", {
+  tool("Grep", "Search file contents with ripgrep. Default output is path:line:text. Case-insensitive unless case_sensitive is set.", {
     pattern: { type: "string", description: "Regex (or literal text)" },
     path: { type: "string", description: "File or folder (default: workspace)" },
     glob: { type: "string", description: "Only files matching this glob, e.g. *.cs" },
+    output_mode: { type: "string", enum: ["content", "files_with_matches", "count"], description: "content (default), files_with_matches (just paths — best for a first wide search), or count" },
+    context: { type: "number", description: "Lines of context around each match (content mode, max 10)" },
+    case_sensitive: { type: "boolean" },
+    head_limit: { type: "number", description: "Max output lines (default 200)" },
   }, ["pattern"]),
-  tool("Shell", "Run a PowerShell command (build, test, git, dotnet, scripts). Returns exit code and output.", {
+  tool("Shell", "Run a PowerShell command (build, test, git, dotnet, scripts). Returns exit code and output. Do not start servers or watchers that never exit.", {
     command: { type: "string" },
     cwd: { type: "string", description: "Working folder (default: workspace)" },
+    timeout: { type: "number", description: "Seconds before the command is killed (default from settings, max 600)" },
   }, ["command"]),
-  tool("StrReplace", "Replace an exact, unique snippet in a file. Copy old_string verbatim from Read output.", {
+  tool("StrReplace", "Replace an exact, unique snippet in a file. Copy old_string verbatim from Read (or Grep) output, without the line-number prefix. The result shows the edited lines and any new compiler errors.", {
     path: { type: "string" },
     old_string: { type: "string" },
     new_string: { type: "string" },
     replace_all: { type: "boolean" },
   }, ["path", "old_string", "new_string"]),
-  tool("Write", "Create a file or overwrite it completely.", {
+  tool("MultiEdit", "Several StrReplace edits to one file, applied in order and all-or-nothing. Prefer this over repeated StrReplace calls on the same file.", {
+    path: { type: "string" },
+    edits: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { old_string: { type: "string" }, new_string: { type: "string" }, replace_all: { type: "boolean" } },
+        required: ["old_string", "new_string"],
+      },
+    },
+  }, ["path", "edits"]),
+  tool("Write", "Create a file, or overwrite one completely (Read it first). Prefer StrReplace for changes to existing files.", {
     path: { type: "string" },
     contents: { type: "string" },
   }, ["path", "contents"]),
@@ -72,10 +104,35 @@ const TOOL_DEFS = [
     path: { type: "string" },
   }, []),
   tool("WebFetch", "Fetch a URL and return its text.", { url: { type: "string" } }, ["url"]),
+  tool("McpTools", "Find tools on the connected MCP servers (e.g. REA for reverse engineering binaries, .NET assemblies, Electron apps). No arguments: list servers. server: list its tools. query: search tool names and descriptions. tool: show that tool's full argument schema; do this before McpCall.", {
+    server: { type: "string" },
+    query: { type: "string", description: "Words to look for in tool names / descriptions" },
+    tool: { type: "string", description: "Tool name whose argument schema to show" },
+  }, []),
+  tool("McpCall", "Run one tool on an MCP server. Get the tool's argument schema with McpTools(server, tool) first.", {
+    server: { type: "string" },
+    tool: { type: "string" },
+    arguments: { type: "object", description: "Arguments matching the tool's schema" },
+  }, ["server", "tool"]),
   tool("list_skills", "List the skills (SKILL.md workflows) available to follow.", {}, []),
   tool("read_skill", "Read a skill's full instructions by name before following it.", {
     name: { type: "string" },
   }, ["name"]),
+  tool("TodoWrite", "Create or update your task list for multi-step work (3+ steps). Send the whole list every time. Keep exactly one item in_progress while working and mark items completed as soon as they are done.", {
+    todos: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { content: { type: "string" }, status: { type: "string", enum: TODO_STATUS } },
+        required: ["content", "status"],
+      },
+    },
+  }, ["todos"]),
+  tool("Task", "Send a read-only research sub-agent (Read, LS, Glob, Grep, WebFetch) to answer one question about the codebase in its own context, and get back its report. Use it for broad searches that would otherwise fill your context. Several Task calls in one reply run in parallel.", {
+    description: { type: "string", description: "3-6 word label" },
+    prompt: { type: "string", description: "The full question, with everything the sub-agent needs to know" },
+    agent: { type: "string", description: "Named sub-agent to run (see the list in your instructions; default explore)" },
+  }, ["prompt"]),
   tool("attempt_completion", "Finish the task. Call only after the work is done and verified.", {
     summary: { type: "string", description: "What changed and how it was verified" },
   }, ["summary"]),
@@ -83,6 +140,8 @@ const TOOL_DEFS = [
 
 const ALIASES = {
   read: "Read", read_file: "Read", readfile: "Read", open_file: "Read", view_file: "Read", cat: "Read",
+  readimage: "ReadImage", read_image: "ReadImage", view_image: "ReadImage", look_at_image: "ReadImage", image: "ReadImage", screenshot: "ReadImage",
+  analyzefile: "AnalyzeFile", analyze_file: "AnalyzeFile", inspect_file: "AnalyzeFile", file_info: "AnalyzeFile", analyze: "AnalyzeFile", inspect_binary: "AnalyzeFile",
   ls: "LS", list_dir: "LS", list_directory: "LS", list_files: "LS", listdir: "LS",
   glob: "Glob", glob_files: "Glob", glob_file_search: "Glob", file_search: "Glob", find_file: "Glob", find_files: "Glob",
   grep: "Grep", search: "Grep", grep_search: "Grep", codebase_search: "Grep", search_files: "Grep",
@@ -92,12 +151,21 @@ const ALIASES = {
   delete: "Delete", delete_file: "Delete", remove_file: "Delete",
   readlints: "ReadLints", read_lints: "ReadLints", get_diagnostics: "ReadLints", diagnostics: "ReadLints",
   webfetch: "WebFetch", web_fetch: "WebFetch", fetch: "WebFetch",
+  mcptools: "McpTools", mcp_tools: "McpTools", list_mcp_tools: "McpTools", mcp_list: "McpTools", mcp_search: "McpTools",
+  mcpcall: "McpCall", mcp_call: "McpCall", call_mcp_tool: "McpCall", mcp: "McpCall", use_mcp_tool: "McpCall",
+  multiedit: "MultiEdit", multi_edit: "MultiEdit", multi_replace: "MultiEdit",
+  todowrite: "TodoWrite", todo_write: "TodoWrite", todos: "TodoWrite", update_todos: "TodoWrite", plan: "TodoWrite",
+  task: "Task", subagent: "Task", agent: "Task", research: "Task",
   list_skills: "list_skills", read_skill: "read_skill", match_skills: "list_skills",
   attempt_completion: "attempt_completion", complete: "attempt_completion", finish: "attempt_completion", done: "attempt_completion",
 };
 
 const NAMES = new Set(TOOL_DEFS.map((t) => t.function.name));
-const MUTATING = new Set(["Shell", "StrReplace", "Write", "Delete"]);
+const MUTATING = new Set(["Shell", "StrReplace", "MultiEdit", "Write", "Delete"]);
+/** Tools that only look: safe to run side by side in one round, and all a sub-agent gets. */
+const READ_ONLY = new Set(["Read", "ReadImage", "AnalyzeFile", "LS", "Glob", "Grep", "WebFetch", "ReadLints", "list_skills", "read_skill", "McpTools"]);
+/** Tools that only exist when an MCP server is configured. */
+const MCP_TOOLS = new Set(["McpTools", "McpCall"]);
 
 function canonName(name) {
   const raw = String(name || "").trim();
@@ -120,7 +188,43 @@ function normArgs(name, args) {
   if (a.content != null && a.contents == null) a.contents = a.content;
   if (a.old_str != null && a.old_string == null) a.old_string = a.old_str;
   if (a.new_str != null && a.new_string == null) a.new_string = a.new_str;
+  if (a["-C"] != null && a.context == null) a.context = a["-C"];
+  if (a["-i"] != null && a.case_sensitive == null) a.case_sensitive = !a["-i"];
+  if (a.timeout_sec != null && a.timeout == null) a.timeout = a.timeout_sec;
+  if (a.task && !a.prompt) a.prompt = a.task;
+  if (a.question && !a.prompt) a.prompt = a.question;
+  if (name === "McpCall" || name === "McpTools") {
+    if (a.server_name && !a.server) a.server = a.server_name;
+    if (a.tool_name && !a.tool) a.tool = a.tool_name;
+    if (name === "McpCall" && a.name && !a.tool) a.tool = a.name;
+    if (a.args != null && a.arguments == null) a.arguments = a.args;
+    if (a.input != null && a.arguments == null) a.arguments = a.input;
+    if (name === "McpTools" && a.pattern && !a.query) a.query = a.pattern;
+  }
+  // Small models often send arrays as JSON text.
+  for (const k of ["edits", "todos", "arguments"]) {
+    if (typeof a[k] === "string") {
+      try {
+        a[k] = JSON.parse(a[k]);
+      } catch {
+        /* reported by the tool */
+      }
+    }
+  }
   return a;
+}
+
+/** "   12\tcode" → "code" when every non-empty line carries a Read line-number prefix. */
+function stripLineNumbers(s) {
+  const lines = String(s).split("\n");
+  const body = lines.filter((l) => l.trim());
+  if (!body.length || !body.every((l) => /^\s*\d+\t/.test(l))) return s;
+  return lines.map((l) => l.replace(/^\s*\d+\t/, "")).join("\n");
+}
+
+function numbered(lines, first) {
+  const w = String(first + lines.length - 1).length;
+  return lines.map((l, i) => String(first + i).padStart(Math.max(w, 4)) + "\t" + l).join("\n");
 }
 
 function clip(text, max = MAX_OUT) {
@@ -147,7 +251,19 @@ class ToolContext {
    * @param {string} [o.rgPath]
    * @param {() => any[]} [o.skills]
    * @param {(command: string, cwd: string) => Promise<boolean>} [o.confirmShell]
+   * @param {boolean} [o.requireRead] refuse edits to existing files the agent has not Read (default true)
+   * @param {boolean} [o.diagnosticsAfterEdit] append new editor errors to edit results (default true)
    * @param {AbortSignal} [o.signal]
+   * @param {(abs: string, kind: string) => string} [o.claim] called before a file is changed; returns
+   *   "" when this chat may change it, or the reason another chat holds it (the edit is refused)
+   * @param {boolean} [o.vision] the model can see images (default true); otherwise ReadImage returns metadata only
+   * @param {number} [o.imageMaxEdge] long edge, in pixels, images are scaled down to (default 1568)
+   * @param {string} [o.model] model name, for messages about vision support
+   * @param {import("./mcp-client").McpHub} [o.mcp] MCP servers for McpTools / McpCall
+   * @param {"auto"|"confirm"|"off"} [o.mcpMode] McpCall runs without asking, asks first, or is refused
+   * @param {(label: string) => Promise<boolean>} [o.confirmMcp]
+   * @param {number} [o.mcpTimeoutSec] per McpCall (default 300)
+   * @param {string[]} [o.thirdParty] folders with optional libraries (pdf.js); default: each root's Tools\Shared\third_party
    */
   constructor(o) {
     this.roots = (o.roots || []).filter(Boolean);
@@ -158,7 +274,120 @@ class ToolContext {
     this.rgPath = o.rgPath || "rg";
     this.skills = o.skills || (() => []);
     this.confirmShell = o.confirmShell || (async () => true);
+    this.requireRead = o.requireRead !== false;
+    this.diagnosticsAfterEdit = o.diagnosticsAfterEdit !== false;
     this.signal = o.signal;
+    this.claimFn = typeof o.claim === "function" ? o.claim : null;
+    this.vision = o.vision !== false;
+    this.imageMaxEdge = Math.max(256, Number(o.imageMaxEdge) || fa.DEFAULT_MAX_EDGE);
+    this.model = o.model || "";
+    this.mcp = o.mcp || null;
+    this.mcpMode = o.mcpMode || "auto";
+    this.confirmMcp = o.confirmMcp || (async () => true);
+    this.mcpTimeoutSec = Math.max(5, Number(o.mcpTimeoutSec) || 300);
+    this.thirdParty = o.thirdParty || mcpc.thirdPartyDirs("", this.roots);
+    /** lower-case abs path → mtime when the agent last read (or wrote) it */
+    this.reads = new Map();
+    /** abs path → { before: string|null } — file contents before the agent first touched it */
+    this.checkpoint = new Map();
+    /** @type {{content:string,status:string}[]} */
+    this.todos = [];
+    // Permission rules (lib/permissions.js): defaults, then settings, then the running agent's own.
+    this.rules = [...perms.DEFAULT_RULES, ...perms.normalize(o.rules || [])];
+    /** "Allow always" answers: turn an ask into allow, never override a deny */
+    this.approved = perms.normalize(o.approved || []);
+    /** @type {(req:{tool:string, action:string, resources:string[], suggest:string[]}) => Promise<"once"|"always"|"reject">} */
+    this.confirmPermission = o.confirmPermission || (async () => "once");
+    this.saveApproval = typeof o.saveApproval === "function" ? o.saveApproval : null;
+    /** lower-case shell commands the user approved through a permission prompt this turn (no second Run dialog) */
+    this.askedShell = new Set();
+    /** lower-case AGENTS.md paths already in the prompt or added to a Read result */
+    this.loadedInstructions = new Set((o.instructionFiles || []).map((f) => String(f).toLowerCase()));
+  }
+
+  /** Rules of the agent running a turn, appended after the settings' rules (they win on a tie). */
+  withAgentRules(rules) {
+    const extra = perms.normalize(rules || []);
+    if (extra.length) this.rules = [...this.rules, ...extra];
+  }
+
+  /**
+   * "" when the call may run, else an error result. An "ask" rule shows the prompt: Allow once,
+   * Allow always (saves the suggested pattern) or Deny.
+   */
+  async permit(name, a) {
+    const r = perms.evaluate(this.rules, name, a, { roots: this.roots, resolve: (p) => this.resolve(p), approved: this.approved });
+    if (r.effect === "allow") return "";
+    if (r.effect === "deny") {
+      return "error: " + name + " on " + (r.resources || []).join(" | ").slice(0, 300) + " is denied by the permission rule " + perms.describeRule(r.rule) + " (localAgentBridge.agent.permissions or the agent's own rules). Do something else or tell the user it is blocked.";
+    }
+    let answer = "reject";
+    try {
+      answer = await this.confirmPermission({ tool: name, action: r.action, resources: r.asked && r.asked.length ? r.asked : r.resources, suggest: r.suggest || [] });
+    } catch {
+      answer = "reject";
+    }
+    if (answer === "always") {
+      const add = (r.suggest || []).map((s) => ({ action: r.action, resource: s, effect: "allow" }));
+      this.approved.push(...add);
+      if (this.saveApproval) {
+        try {
+          this.saveApproval(add);
+        } catch {
+          /* kept for this chat */
+        }
+      }
+    }
+    if (answer === "once" || answer === "always") {
+      if (name === "Shell") this.askedShell.add(String(a.command || "").trim().toLowerCase());
+      return "";
+    }
+    return "error: the user denied " + name + " (" + (r.resources || []).join(" | ").slice(0, 200) + "). Do not retry it; continue another way or report that it was refused.";
+  }
+
+  markRead(abs) {
+    try {
+      this.reads.set(abs.toLowerCase(), fs.statSync(abs).mtimeMs);
+    } catch {
+      /* gone */
+    }
+  }
+
+  /** Error text when an edit to an existing file is not based on what is on disk now, else "". */
+  /** True when the read-before-edit rule applies and the agent has not read this existing file. */
+  unread(abs) {
+    return this.requireRead && fs.existsSync(abs) && !this.reads.has(abs.toLowerCase());
+  }
+
+  /**
+   * Error text when an edit to an existing file is not based on what is on disk now, else "".
+   * With exactOk, an unread file passes: StrReplace's exact unique match proves the model knows that
+   * region (e.g. from Grep output), so only loose matches and whole-file writes need a Read.
+   */
+  staleCheck(abs, { exactOk = false } = {}) {
+    if (!this.requireRead || !fs.existsSync(abs)) return "";
+    const seen = this.reads.get(abs.toLowerCase());
+    if (seen == null) return exactOk ? "" : "error: Read " + abs + " before changing it, so the edit is based on its current contents.";
+    if (openDirty(abs)) return ""; // unsaved editor buffer: mtime says nothing, and edits go through the buffer
+    let now = seen;
+    try {
+      now = fs.statSync(abs).mtimeMs;
+    } catch {
+      /* raced */
+    }
+    return now !== seen ? "error: " + abs + " changed on disk since you last read it. Read it again, then redo the edit." : "";
+  }
+
+  /** Keep the pre-agent contents so the turn can be reviewed and undone. */
+  remember(abs) {
+    if (this.checkpoint.has(abs)) return;
+    let before = null;
+    try {
+      if (fs.existsSync(abs)) before = currentText(abs);
+    } catch {
+      before = null;
+    }
+    this.checkpoint.set(abs, { before });
   }
 
   resolve(p) {
@@ -171,11 +400,23 @@ class ToolContext {
   }
 
   canRead(abs) {
-    return this.readAnywhere || this.writable.some((r) => isUnder(abs, r));
+    return this.readAnywhere || this.writable.some((r) => isUnder(abs, r)) || toolOutput.isOutputFile(abs);
   }
 
   canWrite(abs) {
     return this.writable.some((r) => isUnder(abs, r));
+  }
+
+  /** "" when this chat may change abs now, else an error result naming the chat that holds it. */
+  claimCheck(abs, kind) {
+    if (!this.claimFn) return "";
+    let why = "";
+    try {
+      why = this.claimFn(abs, kind) || "";
+    } catch {
+      return ""; // a broken index must not block editing
+    }
+    return why ? "error: " + why : "";
   }
 
   writeDenied(abs) {
@@ -186,20 +427,190 @@ class ToolContext {
   }
 }
 
+function openDoc(abs) {
+  if (!vscode || !vscode.workspace || !vscode.workspace.textDocuments) return null;
+  return vscode.workspace.textDocuments.find((d) => d.uri && d.uri.fsPath && d.uri.fsPath.toLowerCase() === abs.toLowerCase()) || null;
+}
+
+function openDirty(abs) {
+  const d = openDoc(abs);
+  return !!(d && d.isDirty);
+}
+
 function readFile(ctx, a) {
   const abs = ctx.resolve(a.path);
   if (!abs) return "error: missing path";
   if (!ctx.canRead(abs)) return "error: reading outside the workspace is disabled: " + abs;
   if (!fs.existsSync(abs)) return "error: not found: " + abs + nearMiss(abs);
   if (fs.statSync(abs).isDirectory()) return listDir(ctx, { path: abs });
-  const data = fs.readFileSync(abs, "utf8");
+  let data;
+  if (openDirty(abs)) data = currentText(abs);
+  else {
+    // Images go to the model as images; other binaries get a structured summary, not raw bytes.
+    const head = readHead(abs, 8192);
+    const det = fa.detect(head, abs);
+    if (det.kind === "image") return readImage(ctx, { path: abs });
+    if (["pdf", "archive", "exe"].includes(det.kind) || (head.includes(0) && det.format !== "utf16")) {
+      return analyze(ctx, { path: abs }).then((r) => ({ ...r, text: "(binary file: showing an AnalyzeFile summary instead of raw bytes)\n" + r.text }));
+    }
+    const buf = fs.readFileSync(abs);
+    data = det.format === "utf16" ? fa.decodeText(buf) : buf.toString("utf8");
+  }
+  ctx.markRead(abs);
   const lines = data.split(/\r?\n/);
   const start = Math.max(1, Number(a.offset) || 1);
   const limit = Math.max(1, Number(a.limit) || MAX_READ_LINES);
-  const slice = lines.slice(start - 1, start - 1 + limit);
+  const slice = lines.slice(start - 1, start - 1 + limit).map((l) => (l.length > 2000 ? l.slice(0, 2000) + "…[line cut]" : l));
   const end = start - 1 + slice.length;
   const more = end < lines.length ? "\n…[" + (lines.length - end) + " more lines — Read with offset " + (end + 1) + "]" : "";
-  return abs + " (lines " + start + "-" + end + " of " + lines.length + ")\n" + clip(slice.join("\n"), 40000) + more;
+  if (!slice.length) return abs + " (" + lines.length + " lines; offset " + start + " is past the end)";
+  // AGENTS.md files of the sub-folders on the way to this file are added once (opencode-style).
+  const notes = instructions.nested(abs, ctx.roots, ctx.loadedInstructions).map((n) => "\n\n[Instructions from " + n.file + " — they apply to files in that folder]\n" + n.text);
+  return abs + " (lines " + start + "-" + end + " of " + lines.length + ")\n" + clip(numbered(slice, start), 40000) + more + notes.join("");
+}
+
+function readHead(abs, n) {
+  const fd = fs.openSync(abs, "r");
+  try {
+    const buf = Buffer.alloc(n);
+    const got = fs.readSync(fd, buf, 0, n, 0);
+    return buf.subarray(0, got);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/** GET a URL into memory (redirects followed, size capped). */
+function fetchBytes(u, { max = 20 * 1024 * 1024, depth = 0 } = {}) {
+  const lib = u.startsWith("https") ? require("https") : require("http");
+  return new Promise((resolve, reject) => {
+    const req = lib.get(u, { timeout: 20000, headers: { "User-Agent": "CortexIDE-Agent/2.0", Accept: "image/*,*/*;q=0.5" } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && depth < 4) {
+        res.resume();
+        resolve(fetchBytes(new URL(res.headers.location, u).toString(), { max, depth: depth + 1 }));
+        return;
+      }
+      if (res.statusCode >= 400) {
+        res.resume();
+        reject(new Error("HTTP " + res.statusCode + " for " + u));
+        return;
+      }
+      const chunks = [];
+      let size = 0;
+      res.on("data", (c) => {
+        size += c.length;
+        if (size > max) {
+          res.destroy();
+          reject(new Error(u + " is larger than " + fa.fmtBytes(max)));
+          return;
+        }
+        chunks.push(c);
+      });
+      res.on("end", () => resolve({ buf: Buffer.concat(chunks), type: String(res.headers["content-type"] || "") }));
+      res.on("error", reject);
+    });
+    req.on("error", reject);
+    req.on("timeout", () => req.destroy(new Error("timeout fetching " + u)));
+  });
+}
+
+function noVisionNote(ctx) {
+  return (
+    "This model" + (ctx.model ? " (" + ctx.model + ")" : "") + " cannot see images, so only the metadata above is available. " +
+    "Tell the user if the task needs the picture itself: a vision model (Claude, Qwen2.5-VL, llava, gemma3, llama3.2-vision…) can look at it, " +
+    "or set localAgentBridge.agent.vision to \"on\" if this model does support images."
+  );
+}
+
+/** One image from a path or URL → { text, images } (images empty when the model cannot see them). */
+async function readImage(ctx, a) {
+  const raw = String(a.path || a.url || "").trim().replace(/^["'`<]|["'`>]$/g, "");
+  if (!raw) return "error: missing path";
+  let src;
+  let label;
+  if (/^https?:\/\//i.test(raw)) {
+    let got;
+    try {
+      got = await fetchBytes(raw);
+    } catch (e) {
+      return "error: " + (e.message || e);
+    }
+    const name = raw.split(/[?#]/)[0];
+    if (fa.detect(got.buf, name).kind !== "image") return "error: " + raw + " did not return an image (" + (got.type || fa.detect(got.buf, name).label) + "). Use WebFetch for pages.";
+    src = got.buf;
+    label = raw;
+  } else {
+    const abs = ctx.resolve(raw);
+    if (!ctx.canRead(abs)) return "error: reading outside the workspace is disabled: " + abs;
+    if (!fs.existsSync(abs)) return "error: not found: " + abs + nearMiss(abs);
+    if (fs.statSync(abs).isDirectory()) return "error: " + abs + " is a folder. Glob for images in it, e.g. **/*.png";
+    const det = fa.detect(readHead(abs, 4096), abs);
+    if (det.kind !== "image") return analyze(ctx, { path: abs }).then((r) => ({ ...r, text: "(not an image: " + det.label + ")\n" + r.text }));
+    src = abs;
+    label = abs;
+  }
+  const name = typeof src === "string" ? src : label.split(/[?#]/)[0];
+  if (!ctx.vision) {
+    const r = fa.analyzeFile(src, { name });
+    return label + " · " + r.text.split("\n").slice(1).join(" · ") + "\n" + noVisionNote(ctx);
+  }
+  let img;
+  try {
+    img = await fa.prepareImage(src, { name, maxEdge: ctx.imageMaxEdge });
+  } catch (e) {
+    return "error: " + (e.message || e);
+  }
+  const size = img.origWidth && img.origHeight ? img.origWidth + "x" + img.origHeight : "unknown size";
+  const sent = img.width + "x" + img.height + " " + img.mime.replace("image/", "").toUpperCase() + ", " + fa.fmtBytes(img.bytes);
+  return {
+    text: label + " · " + img.format.toUpperCase() + " " + size + (img.detail ? " (" + img.detail + ")" : "") + " · attached to this result as " + sent + (img.note ? " (" + img.note + ")" : "") + ".",
+    images: [{ mime: img.mime, data: img.data, path: label, width: img.width, height: img.height }],
+  };
+}
+
+/** AnalyzeFile: structured summary; an image (the file itself or an archive entry) is attached. */
+async function analyze(ctx, a) {
+  const abs = ctx.resolve(a.path);
+  if (!abs) return "error: missing path";
+  if (!ctx.canRead(abs)) return "error: reading outside the workspace is disabled: " + abs;
+  if (!fs.existsSync(abs)) return "error: not found: " + abs + nearMiss(abs);
+  if (fs.statSync(abs).isDirectory()) return listDir(ctx, { path: abs });
+  let r;
+  try {
+    r = fa.analyzeFile(abs, { filter: a.filter, entry: a.entry });
+  } catch (e) {
+    return "error: " + (e.message || e);
+  }
+  let extra = "";
+  if (r.format === "pdf") {
+    // pdf.js reads compressed, font-encoded and encrypted PDFs the built-in reader cannot.
+    try {
+      const pj = await fa.pdfjsText(abs, { dirs: ctx.thirdParty, pages: a.pages });
+      if (pj) r = { ...r, text: r.text.split("\n")[0] + "\n" + pj.lines.join("\n") };
+      else if (a.pages) extra = "\n(pages ignored: pdf.js is not installed; fetch it with Tools\\Fetch-ThirdParty.ps1 -AgentBridge)";
+    } catch (e) {
+      extra = "\n(pdf.js failed: " + (e.message || e) + "; built-in reader used)";
+    }
+  } else if (fa.SEVEN_ZIP_FORMATS.has(r.format)) {
+    try {
+      const sz = await fa.sevenZipDescribe(abs, { entry: a.entry, filter: a.filter });
+      if (sz) r = { ...r, text: sz.text, image: sz.image };
+    } catch (e) {
+      extra = "\n(7-Zip failed: " + (e.message || e) + ")";
+    }
+  }
+  const text = clip(r.text + extra, 30000);
+  if (!r.image) return text;
+  if (!ctx.vision) return text + "\n" + noVisionNote(ctx);
+  try {
+    const img = await fa.prepareImage(r.image.buf || abs, { name: r.image.name, maxEdge: ctx.imageMaxEdge });
+    return {
+      text: text + "\nAttached as " + img.width + "x" + img.height + " " + img.mime.replace("image/", "").toUpperCase() + (img.note ? " (" + img.note + ")" : "") + ".",
+      images: [{ mime: img.mime, data: img.data, path: abs + (a.entry ? "!" + r.image.name : ""), width: img.width, height: img.height }],
+    };
+  } catch (e) {
+    return text + "\n(could not attach the image: " + (e.message || e) + ")";
+  }
 }
 
 function nearMiss(abs) {
@@ -278,7 +689,17 @@ async function grep(ctx, a) {
   const target = ctx.resolve(a.path || ctx.roots[0] || ".");
   if (!ctx.canRead(target)) return "error: reading outside the workspace is disabled: " + target;
   if (!fs.existsSync(target)) return "error: not found: " + target;
-  const args = ["-n", "-i", "--no-heading", "--color", "never", "--max-columns", "240", "--max-filesize", "2M", "-m", "20"];
+  const mode = ["files_with_matches", "count"].includes(a.output_mode) ? a.output_mode : "content";
+  const headLimit = Math.min(1000, Math.max(1, Number(a.head_limit) || 200));
+  const args = ["--no-heading", "--color", "never", "--max-columns", "240", "--max-filesize", "2M"];
+  if (!a.case_sensitive) args.push("-i");
+  if (mode === "files_with_matches") args.push("-l");
+  else if (mode === "count") args.push("-c");
+  else {
+    args.push("-n", "-m", "20");
+    const ctxLines = Math.min(10, Math.max(0, Number(a.context) || 0));
+    if (ctxLines) args.push("-C", String(ctxLines));
+  }
   if (a.glob) args.push("-g", String(a.glob));
   let regexOk = true;
   try {
@@ -289,11 +710,15 @@ async function grep(ctx, a) {
   if (!regexOk) args.push("-F");
   args.push("--", pat, target);
   const r = await runProcess(ctx.rgPath, args, { cwd: ctx.roots[0], timeoutSec: 30, signal: ctx.signal });
-  if (/ENOENT|not recognized|error: spawn/i.test(r.out) && r.code !== 0 && r.code !== 1) return grepJs(target, pat, a.glob);
+  if (/ENOENT|not recognized|error: spawn/i.test(r.out) && r.code !== 0 && r.code !== 1) return grepJs(target, pat, a.glob, mode, !!a.case_sensitive);
   const out = r.out.trim();
   if (!out) return "(no matches for " + pat + " in " + target + ")";
   const lines = out.split(/\r?\n/);
-  return clip((lines.length > 200 ? lines.slice(0, 200).join("\n") + "\n…[" + (lines.length - 200) + " more matches — narrow path/glob]" : out));
+  if (lines.length > headLimit) {
+    const saved = toolOutput.save(out, "grep");
+    return clip(lines.slice(0, headLimit).join("\n")) + "\n…[" + (lines.length - headLimit) + " more lines — narrow path/glob, or use output_mode files_with_matches" + (saved ? "; all " + lines.length + " lines are saved in " + saved : "") + "]";
+  }
+  return toolOutput.clipSaved(out, MAX_OUT, clip, "grep");
 }
 
 function walk(root, onFile, limit = 20000) {
@@ -338,12 +763,13 @@ function globToRegex(glob) {
   return new RegExp("(^|/)" + re + "$", "i");
 }
 
-function grepJs(target, pat, glob) {
+function grepJs(target, pat, glob, mode = "content", caseSensitive = false) {
   let re;
+  const flags = caseSensitive ? "" : "i";
   try {
-    re = new RegExp(pat, "i");
+    re = new RegExp(pat, flags);
   } catch {
-    re = new RegExp(pat.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    re = new RegExp(pat.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), flags);
   }
   const gre = glob ? globToRegex(glob) : null;
   const hits = [];
@@ -356,9 +782,14 @@ function grepJs(target, pat, glob) {
     } catch {
       return;
     }
+    let n = 0;
     text.split(/\r?\n/).forEach((line, i) => {
-      if (hits.length < 200 && re.test(line)) hits.push(file + ":" + (i + 1) + ":" + line.slice(0, 240));
+      if (!re.test(line)) return;
+      n++;
+      if (mode === "content" && hits.length < 200) hits.push(file + ":" + (i + 1) + ":" + line.slice(0, 240));
     });
+    if (n && mode === "files_with_matches") hits.push(file);
+    else if (n && mode === "count") hits.push(file + ":" + n);
     if (hits.length >= 200) return false;
   };
   if (fs.statSync(target).isFile()) scan(target);
@@ -380,7 +811,7 @@ async function globFiles(ctx, a) {
   if (!ctx.canRead(base)) return "error: reading outside the workspace is disabled: " + base;
   if (!fs.existsSync(base)) return "error: not found: " + base;
   if (!/[*?{]/.test(pattern)) pattern = "**/*" + pattern + "*";
-  const r = await runProcess(ctx.rgPath, ["--files", "--color", "never", "-g", pattern, base], {
+  const r = await runProcess(ctx.rgPath, ["--files", "--color", "never", "--sortr", "modified", "-g", pattern, base], {
     cwd: base,
     timeoutSec: 30,
     signal: ctx.signal,
@@ -408,7 +839,7 @@ async function shell(ctx, a) {
   const cwd = ctx.resolve(a.cwd || ctx.roots[0] || process.cwd());
   if (!fs.existsSync(cwd)) return "error: cwd not found: " + cwd;
   if (!ctx.canWrite(cwd)) return ctx.writeDenied(cwd);
-  if (ctx.shellMode === "confirm" && !(await ctx.confirmShell(cmd, cwd))) return "error: the user declined to run this command";
+  if (ctx.shellMode === "confirm" && !ctx.askedShell.has(cmd.toLowerCase()) && !(await ctx.confirmShell(cmd, cwd))) return "error: the user declined to run this command";
   // A command that starts with a quoted exe path is a parse error in PowerShell without the call operator.
   if (/^["'][^"']+\.(exe|bat|cmd|ps1)["']/i.test(cmd)) cmd = "& " + cmd;
   let exe = "bash";
@@ -421,8 +852,9 @@ async function shell(ctx, a) {
     exe = "powershell.exe";
     args = ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", Buffer.from(script, "utf16le").toString("base64")];
   }
-  const r = await runProcess(exe, args, { cwd, timeoutSec: ctx.shellTimeoutSec, signal: ctx.signal });
-  return "exit " + r.code + " (cwd " + cwd + ")\n" + (clip(r.out.trim()) || "(no output)");
+  const timeoutSec = Math.min(600, Math.max(1, Number(a.timeout) || ctx.shellTimeoutSec));
+  const r = await runProcess(exe, args, { cwd, timeoutSec, signal: ctx.signal });
+  return "exit " + r.code + " (cwd " + cwd + ")\n" + (toolOutput.clipSaved(r.out.trim(), MAX_OUT, clip, "shell") || "(no output)");
 }
 
 async function saveText(abs, contents) {
@@ -450,38 +882,179 @@ function currentText(abs) {
   return fs.readFileSync(abs, "utf8");
 }
 
+/**
+ * Apply one exact replacement to `cur`. Returns { next, count, at } or { error }.
+ * Tolerates LF old_string on a CRLF file and Read line-number prefixes copied into the strings.
+ */
+function applyReplace(cur, oldS, newS, replaceAll, abs, allowLoose = true) {
+  if (!oldS) return { error: "old_string is empty" };
+  if (oldS === newS) return { error: "old_string and new_string are identical; nothing to change" };
+  const crlf = cur.includes("\r\n");
+  const variants = [[oldS, newS]];
+  const stripped = stripLineNumbers(oldS);
+  if (stripped !== oldS) variants.push([stripped, stripLineNumbers(newS)]);
+  for (const [o, n] of variants.slice()) if (crlf) variants.push([o.replace(/\r?\n/g, "\r\n"), n.replace(/\r?\n/g, "\r\n")]);
+  const hit = variants.find(([o]) => cur.includes(o));
+  if (!hit) {
+    if (!allowLoose) return { error: "old_string not found exactly in " + abs + ", and you have not Read this file yet. Read it, then copy old_string exactly." };
+    const loose = looseMatch(cur, stripped, stripLineNumbers(newS));
+    if (loose === "ambiguous") return { error: "old_string matches several places in " + abs + " once whitespace is ignored; include more surrounding lines" };
+    if (loose) return { ...loose, count: 1, loose: true };
+    const first = stripped.split(/\r?\n/).find((l) => l.trim().length > 3) || stripped;
+    const lines = cur.split(/\r?\n/);
+    const near = lines.findIndex((l) => l.includes(first.trim()));
+    const hint = near >= 0
+      ? "\nClosest match near line " + (near + 1) + ":\n" + numbered(lines.slice(Math.max(0, near - 2), near + 6), Math.max(1, near - 1))
+      : "";
+    return { error: "old_string not found in " + abs + ". Read the file again and copy the text exactly (whitespace matters, line-number prefixes are not part of the file)." + hint };
+  }
+  const [find, repl] = hit;
+  const count = cur.split(find).length - 1;
+  if (count > 1 && !replaceAll) return { error: "old_string matches " + count + " places in " + abs + "; include more surrounding lines or set replace_all" };
+  const at = cur.indexOf(find);
+  const next = replaceAll ? cur.split(find).join(repl) : cur.slice(0, at) + repl + cur.slice(at + find.length);
+  return { next, count: replaceAll ? count : 1, at, repl };
+}
+
+/**
+ * Indentation-tolerant fallback for old_string: compare whole lines with leading/trailing
+ * whitespace ignored. Only a single matching window is accepted. new_string is re-indented by the
+ * difference between the file's indentation and the model's at the first line.
+ * Returns { next, at, repl }, "ambiguous", or null.
+ */
+function looseMatch(cur, oldS, newS) {
+  const want = oldS.replace(/\r/g, "").split("\n");
+  while (want.length && !want[0].trim()) want.shift();
+  while (want.length && !want[want.length - 1].trim()) want.pop();
+  if (!want.length || want.join("").trim().length < 8) return null; // too little to anchor on safely
+  const eol = cur.includes("\r\n") ? "\r\n" : "\n";
+  const lines = cur.split(/\r?\n/);
+  // Only indentation and trailing whitespace are forgiven; spacing inside a line must match.
+  const norm = (l) => l.trim();
+  const target = want.map(norm);
+  const hits = [];
+  for (let i = 0; i + target.length <= lines.length; i++) {
+    let ok = true;
+    for (let k = 0; k < target.length && ok; k++) ok = norm(lines[i + k]) === target[k];
+    if (ok) hits.push(i);
+    if (hits.length > 1) return "ambiguous";
+  }
+  if (!hits.length) return null;
+  const i = hits[0];
+  const indentOf = (l) => (l.match(/^[ \t]*/) || [""])[0];
+  const fileIndent = indentOf(lines[i]);
+  const modelIndent = indentOf(want[0]);
+  const newLines = newS.replace(/\r/g, "").split("\n");
+  while (newLines.length && !newLines[0].trim()) newLines.shift();
+  while (newLines.length && !newLines[newLines.length - 1].trim()) newLines.pop();
+  const reindented = newLines.map((l) => {
+    if (!l.trim()) return "";
+    if (l.startsWith(modelIndent)) return fileIndent + l.slice(modelIndent.length);
+    return fileIndent + l.trimStart();
+  });
+  const before = lines.slice(0, i);
+  const after = lines.slice(i + target.length);
+  const at = before.length ? before.join(eol).length + eol.length : 0;
+  const repl = reindented.join(eol);
+  return { next: [...before, ...(reindented.length ? reindented : []), ...after].join(eol), at, repl };
+}
+
+/** Numbered lines around an edit so the model sees the result without another Read. */
+function snippet(text, at, len) {
+  const lines = text.split(/\r?\n/);
+  const first = text.slice(0, at).split(/\r?\n/).length; // 1-based
+  const span = Math.max(1, text.slice(at, at + len).split(/\r?\n/).length);
+  const from = Math.max(1, first - 2);
+  const to = Math.min(lines.length, first + span + 1);
+  if (to - from > 30) return numbered(lines.slice(from - 1, from + 11), from) + "\n…\n" + numbered(lines.slice(to - 8, to), to - 7);
+  return numbered(lines.slice(from - 1, to), from);
+}
+
+/** Wait briefly for the language server, then report errors in `abs`. "" when there are none. */
+async function editorProblems(ctx, abs) {
+  if (!ctx.diagnosticsAfterEdit || !vscode || !vscode.languages || !vscode.languages.onDidChangeDiagnostics) return "";
+  const uri = vscode.Uri.file(abs);
+  try {
+    await vscode.workspace.openTextDocument(uri);
+  } catch {
+    return "";
+  }
+  await new Promise((resolve) => {
+    let sub = null;
+    let settle = null;
+    const done = () => {
+      clearTimeout(cap);
+      clearTimeout(settle);
+      if (sub) sub.dispose();
+      resolve();
+    };
+    const cap = setTimeout(done, 2500);
+    sub = vscode.languages.onDidChangeDiagnostics((e) => {
+      if (e.uris.some((u) => u.fsPath.toLowerCase() === abs.toLowerCase())) {
+        clearTimeout(settle);
+        settle = setTimeout(done, 400);
+      }
+    });
+  });
+  const errs = vscode.languages.getDiagnostics(uri).filter((d) => d.severity === 0);
+  if (!errs.length) return "";
+  return "\nEditor errors in this file now (fix them if your edit caused them):\n" +
+    errs.slice(0, 15).map((d) => "  line " + (d.range.start.line + 1) + ": " + d.message.split("\n")[0]).join("\n");
+}
+
+async function commit(ctx, abs, next) {
+  ctx.remember(abs);
+  await saveText(abs, next);
+  ctx.markRead(abs);
+}
+
 async function strReplace(ctx, a) {
   const abs = ctx.resolve(a.path);
   if (!abs) return "error: missing path";
   if (!ctx.canWrite(abs)) return ctx.writeDenied(abs);
   if (!fs.existsSync(abs)) return "error: not found: " + abs + " (use Write to create it)";
-  const oldS = String(a.old_string == null ? "" : a.old_string);
-  const newS = String(a.new_string == null ? "" : a.new_string);
-  if (!oldS) return "error: old_string is empty";
+  // Another running chat's file comes before "Read it first": reading would not help.
+  const held = ctx.claimCheck(abs, "edit");
+  if (held) return held;
+  const unread = ctx.unread(abs);
+  const stale = ctx.staleCheck(abs, { exactOk: true });
+  if (stale) return stale;
+  const r = applyReplace(currentText(abs), String(a.old_string == null ? "" : a.old_string), String(a.new_string == null ? "" : a.new_string), !!a.replace_all, abs, !unread);
+  if (r.error) return "error: " + r.error;
+  await commit(ctx, abs, r.next);
+  const line = r.next.slice(0, r.at).split(/\r?\n/).length;
+  return "edited " + abs + " (" + r.count + " replacement" + (r.count > 1 ? "s" : "") + ", at line " + line + (r.loose ? ", matched ignoring whitespace and re-indented — check the lines below" : "") + ")\n" +
+    snippet(r.next, r.at, r.repl.length) + (await editorProblems(ctx, abs));
+}
+
+async function multiEdit(ctx, a) {
+  const abs = ctx.resolve(a.path);
+  if (!abs) return "error: missing path";
+  if (!ctx.canWrite(abs)) return ctx.writeDenied(abs);
+  if (!fs.existsSync(abs)) return "error: not found: " + abs + " (use Write to create it)";
+  const edits = Array.isArray(a.edits) ? a.edits : [];
+  if (!edits.length) return "error: edits must be a non-empty array of {old_string, new_string}";
+  const held = ctx.claimCheck(abs, "edit");
+  if (held) return held;
+  const unread = ctx.unread(abs);
+  const stale = ctx.staleCheck(abs, { exactOk: true });
+  if (stale) return stale;
   let cur = currentText(abs);
-  const eol = cur.includes("\r\n") ? "\r\n" : "\n";
-  let find = oldS;
-  let repl = newS;
-  if (!cur.includes(find) && eol === "\r\n") {
-    find = oldS.replace(/\r?\n/g, "\r\n");
-    repl = newS.replace(/\r?\n/g, "\r\n");
+  let firstAt = Infinity;
+  let lastEnd = 0;
+  for (let i = 0; i < edits.length; i++) {
+    const e = normArgs("StrReplace", edits[i]);
+    const r = applyReplace(cur, String(e.old_string == null ? "" : e.old_string), String(e.new_string == null ? "" : e.new_string), !!e.replace_all, abs, !unread);
+    if (r.error) return "error: edit " + (i + 1) + " of " + edits.length + ": " + r.error + "\nNo edits were applied.";
+    // Keep the touched span roughly in place as later edits shift text around it.
+    if (r.at < firstAt) firstAt = r.at;
+    lastEnd = Math.max(lastEnd, r.at + r.repl.length);
+    cur = r.next;
   }
-  if (!cur.includes(find)) {
-    const first = oldS.split(/\r?\n/).find((l) => l.trim().length > 3) || oldS;
-    const lines = cur.split(/\r?\n/);
-    const near = lines.findIndex((l) => l.includes(first.trim()));
-    const hint = near >= 0
-      ? "\nClosest match near line " + (near + 1) + ":\n" + lines.slice(Math.max(0, near - 2), near + 6).join("\n")
-      : "";
-    return "error: old_string not found in " + abs + ". Read the file again and copy the text exactly (whitespace matters)." + hint;
-  }
-  const count = cur.split(find).length - 1;
-  if (count > 1 && !a.replace_all) return "error: old_string matches " + count + " places in " + abs + "; include more surrounding lines or set replace_all";
-  const next = a.replace_all ? cur.split(find).join(repl) : cur.replace(find, () => repl);
-  await saveText(abs, next);
-  const at = next.indexOf(repl);
-  const line = at >= 0 ? next.slice(0, at).split(/\r?\n/).length : 0;
-  return "edited " + abs + " (" + (a.replace_all ? count : 1) + " replacement" + (count > 1 && a.replace_all ? "s" : "") + (line ? ", at line " + line : "") + ")";
+  await commit(ctx, abs, cur);
+  const line = cur.slice(0, firstAt).split(/\r?\n/).length;
+  return "edited " + abs + " (" + edits.length + " edits, from line " + line + ")\n" +
+    snippet(cur, firstAt, Math.max(0, lastEnd - firstAt)) + (await editorProblems(ctx, abs));
 }
 
 async function writeFile(ctx, a) {
@@ -490,8 +1063,13 @@ async function writeFile(ctx, a) {
   if (!ctx.canWrite(abs)) return ctx.writeDenied(abs);
   const contents = String(a.contents == null ? "" : a.contents);
   const existed = fs.existsSync(abs);
-  await saveText(abs, contents);
-  return (existed ? "overwrote " : "created ") + abs + " (" + contents.split(/\r?\n/).length + " lines)";
+  if (existed && fs.statSync(abs).isDirectory()) return "error: " + abs + " is a folder";
+  const held = ctx.claimCheck(abs, existed ? "write" : "create");
+  if (held) return held;
+  const stale = ctx.staleCheck(abs);
+  if (stale) return stale.replace("before changing it", "before overwriting it (or use StrReplace for a partial change)");
+  await commit(ctx, abs, contents);
+  return (existed ? "overwrote " : "created ") + abs + " (" + contents.split(/\r?\n/).length + " lines)" + (await editorProblems(ctx, abs));
 }
 
 async function deleteFile(ctx, a) {
@@ -500,9 +1078,37 @@ async function deleteFile(ctx, a) {
   if (!ctx.canWrite(abs)) return ctx.writeDenied(abs);
   if (!fs.existsSync(abs)) return "error: not found: " + abs;
   if (fs.statSync(abs).isDirectory()) return "error: Delete only removes files; use Shell for folders";
+  const held = ctx.claimCheck(abs, "delete");
+  if (held) return held;
+  ctx.remember(abs);
   if (vscode) await vscode.workspace.fs.delete(vscode.Uri.file(abs), { useTrash: true });
   else fs.unlinkSync(abs);
+  ctx.reads.delete(abs.toLowerCase());
   return "deleted " + abs + (vscode ? " (moved to recycle bin)" : "");
+}
+
+function todoWrite(ctx, a) {
+  const raw = Array.isArray(a.todos) ? a.todos : null;
+  if (!raw) return "error: todos must be an array of {content, status}";
+  const norm = (s) => {
+    const t = String(s || "pending").toLowerCase().replace(/[\s-]+/g, "_");
+    if (/^(done|complete|completed|finished)$/.test(t)) return "completed";
+    if (/^(in_progress|active|doing|started|working)$/.test(t)) return "in_progress";
+    return "pending";
+  };
+  ctx.todos = raw
+    .map((t) => (typeof t === "string" ? { content: t, status: "pending" } : { content: String(t.content || t.task || t.title || "").trim(), status: norm(t.status) }))
+    .filter((t) => t.content)
+    .slice(0, 30);
+  const active = ctx.todos.filter((t) => t.status === "in_progress").length;
+  const open = ctx.todos.filter((t) => t.status !== "completed").length;
+  return "Todo list updated (" + (ctx.todos.length - open) + "/" + ctx.todos.length + " done):\n" + renderTodos(ctx.todos) +
+    (open && !active ? "\nNo item is in_progress: mark the one you work on next." : "");
+}
+
+function renderTodos(todos) {
+  const mark = { completed: "[x]", in_progress: "[>]", pending: "[ ]" };
+  return (todos || []).map((t) => mark[t.status] + " " + t.content).join("\n");
 }
 
 function readLints(ctx, a) {
@@ -543,6 +1149,11 @@ function webFetch(a, depth = 0) {
       let size = 0;
       let cut = false;
       const finish = () => {
+        const ctype = String(res.headers["content-type"] || "");
+        if (/^image\//i.test(ctype)) {
+          resolve("HTTP " + res.statusCode + " " + u + " is an image (" + ctype + "). Call ReadImage with this URL to look at it.");
+          return;
+        }
         let text = Buffer.concat(chunks).toString("utf8");
         if (/html/i.test(res.headers["content-type"] || "")) {
           text = text
@@ -583,12 +1194,35 @@ function webFetch(a, depth = 0) {
   });
 }
 
+/**
+ * Run a tool; the result may carry images for the model.
+ * @returns {Promise<{text:string, images:{mime:string,data:string,path:string,width:number,height:number}[]}>}
+ */
+async function execToolRich(ctx, name, rawArgs) {
+  const r = await dispatch(ctx, name, rawArgs);
+  if (r && typeof r === "object") return { text: String(r.text == null ? "" : r.text), images: Array.isArray(r.images) ? r.images : [] };
+  return { text: String(r == null ? "" : r), images: [] };
+}
+
+/** Run a tool and return its text (images, if any, are described but not returned). */
 async function execTool(ctx, name, rawArgs) {
+  return (await execToolRich(ctx, name, rawArgs)).text;
+}
+
+async function dispatch(ctx, name, rawArgs) {
   const canon = canonName(name);
   const a = normArgs(canon, rawArgs);
+  if (ctx && typeof ctx.permit === "function" && canon !== "Task") {
+    const refused = await ctx.permit(canon, a);
+    if (refused) return refused;
+  }
   switch (canon) {
     case "Read":
       return readFile(ctx, a);
+    case "ReadImage":
+      return readImage(ctx, a);
+    case "AnalyzeFile":
+      return analyze(ctx, a);
     case "LS":
       return listDir(ctx, a);
     case "Glob":
@@ -599,6 +1233,12 @@ async function execTool(ctx, name, rawArgs) {
       return shell(ctx, a);
     case "StrReplace":
       return strReplace(ctx, a);
+    case "MultiEdit":
+      return multiEdit(ctx, a);
+    case "TodoWrite":
+      return todoWrite(ctx, a);
+    case "Task":
+      return "error: Task only runs inside the agent loop";
     case "Write":
       return writeFile(ctx, a);
     case "Delete":
@@ -607,6 +1247,10 @@ async function execTool(ctx, name, rawArgs) {
       return readLints(ctx, a);
     case "WebFetch":
       return webFetch(a);
+    case "McpTools":
+      return mcpTools(ctx, a);
+    case "McpCall":
+      return mcpCall(ctx, a);
     case "list_skills": {
       const skills = ctx.skills();
       if (!skills.length) return "(no skills found)";
@@ -625,6 +1269,140 @@ async function execTool(ctx, name, rawArgs) {
   }
 }
 
+const NO_MCP = "error: no MCP servers are configured. Add them in localAgentBridge.agent.mcpServers, or fetch REA with Tools\\Fetch-ThirdParty.ps1 -AgentBridge.";
+
+function mcpServerOrError(ctx, name) {
+  const s = ctx.mcp.server(name);
+  return s || "error: no MCP server named " + name + ". Servers: " + ctx.mcp.names().join(", ");
+}
+
+async function mcpTools(ctx, a) {
+  if (!ctx.mcp || !ctx.mcp.size) return NO_MCP;
+  const want = String(a.tool || "").trim();
+  const query = String(a.query || "").trim().toLowerCase();
+  if (!a.server && !want && !query) {
+    const lines = ["MCP servers (McpTools server=<name> lists its tools; query=<words> searches them):", ...ctx.mcp.summary()];
+    if (ctx.mcp.skipped.length) lines.push("Not available: " + ctx.mcp.skipped.join("; "));
+    return lines.join("\n");
+  }
+  let servers;
+  if (a.server) {
+    const s = mcpServerOrError(ctx, a.server);
+    if (typeof s === "string") return s;
+    servers = [s];
+  } else servers = ctx.mcp.names().map((n) => ctx.mcp.server(n));
+  const found = [];
+  const errors = [];
+  for (const s of servers) {
+    try {
+      for (const t of await s.listTools()) found.push({ server: s.name, t });
+    } catch (e) {
+      errors.push(s.name + ": " + (e.message || e));
+    }
+  }
+  const errText = errors.length ? "\nServers that failed to start:\n" + errors.join("\n") : "";
+  if (want) {
+    const hit = found.find((f) => f.t.name === want) || found.find((f) => f.t.name.toLowerCase() === want.toLowerCase());
+    if (!hit) {
+      const near = found.filter((f) => f.t.name.toLowerCase().includes(want.toLowerCase().replace(/[^a-z0-9]+/g, "_"))).slice(0, 10);
+      return "error: no tool named " + want + (near.length ? ". Similar: " + near.map((f) => f.server + "." + f.t.name).join(", ") : ". Use McpTools with query to search.") + errText;
+    }
+    return clip(
+      "Server: " + hit.server + "\nTool: " + mcpc.signature(hit.t) + "\n\n" + String(hit.t.description || "").trim() + "\n\nArguments (JSON schema):\n" + JSON.stringify(hit.t.inputSchema || {}, null, 1) + errText,
+      12000
+    );
+  }
+  let list = found;
+  if (query) {
+    const words = query.split(/[\s,]+/).filter(Boolean);
+    const score = (f) => {
+      const n = f.t.name.toLowerCase();
+      const d = String(f.t.description || "").toLowerCase();
+      let sc = 0;
+      for (const w of words) {
+        if (n.includes(w)) sc += 3;
+        else if (d.includes(w)) sc += 1;
+        else return 0;
+      }
+      return sc;
+    };
+    list = found.map((f) => ({ f, sc: score(f) })).filter((x) => x.sc > 0).sort((x, y) => y.sc - x.sc).map((x) => x.f);
+  }
+  if (!list.length) return (query ? "No MCP tool matches \"" + query + "\"." : "The server lists no tools.") + errText;
+  const max = 60;
+  const lines = list.slice(0, max).map((f) => "- " + (a.server ? "" : f.server + ".") + mcpc.signature(f.t) + ": " + mcpc.firstLine(f.t.description, 120));
+  if (list.length > max) lines.push("…and " + (list.length - max) + " more; narrow it with query.");
+  return clip(list.length + " tool(s)" + (a.server ? " on " + servers[0].name : "") + ". Show one's arguments with McpTools(server, tool):\n" + lines.join("\n") + errText);
+}
+
+async function mcpCall(ctx, a) {
+  if (!ctx.mcp || !ctx.mcp.size) return NO_MCP;
+  if (ctx.mcpMode === "off") return "error: MCP tool calls are turned off (localAgentBridge.agent.mcpMode).";
+  if (!a.server || !a.tool) return "error: McpCall needs server and tool. Find them with McpTools.";
+  const s = mcpServerOrError(ctx, a.server);
+  if (typeof s === "string") return s;
+  let args = a.arguments == null ? {} : a.arguments;
+  if (typeof args === "string") return "error: arguments must be a JSON object, got text that is not valid JSON.";
+  if (typeof args !== "object" || Array.isArray(args)) return "error: arguments must be a JSON object.";
+  let tools;
+  try {
+    tools = await s.listTools();
+  } catch (e) {
+    return "error: " + (e.message || e);
+  }
+  const t = tools.find((x) => x.name === a.tool) || tools.find((x) => x.name.toLowerCase() === String(a.tool).toLowerCase());
+  if (!t) return "error: " + s.name + " has no tool " + a.tool + ". Use McpTools(server: \"" + s.name + "\", query: ...) to find it.";
+  const missing = ((t.inputSchema && t.inputSchema.required) || []).filter((k) => args[k] == null);
+  if (missing.length) return "error: missing required argument(s) " + missing.join(", ") + " for " + mcpc.signature(t) + ". See McpTools(server, tool) for the schema.";
+  const label = s.name + "." + t.name + " " + clip(JSON.stringify(args), 600);
+  if (ctx.mcpMode === "confirm" && !(await ctx.confirmMcp(label))) return "error: the user declined " + s.name + "." + t.name + ".";
+  let res;
+  try {
+    res = await s.callTool(t.name, args, { signal: ctx.signal, timeoutMs: ctx.mcpTimeoutSec * 1000 });
+  } catch (e) {
+    return "error: " + (e.message || e);
+  }
+  const out = mcpc.formatResult(s.name, t.name, res);
+  let text = toolOutput.clipSaved(out.text, 30000, clip, s.name + "_" + t.name);
+  if (out.images.length && !ctx.vision) {
+    text += "\n(" + out.images.length + " image(s) returned; " + (ctx.model || "this model") + " cannot see images, so they were not attached.)";
+    return text;
+  }
+  if (out.images.length) text += "\n(" + out.images.length + " image(s) attached.)";
+  return out.images.length ? { text, images: out.images } : text;
+}
+
+/**
+ * Images linked in a prompt (paths, file:/// and http(s) URLs, markdown image links), loaded the way
+ * ReadImage loads them, so a vision model sees them with the task. Paths that do not exist are skipped.
+ * @returns {Promise<{images:object[], notes:string[]}>} notes: one line per image found (attached or why not)
+ */
+async function promptImages(ctx, text, max = 6) {
+  const images = [];
+  const notes = [];
+  for (const ref of fa.findImageRefs(text, max * 2)) {
+    if (images.length >= max) {
+      notes.push(ref + ": not attached (more than " + max + " images); use ReadImage");
+      continue;
+    }
+    if (!/^https?:\/\//i.test(ref)) {
+      const abs = ctx.resolve(ref);
+      if (!abs || !fs.existsSync(abs) || fs.statSync(abs).isDirectory()) continue;
+    }
+    let r;
+    try {
+      r = await readImage(ctx, { path: ref });
+    } catch (e) {
+      r = "error: " + (e.message || e);
+    }
+    if (r && typeof r === "object" && Array.isArray(r.images) && r.images.length) {
+      images.push(...r.images);
+      notes.push(r.text);
+    } else notes.push(String((r && r.text) || r));
+  }
+  return { images, notes };
+}
+
 function defaultRgPath(appRoot) {
   const candidates = [];
   if (appRoot) {
@@ -641,9 +1419,16 @@ module.exports = {
   TOOL_DEFS,
   NAMES,
   MUTATING,
+  READ_ONLY,
+  MCP_TOOLS,
+  renderTodos,
+  stripLineNumbers,
   canonName,
   normArgs,
   execTool,
+  execToolRich,
+  readImage,
+  promptImages,
   ToolContext,
   defaultRgPath,
   clip,

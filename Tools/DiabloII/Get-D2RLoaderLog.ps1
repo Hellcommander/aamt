@@ -2,9 +2,9 @@
 .SYNOPSIS
     Lists the game checks that failed in the last D2RLoader session (see README.md).
 .EXAMPLE
-    .\Get-D2RLoaderLog.ps1 -Root 'D:\games\Diablo II Resurrected'
+    .\Get-D2RLoaderLog.ps1 -Root 'D:\games\Steam\steamapps\common\Diablo II Resurrected'
 .EXAMPLE
-    .\Get-D2RLoaderLog.ps1 -Root 'D:\games\Diablo II Resurrected' -All -Plugins
+    .\Get-D2RLoaderLog.ps1 -Root 'D:\games\Steam\steamapps\common\Diablo II Resurrected' -All -Plugins
 #>
 [CmdletBinding()]
 param(

@@ -2,9 +2,9 @@
 .SYNOPSIS
     Builds scaled HD monster definitions for a Diablo II: Resurrected mod (see README.md).
 .EXAMPLE
-    .\New-ScaledMonster.ps1 -GamePath 'D:\games\Diablo II Resurrected' -OutDir '<D2RMM>\mods\QuillRatDruid'
+    .\New-ScaledMonster.ps1 -GamePath 'D:\games\Steam\steamapps\common\Diablo II Resurrected' -OutDir '<D2RMM>\mods\QuillRatDruid'
 .EXAMPLE
-    .\New-ScaledMonster.ps1 -GamePath 'D:\games\Diablo II Resurrected' -Audit
+    .\New-ScaledMonster.ps1 -GamePath 'D:\games\Steam\steamapps\common\Diablo II Resurrected' -Audit
 #>
 [CmdletBinding()]
 param(

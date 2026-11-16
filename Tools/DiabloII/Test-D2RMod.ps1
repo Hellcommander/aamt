@@ -3,7 +3,7 @@
     Runs D2RMM mod scripts without the game and checks what they produce (see README.md, "Mod test pipeline").
     Game files are taken from the archive as the mods ask for them and cached.
 .EXAMPLE
-    .\Test-D2RMod.ps1 -GamePath 'D:\games\Diablo II Resurrected' -Mod '<D2RMM>\mods\DruidPoisonDisaster'
+    .\Test-D2RMod.ps1 -GamePath 'D:\games\Steam\steamapps\common\Diablo II Resurrected' -Mod '<D2RMM>\mods\DruidPoisonDisaster'
 .EXAMPLE
     # several mods together, in load order (page number clashes between mods show up this way)
     .\Test-D2RMod.ps1 -Mod '<D2RMM>\mods\QuillRatDruid','<D2RMM>\mods\DruidPoisonDisaster' -Config 'testMode=false' -Manifest .\needed_files.json
@@ -18,7 +18,9 @@ param(
     [int]$MaxPage = 15,
     [switch]$Refresh,
     [switch]$Dump,
-    [switch]$DumpBase
+    [switch]$DumpBase,
+    # like D2RMM: a mod that throws is rolled back and the next one runs
+    [switch]$KeepGoing
 )
 $ErrorActionPreference = 'Stop'
 if (-not $GamePath -or -not (Test-Path $GamePath)) { throw 'Pass -GamePath (or set D2R_PATH) to the folder that contains D2R.exe.' }
@@ -34,6 +36,7 @@ $arguments = @((Join-Path $PSScriptRoot 'ModHarness.js'), '--game', $GamePath, '
 if ($Cache) { $arguments += @('--cache', $Cache) }
 if ($Manifest) { $arguments += @('--manifest', $Manifest) }
 if ($Refresh) { $arguments += '--refresh' }
+if ($KeepGoing) { $arguments += '--keep-going' }
 if ($DumpBase) { $arguments += @('--dump', 'base') } elseif ($Dump) { $arguments += '--dump' }
 foreach ($c in $Config) { $arguments += @('--config', $c) }
 $arguments += $Mod

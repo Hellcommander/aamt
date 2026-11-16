@@ -1,0 +1,340 @@
+{
+ "scSpaceWhale": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceWhale\\bake\\scSpaceWhale_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 256,
+  "poses": [
+   "idle",
+   "mawOpen",
+   "bodyCompress",
+   "bellyGlow"
+  ]
+ },
+ "scSpaceWhaleSegment": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceWhaleSegment\\bake\\scSpaceWhaleSegment_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 128,
+  "poses": [
+   "idle",
+   "bodyCompress"
+  ]
+ },
+ "scSpaceWhaleFluke": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceWhaleFluke\\bake\\scSpaceWhaleFluke_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 128,
+  "poses": [
+   "idle",
+   "bodyCompress"
+  ]
+ },
+ "scSpaceWhaleDrone": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceWhaleDrone\\bake\\scSpaceWhaleDrone_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 64,
+  "poses": [
+   "idle",
+   "bodyCompress"
+  ]
+ },
+ "scLeviathanBase": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scLeviathanBase\\bake\\scLeviathanBase_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 192,
+  "poses": [
+   "idle",
+   "mawOpen",
+   "bodyCompress",
+   "bellyGlow"
+  ]
+ },
+ "lwViperShip": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\lwViperShip\\bake\\lwViperShip_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "lwSentinelShip": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\lwSentinelShip\\bake\\lwSentinelShip_baked.glb",
+  "noseYaw": 185.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "lwCarrierShip": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\lwCarrierShip\\bake\\lwCarrierShip_baked.glb",
+  "noseYaw": 312.0,
+  "cell": 192,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scBiometalDragon": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scBiometalDragon\\bake\\scBiometalDragon_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 256,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scBiometalDragonSegment": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scBiometalDragonSegment\\bake\\scBiometalDragonSegment_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scBiometalDragonTail": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scBiometalDragonTail\\bake\\scBiometalDragonTail_baked.glb",
+  "noseYaw": 33.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scBiometalDragonDrone": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scBiometalDragonDrone\\bake\\scBiometalDragonDrone_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 64,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scCeratotitan": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scCeratotitan\\bake\\scCeratotitan_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 256,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scHornRam": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scHornRam\\bake\\scHornRam_baked.glb",
+  "noseYaw": 90.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scHornScythe": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scHornScythe\\bake\\scHornScythe_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scHornDrone": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scHornDrone\\bake\\scHornDrone_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 64,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceManta": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceManta\\bake\\scSpaceManta_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 192,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceMantaGuardian": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceMantaGuardian\\bake\\scSpaceMantaGuardian_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceMantaRift": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceMantaRift\\bake\\scSpaceMantaRift_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceMantaWing": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceMantaWing\\bake\\scSpaceMantaWing_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceMantaScout": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceMantaScout\\bake\\scSpaceMantaScout_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 96,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceMantaTail": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceMantaTail\\bake\\scSpaceMantaTail_baked.glb",
+  "noseYaw": 60.0,
+  "cell": 96,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceMantaDrone": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceMantaDrone\\bake\\scSpaceMantaDrone_baked.glb",
+  "noseYaw": 180.0,
+  "cell": 64,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceShark": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceShark\\bake\\scSpaceShark_baked.glb",
+  "noseYaw": 51.0,
+  "cell": 192,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceSharkApex": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceSharkApex\\bake\\scSpaceSharkApex_baked.glb",
+  "noseYaw": 270.0,
+  "cell": 192,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceSharkSegment": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceSharkSegment\\bake\\scSpaceSharkSegment_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceSharkScout": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceSharkScout\\bake\\scSpaceSharkScout_baked.glb",
+  "noseYaw": 218.0,
+  "cell": 96,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceSharkTail": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceSharkTail\\bake\\scSpaceSharkTail_baked.glb",
+  "noseYaw": 270.0,
+  "cell": 96,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scSpaceSharkDrone": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scSpaceSharkDrone\\bake\\scSpaceSharkDrone_baked.glb",
+  "noseYaw": 270.0,
+  "cell": 64,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scEvolvedFirefly": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scEvolvedFirefly\\bake\\scEvolvedFirefly_baked.glb",
+  "noseYaw": 45.0,
+  "cell": 96,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scEvolvedWolfen": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scEvolvedWolfen\\bake\\scEvolvedWolfen_baked.glb",
+  "noseYaw": 76.0,
+  "cell": 96,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scEvolvedSapphire": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scEvolvedSapphire\\bake\\scEvolvedSapphire_baked.glb",
+  "noseYaw": 90.0,
+  "cell": 96,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scEvolvedCenturion": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scEvolvedCenturion\\bake\\scEvolvedCenturion_baked.glb",
+  "noseYaw": 131.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scEvolvedSpectre": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scEvolvedSpectre\\bake\\scEvolvedSpectre_baked.glb",
+  "noseYaw": 131.0,
+  "cell": 96,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scEvolvedHullbreaker": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scEvolvedHullbreaker\\bake\\scEvolvedHullbreaker_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scEvolvedBattery": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scEvolvedBattery\\bake\\scEvolvedBattery_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scEvolvedCourser": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scEvolvedCourser\\bake\\scEvolvedCourser_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 128,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scEvolvedArchitect": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scEvolvedArchitect\\bake\\scEvolvedArchitect_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 192,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scCarrierSwarmConstruct": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scCarrierSwarmConstruct\\bake\\scCarrierSwarmConstruct_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 48,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scArchitectConstruct": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scArchitectConstruct\\bake\\scArchitectConstruct_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 64,
+  "poses": [
+   "idle"
+  ]
+ },
+ "scLeviathanSegment": {
+  "glb": "D:\\games\\Ai assisted toolkit\\Tools\\Transcendence\\Output\\HdPipeline\\scLeviathanSegment\\bake\\scLeviathanSegment_baked.glb",
+  "noseYaw": 0.0,
+  "cell": 96,
+  "poses": [
+   "idle",
+   "bodyCompress"
+  ]
+ }
+}

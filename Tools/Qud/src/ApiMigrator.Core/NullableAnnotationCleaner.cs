@@ -47,6 +47,12 @@ public static class NullableAnnotationCleaner
         "XRL.Version",
     };
 
+    // `using XRL;` or code inside `namespace XRL...` reaches the game's Version struct by its bare name
+    // (a namespace XRL.World.Parts resolves XRL.Version before any `using System;`).
+    static readonly Regex XrlVersionInScope = new(
+        @"(?m)^\s*(?:using\s+XRL\s*;|namespace\s+XRL\b)",
+        RegexOptions.Compiled);
+
     /// <summary>
     /// Reference types that may safely lose <c>?</c> even when written as <c>Type? x = null</c>
     /// (CoQ compiles <c>string x = null</c>; keeping <c>string?</c> is CS8632).
@@ -129,8 +135,11 @@ public static class NullableAnnotationCleaner
             preserve.Add(m.Groups["name"].Value);
         // XRL.Version is a struct; System.Version is a class. Keep Version? only when this
         // file clearly means the game struct (alias or XRL.Version qualification).
+        // 2026-11-12: also when the bare name can only mean the struct (Tinkering Bytes:
+        // `private Version? MigrateFrom;` in namespace XRL.World.Parts lost its ? and stopped compiling).
         if (content.IndexOf("XRL.Version", StringComparison.Ordinal) >= 0 ||
-            XrlVersionAlias.IsMatch(content))
+            XrlVersionAlias.IsMatch(content) ||
+            XrlVersionInScope.IsMatch(content))
         {
             preserve.Add("Version");
         }
@@ -150,8 +159,14 @@ public static class NullableAnnotationCleaner
             return "";
         });
 
+        // Text is not code: "Cancel learning? You will..." and "(... not applied?)" look like `Type? name`
+        // and `Type?)` to the patterns below, and lost their question marks (2026-11-12, Jademouth and
+        // an Arendeth bridge mod). The snapshot is taken per pass so indices match the text being scanned.
+        var refPass = working;
         working = NullableRefType.Replace(working, m =>
         {
+            if (HitFilter.IsInsideStringLiteral(refPass, m.Index) || HitFilter.IsInsideComment(refPass, m.Index))
+                return m.Value;
             var typeName = m.Groups["type"].Value;
             var simple = typeName;
             var dot = typeName.LastIndexOf('.');
@@ -175,8 +190,11 @@ public static class NullableAnnotationCleaner
             return typeName;
         });
 
-        working = NullableAfterCloser.Replace(working, _ =>
+        var closerPass = working;
+        working = NullableAfterCloser.Replace(working, m =>
         {
+            if (HitFilter.IsInsideStringLiteral(closerPass, m.Index) || HitFilter.IsInsideComment(closerPass, m.Index))
+                return m.Value;
             edits++;
             return "";
         });

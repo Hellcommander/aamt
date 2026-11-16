@@ -1,0 +1,12 @@
+{
+  "gameFileVersion": "2.0.212.32",
+  "steamBetaKey": "lang-experimental",
+  "steamBuildId": "26307554",
+  "notes": "Explicit sync-version --save-profile.",
+  "updated": "2026-11-12 02:12:45",
+  "files": [
+    "obsolete_api_dump.json",
+    "curated_rewrite_rules.json",
+    "charts/"
+  ]
+}

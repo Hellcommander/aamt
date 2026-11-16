@@ -17,7 +17,7 @@
             "label": "Enabled",
             "type": "bool",
             "default": false,
-            "hint": "Master switch for the AOB patch engine only (FileHandleLimit, PapyrusLimits, BA2, ...). false = do not write Starfield.exe. Leave this off if Engine Fixes is installed."
+            "hint": "Master switch for the AOB patch engine only (FileHandleLimit, PapyrusLimits, streaming, ...). false = do not write Starfield.exe. Leave this off if Engine Fixes is installed. Does not include BA2 — that is Nexus 17936."
           },
           {
             "key": "General.RespectEngineFixes",
@@ -46,7 +46,7 @@
             "min": 0,
             "max": 10,
             "step": 1,
-            "hint": "0 = hardware_concurrency - 1 (leaves one core for the game). Cap is 8."
+            "hint": "0 = scale to this PC (OS logical-processor count, hybrid P/E aware). Leaves a slice of performance cores for Starfield. No hard cap of 8."
           },
           {
             "key": "Threading.MaxQueuedJobs",
@@ -77,15 +77,15 @@
             "key": "FileChanges.Enabled",
             "label": "Enabled",
             "type": "bool",
-            "default": false
+            "default": true
           },
           {
             "key": "FileChanges.MaxStdio",
             "label": "Max Stdio",
             "type": "int",
-            "default": 2048,
+            "default": 8080,
             "min": 0,
-            "max": 8192,
+            "max": 32320,
             "step": 1
           }
         ]
@@ -111,12 +111,340 @@
             "hint": "Warn when nativeHandle count or REFR+ACHR count reaches this % of 2,097,152."
           },
           {
+            "key": "RecordDiagnostics.WarnFullPluginPercent",
+            "label": "Warn Full Plugin Percent",
+            "type": "int",
+            "default": 80,
+            "min": 0,
+            "max": 320,
+            "step": 1,
+            "hint": "Warn when full/small/medium plugin counts or mapped chains reach this % of their ceilings (253 / 4096 / 256 / 65535)."
+          },
+          {
             "key": "RecordDiagnostics.WarnCreatedLocalId",
             "label": "Warn Created Local Id",
             "type": "string",
             "default": "0x400000",
             "maxLength": 64,
             "hint": "Warn when the highest runtime-created local FormID reaches this (0x400000 is the community \"saves start dying\" zone; format max is 0xFFFFFE)."
+          }
+        ]
+      },
+      {
+        "id": "lightpromote",
+        "label": "LightPromote",
+        "settings": [
+          {
+            "key": "LightPromote.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": false,
+            "hint": "Disabled 2026-09-18: CTD at main menu always lands on the last LightPromote line (ImprovedCameraSF second pass). Re-enable after a clean boot."
+          },
+          {
+            "key": "LightPromote.DryRun",
+            "label": "Dry Run",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "LightPromote.Deny",
+            "label": "Deny",
+            "type": "string",
+            "default": "Starfield.esm,ShatteredSpace.esm,BlueprintShips-Starfield.esm,Constellation.esm,OldMars.esm",
+            "maxLength": 123
+          },
+          {
+            "key": "LightPromote.Allow",
+            "label": "Allow",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "Empty = every eligible full plugin. Non-empty = only these names."
+          },
+          {
+            "key": "LightPromote.Signature",
+            "label": "Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "Blank = built-in 1.16.x TES4 flag-merge signature."
+          }
+        ]
+      },
+      {
+        "id": "changeformsidecar",
+        "label": "ChangeFormSidecar",
+        "settings": [
+          {
+            "key": "ChangeFormSidecar.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": false,
+            "hint": "Disabled 2026-09-18: isolating New Game CTD (menu OK after LightPromote off)."
+          },
+          {
+            "key": "ChangeFormSidecar.CleanDeleted",
+            "label": "Clean Deleted",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "ChangeFormSidecar.CleanOrphans",
+            "label": "Clean Orphans",
+            "type": "bool",
+            "default": false,
+            "hint": "Disabled created REFR with no parent cell. Off by default — too easy to eat a disabled world drop."
+          },
+          {
+            "key": "ChangeFormSidecar.MaxCleanPerSave",
+            "label": "Max Clean Per Save",
+            "type": "int",
+            "default": 256,
+            "min": 0,
+            "max": 1024,
+            "step": 1
+          },
+          {
+            "key": "ChangeFormSidecar.Log",
+            "label": "Log",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "ChangeFormSidecar.PoolPrefix",
+            "label": "Pool Prefix",
+            "type": "string",
+            "default": "Arc_REFR_DynPool_",
+            "maxLength": 64
+          },
+          {
+            "key": "ChangeFormSidecar.PoolCount",
+            "label": "Pool Count",
+            "type": "int",
+            "default": 64,
+            "min": 0,
+            "max": 256,
+            "step": 1
+          },
+          {
+            "key": "ChangeFormSidecar.OverrideOverflow",
+            "label": "Override Overflow",
+            "type": "bool",
+            "default": true
+          },
+          {
+            "key": "ChangeFormSidecar.MaxPluginChanges",
+            "label": "Max Plugin Changes",
+            "type": "int",
+            "default": 4096,
+            "min": 0,
+            "max": 16384,
+            "step": 1,
+            "hint": "Cap on dirty plugin records (formChangeFlags, not 0xFF created) flushed alongside mapped-chain overflow. 0 = skip that scan."
+          }
+        ]
+      },
+      {
+        "id": "mappedchain",
+        "label": "MappedChain",
+        "settings": [
+          {
+            "key": "MappedChain.Enabled",
+            "label": "Enabled",
+            "type": "bool",
+            "default": false,
+            "hint": "Disabled 2026-09-18: 144 GetWinningFile skip-hooks; New Game CTD after menu."
+          },
+          {
+            "key": "MappedChain.LogIntern",
+            "label": "Log Intern",
+            "type": "bool",
+            "default": false
+          },
+          {
+            "key": "MappedChain.WarnPercent",
+            "label": "Warn Percent",
+            "type": "int",
+            "default": 80,
+            "min": 0,
+            "max": 320,
+            "step": 1
+          },
+          {
+            "key": "MappedChain.GetWinningSignature",
+            "label": "Get Winning Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "GetWinningFile — TESForm* in rcx, returns TESFile*  expect=1  hook_offset=0"
+          },
+          {
+            "key": "MappedChain.Clone688Signature",
+            "label": "Clone688 Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "688-byte FormID-through-winning-file clones (inline table)  expect=120  hook_offset=42"
+          },
+          {
+            "key": "MappedChain.Clone688Offset",
+            "label": "Clone688 Offset",
+            "type": "int",
+            "default": 42,
+            "min": 0,
+            "max": 168,
+            "step": 1
+          },
+          {
+            "key": "MappedChain.CloneSkipSignature",
+            "label": "Clone Skip Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "identical 0xFFFF skip (sanity; same sites as clone688 +0x2A)  expect=120  hook_offset=0"
+          },
+          {
+            "key": "MappedChain.ChainFileAtSignature",
+            "label": "Chain File At Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "chain[index][slot] → TESFile*  expect=1  hook_offset=0"
+          },
+          {
+            "key": "MappedChain.ChainFlaggedSignature",
+            "label": "Chain Flagged Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "walk chain for flagged TESFile*  expect=1  hook_offset=0"
+          },
+          {
+            "key": "MappedChain.ReadChainSignature",
+            "label": "Read Chain Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "[form+0x30] → chain*  expect=1  hook_offset=0"
+          },
+          {
+            "key": "MappedChain.AssignSignature",
+            "label": "Assign Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "write TESForm+0x30 ushort index  expect=1  hook_offset=0"
+          },
+          {
+            "key": "MappedChain.InternSignature",
+            "label": "Intern Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "BSTArray intern of TESFile* chain  expect=1  hook_offset=0"
+          },
+          {
+            "key": "MappedChain.Family281Signature",
+            "label": "Family281 Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "281-byte sibling. Form in r8, winning file in rbx. Rejoin past xor ebx; 280-byte site cmp esi,0x7FF.  expect=10  hook_offset=48"
+          },
+          {
+            "key": "MappedChain.Family281Offset",
+            "label": "Family281 Offset",
+            "type": "int",
+            "default": 48,
+            "min": 0,
+            "max": 192,
+            "step": 1
+          },
+          {
+            "key": "MappedChain.Family685Signature",
+            "label": "Family685 Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "685-byte near-clone. Form in r8, result rdx, sentinel esi. je already skips mov rdx,rdi.  expect=5  hook_offset=43"
+          },
+          {
+            "key": "MappedChain.Family685Offset",
+            "label": "Family685 Offset",
+            "type": "int",
+            "default": 43,
+            "min": 0,
+            "max": 172,
+            "step": 1
+          },
+          {
+            "key": "MappedChain.Family684Signature",
+            "label": "Family684 Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "684-byte sibling. Form already in rcx. Same je-after-xor merge as clone688.  expect=4  hook_offset=38"
+          },
+          {
+            "key": "MappedChain.Family684Offset",
+            "label": "Family684 Offset",
+            "type": "int",
+            "default": 38,
+            "min": 0,
+            "max": 152,
+            "step": 1
+          },
+          {
+            "key": "MappedChain.Family647Signature",
+            "label": "Family647 Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "647-byte sibling. Form in rax (from rdx). Winning file in r8. Spills rbx+rdi.  expect=2  hook_offset=35"
+          },
+          {
+            "key": "MappedChain.Family647Offset",
+            "label": "Family647 Offset",
+            "type": "int",
+            "default": 35,
+            "min": 0,
+            "max": 140,
+            "step": 1
+          },
+          {
+            "key": "MappedChain.Family634Signature",
+            "label": "Family634 Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "634-byte sibling. Form in rax. Dest rbx then mov r8,rbx at rejoin. Sentinel esi.  expect=2  hook_offset=39"
+          },
+          {
+            "key": "MappedChain.Family634Offset",
+            "label": "Family634 Offset",
+            "type": "int",
+            "default": 39,
+            "min": 0,
+            "max": 156,
+            "step": 1
+          },
+          {
+            "key": "MappedChain.Family656Signature",
+            "label": "Family656 Signature",
+            "type": "string",
+            "default": "",
+            "maxLength": 64,
+            "hint": "656-byte 685-sibling. Form in r8, dest rdx, spill rsi [rsp+48h], xor edi.  expect=1  hook_offset=47"
+          },
+          {
+            "key": "MappedChain.Family656Offset",
+            "label": "Family656 Offset",
+            "type": "int",
+            "default": 47,
+            "min": 0,
+            "max": 188,
+            "step": 1
           }
         ]
       },
@@ -128,7 +456,8 @@
             "key": "FileChangeNotify.Enabled",
             "label": "Enabled",
             "type": "bool",
-            "default": true
+            "default": true,
+            "hint": "Keep on for now; MappedChain/ChangeFormSidecar/LightPromote already off for CTD bisect."
           },
           {
             "key": "FileChangeNotify.BufferBytes",

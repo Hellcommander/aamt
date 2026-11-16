@@ -1,6 +1,7 @@
 .gitignore
 .vscodeignore
 *.ps1
+*.cmd
 *.vsix
 test/**
 node_modules/**

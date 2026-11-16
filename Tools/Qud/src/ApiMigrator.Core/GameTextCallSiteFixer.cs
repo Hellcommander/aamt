@@ -46,12 +46,14 @@ public static class GameTextCallSiteFixer
 
     // "…" + go.The/the + go.ShortDisplayName[WithoutTitles] + "…"
     static readonly Regex TheShortNameConcat = new(
-        @"""(?<pre>(?:[^""\\]|\\.)*)""\s*\+\s*(?<recv>(?:this\.)?\w+(?:\.\w+)*)\.(?<art>The|the)\s*\+\s*\k<recv>\.ShortDisplayName(?:WithoutTitles)?\s*\+\s*""(?<post>(?:[^""\\]|\\.)*)""",
+        @"""(?<pre>(?:[^""\\]|\\.)*)""\s*\+\s*(?<recv>(?:this\.)?\w+(?:\.\w+)*)\.(?<art>The|the)\s*\+\s*\k<recv>\.ShortDisplayName(?:WithoutTitles|(?<single>Single))?(?!\w)\s*\+\s*""(?<post>(?:[^""\\]|\\.)*)""",
         RegexOptions.Compiled);
 
-    // go.The/the + go.ShortDisplayName[WithoutTitles] mid-expression (XDidY Extra, etc.)
+    // go.The/the + go.ShortDisplayName[WithoutTitles|Single] mid-expression (XDidY Extra, etc.)
+    // (?!\w): without it "ShortDisplayNameSingle" matched as "ShortDisplayName" and the rewrite left a stray
+    // "Single" behind the call (uncompilable). Single maps to the :single name option.
     static readonly Regex TheShortNameMid = new(
-        @"(?<recv>(?:this\.)?\w+(?:\.\w+)*)\.(?<art>The|the)\s*\+\s*\k<recv>\.ShortDisplayName(?:WithoutTitles)?",
+        @"(?<recv>(?:this\.)?\w+(?:\.\w+)*)\.(?<art>The|the)\s*\+\s*\k<recv>\.ShortDisplayName(?:WithoutTitles|(?<single>Single))?(?!\w)",
         RegexOptions.Compiled);
 
     // "…" + go.poss("word")  (trailing, no further concat required)
@@ -99,12 +101,143 @@ public static class GameTextCallSiteFixer
         working = FixSimpleDidXToY(working, ref edits);
         working = FixEffectParentObjectSubjects(working, ref edits);
         working = RemoveNowUnusedMessageLocals(working, ref edits);
+        // Tidy only what this run produced: a file with no edits is returned untouched below.
+        if (edits > 0)
+            working = MergeAdjacentReplacers(working);
 
         if (edits == 0)
             return (content, 0);
 
         var (withUsing, _) = UsingInserter.EnsureUsings(working, UsingInserter.UsingsForStartReplace(working));
         return (withUsing, edits);
+    }
+
+    // ---- Merging the one-word replacer fragments the passes above produce --------------------------------
+    //
+    // Each pass rewrites a single call, so a message built by concatenation came out as one builder per word:
+    //   "=object.Does:coat=".StartReplace().SetObject(actor).ToString() + " " +
+    //   "=object.the.name=".StartReplace().SetObject(weapon).ToString() + " with venom."
+    // which works but allocates a builder per fragment and is hard to read. This pass folds neighbours into
+    // one template, the way the game's own code writes it:
+    //   "=subject.Does:coat= =object.the.name= with venom.".StartReplace().SetSubject(actor).SetObject(weapon).ToString()
+    // It only joins plain string literals (no '=', which the replacer would read as a variable) and fragments
+    // whose arguments fit the subject/object pair; anything else is left as it was.
+
+    const string ReplacerFragmentPattern =
+        @"""(?<t>(?:[^""\\]|\\.)*)""\.StartReplace\(\)(?<sets>(?:\.Set(?:Subject|Object)\([\w\.\[\]]+\)){1,2})\.ToString\(\)";
+
+    const string PlainLiteralPattern = @"""(?<lit>(?:[^""\\=]|\\.)*)""";
+
+    static readonly Regex FragmentThenLiteral = new(
+        ReplacerFragmentPattern + @"\s*\+\s*" + PlainLiteralPattern + @"(?=\s*(?:[+),;:\]}]|$))",
+        RegexOptions.Compiled | RegexOptions.Multiline);
+
+    static readonly Regex LiteralThenFragment = new(
+        @"(?<![\w$@""\\])" + PlainLiteralPattern + @"\s*\+\s*" + ReplacerFragmentPattern,
+        RegexOptions.Compiled);
+
+    static readonly Regex FragmentThenFragment = new(
+        ReplacerFragmentPattern + @"\s*\+\s*" +
+        ReplacerFragmentPattern.Replace("<t>", "<t2>").Replace("<sets>", "<sets2>"),
+        RegexOptions.Compiled);
+
+    static readonly Regex SetterCall = new(@"\.Set(?<role>Subject|Object)\((?<recv>[\w\.\[\]]+)\)", RegexOptions.Compiled);
+
+    internal static string MergeAdjacentReplacers(string content)
+    {
+        // Every merge removes one "+", so this terminates; the cap is only a guard.
+        for (var pass = 0; pass < 64; pass++)
+        {
+            var before = content;
+            content = FragmentThenLiteral.Replace(content, m =>
+                HitFilter.IsInsideComment(before, m.Index)
+                    ? m.Value
+                    : Fragment(m.Groups["t"].Value + m.Groups["lit"].Value, m.Groups["sets"].Value));
+            var mid = content;
+            content = LiteralThenFragment.Replace(content, m =>
+                HitFilter.IsInsideComment(mid, m.Index)
+                    ? m.Value
+                    : Fragment(m.Groups["lit"].Value + m.Groups["t"].Value, m.Groups["sets"].Value));
+            var late = content;
+            content = FragmentThenFragment.Replace(content, m =>
+                HitFilter.IsInsideComment(late, m.Index)
+                    ? m.Value
+                    : JoinFragments(m.Groups["t"].Value, m.Groups["sets"].Value,
+                          m.Groups["t2"].Value, m.Groups["sets2"].Value) ?? m.Value);
+            if (ReferenceEquals(content, before) || content == before)
+                break;
+        }
+        return content;
+    }
+
+    static string Fragment(string template, string setters) =>
+        "\"" + template + "\".StartReplace()" + setters + ".ToString()";
+
+    static string Setters(string? subject, string? obj) =>
+        (subject is null ? "" : ".SetSubject(" + subject + ")") + (obj is null ? "" : ".SetObject(" + obj + ")");
+
+    static string Retarget(string template, string fromRole, string toRole) =>
+        fromRole == toRole
+            ? template
+            : template.Replace("=" + fromRole.ToLowerInvariant() + ".", "=" + toRole.ToLowerInvariant() + ".", StringComparison.Ordinal);
+
+    /// <summary>
+    /// One template for two neighbouring fragments, or null when their arguments don't fit a single
+    /// subject/object pair (three different objects, or the same role already taken by another object).
+    /// </summary>
+    static string? JoinFragments(string t1, string sets1, string t2, string sets2)
+    {
+        // "=verb:x=" with no owner agrees with whatever the subject is; moving arguments around under it
+        // would change which noun it follows, so such fragments are left alone.
+        if (t1.Contains("=verb:", StringComparison.Ordinal) || t2.Contains("=verb:", StringComparison.Ordinal))
+            return null;
+
+        string? subject = null, obj = null;
+        foreach (Match s in SetterCall.Matches(sets1))
+        {
+            if (s.Groups["role"].Value == "Subject") subject = s.Groups["recv"].Value;
+            else obj = s.Groups["recv"].Value;
+        }
+
+        // A lone object in the first fragment becomes the subject of the joined template, so a second
+        // argument has somewhere to go and the sentence reads subject-first.
+        if (subject is null && obj is not null)
+        {
+            t1 = Retarget(t1, "Object", "Subject");
+            subject = obj;
+            obj = null;
+        }
+
+        var second = SetterCall.Matches(sets2);
+        // Place every argument of the second fragment before touching its template, so a subject/object
+        // swap can't rename a token twice.
+        var moves = new List<(string From, string To)>();
+        foreach (Match s in second)
+        {
+            var role = s.Groups["role"].Value;
+            var recv = s.Groups["recv"].Value;
+            string target;
+            if (recv == subject) target = "Subject";
+            else if (recv == obj) target = "Object";
+            else if (subject is null) { subject = recv; target = "Subject"; }
+            else if (obj is null) { obj = recv; target = "Object"; }
+            else return null;
+            moves.Add((role, target));
+        }
+        if (moves.Count == 2 && moves[0].From != moves[0].To && moves[1].From != moves[1].To)
+        {
+            // Both roles swap: go through a placeholder.
+            t2 = t2.Replace("=subject.", "=\u0001.", StringComparison.Ordinal)
+                   .Replace("=object.", "=subject.", StringComparison.Ordinal)
+                   .Replace("=\u0001.", "=object.", StringComparison.Ordinal);
+        }
+        else
+        {
+            foreach (var (from, to) in moves)
+                t2 = Retarget(t2, from, to);
+        }
+
+        return Fragment(t1 + t2, Setters(subject, obj));
     }
 
     static string FixInterpolatedMessages(string content, ref int edits)
@@ -302,8 +435,8 @@ public static class GameTextCallSiteFixer
         return false;
     }
 
-    static string TheNameToken(string art) =>
-        art == "The" ? "=object.The.name=" : "=object.the.name=";
+    static string TheNameToken(string art, bool single = false) =>
+        "=object." + (art == "The" ? "The" : "the") + ".name" + (single ? ":single=" : "=");
 
     static bool TryRewriteInterpolation(string inner, out string rewritten, out string subjectExpr)
     {
@@ -396,10 +529,12 @@ public static class GameTextCallSiteFixer
 
             var method = m.Groups["method"].Value;
             string token;
+            // Single: true asked for the name of one item of a stack; the name replacer has the same option.
+            var single = args.Any(a => a.Name == "Single" && a.Expression.Trim() == "true") ? ":single" : "";
             if (method == "t")
-                token = "=object.the.name=";
+                token = "=object.the.name" + single + "=";
             else if (method == "an")
-                token = "=object.a.name=";
+                token = "=object.a.name" + single + "=";
             else
             {
                 // The first argument is the grammatical word represented by the token;
@@ -799,7 +934,8 @@ public static class GameTextCallSiteFixer
                 return m.Value;
 
             local++;
-            return $"\"=subject.poss:{word}={rest}\".StartReplace().SetSubject({recv}).ToString()";
+            // Poss(...) is the capitalised form ("The snapjaw's flesh"); the replacer keeps that with a capital P.
+            return $"\"=subject.Poss:{word}={rest}\".StartReplace().SetSubject({recv}).ToString()";
         });
         edits += local;
         return next;
@@ -992,7 +1128,7 @@ public static class GameTextCallSiteFixer
             local++;
             var pre = m.Groups["pre"].Value;
             var post = m.Groups["post"].Value;
-            var token = TheNameToken(m.Groups["art"].Value);
+            var token = TheNameToken(m.Groups["art"].Value, m.Groups["single"].Success);
             return $"\"{pre}{token}{post}\".StartReplace().SetObject({recv}).ToString()";
         });
         edits += local;
@@ -1015,7 +1151,7 @@ public static class GameTextCallSiteFixer
             if (before.Contains("StartReplace", StringComparison.Ordinal))
                 return m.Value;
             local++;
-            var token = TheNameToken(m.Groups["art"].Value);
+            var token = TheNameToken(m.Groups["art"].Value, m.Groups["single"].Success);
             return $"\"{token}\".StartReplace().SetObject({recv}).ToString()";
         });
         edits += local;
@@ -1248,6 +1384,14 @@ public static class GameTextCallSiteFixer
                 continue;
             if (prop == "Is" && !LooksLikeGameObjectRecv(recv))
                 continue;
+            // There is no type information here. ".a" is also a colour's alpha (px[i].a <= 0.05f, c.a = sp[i].a),
+            // and rewriting that produced a string where a float was needed. An article is only ever glued onto
+            // text, so "a"/"A" must sit next to a string literal or the same object's name; every pronoun is
+            // skipped where the code around it is arithmetic or a comparison.
+            if (IsNumericContext(content, m.Index, m.Index + m.Length))
+                continue;
+            if (prop is "a" or "A" && !IsGluedToText(content, m.Index, m.Index + m.Length, recv))
+                continue;
             var token = PronounToken(prop);
             if (token is null) continue;
             sb.Append(content, last, m.Index - last);
@@ -1270,6 +1414,64 @@ public static class GameTextCallSiteFixer
     {
         if (afterMatch < 0 || afterMatch >= content.Length) return false;
         return content[afterMatch] is '.' or '=' or ':' or '#';
+    }
+
+    static int SkipSpaceBack(string content, int index)
+    {
+        while (index >= 0 && char.IsWhiteSpace(content[index])) index--;
+        return index;
+    }
+
+    static int SkipSpace(string content, int index)
+    {
+        while (index < content.Length && char.IsWhiteSpace(content[index])) index++;
+        return index;
+    }
+
+    /// <summary>True when the expression is an operand of arithmetic or a comparison (so it is a number, not text).</summary>
+    static bool IsNumericContext(string content, int start, int end)
+    {
+        var after = SkipSpace(content, end);
+        if (after < content.Length)
+        {
+            var c = content[after];
+            if (c is '<' or '>' or '*' or '/' or '%' or '-') return true;
+            if (c is '=' or '!' && after + 1 < content.Length && content[after + 1] == '=')
+            {
+                // == / != against a number or another member: not text. Against a string literal it is text.
+                var rhs = SkipSpace(content, after + 2);
+                if (rhs < content.Length && content[rhs] != '"') return true;
+            }
+        }
+        var before = SkipSpaceBack(content, start - 1);
+        if (before < 0) return false;
+        // "=>" is a lambda or expression-body arrow, not a comparison.
+        if (content[before] == '>' && before > 0 && content[before - 1] == '=') return false;
+        return content[before] is '*' or '/' or '%' or '-' or '<' or '>';
+    }
+
+    /// <summary>
+    /// True when the expression is concatenated with a string literal on either side, or followed by
+    /// "+ recv.Something" on the same object (go.a + go.ShortDisplayName).
+    /// </summary>
+    static bool IsGluedToText(string content, int start, int end, string recv)
+    {
+        var after = SkipSpace(content, end);
+        if (after < content.Length && content[after] == '+' &&
+            (after + 1 >= content.Length || content[after + 1] is not ('+' or '=')))
+        {
+            var rhs = SkipSpace(content, after + 1);
+            if (rhs < content.Length && content[rhs] == '"') return true;
+            if (string.CompareOrdinal(content, rhs, recv + ".", 0, recv.Length + 1) == 0) return true;
+        }
+        var before = SkipSpaceBack(content, start - 1);
+        if (before > 0 && content[before] == '+' && content[before - 1] != '+')
+        {
+            var lhs = SkipSpaceBack(content, before - 1);
+            if (lhs >= 0 && content[lhs] == '"') return true;
+        }
+        // An interpolation hole: $"... {go.a}{go.ShortDisplayName} ..."
+        return before >= 0 && content[before] == '{' && after < content.Length && content[after] == '}';
     }
 
     static bool IsTernaryArm(string content, int expressionStart, int expressionEnd)

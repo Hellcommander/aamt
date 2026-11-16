@@ -128,6 +128,12 @@ public sealed class MigrationOptions
     public List<string> Extensions { get; set; } = new() { ".cs", ".xml" };
     public string DumpPath { get; set; } = "";
     public string RulesPath { get; set; } = "";
+    /// <summary>Refuse a .cs rewrite that unbalances brackets or changes string-literal text (ApplyGuard).</summary>
+    public bool TextGuard { get; set; } = true;
+    /// <summary>Compile each mod before and after applying; restore its files on new errors (CompileGuard).</summary>
+    public bool CompileGuard { get; set; } = true;
+    /// <summary>Set by MigrationRunner for the duration of an apply run.</summary>
+    internal CompileGuard? ActiveCompileGuard { get; set; }
 }
 
 public sealed class MigrationReport

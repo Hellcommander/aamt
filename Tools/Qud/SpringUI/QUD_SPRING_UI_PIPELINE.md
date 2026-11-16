@@ -60,6 +60,7 @@ pipeline with the right spec and `-Build -Install`.
 |---|---|---|---|
 | `specs\springmenu.springui.json` | `SpringMenu` / `arendeth_springui` | `Arendeth_SpringUI` (library used by Mountwright and Broodmother) | `SpringMenuWindow.cs` (`kind: springmenu`) |
 | `specs\conjoined_picker.springui.json` | `ConjoinedPicker` / `conjoined_ui` | `Arendeth_Conjoined_Extended` | `UI\ConjoinedPickerScreen.cs` (`kind: conjoined_picker`) |
+| `specs\sifrah_board.springui.json` | `SifrahBoard` / `arendeth_sifrah_board` | `Arendeth_SifrahFork_Extended` (overlay for Workshop Sifrah [Fork]) | `SifrahBoardWindow.cs` (`kind: sifrah_board`; two list scrollers sharing one row template, stays open for a whole game) |
 
 Themes: `themes\qud-dark.theme.json` (the game look, default) and `themes\biomutation.theme.json` (Broodmother
 magenta/chitin, for a Broodmother-only window). The shared SpringMenu stays qud-dark and tints its `Accent*`

@@ -20,6 +20,21 @@ param([switch]$SkipTests)
 
 $ErrorActionPreference = 'Stop'
 
+# Run a native command and return its exit code. npm / npx / node write notices to stderr; under
+# 'Stop' (or with 2>&1 redirection) Windows PowerShell turns those lines into terminating errors,
+# so the command's exit code is the only thing that decides success here.
+function Invoke-Native([string]$Exe, [string[]]$Arguments) {
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Exe @Arguments 2>&1 | ForEach-Object { if ($_ -is [System.Management.Automation.ErrorRecord]) { Write-Host $_.Exception.Message } else { Write-Host $_ } }
+        return $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
 $react = @(
     @{ File = 'react.production.min.js'
        Url = 'https://unpkg.com/react@18.3.1/umd/react.production.min.js'
@@ -47,12 +62,12 @@ try {
     }
 
     if (-not $SkipTests) {
-        node test/run.js
-        if ($LASTEXITCODE) { throw "Tests failed (exit $LASTEXITCODE). Fix them or pass -SkipTests." }
+        $code = Invoke-Native 'node' @('test/run.js')
+        if ($code) { throw "Tests failed (exit $code). Fix them or pass -SkipTests." }
     }
 
-    npx --yes @vscode/vsce package --no-dependencies --allow-missing-repository
-    if ($LASTEXITCODE) { throw "vsce package failed (exit $LASTEXITCODE)." }
+    $code = Invoke-Native 'npx' @('--yes', '@vscode/vsce', 'package', '--no-dependencies', '--allow-missing-repository')
+    if ($code) { throw "vsce package failed (exit $code)." }
 
     $pkg = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'package.json') -Raw | ConvertFrom-Json
     $vsix = Join-Path $PSScriptRoot "$($pkg.name)-$($pkg.version).vsix"

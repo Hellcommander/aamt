@@ -15,6 +15,10 @@ from pathlib import Path
 
 from PIL import Image
 
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+import elin_keep  # noqa: E402  (existing mod files are kept unless --force)
+
 CATALOG = Path(__file__).with_name("elin_asset_catalog.json")
 TARGET = (240, 320)
 WHITE_THRESH = 245
@@ -79,10 +83,12 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--assets-dir", type=Path, default=Path(cat["cursorAssetsDir"]))
     ap.add_argument("--mod-path", type=Path, default=Path(cat["modPath"]))
+    elin_keep.add_arguments(ap)
     args = ap.parse_args()
 
     out_dir = args.mod_path / "Portrait"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    if not elin_keep.DRY_RUN:
+        out_dir.mkdir(parents=True, exist_ok=True)
 
     heroes = [h["id"] for h in cat["heroes"]]
     written = []
@@ -94,6 +100,8 @@ def main() -> int:
             missing.append(name)
             continue
         dst = out_dir / name
+        if not elin_keep.may_write(dst):
+            continue
         portrait = fit_portrait(Image.open(src))
         portrait.save(dst, optimize=True)
         written.append((name, dst.stat().st_size))
