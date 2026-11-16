@@ -66,13 +66,10 @@ class Effect:
     def __init__(self, data, source=''):
         self.source = source
         self.baked = Baked(data)
-        plats = self.baked.platforms()
-        if 'PC' not in plats:
+        self.pc = self.baked.platform_range('PC')
+        if self.pc is None:
             raise EditError('the effect has no PC copy')
-        first = plats['PC'].number
-        later = sorted(o.number for o in plats.values() if o.number > first)
-        self.pc = (first, later[0] if later else len(self.baked.objects) + 1)
-        self.platform_names = sorted(plats)
+        self.platform_names = sorted(self.baked.platforms())
         self._layers = None
 
     # -- structure --------------------------------------------------------
@@ -345,7 +342,9 @@ class Effect:
 
     def encode(self):
         out = self.baked.encode()
-        Baked(out)  # must read back
+        problems = Baked(out).validate()  # must read back and hang together
+        if problems:
+            raise EditError('the edited effect fails its checks: %s' % '; '.join(problems[:5]))
         return out
 
 

@@ -6,7 +6,8 @@ list of instructions and back, and prints it as readable text.
 
 Worked out from the game's own files, 2026-11-13: all 11241 distinct scripts found
 in the 1991 files decode with exactly the instruction count their header gives, and
-encode back to the same bytes.
+encode back to the same bytes. Rechecked 2026-11-16 on the game's 2206 files (11849
+distinct scripts), which added opcode 76.
 
 Operand (4 bytes): u16 index, u8 kind, u8 type.
   kind  00 constant (index into the script's 32-byte constants)
@@ -28,6 +29,9 @@ Instructions (opcode byte first):
                              0-3 = x y z w of the source, 4 = 0, 5 = 1 (4 and 5 presumed)
   71 72 73 74 dst, a, b      add, subtract, multiply, divide
   75 dst, a, b, c            a * b + c
+  76 dst, a, b, m, s         integer a / b, b a constant; m and s are the compiler's
+                             magic multiplier and shift for it (b 100: m 0x51EB851F, s 5).
+                             First seen 2026-11-16 in one script of the game's newer files.
   70 sub, dst, a, b          compare and logic, see SUB70
   77 sub, dst, a             one-argument function, see SUB77 (few are identified)
   78 sub, dst, a, b          two-argument function, see SUB78
@@ -47,7 +51,7 @@ TYPE_WIDTH = {'f1': 1, 'f2': 2, 'f3': 3, 'f4': 4, 'i1': 1, 'i2': 2, 'i3': 3, 'i4
 KIND_NAMES = {0x00: 'c', 0x20: 'p', 0x40: 'q', 0x60: 'r', 0x80: '#'}
 
 OPS = {0x7C: 'begin', 0x7D: 'end', 0x69: 'load', 0x6A: 'store', 0x6B: 'keep', 0x6C: 'convert', 0x6F: 'spread',
-       0x6D: 'vector', 0x6E: 'swizzle', 0x71: 'add', 0x72: 'sub', 0x73: 'mul', 0x74: 'div', 0x75: 'muladd',
+       0x6D: 'vector', 0x6E: 'swizzle', 0x71: 'add', 0x72: 'sub', 0x73: 'mul', 0x74: 'div', 0x75: 'muladd', 0x76: 'idiv',
        0x70: 'logic', 0x77: 'fn1', 0x78: 'fn2', 0x79: 'fn3', 0x7A: 'choose', 0x7B: 'call'}
 # 0x10 / 0x11 also take bools, so they are the equality tests; the order of the four
 # inequalities is presumed apart from 0x0C (used as "length squared < 1e-16").
@@ -58,7 +62,8 @@ SUB78 = {0x1B: 'min', 0x1C: 'max', 0x1D: 'dot', 0x1E: 'cross'}
 
 # opcode -> (has sub byte, number of register operands, trailing u16 fields)
 _FIXED = {0x6C: (False, 2), 0x6F: (False, 2), 0x71: (False, 3), 0x72: (False, 3), 0x73: (False, 3), 0x74: (False, 3),
-          0x75: (False, 4), 0x7A: (False, 4), 0x77: (True, 2), 0x70: (True, 3), 0x78: (True, 3), 0x79: (True, 4)}
+          0x75: (False, 4), 0x76: (False, 5), 0x7A: (False, 4), 0x77: (True, 2), 0x70: (True, 3), 0x78: (True, 3),
+          0x79: (True, 4)}
 
 
 def _reg(code, p):
@@ -162,6 +167,17 @@ def encode(instructions):
     return bytes(out)
 
 
+def counts(instructions):
+    """(number of instructions, registers used in bank p, q, r): what header words 0, 6, 7
+    and 8 of a script hold (true for every script of the game, 2026-11-16)."""
+    top = {0x20: 0, 0x40: 0, 0x60: 0}
+    for ins in instructions:
+        for index, kind, _ in ins.get('regs', []):
+            if kind in top:
+                top[kind] = max(top[kind], index + 1)
+    return len(instructions), top[0x20], top[0x40], top[0x60]
+
+
 def constant_value(const, type_name):
     """The numbers of a 32-byte constant as the given operand type reads them."""
     width = TYPE_WIDTH.get(type_name, 1)
@@ -223,6 +239,8 @@ def listing(instructions, constants=None, names=None, functions=None):
             text = '%s = %s %s %s' % (regs[0], regs[1], {0x71: '+', 0x72: '-', 0x73: '*', 0x74: '/'}[op], regs[2])
         elif op == 0x75:
             text = '%s = %s * %s + %s' % tuple(regs)
+        elif op == 0x76:
+            text = '%s = %s / %s   (integer; magic %s, shift %s)' % tuple(regs)
         elif op == 0x7A:
             text = '%s = %s ? %s : %s' % (regs[0], regs[3], regs[2], regs[1])
         elif op == 0x70:
