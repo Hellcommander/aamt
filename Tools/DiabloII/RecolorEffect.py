@@ -5,17 +5,19 @@ An HD missile definition (hd/missiles/<name>.json) points at particle files
 and most of an effect's colour comes from those textures: gradient maps and
 colour sprites. This tool makes a new "look" from an existing effect:
 
-  1. every texture the effect's particle files use is read; the ones stored
-     uncompressed (RGBA8) or as BC1 / BC3 blocks are recoloured and written
-     under a new file name of the same length;
+  1. every texture the effect's particle files use is read; the ones that hold
+     colour, stored uncompressed (RGBA8) or as BC1 / BC3 blocks, are recoloured
+     and written under a new file name (the first characters become the tag);
   2. the particle files are copied under a new name with the texture paths
-     swapped for the recoloured ones (same length, so nothing else in the
-     binary moves);
+     swapped for the recoloured ones, through PopcornBaked.py (the result must
+     pass its checks);
   3. a manifest says which particle path became which, for the mod script.
 
 Nothing is written to the game folder. Colour that is baked into the particle
-file itself (a constant colour, not a texture) and BC4/BC5/BC7 textures are
-left as they are; the report lists them.
+file itself (a constant colour, not a texture), grey data textures, and BC4 / BC5
+textures (one or two channels: masks, noise, distortion) are left as they are;
+the report lists them. The format codes are the ones HdTexture.py identified;
+a preset can override one: "blockFormats": {"0x3d": "keep"} (or "bc1", "bc3").
 
 usage:
   RecolorEffect.py --game <D2R folder> --preset <preset.json> --out <mod folder> [--patch-mod <mod.js>]
@@ -31,12 +33,20 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from d2r_casc import D2RArchive  # noqa: E402
+from HdTexture import FORMATS as FORMAT_NAMES  # noqa: E402
+from PopcornBaked import Baked  # noqa: E402
 
 MAGIC = b'<DE('
-# Pixel formats seen in .texture headers (byte 4). Sizes checked against the mip table.
-FMT_RGBA8 = 0x1F
-FORMAT_NAMES = {0x1F: 'RGBA8'}
-TEXTURE_PATH = re.compile(rb'data/hd/[A-Za-z0-9_/\-]+\.texture')
+# Pixel formats of .texture headers (byte 4), as HdTexture.py identified them:
+# format code -> (kind, bytes per 4x4 block; 0 = uncompressed, 4 bytes per pixel).
+FORMAT_KINDS = {0x1F: ('rgba8', 0), 0x3A: ('bc1', 8), 0x3D: ('bc3', 16), 0x3E: ('bc3', 16),
+                0x3F: ('bc4', 8), 0x41: ('bc5', 16)}
+RECOLOURABLE = ('rgba8', 'bc1', 'bc3')
+TEXTURE_PATH = re.compile(r'data/hd/[A-Za-z0-9_/\-]+\.texture')
+# Textures whose channels are data, not colour, though they are not grey: normal maps
+# (_NRM, _N, NMap), occlusion/roughness/metal maps (_ORM), distortion, debug arrows.
+# Matched on the file name; every such texture the game's effects use has one of these.
+DATA_TEXTURE = re.compile(r'(?i)(_nrm|_orm|_mra|_rma|_n(_\d+)?$|^nmap|distort|debug)')
 # A texture with fewer coloured pixels than this is a data ramp (alpha remap,
 # fresnel, linear gradient): its channels are read as numbers, so it is left alone.
 COLOURED_FRACTION = 0.05
@@ -66,19 +76,22 @@ class Texture:
             self.mips.append((pos + 4 + rel, size, w, h))
             w, h = max(1, w // 2), max(1, h // 2)
 
-    def kind(self):
-        """'rgba8', 'bc1', 'bc3', or None when the pixel data is not one this tool rewrites."""
+    def kind(self, overrides=None):
+        """'rgba8', 'bc1', 'bc3', 'bc4', 'bc5', or None when the format is not known or the
+        first mip's size does not fit it. `overrides`: {"0x3d": "bc3" | "bc1" | "keep"}."""
         _, size, w, h = self.mips[0]
         blocks = max(1, (w + 3) // 4) * max(1, (h + 3) // 4)
-        if self.format == FMT_RGBA8 and size == w * h * 4:
-            return 'rgba8'
-        return None if self.format == FMT_RGBA8 else self._block_kind(size, blocks)
-
-    def _block_kind(self, size, blocks):
-        # 8 bytes per block is BC1 (colour) or BC4 (one channel); 16 is BC3, BC5 or BC7.
-        # They cannot be told apart by size, so block formats are only rewritten when
-        # the preset names the format code: "blockFormats": {"<code>": "bc1" | "bc3"}.
-        return None
+        override = (overrides or {}).get('0x%02x' % self.format)
+        if override == 'keep':
+            return None
+        if override in ('bc1', 'bc3'):
+            kind, per_block = override, 8 if override == 'bc1' else 16
+        elif self.format in FORMAT_KINDS:
+            kind, per_block = FORMAT_KINDS[self.format]
+        else:
+            return None
+        want = w * h * 4 if per_block == 0 else blocks * per_block
+        return kind if size == want else None
 
     def describe(self):
         _, size, w, h = self.mips[0]
@@ -100,14 +113,24 @@ def recolor_rgb(r, g, b, op):
     return colorsys.hsv_to_rgb(h, s, v)
 
 
-def is_coloured(tex):
-    """True when a real share of the first mip's pixels are not grey."""
+def is_coloured(tex, kind='rgba8'):
+    """True when a real share of the first mip's pixels are not grey. For block formats
+    the colour end points of the blocks are sampled (both of each block)."""
     offset, size, _, _ = tex.mips[0]
     data = tex.data
-    step = max(4, (size // 4 // 4096) * 4)  # sample about 4096 pixels
     coloured = total = 0
-    for i in range(offset, offset + size, step):
-        r, g, b = data[i], data[i + 1], data[i + 2]
+    if kind == 'rgba8':
+        step = max(4, (size // 4 // 4096) * 4)  # sample about 4096 pixels
+        samples = ((data[i], data[i + 1], data[i + 2]) for i in range(offset, offset + size, step))
+    else:
+        block, color_at = (8, 0) if kind == 'bc1' else (16, 8)
+        step = max(block, (size // block // 2048) * block)  # about 2048 blocks
+        samples = []
+        for pos in range(offset + color_at, offset + size - block + color_at + 1, step):
+            for c in struct.unpack_from('<HH', data, pos):
+                r, g, b = _565(c)
+                samples.append((r * 255, g * 255, b * 255))
+    for r, g, b in samples:
         total += 1
         if max(r, g, b) - min(r, g, b) > 24:
             coloured += 1
@@ -177,10 +200,12 @@ def recolor_blocks(tex, op, kind):
 # Looks
 # ---------------------------------------------------------------------------
 def renamed(path, tag):
-    """Same folder, same length: the first characters of the file name become the tag."""
+    """Same folder: the first characters of the file name become the tag (same length,
+    as earlier versions made them); a name too short for that gets the tag in front."""
     folder, name = path.rsplit('/', 1)
-    if len(name) <= len(tag) + len('.texture'):
-        raise ValueError('file name too short to tag: ' + path)
+    stem = name.rsplit('.', 1)[0]
+    if len(stem) <= len(tag):
+        return folder + '/' + tag + name
     return folder + '/' + tag + name[len(tag):]
 
 
@@ -197,51 +222,62 @@ def build_look(archive, look, preset, out_dir, report):
     entry = {'source': source, 'particles': {}, 'textures': [], 'recoloured': [], 'unchanged': []}
     particle_paths = [d['path'] for d in definition['dependencies'].get('particles', []) if d.get('path')]
     done = {}  # texture path -> new path, or None when left alone
+
+    def texture(tpath):
+        """The recoloured texture's path (written to out_dir), or None when it is left alone."""
+        if tpath in done:
+            return done[tpath]
+        done[tpath] = None
+        raw = archive.read(archive_key(tpath))
+        if raw is None:
+            entry['unchanged'].append(tpath + ' (not in the archive)')
+            return None
+        tex = Texture(raw)
+        kind = tex.kind(block_formats)
+        reason = None
+        if any(d in tpath for d in skip_folders):
+            reason = 'folder skipped by the preset'
+        elif block_formats.get('0x%02x' % tex.format) == 'keep':
+            reason = '%s, kept by the preset' % tex.describe()
+        elif kind not in RECOLOURABLE:
+            reason = tex.describe() + {'bc4': ', one channel', 'bc5': ', two channels'}.get(kind, '')
+        elif DATA_TEXTURE.search(tpath.rsplit('/', 1)[1].rsplit('.', 1)[0]):
+            reason = '%s, normal / material / distortion data by its name' % tex.describe()
+        elif not is_coloured(tex, kind):
+            reason = 'grey: %s data or a mask' % tex.describe()
+        if reason:
+            entry['unchanged'].append('%s (%s)' % (tpath, reason))
+            return None
+        new_bytes = recolor_rgba8(tex, look['color']) if kind == 'rgba8' else recolor_blocks(tex, look['color'], kind)
+        new_path = renamed(tpath, tag)
+        done[tpath] = new_path
+        entry['recoloured'].append('%s (%s)' % (tpath, tex.describe()))
+        entry['textures'].append(new_path)
+        if out_dir:
+            write(out_dir, new_path, new_bytes)
+        return new_path
+
     for ppath in particle_paths:
         blob = archive.read(archive_key(ppath))
         if blob is None:
             entry['unchanged'].append(ppath + ' (particle file not in the archive)')
             continue
-        blob = bytearray(blob)
+        baked = Baked(blob)
         swapped = 0
-        for match in list(TEXTURE_PATH.finditer(bytes(blob))):
-            tpath = match.group().decode('latin1')
-            if tpath not in done:
-                done[tpath] = None
-                raw = archive.read(archive_key(tpath))
-                if raw is None:
-                    entry['unchanged'].append(tpath + ' (not in the archive)')
-                else:
-                    tex = Texture(raw)
-                    kind = tex.kind() or block_formats.get('0x%02x' % tex.format)
-                    if any(d in tpath for d in skip_folders):
-                        new_bytes = None
-                        entry['unchanged'].append('%s (folder skipped by the preset)' % tpath)
-                    elif kind == 'rgba8' and not is_coloured(tex):
-                        new_bytes = None
-                        entry['unchanged'].append('%s (grey data ramp)' % tpath)
-                    elif kind == 'rgba8':
-                        new_bytes = recolor_rgba8(tex, look['color'])
-                    elif kind in ('bc1', 'bc3'):
-                        new_bytes = recolor_blocks(tex, look['color'], kind)
-                    else:
-                        new_bytes = None
-                        entry['unchanged'].append('%s (%s)' % (tpath, tex.describe()))
-                    if new_bytes is not None:
-                        new_path = renamed(tpath, tag)
-                        done[tpath] = new_path
-                        entry['recoloured'].append('%s (%s)' % (tpath, tex.describe()))
-                        entry['textures'].append(new_path)
-                        if out_dir:
-                            write(out_dir, new_path, new_bytes)
-            if done[tpath]:
-                blob[match.start():match.end()] = done[tpath].encode('latin1')
+        for i, s in enumerate(baked.strings):
+            new = TEXTURE_PATH.sub(lambda m: texture(m.group()) or m.group(), s)
+            if new != s:
+                baked.strings[i] = new
                 swapped += 1
         if swapped:
+            new_blob = baked.encode()
+            problems = Baked(new_blob).validate()
+            if problems:
+                raise SystemExit('%s: the recoloured copy fails its checks: %s' % (ppath, '; '.join(problems[:3])))
             new_ppath = renamed(ppath, tag)
             entry['particles'][ppath] = new_ppath
             if out_dir:
-                write(out_dir, new_ppath, bytes(blob))
+                write(out_dir, new_ppath, new_blob)
     report[look['name']] = entry
     return entry
 
