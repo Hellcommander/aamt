@@ -268,9 +268,12 @@ because the reshaped copy no longer matches its donor; rebuild the model then.
 `GrannyAnim.py` reads a monster's clips (`<monster>/animation/combined.animations`,
 one Granny Animation per clip), poses a mesh with them, and writes new clips
 (through `Granny.py`'s writer). Stock curves are decoded exactly (quantised
-B-spline formats D4nK16uC15u, D4nK8uC7u, D3K16uC16u, D3K8uC8u, D3I1K*, the
-constants and DaK32fC32f) and then treated as keyframes; new clips are written
-as plain linear float keys. `clip.pose(t)`, `GrannyAnim.skin(...)` and
+B-spline formats D4nK16uC15u, D4nK8uC7u, D3K16uC16u, D3K8uC8u, D3I1K*, D9I1K*,
+D9I3K*, DaK16uC16u, DaK8uC8u, the constants, DaK32fC32f and D3I1K32fC32f) and
+then treated as keyframes; new clips are written as plain linear float keys.
+Checked 2026-11-16: every curve of the game's 245 HD character animation files
+decodes (DaK8uC8u / DaK16uC16u had kept the Skeleton, the Act 5 barbarians and
+others from being used as a base). `clip.pose(t)`, `GrannyAnim.skin(...)` and
 `GrannyPreview.draw` give a still of any clip at any time.
 
 A variant in a preset can ask for its own animation set:
@@ -306,6 +309,23 @@ A variant in a preset can ask for its own animation set:
   its own name instead, e.g. a clip called `charge` on S3. Every added clip is listed as an
   `AnimationItem` (`<folder>/animation/<clip>.animation`) in the copied state machine, bound or not,
   so a mod can bind it by name in states it adds itself (skill-indexed states, for example).
+- More clip options (2026-11-16):
+  - `"reverse": true` plays a clip or part backwards; `"mirror": true` has the other side of the
+    body do it (a right-hand claw becomes a left-hand one; `Keys.mirrored`).
+  - A `layer` edit lays another clip over a bone and everything below it, at the same progress:
+    `{"layer": "attack1", "bones": "spine_01_bind_jnt", "weight": [[0, 0], [0.15, 1], [0.85, 1], [1, 0]]}`
+    on a `walk` base gives a claw attack on the move (legs keep walking). `from`/`to` take a piece
+    of the other clip, `"at"` one pose of it, `"only": true` the named bones alone.
+  - `"seamless": 0.25` bends the last quarter of a clip into its first pose, for loops.
+  - `"hit"` in a curve: the point of the clip where the legacy animation of its mode deals the hit
+    or launches the missile (the COF's trigger frame over its frame count; the Spike Fiend's A1:
+    frame 11 of 16 = 0.69). `["hit", -30]`, `["hit-0.1", 0]`, `["hit+0.05", ...]`. The pipeline
+    reads it from the donor's audit for the clip's mode (`mode`, or a clip named after one);
+    `"hit": 0.6` on a clip sets it by hand. The report lists the value used. Presumed, not seen:
+    stock HD clips are not as long as their legacy animations (ratios 0.8 to 4 measured on the
+    Zombie, Fallen and Spike Fiend), so the game stretches the clip over the legacy span and the
+    hit lands at that fraction of it.
+  - A curve may be one number (`"weight": 0.5`).
 - Offline stills of a clip: `GrannyPreview.clip_sheet(models, skeleton, animations, clip, [0, 0.3, 0.55, 0.8], out.png)`
   draws one picture per view and moment with a fixed camera per view (so motion shows), wings or
   other parts coloured by bone (`colours`), and a floor square (`ground`) to show the height.
@@ -1207,6 +1227,35 @@ python PopcornBaked.py roundtrip <file or folder> ... [--check]
 The layout and the known field meanings are in the module's docstring. First use:
 `SorceressSecondPages\dev\build_effects.py`, which draws its own RGBA8 textures (one mip, the
 gradient textures' layout) and points an effect's layers at them.
+
+## Effect looks from rules (`EffectLooks.py`)
+
+A mod's own HD effects, built from stock missile effects by a list of rules per look. Every
+effect mod's `dev\build_effects.py` had its own copy of this loop (about a dozen copies, in
+several versions); `EffectLooks.Builder` is the newest one (DruidGiantRaven's), so a build script
+can keep only its drawings and its `LOOKS` (example names below are illustrative):
+
+```python
+import EffectLooks as L
+LOOKS = {'crescent': ('holy_bolt', [L.tex(L.BASE, 'holybolt_core', 'pdo_crescent'),
+                                    L.tint((0.9, 0.8, 0.3), (1.0, 0.85, 0.4))], [])}
+builder = L.Builder(game, MOD, 'pdo', drawn=TEXTURES, atlas=ATLAS)   # atlas optional
+manifest = builder.build(LOOKS)          # runs a recipe per particle file, fails on rules that fit nothing
+builder.clean()                          # drops drawn textures, particle files and recipes no look uses
+L.write_block(os.path.join(MOD, 'mod.js'), START, END, 'AUTHORED', manifest)
+```
+
+Rules: `tex` (a texture slot: property or feature, part of the old texture's name or `*`, drawn
+art or a `data/...` path, layers), `mesh` (a mesh layer's model), `tint` (f3/f4 colour constants
+near a colour), `vec` (a colour a script builds from three numbers), `prop` (a renderer setting),
+`num` (single-number constants of a value). The tuple forms the mods already use are accepted as
+they are. `on_effect` gets the descriptions before and after each file, for stills. The module
+docstring has the details.
+
+Checked 2026-11-16 on copies of two mods (the user's mods were not changed): DruidGiantRaven built
+through `EffectLooks` gives byte-identical particle files, textures, recipes and manifest;
+PaladinOaths (an older copy of the loop) the same, plus `"models": []` per look in its `mod.js`
+block, which its install script does not read.
 
 ## Particle effect editor (GUI and command line)
 

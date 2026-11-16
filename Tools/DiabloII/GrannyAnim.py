@@ -94,6 +94,21 @@ def decode_curve(curve):
         n = len(kc) // 4
         knots = np.array(kc[:n], dtype=np.float64) / value['OneOverKnotScale']
         return knots, _quats(value['ScaleOffsetTableEntries'], kc[n:], 15 if kind == 'D4nK16uC15u' else 7)
+    if kind in ('DaK16uC16u', 'DaK8uC8u'):
+        # Any dimension (scale-shear: 9): n knots, then n x dimension controls;
+        # ControlScaleOffsets = dimension scales, then dimension offsets.
+        so = np.array(value['ControlScaleOffsets'], dtype=np.float64)
+        dim = len(so) // 2
+        n = len(kc) // (dim + 1)
+        knots = np.array(kc[:n], dtype=np.float64) / _float_from_trunc(value['OneOverKnotScaleTrunc'])
+        controls = np.array(kc[n:], dtype=np.float64).reshape(n, dim)
+        return knots, so[dim:] + controls * so[:dim]
+    if kind == 'D3I1K32fC32f':
+        # A 3-vector along one line: n float knots, n float controls, each scaled per axis.
+        n = len(kc) // 2
+        knots = np.array(kc[:n], dtype=np.float64)
+        controls = np.array(kc[n:], dtype=np.float64)[:, None]
+        return knots, np.array(value['ControlOffsets']) + controls * np.array(value['ControlScales'])
     if kind in ('D3K16uC16u', 'D3K8uC8u', 'D3I1K16uC16u', 'D3I1K8uC8u'):
         one = 'I1' in kind
         n = len(kc) // (2 if one else 4)
@@ -353,6 +368,47 @@ class Keys:
                 local.rotation = q / np.linalg.norm(q)
                 local.scale = local.scale + (target.scale - local.scale) * w
 
+    def layer(self, skeleton, source, bones, weight, below=True):
+        """Lays another motion over some bones: source(progress) -> pose (a clip sampled at that
+        point of this clip's progress); `bones` with (below=True) everything under them take
+        that pose's local transforms, mixed by weight (a number or a function of progress).
+        An attack's upper body over a walk: layer(attack, ["spine_01_bind_jnt"], 1.0)."""
+        names = set()
+        for bone in bones:
+            if bone not in skeleton.index:
+                raise KeyError(f'no bone "{bone}" in the skeleton')
+            stack = [bone]
+            while stack:
+                name = stack.pop()
+                names.add(name)
+                if below:
+                    stack.extend(skeleton.children(name))
+        for k, pose in enumerate(self.poses):
+            w = self._amount(weight, k)
+            if not w:
+                continue
+            other = source(self.times[k] / self.duration if self.duration else 0.0)
+            for n in names:
+                if n not in pose:
+                    pose[n] = skeleton.rest[n].copy()
+            target = {n: (other.get(n) or skeleton.rest[n]) for n in names}
+            mix = Keys(self.times[k:k + 1], [pose], self.template, self.group)
+            mix.blend_to(target, w)
+
+    def seamless(self, fraction):
+        """Bends the last `fraction` of the clip into its first pose, so it loops without a jump."""
+        if not 0 < fraction <= 1:
+            raise ValueError('seamless takes a fraction of the clip, 0 < f <= 1')
+        first = {n: l.copy() for n, l in self.poses[0].items()}
+        start = 1.0 - fraction
+        for k, pose in enumerate(self.poses):
+            p = self.times[k] / self.duration if self.duration else 0.0
+            if p <= start:
+                continue
+            f = min(1.0, (p - start) / fraction)
+            mix = Keys(self.times[k:k + 1], [pose], self.template, self.group)
+            mix.blend_to(first, f * f * (3 - 2 * f))
+
     def append(self, other):
         """Plays another set of keys after this one."""
         self.times = np.concatenate([self.times, self.duration + other.times[1:]])
@@ -528,8 +584,25 @@ def load(source):
 
 # --- clips from a description (what a preset holds) ---
 
-def _curve_function(points, wave=None, ease=True):
+def _progress(p, marks=None):
+    """A point of a clip: a number 0..1, or a named mark ("hit", "hit-0.1", "hit+0.05")."""
+    if isinstance(p, (int, float)):
+        return float(p)
+    text = str(p).replace(' ', '')
+    for sign in ('+', '-'):
+        if sign in text[1:]:
+            name, offset = text.split(sign, 1)
+            return _progress(name, marks) + (float(offset) if sign == '+' else -float(offset))
+    if not marks or text not in marks:
+        raise ValueError(f'"{p}": no mark of that name here (marks: {sorted(marks or {})})')
+    return float(marks[text])
+
+
+def _curve_function(points, wave=None, ease=True, marks=None):
     """[[progress, value], ...] -> smooth function of progress 0..1. value: a number or a list of numbers.
+
+    A progress can name a mark instead of a number: "hit" (the moment the game's legacy animation
+    deals the hit or launches the missile, when the clip knows it), with an offset ("hit-0.1").
 
     wave: {"cycles": n, "amplitude": a} adds a sine of that size, faded in and out with the clip;
     with "fade": false it runs at full size throughout (whole cycles then loop seamlessly), and
@@ -537,7 +610,9 @@ def _curve_function(points, wave=None, ease=True):
     ease False: straight lines between the points (an even turn, e.g. 0 -> 360 for a looping spin)
     instead of easing in and out of each point.
     """
-    points = sorted(([float(p), np.asarray(v, dtype=np.float64)] for p, v in points), key=lambda item: item[0])
+    if isinstance(points, (int, float)):
+        points = [[0, points], [1, points]]
+    points = sorted(([_progress(p, marks), np.asarray(v, dtype=np.float64)] for p, v in points), key=lambda item: item[0])
 
     def value(progress):
         if progress <= points[0][0]:
@@ -578,22 +653,36 @@ def _bones_named(skeleton, spec):
     return out
 
 
-def build_clip(animations, skeleton, spec):
+def build_clip(animations, skeleton, spec, marks=None):
     """Makes a clip from a description and adds it to `animations`.
 
     spec: {"name": "cast", "base": "neutral", "duration": 0.8, "fps": 30, "from": 0.0, "to": 0.8,
            "edits": [
-             {"rotate": "spine_01_bind_jnt", "axis": [1, 0, 0], "degrees": [[0, 0], [0.4, -30], [1, 0]]},
+             {"rotate": "spine_01_bind_jnt", "axis": [1, 0, 0], "degrees": [[0, 0], ["hit", -30], [1, 0]]},
              {"scale": {"prefix": "spike_", "first": 20, "last": 62}, "factor": [[0, 1], [0.5, 1.3], [1, 1]]},
-             {"move": "pelvis_bind_jnt", "offset": [[0, [0, 0, 0]], [0.5, [0, -0.2, 0]], [1, [0, 0, 0]]]}
-           ]}
+             {"move": "pelvis_bind_jnt", "offset": [[0, [0, 0, 0]], [0.5, [0, -0.2, 0]], [1, [0, 0, 0]]]},
+             {"layer": "attack1", "bones": "spine_01_bind_jnt", "weight": [[0, 0], [0.2, 1], [0.8, 1], [1, 0]]}
+           ],
+           "seamless": 0.2}
     base is a clip of the same file; from/to cut a piece of it (seconds) and duration retimes the piece.
     "at": <seconds> instead holds the base's pose at that time for `duration` (keys at `fps`).
-    Instead of base, "parts": [{base, from, to, duration, edits}, ...] plays several pieces in a row.
+    "reverse": true plays the piece backwards; "mirror": true has the other side of the body do it
+    (left <-> right bones, see Keys.mirrored).
+    Instead of base, "parts": [{base, from, to, duration, reverse, mirror, edits}, ...] plays several
+    pieces in a row.
     Curves are [progress 0..1, value] pairs, eased between ("ease": "linear" on an edit: straight lines);
-    an edit may add "wave": {"cycles", "amplitude", "fade": true, "phase": 0}.
+    an edit may add "wave": {"cycles", "amplitude", "fade": true, "phase": 0}. A curve may be one number.
+    `marks` names points of the clip that edits on the clip itself can use instead of a number:
+    {"hit": 0.62} lets a curve say ["hit", -30] or ["hit-0.1", 0]; a spec's own "hit" overrides it.
+    A "layer" edit lays another clip (from its "from"/"to" piece, or one pose "at") over a bone and
+    everything below it ("bones": a name or a list; "only": true for those bones alone), mixed by
+    "weight" (default 1), at the same progress as this clip.
+    "seamless": f bends the last fraction f of the clip into its first pose, for a clip that loops.
     Axes and offsets are in model space (D2R monsters: +Y up, +Z towards the head).
     """
+    marks = dict(marks or {})
+    if 'hit' in spec:
+        marks['hit'] = float(spec['hit'])
     if 'parts' in spec:
         # Several pieces played one after another, each made like a clip of its own; edits on the
         # clip itself then run over the whole result.
@@ -606,7 +695,9 @@ def build_clip(animations, skeleton, spec):
                 keys.append(piece)
     else:
         keys = _keys_for(animations, skeleton, {k: v for k, v in spec.items() if k != 'edits'})
-    _apply_edits(keys, skeleton, spec.get('edits', []), spec['name'])
+    _apply_edits(keys, skeleton, spec.get('edits', []), spec['name'], animations, marks)
+    if spec.get('seamless'):
+        keys.seamless(float(spec['seamless']))
     animations.add(spec['name'], keys, skeleton)
     return keys
 
@@ -626,22 +717,51 @@ def _keys_for(animations, skeleton, spec):
     else:
         keys = base.resample(fps=spec.get('fps', 30.0), duration=spec.get('duration'),
                              start=spec.get('from', 0.0), end=spec.get('to'))
-    _apply_edits(keys, skeleton, spec.get('edits', []), spec.get('name', spec['base']))
+    if spec.get('reverse'):
+        keys = keys.reversed()
+    if spec.get('mirror'):
+        keys = keys.mirrored(skeleton)
+    _apply_edits(keys, skeleton, spec.get('edits', []), spec.get('name', spec['base']), animations)
     return keys
 
 
-def _apply_edits(keys, skeleton, edits, label):
+def _layer_source(animations, edit, label):
+    """progress -> pose of the clip a "layer" edit lays over."""
+    clip = animations.clip(edit['layer'])
+    if 'at' in edit:
+        held = clip.pose(float(edit['at']))
+        return lambda progress: held
+    start = float(edit.get('from', 0.0))
+    end = clip.duration if edit.get('to') is None else float(edit['to'])
+    if end <= start:
+        raise ValueError(f'clip {label}: layer "{edit["layer"]}" has an empty from/to piece')
+    if edit.get('reverse'):
+        return lambda progress: clip.pose(end - progress * (end - start))
+    return lambda progress: clip.pose(start + progress * (end - start))
+
+
+def _apply_edits(keys, skeleton, edits, label, animations=None, marks=None):
     for edit in edits:
         ease = edit.get('ease', 'smooth') != 'linear'
+
+        def curve(points):
+            return _curve_function(points, edit.get('wave'), ease, marks)
         if 'rotate' in edit:
             for bone in _bones_named(skeleton, edit['rotate']):     # each about its own joint
-                keys.rotate_world(skeleton, bone, edit.get('axis', [1, 0, 0]), _curve_function(edit['degrees'], edit.get('wave'), ease))
+                keys.rotate_world(skeleton, bone, edit.get('axis', [1, 0, 0]), curve(edit['degrees']))
         elif 'scale' in edit:
-            keys.scale(_bones_named(skeleton, edit['scale']), _curve_function(edit['factor'], edit.get('wave'), ease))
+            keys.scale(_bones_named(skeleton, edit['scale']), curve(edit['factor']))
         elif 'move' in edit:
-            keys.move(skeleton, edit['move'], _curve_function(edit['offset'], edit.get('wave'), ease))
+            keys.move(skeleton, edit['move'], curve(edit['offset']))
+        elif 'layer' in edit:
+            if animations is None:
+                raise ValueError(f'clip {label}: a "layer" edit needs the animation file')
+            if 'bones' not in edit:
+                raise ValueError(f'clip {label}: a "layer" edit needs "bones" (where the other clip takes over)')
+            keys.layer(skeleton, _layer_source(animations, edit, label), _bones_named(skeleton, edit['bones']),
+                       curve(edit.get('weight', 1.0)), below=not edit.get('only'))
         else:
-            raise ValueError(f"clip {label}: an edit needs \"rotate\", \"scale\" or \"move\"")
+            raise ValueError(f"clip {label}: an edit needs \"rotate\", \"scale\", \"move\" or \"layer\"")
 
 
 def mirror_name(name):
