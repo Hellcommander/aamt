@@ -266,23 +266,41 @@ class Builder:
         return out
 
     def clean(self):
-        """Removes what an earlier run left: drawn textures no look uses now, particle files and
-        recipes this run did not write. Returns the removed paths."""
+        """Removes what an earlier run of this builder left: drawn textures no look uses now, and
+        particle files and recipes named like this builder's ("<prefix>_...") that this run did
+        not write. A recipe is only removed when its output is in this builder's particle folder,
+        so recipes saved with the effect editor (same folder) stay. Returns the removed paths."""
         removed = []
         for name in self.drawn:
             full = os.path.join(self.mod, *(self.texture_path % name)[len('data/'):].split('/'))
             if name not in self.used and os.path.exists(full):
                 os.remove(full)
                 removed.append(full)
-        folder = os.path.join(self.mod, *self.output_path[len('data/'):].rsplit('/', 1)[0].split('/'))
+        ours = self.prefix + '_'
+        out_folder = self.output_path.rsplit('/', 1)[0] + '/'
+        folder = os.path.join(self.mod, *out_folder[len('data/'):-1].split('/'))
         for directory, suffix in ((folder, '.particles'), (self.recipes, '.json')):
             if not os.path.isdir(directory):
                 continue
             for f in os.listdir(directory):
-                if f.endswith(suffix) and f[:-len(suffix)] not in self.written:
-                    os.remove(os.path.join(directory, f))
-                    removed.append(os.path.join(directory, f))
+                name = f[:-len(suffix)]
+                if not f.endswith(suffix) or not name.startswith(ours) or name in self.written:
+                    continue
+                path = os.path.join(directory, f)
+                if suffix == '.json' and not self._builder_recipe(path, out_folder):
+                    continue
+                os.remove(path)
+                removed.append(path)
         return removed
+
+    @staticmethod
+    def _builder_recipe(path, out_folder):
+        try:
+            with open(path, encoding='utf-8') as f:
+                output = json.load(f).get('output', '')
+        except (OSError, ValueError, AttributeError):
+            return False
+        return isinstance(output, str) and output.startswith(out_folder)
 
 
 def write_block(mod_js, start, end, const_name, manifest):

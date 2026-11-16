@@ -544,9 +544,18 @@ class Animations:
         wanted = getattr(keys, 'group', None)
         group = next(g for g in animation['TrackGroups'] if g['Name'] == wanted) if wanted is not None else animation['TrackGroups'][0]
         order = [t['Name'] for t in group['TransformTracks']]
+        # A bone the edits posed that the template clip has no track for (a layered clip can
+        # bring one) gets a track of its own, so its motion is not lost.
+        known = set(order)
+        for pose in keys.poses:
+            for bone in pose:
+                if bone not in known:
+                    known.add(bone)
+                    order.append(bone)
         tracks = []
         for bone in order:
-            locals_ = [pose[bone] for pose in keys.poses]
+            fallback = skeleton.rest[bone] if skeleton is not None and bone in skeleton.index else next(p[bone] for p in keys.poses if bone in p)
+            locals_ = [pose.get(bone) or fallback for pose in keys.poses]
             rotations = np.array([l.rotation for l in locals_])
             for k in range(1, len(rotations)):           # keep neighbours on the same side so straight lines are short
                 if float(rotations[k] @ rotations[k - 1]) < 0:
@@ -693,6 +702,11 @@ def build_clip(animations, skeleton, spec, marks=None):
                 keys = piece
             else:
                 keys.append(piece)
+        # reverse / mirror on the clip itself act on the whole joined clip
+        if spec.get('reverse'):
+            keys = keys.reversed()
+        if spec.get('mirror'):
+            keys = keys.mirrored(skeleton)
     else:
         keys = _keys_for(animations, skeleton, {k: v for k, v in spec.items() if k != 'edits'})
     _apply_edits(keys, skeleton, spec.get('edits', []), spec['name'], animations, marks)
