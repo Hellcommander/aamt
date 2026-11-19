@@ -176,6 +176,39 @@ bends the ramp) and fades out with distance along the `within` axes. That is
 how the Giant Raven (`Presets/giant_raven.json`) gets a hooked beak tip, a
 throat ruff and a wedge tail longer in the middle than at the sides.
 
+**Removing geometry** (2026-11-16): `"remove"` in `"reshape"` is a list of rules, applied to
+every LOD file after the edits above (`GrannyMesh.remove_geometry`; the file is rebuilt through
+`Granny.py`, so vertex and triangle counts can change):
+
+```json
+"remove": [
+  { "bones": "spike_", "below": true, "weight": 0.6 },
+  { "box": { "min": [-1, 0, 2.5], "max": [1, 1.5, 4] }, "mesh": "QuillratShape" }
+]
+```
+
+- `bones`: triangles whose three vertices follow those bones (a name, a name start, a list, or
+  `{"prefix", "first", "last"}`; `"below": true` adds every bone under them) by at least
+  `weight` in all (default 0.5). A lower weight also takes the parts where they join the body.
+- `box`: triangles whose vertices lie in a model-space box (bind pose); `"outside": true` takes
+  the rest. `"any": true` on a rule takes a triangle when one vertex is selected, not all three.
+  `"mesh"` limits a rule to one mesh.
+- Unused vertices are dropped and renumbered; material groups, the mesh box and each bone
+  binding's box are recomputed (checked: the formula reproduces the stock boxes to 0.0001). The
+  bone bindings stay, so the skin and the donor's animations still fit.
+- Holes are not capped: where a removed part joined the body, the opening stays open. A mesh may
+  not lose every triangle (drop the model instead).
+- Command line: `python GrannyMesh.py remove <in.model> <out.model> '<rules JSON or file>'`.
+- Tested 2026-11-16, offline only: the Spike Fiend body without its quills (27541 -> 22312
+  triangles in LOD 0, all five LODs through a preset), and a box cut; not seen in the game.
+
+`Granny.py`'s writer could not write a model with materials before this: a member whose type is
+the struct around it (a material map's `Map`, a material) was not handled. The reader now marks
+it `'$recursive'` / `'$recursive:N'` (N structs further out) and the writer resolves both; 45
+character models read and write back equal. The same fix makes animation files the toolkit
+writes carry the same type table as the game's own (before, one such member pointed at the
+wrong type; the game played those files anyway). Clip data is unchanged.
+
 A variant with `"reshape"` can also wear its own textures: `"retexture"`
 entries (`from`, `to`, `format` bc1/bc3/rgba8, `recolor` as in the recoloured
 effect pipeline) write a recoloured copy (block by block, so format and mips

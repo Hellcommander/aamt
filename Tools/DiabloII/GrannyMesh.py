@@ -257,3 +257,174 @@ def reshape(model, bones, quills=None, bulk=None, shape=None):
         report += [f'{mesh.name}: {line}' for line in lines]
         mesh.set_positions(moved)
     return report
+
+
+# --- removing geometry (rebuilds the file through Granny.py) ---------------------------------
+
+def _selected_bones(bone_names, spec):
+    """Names picked by a remove rule's "bones": a name, a name start ("spike_"), a list of either,
+    or {"prefix", "first", "last"} (numbered joints)."""
+    if isinstance(spec, dict):
+        prefix, first, last = spec['prefix'], spec.get('first', 0), spec.get('last', 10 ** 9)
+        picked = set()
+        for n in bone_names:
+            if n.startswith(prefix):
+                digits = ''.join(ch for ch in n[len(prefix):] if ch.isdigit())
+                if first <= (int(digits) if digits else 0) <= last:
+                    picked.add(n)
+        return picked
+    wanted = [spec] if isinstance(spec, str) else list(spec)
+    return {n for n in bone_names if any(n == w or n.startswith(w) for w in wanted)}
+
+
+def _below(bone_names, parents, picked):
+    """The picked bones and everything under them."""
+    out = set(picked)
+    changed = True
+    while changed:
+        changed = False
+        for n, p in zip(bone_names, parents):
+            if p >= 0 and n not in out and bone_names[p] in out:
+                out.add(n)
+                changed = True
+    return out
+
+
+_TOPOLOGY_EXTRAS = ('VertexToVertexMap', 'VertexToTriangleMap', 'SideToNeighborMap', 'PolygonIndexStarts',
+                    'PolygonIndices', 'BonesForTriangle', 'TriangleToBoneIndices', 'TriAnnotationSets')
+
+
+def remove_geometry(data, rules):
+    """Removes triangles from the meshes of a model; returns (new file bytes, report lines).
+
+    rules: a list; a triangle goes when any rule takes it. A rule selects vertices and takes a
+    triangle when all three of its vertices are selected ("any": true: when one is):
+        {"bones": "spike_", "below": true, "weight": 0.5}
+            vertices that follow those bones (with "below": and every bone under them) by at least
+            `weight` in all (default 0.5). "bones" is a name, a name start, a list of them, or
+            {"prefix", "first", "last"}. A rigid mesh (no skin weights) follows its one bone.
+        {"box": {"min": [x, y, z], "max": [x, y, z]}}
+            vertices inside a model-space box (bind pose); "outside": true selects the rest.
+        "mesh": "name" limits a rule to the meshes of that name.
+    Vertices no triangle uses any more are dropped and the indices renumbered; material groups,
+    the mesh box (bbMin/bbMax; VertexScale stays) and each bone binding's box (OBBMin/OBBMax, in
+    that bone's space) are recomputed from what is left. The bone bindings themselves stay, so
+    the vertices' bone indices keep meaning the same bones. A mesh may not lose every triangle.
+    """
+    import Granny
+    source = Granny.read(data)
+    tree = source.root()
+    skeleton = tree['Models'][0]['Skeleton']['Bones'] if tree.get('Models') else []
+    bone_names = [b['Name'] for b in skeleton]
+    parents = [b['ParentIndex'] for b in skeleton]
+    inverse = {b['Name']: np.array(b['InverseWorldTransform'], dtype=np.float64).reshape(4, 4) for b in skeleton}
+    report = []
+    for mesh in tree['Meshes']:
+        name = mesh['Name']
+        vertices = mesh['PrimaryVertexData']['Vertices']
+        items = vertices['$items']
+        topology = mesh['PrimaryTopology']
+        applies = [r for r in rules if not r.get('mesh') or r['mesh'] == name]
+        if not applies:
+            continue
+        if topology.get('Indices'):
+            raise ValueError(f'{name}: 32-bit indices are not handled')
+        for extra in _TOPOLOGY_EXTRAS:
+            if topology.get(extra):
+                raise ValueError(f'{name}: the topology has {extra}, which removing triangles would leave stale')
+        if mesh.get('MorphTargets'):
+            raise ValueError(f'{name}: morph targets are not handled')
+        triangles = np.array(topology['Indices16'], dtype=np.int64).reshape(-1, 3)
+        extended = mesh['ExtendedData']['$value']
+        scale = float(extended.get('VertexScale') or 1.0)
+        positions = np.array([it['Position'][:3] for it in items], dtype=np.float64) / 32767.0 * scale
+        bindings = [b['BoneName'] for b in mesh['BoneBindings']]
+        skinned = 'BoneWeights' in items[0]
+        if skinned:
+            weights = np.array([it['BoneWeights'] for it in items], dtype=np.float64) / 255.0
+            slots = np.array([it['BoneIndices'] for it in items], dtype=np.int64)
+        gone = np.zeros(len(triangles), dtype=bool)
+        for rule in applies:
+            if 'bones' in rule:
+                picked = _selected_bones(bone_names or bindings, rule['bones'])
+                if rule.get('below'):
+                    picked = _below(bone_names, parents, picked)
+                hits = np.array([b in picked for b in bindings], dtype=bool)
+                if skinned:
+                    follow = (weights * hits[slots]).sum(1)
+                else:
+                    follow = np.full(len(items), 1.0 if hits[:1].any() else 0.0)
+                chosen = follow >= float(rule.get('weight', 0.5))
+            elif 'box' in rule:
+                low, high = np.array(rule['box']['min'], dtype=float), np.array(rule['box']['max'], dtype=float)
+                chosen = ((positions >= low) & (positions <= high)).all(1)
+                if rule.get('outside'):
+                    chosen = ~chosen
+            else:
+                raise ValueError('a remove rule needs "bones" or "box"')
+            per_triangle = chosen[triangles]
+            gone |= per_triangle.any(1) if rule.get('any') else per_triangle.all(1)
+        if not gone.any():
+            report.append(f'{name}: nothing removed')
+            continue
+        if gone.all():
+            raise ValueError(f'{name}: the rules would remove every triangle; drop the model instead')
+        # Material groups keep their order; each keeps the triangles left in its range.
+        kept_rows, groups = [], []
+        for group in topology['Groups']:
+            first, count = group['TriFirst'], group['TriCount']
+            rows = [t for t in range(first, first + count) if not gone[t]]
+            if rows:
+                new = dict(group)
+                new.update({'TriFirst': len(kept_rows), 'TriCount': len(rows)})
+                groups.append(new)
+                kept_rows += rows
+        kept = triangles[kept_rows]
+        used = np.unique(kept)
+        remap = -np.ones(len(items), dtype=np.int64)
+        remap[used] = np.arange(len(used))
+        vertices['$items'] = [items[i] for i in used]
+        topology['Indices16'] = [int(v) for v in remap[kept].reshape(-1)]
+        topology['Groups'] = groups
+        left = positions[used]
+        extended['bbMin'], extended['bbMax'] = [float(v) for v in left.min(0)], [float(v) for v in left.max(0)]
+        homogeneous = np.concatenate([left, np.ones((len(left), 1))], axis=1)
+        for k, binding in enumerate(mesh['BoneBindings']):
+            if skinned:
+                mine = ((slots[used] == k) & (weights[used] > 0)).any(1)
+            else:
+                mine = np.full(len(used), k == 0)
+            if binding['BoneName'] in inverse and mine.any():
+                local = homogeneous[mine] @ inverse[binding['BoneName']]
+                binding['OBBMin'] = [float(v) for v in local[:, :3].min(0)]
+                binding['OBBMax'] = [float(v) for v in local[:, :3].max(0)]
+            if binding.get('TriangleIndices'):
+                binding['TriangleIndices'] = []
+        report.append(f'{name}: {int(gone.sum())} of {len(triangles)} triangles and '
+                      f'{len(items) - len(used)} of {len(items)} vertices removed')
+    out = Granny.Writer(source.tag, tuple(source.extra_tags)).build(source.describe(source.root_type), tree)
+    return out, report
+
+
+def main(argv):
+    """python GrannyMesh.py remove <in.model> <out.model> <rules.json or a JSON list>"""
+    import json
+    import os
+    if len(argv) != 4 or argv[0] != 'remove':
+        print(main.__doc__)
+        return 2
+    _, source, target, rules = argv
+    rules = json.load(open(rules, encoding='utf-8')) if os.path.isfile(rules) else json.loads(rules)
+    with open(source, 'rb') as f:
+        data, report = remove_geometry(f.read(), rules if isinstance(rules, list) else [rules])
+    if os.path.dirname(target):
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+    with open(target, 'wb') as f:
+        f.write(data)
+    print('\n'.join(report))
+    return 0
+
+
+if __name__ == '__main__':
+    import sys
+    sys.exit(main(sys.argv[1:]))

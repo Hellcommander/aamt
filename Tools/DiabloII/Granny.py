@@ -194,11 +194,16 @@ class GrannyFile:
         raise ValueError(f'member type {kind}')
 
     def describe(self, type_addr, _seen=None):
-        """A type definition as JSON-ready data (enough to write it back with Writer)."""
-        seen = _seen or set()
+        """A type definition as JSON-ready data (enough to write it back with Writer).
+
+        A member whose type is one of the structs it sits in is marked '$recursive' (the struct
+        that holds the member) or '$recursive:N' (N structs further out: a material map's Map is
+        a material, '$recursive:1')."""
+        seen = _seen or ()
         if type_addr in seen:
-            return '$recursive'
-        seen = seen | {type_addr}
+            up = len(seen) - 1 - seen.index(type_addr)
+            return '$recursive' if up == 0 else '$recursive:%d' % up
+        seen = seen + (type_addr,)
         out = []
         for m in self.type_of(type_addr):
             d = {'name': m['name'], 'type': TYPE_NAMES[m['type']]}
@@ -303,19 +308,20 @@ class Writer:
         return self._strings[key]
 
     # -- types
-    def _type(self, desc):
+    def _type(self, desc, _outer=()):
         key = _freeze(desc)
         if key in self._types:
             return self._types[key]
-        subs = [self._type(m['of']) if isinstance(m.get('of'), list) else None for m in desc]
         at = self._alloc(6, MEMBER_SIZE * (len(desc) + 1))
         here = self._types[key] = (6, at)
+        stack = _outer + (here,)
+        subs = [self._type(m['of'], stack) if isinstance(m.get('of'), list) else None for m in desc]
         for i, m in enumerate(desc):
             o = at + i * MEMBER_SIZE
             struct.pack_into('<I', self.buf[6], o, TYPE_NAMES.index(m['type']))
             self._point(6, o + 4, self._string(m['name'], 6))
-            if m.get('of') == '$recursive':
-                self._point(6, o + 12, here)
+            if _recursion(m.get('of')) is not None:
+                self._point(6, o + 12, stack[-1 - _recursion(m['of'])])
             else:
                 self._point(6, o + 12, subs[i])
             struct.pack_into('<4I', self.buf[6], o + 20, m.get('width', 0), *m.get('extra', (0, 0, 0)))
@@ -335,35 +341,36 @@ class Writer:
         return one * max(1, m.get('width', 0))
 
     # -- objects
-    def _struct(self, desc, obj, section, at):
+    def _struct(self, desc, obj, section, at, outer=()):
+        outer = outer + (desc,)
         for m, name in zip(desc, member_keys(m['name'] for m in desc)):
             width = m.get('width', 0)
             value = obj[name]
             if width:
                 step = self._member_size(m) // width
                 for i in range(width):
-                    self._value(m, value[i], section, at + i * step)
+                    self._value(m, value[i], section, at + i * step, outer)
             else:
-                self._value(m, value, section, at)
+                self._value(m, value, section, at, outer)
             at += self._member_size(m)
 
-    def _new(self, desc, obj):
+    def _new(self, desc, obj, outer=()):
         key = (_freeze(desc), _freeze(obj))
         if key not in self._made:
             at = self._alloc(0, self._size(desc))
             self._made[key] = (0, at)
-            self._struct(desc, obj, 0, at)
+            self._struct(desc, obj, 0, at, outer)
         return self._made[key]
 
-    def _new_array(self, desc, items):
+    def _new_array(self, desc, items, outer=()):
         if not items:
             return None
         key = (_freeze(desc), _freeze(items))
         if key not in self._made:
-            self._made[key] = self._write_array(desc, items)
+            self._made[key] = self._write_array(desc, items, outer)
         return self._made[key]
 
-    def _write_array(self, desc, items):
+    def _write_array(self, desc, items, outer=()):
         if len(desc) == 1 and TYPE_NAMES.index(desc[0]['type']) in SCALAR and not desc[0].get('width'):
             code = SCALAR[TYPE_NAMES.index(desc[0]['type'])]
             raw = struct.pack(f'<{len(items)}{code}', *items)
@@ -373,28 +380,30 @@ class Writer:
         size = self._size(desc)
         at = self._alloc(0, size * len(items))
         for i, item in enumerate(items):
-            self._struct(desc, item, 0, at + i * size)
+            self._struct(desc, item, 0, at + i * size, outer)
         return (0, at)
 
-    def _value(self, m, value, section, at):
+    def _value(self, m, value, section, at, outer=()):
         kind = TYPE_NAMES.index(m['type'])
         b = self.buf[section]
         of = m.get('of')
+        if _recursion(of) is not None:   # a member whose type is a struct it sits in (a material map's Map)
+            of = outer[-1 - _recursion(of)]
         if kind in SCALAR:
             struct.pack_into('<' + SCALAR[kind], b, at, value)
         elif kind == T_STRING:
             if value is not None:
                 self._point(section, at, self._string(value, 0))
         elif kind == T_INLINE:
-            self._struct(of, value, section, at)
+            self._struct(of, value, section, at, outer)
         elif kind == T_REF:
             if value is not None:
-                self._point(section, at, self._new(of, value))
+                self._point(section, at, self._new(of, value, outer))
         elif kind == T_EMPTY_REF:
             pass
         elif kind == T_REF_ARRAY:
             struct.pack_into('<I', self.buf[section], at, len(value))
-            self._point(section, at + 4, self._new_array(of, value))
+            self._point(section, at + 4, self._new_array(of, value, outer))
         elif kind == T_ARRAY_OF_REFS:
             struct.pack_into('<I', self.buf[section], at, len(value))
             if value:
@@ -402,7 +411,7 @@ class Writer:
                 self._point(section, at + 4, (0, table))
                 for i, item in enumerate(value):
                     if item is not None:
-                        self._point(0, table + 8 * i, self._new(of, item))
+                        self._point(0, table + 8 * i, self._new(of, item, outer))
         elif kind == T_VARIANT:
             if value is not None:
                 self._point(section, at, self._type(value['$type']))
@@ -457,6 +466,13 @@ def member_keys(names):
 
 
 _frozen = {}
+
+
+def _recursion(of):
+    """How many structs out a '$recursive' type marker points (0 = the one holding the member), or None."""
+    if isinstance(of, str) and of.startswith('$recursive'):
+        return int(of.split(':', 1)[1]) if ':' in of else 0
+    return None
 
 
 def _freeze(value):
