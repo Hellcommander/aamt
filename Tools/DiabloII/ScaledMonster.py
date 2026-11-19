@@ -324,14 +324,31 @@ def reshape_models(archive, definition, variant, out_dir, write, index):
                 stem = component['filename'][len('data/'):-len('.model')]
                 sources = [f for f in files if f == f'{stem}.model' or (f.startswith(f'{stem}_lod') and f.endswith('.model'))]
                 if not sources:
-                    raise FileNotFoundError(f"{name}: no model files for {component['filename']}")
+                    # Some stock definitions list models that are not in the archive at all (the
+                    # Balrog's rhand_flb/wax/wsc/wsd weapon slots); the game skips them. Leave the
+                    # component pointing at its stock path and say so, instead of refusing the variant.
+                    written.append({'file': None, 'from': component['filename'], 'edits': ['not in the archive: left as it is (the game skips it too)']})
+                    continue
                 new_stem = f"hd/character/enemy/{name}/{stem.split('/')[-1]}"
                 for source in sorted(sources):
                     model = GrannyMesh.Model(fetch(source))
                     report = GrannyMesh.reshape(model, bones, spec.get('quills'), spec.get('bulk'), spec.get('shape'))
                     report += point_textures(model, variant.get('retexture', []))
                     target = new_stem + source[len(stem):]
-                    if write:
+                    if spec.get('remove'):
+                        # Geometry removal rebuilds the file (GrannyMesh.remove_geometry), after the
+                        # in-place edits above.
+                        edited = os.path.join(work, 'edited.model')
+                        model.save(edited)
+                        with open(edited, 'rb') as f:
+                            data, lines = GrannyMesh.remove_geometry(f.read(), spec['remove'])
+                        report += lines
+                        if write:
+                            path = os.path.join(out_dir, *target.split('/'))
+                            os.makedirs(os.path.dirname(path), exist_ok=True)
+                            with open(path, 'wb') as f:
+                                f.write(data)
+                    elif write:
                         model.save(os.path.join(out_dir, *target.split('/')))
                     written.append({'file': target, 'from': source, 'edits': report})
                 # The game only draws models listed in hd/model_lod_desc.bin (see ModelLodDesc.py).
