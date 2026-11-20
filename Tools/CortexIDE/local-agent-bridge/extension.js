@@ -212,6 +212,12 @@ function activate(context) {
   context.subscriptions.push(agentStatus);
 
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.openAgent", () => agent.focus()));
+  // Memory between chats (lib/memory.js): manage, add, import, export, generate now.
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.memoryManage", () => agent.manageMemory()));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.memoryAdd", () => agent.addMemory()));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.memoryImport", () => agent.importMemory()));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.memoryExport", () => agent.exportMemory()));
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.memoryGenerate", () => agent.generateMemorySoon(agent.active(), { force: true })));
   // Canvases of other workspaces (a moved project, a second checkout): hard-link them into this one.
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.linkCanvas", async (file) => {
     const link = require("./lib/canvas-link");
@@ -270,6 +276,8 @@ function activate(context) {
   setTimeout(() => agent.takeHandoff().catch(() => {}), 1500);
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentPickModel", () => agent.pickModel()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentNewChat", () => agent.newChat()));
+  // A chat that works in any folder, opened in this window (no window switch).
+  context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentNewChatInFolder", (folder) => agent.newChatInFolder(folder)));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentStop", () => agent.stop()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentHistory", () => agent.showHistory()));
   context.subscriptions.push(vscode.commands.registerCommand("localAgentBridge.agentRunOnModels", () => agent.runOnModelsFromComposer()));

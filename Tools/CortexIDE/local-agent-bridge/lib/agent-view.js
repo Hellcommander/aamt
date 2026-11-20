@@ -14,6 +14,7 @@ const { parseChatFile } = require("./import-chat");
 const claudeCode = require("./claude-code");
 const { SessionStore, titleFrom, listClaudeCodeSessions, listWorkspaces, readForeignChat } = require("./sessions");
 const sessionLimits = require("./session-limits");
+const memoryLib = require("./memory");
 const mcpClient = require("./mcp-client");
 const compress = require("./compress");
 const fileRef = require("./file-ref");
@@ -30,6 +31,8 @@ const NON_TEXT = /\.(png|jpe?g|gif|webp|bmp|ico|tiff?|tga|dds|psd|pdf|zip|7z|rar
 /** Pre-2.7 single conversation; moved into the history cache on first use. */
 const STATE_KEY = "localAgentBridge.agent.conversation";
 const ACTIVE_KEY = "localAgentBridge.agent.activeSession";
+/** Chats of other workspace folders attached to this window (they run in their own folder). */
+const ATTACHED_KEY = "localAgentBridge.agent.attachedChats";
 const SECRET_KEY = "localAgentBridge.anthropicApiKey";
 const MAX_LOG = 400;
 const MAX_HISTORY_TURNS = 12;
@@ -58,6 +61,11 @@ function transcript(s, where) {
 
 function folders() {
   return (vscode.workspace.workspaceFolders || []).map((f) => f.uri.fsPath);
+}
+
+function sameDir(a, b) {
+  if (!a || !b) return !a && !b;
+  return path.resolve(a).toLowerCase().replace(/[\\/]+$/, "") === path.resolve(b).toLowerCase().replace(/[\\/]+$/, "");
 }
 
 /** The model's own output cap as discovered (Claude's max_tokens), 0 = unknown. */
@@ -153,9 +161,10 @@ function gitSummary(root) {
   }
 }
 
-function editorEnv() {
-  const ed = vscode.window.activeTextEditor;
-  const roots = folders();
+function editorEnv(forRoots) {
+  const roots = forRoots && forRoots.length ? forRoots : folders();
+  // The editor's state belongs to this window's folder; a chat working in another folder does not get it.
+  const ed = sameDir(roots[0] || "", folders()[0] || "") ? vscode.window.activeTextEditor : null;
   // AGENTS.md / CLAUDE.md / .cursorrules of every folder and its parents up to the repo root, a global
   // ~/.cortexide/AGENTS.md, Cursor alwaysApply rules and localAgentBridge.agent.instructions.
   let ins = { text: "", files: [] };
@@ -377,6 +386,48 @@ class AgentViewProvider {
   }
 
   /**
+   * The history store of any workspace folder (same history root). This window's own folder is
+   * store(); other folders' stores serve chats attached to this window, which run in their folder.
+   */
+  storeOf(ws) {
+    const w = String(ws || "");
+    const mine = this.store();
+    if (!w || sameDir(w, mine.workspace)) return mine;
+    this.otherStores = this.otherStores || new Map();
+    const key = path.resolve(w).toLowerCase() + "|" + (this.sessionsRoot || "");
+    if (!this.otherStores.has(key)) this.otherStores.set(key, new SessionStore({ root: this.sessionsRoot || undefined, workspace: w, limit: cfg().get("historyLimit", 200) }));
+    return this.otherStores.get(key);
+  }
+
+  /** The store a chat belongs to (its own workspace folder). */
+  storeFor(s) {
+    return s && s.workspace ? this.storeOf(s.workspace) : this.store();
+  }
+
+  /** The folders a chat works in: its own folder when it belongs to another one, else this window's. */
+  rootsFor(s) {
+    const mine = folders();
+    if (!s || !s.workspace || mine.some((f) => sameDir(f, s.workspace))) return mine;
+    return [s.workspace];
+  }
+
+  /** Chats of other folders shown and run in this window: id → folder (kept per window). */
+  attached() {
+    if (!this.attachedMap) {
+      const saved = (this.context && this.context.workspaceState.get(ATTACHED_KEY)) || [];
+      this.attachedMap = new Map((Array.isArray(saved) ? saved : []).filter((x) => x && x.id && x.workspace).map((x) => [x.id, x.workspace]));
+    }
+    return this.attachedMap;
+  }
+
+  setAttached(id, ws) {
+    const m = this.attached();
+    if (ws) m.set(id, ws);
+    else m.delete(id);
+    Promise.resolve(this.context.workspaceState.update(ATTACHED_KEY, [...m].map(([i, w]) => ({ id: i, workspace: w })))).catch(() => {});
+  }
+
+  /**
    * Another CortexIDE window on this workspace writes the same main index: when it changes on disk,
    * merge it in and redraw the tabs and history (new chats, renames, deletions, its running chats).
    */
@@ -421,7 +472,11 @@ class AgentViewProvider {
   session(id) {
     if (!id) return null;
     const r = this.runs.get(id);
-    return r ? r.s : this.store().get(id);
+    if (r) return r.s;
+    const own = this.store().get(id);
+    if (own) return own;
+    const ws = this.attached().get(id);
+    return ws ? this.storeOf(ws).get(id) : null;
   }
 
   /** The chat on screen; falls back to the most recent open chat, or a new one. */
@@ -451,20 +506,27 @@ class AgentViewProvider {
     const at = h.findIndex((e) => e && e.summary);
     const head = at >= 0 && h.length - at > MAX_HISTORY_TURNS * 2 ? h.slice(at, at + 2) : [];
     s.history = [...head, ...h.slice(-MAX_HISTORY_TURNS * 2)];
-    this.store().save(s, opts);
+    this.storeFor(s).save(s, opts);
     this.postSessions();
   }
 
   /** A new chat on the default backend and model (the last one picked), unless init says otherwise. */
   createSession(init = {}) {
     const c = cfg();
-    return this.store().create({
+    // A chat may be started in another folder: it lives in that folder's history and runs there.
+    const ws = init.workspace && !folders().some((f) => sameDir(f, init.workspace)) ? init.workspace : "";
+    const st = ws ? this.storeOf(ws) : this.store();
+    if (ws) init = { ...init };
+    delete init.workspace;
+    const s = st.create({
       provider: c.get("provider", "auto"),
       baseUrl: c.get("baseUrl", ""),
       model: c.get("model", ""),
       limits: sessionLimits.normalize({ preset: c.get("defaultSessionLimits", "standard") }),
       ...init,
     });
+    if (ws) this.setAttached(s.id, ws);
+    return s;
   }
 
   /** Show a chat in the panel. Other chats keep running in the background. */
@@ -476,9 +538,10 @@ class AgentViewProvider {
     if (s.unread || s.open === false) {
       s.unread = false;
       s.open = true;
-      this.store().update(s.id, { unread: false, open: true });
+      this.storeFor(s).update(s.id, { unread: false, open: true });
     }
-    this.post({ type: "restore", sid: s.id, title: s.title, log: s.log || [], todos: s.todos || [], busy: this.runs.has(s.id), pending: this.queues.has(s.id) ? this.queues.get(s.id).list() : [] });
+    const elsewhere = s.workspace && !folders().some((f) => sameDir(f, s.workspace)) ? s.workspace : "";
+    this.post({ type: "restore", sid: s.id, title: s.title, log: s.log || [], todos: s.todos || [], busy: this.runs.has(s.id), pending: this.queues.has(s.id) ? this.queues.get(s.id).list() : [], workspace: elsewhere });
     this.postSessions();
     await this.refreshBackend(false);
     this.postInfo();
@@ -487,9 +550,21 @@ class AgentViewProvider {
 
   /** The chat list for the history drawer and the tab strip. */
   postSessions() {
-    const items = this.store()
-      .list()
+    const own = this.store().list();
+    const extra = [];
+    for (const [id, ws] of this.attached()) {
+      try {
+        const e = this.storeOf(ws).meta(id);
+        if (e) extra.push({ ...e, workspace: ws });
+        else this.setAttached(id, "");
+      } catch {
+        /* folder gone */
+      }
+    }
+    const items = [...own, ...extra]
       .map((e) => ({
+        folder: e.workspace ? path.basename(e.workspace) || e.workspace : "",
+        workspace: e.workspace || "",
         id: e.id,
         title: e.title || "New chat",
         created: e.created || 0,
@@ -512,7 +587,7 @@ class AgentViewProvider {
     const t = await vscode.window.showInputBox({ prompt: "Chat title", value: s.title || "", ignoreFocusOut: true });
     if (t === undefined || !t.trim()) return;
     s.title = t.trim().slice(0, 120);
-    this.store().update(s.id, { title: s.title });
+    this.storeFor(s).update(s.id, { title: s.title });
     this.postSessions();
   }
 
@@ -520,7 +595,7 @@ class AgentViewProvider {
     const s = this.session(id);
     if (!s) return;
     s.pinned = !s.pinned;
-    this.store().update(s.id, { pinned: s.pinned });
+    this.storeFor(s).update(s.id, { pinned: s.pinned });
     this.postSessions();
   }
 
@@ -529,7 +604,9 @@ class AgentViewProvider {
     const s = this.session(id);
     if (!s) return;
     s.open = false;
-    this.store().update(s.id, { open: false });
+    this.storeFor(s).update(s.id, { open: false });
+    // An attached chat of another folder leaves this window when its tab closes (it stays in its folder's history).
+    if (this.attached().has(s.id) && !this.runs.has(s.id)) this.setAttached(s.id, "");
     if (s.id === this.activeId) await this.switchAway(s.id);
     else this.postSessions();
   }
@@ -555,12 +632,13 @@ class AgentViewProvider {
       s.deleted = true;
       running.controller.abort();
     }
-    if (!this.store().remove(s.id)) {
-      if (this.store().runningElsewhere(s.id)) vscode.window.showWarningMessage("That chat is running in another CortexIDE window; stop it there first.");
+    if (!this.storeFor(s).remove(s.id)) {
+      if (this.storeFor(s).runningElsewhere(s.id)) vscode.window.showWarningMessage("That chat is running in another CortexIDE window; stop it there first.");
       this.postSessions();
       return;
     }
     this.ccSeen.delete(s.id);
+    this.setAttached(s.id, "");
     if (s.id === this.activeId) await this.switchAway(s.id);
     else this.postSessions();
   }
@@ -595,14 +673,17 @@ class AgentViewProvider {
     const name = ws ? path.basename(ws) || ws : folderSlug;
     const items = [];
     if (ws && fs.existsSync(ws)) {
+      items.push({ label: "$(comment-discussion) Open it here", description: "it keeps working in “" + name + "”: its tools, git, checks and project memory are that folder's", act: "attach" });
       items.push({ label: "$(empty-window) Open “" + name + "” in a new window", description: "the chat is in that window's Agent history", act: "window" });
-      items.push({ label: "$(folder-opened) Open “" + name + "” in this window", act: "here" });
+      items.push({ label: "$(folder-opened) Switch this window to “" + name + "”", act: "here" });
     }
     items.push({ label: "$(copy) Continue it in this workspace", description: "copies the chat (log, history, plan) into a new chat here", act: "copy" });
     items.push({ label: "$(markdown) Read it", description: "read-only Markdown transcript", act: "read" });
     const pick = await vscode.window.showQuickPick(items, { title: "“" + (s.title || "New chat") + "” · " + name, placeHolder: ws || folderSlug });
     if (!pick) return;
-    if (pick.act === "window" || pick.act === "here") {
+    if (pick.act === "attach") {
+      await this.attachChat(id, ws);
+    } else if (pick.act === "window" || pick.act === "here") {
       await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(ws), { forceNewWindow: pick.act === "window" });
     } else if (pick.act === "copy") {
       const c = this.createSession({
@@ -621,6 +702,50 @@ class AgentViewProvider {
       const doc = await vscode.workspace.openTextDocument({ language: "markdown", content: transcript(s, ws || folderSlug) });
       await vscode.window.showTextDocument(doc, { preview: true });
     }
+  }
+
+  /** Show a chat of another folder in this window; it keeps working in its own folder. */
+  async attachChat(id, ws) {
+    if (!ws || !fs.existsSync(ws)) {
+      vscode.window.showWarningMessage("The folder no longer exists: " + ws);
+      return;
+    }
+    const st = this.storeOf(ws);
+    if (st.runningElsewhere(id)) {
+      vscode.window.showWarningMessage("That chat is running in another CortexIDE window; it can be opened here when it stops.");
+      return;
+    }
+    if (!folders().some((f) => sameDir(f, ws))) this.setAttached(id, ws);
+    st.update(id, { open: true });
+    await this.setActive(id);
+    await this.focus();
+  }
+
+  /** Agent: New Chat in Folder… — a chat that works in any folder, without opening it in a window. */
+  async newChatInFolder(folder) {
+    let ws = typeof folder === "string" ? folder : folder && folder.fsPath ? folder.fsPath : "";
+    if (!ws) {
+      const known = [];
+      try {
+        for (const w of listWorkspaces({ root: this.store().root, current: folders() })) if (w.workspace && w.exists !== false) known.push(w.workspace);
+      } catch {
+        /* no master index yet */
+      }
+      const items = [...new Set([...folders(), ...known])].map((w) => ({ label: path.basename(w) || w, description: w, ws: w }));
+      items.push({ label: "$(folder) Choose a folder…", ws: "" });
+      const pick = await vscode.window.showQuickPick(items, { placeHolder: "Folder the new chat works in (it opens in this window)" });
+      if (!pick) return;
+      ws = pick.ws;
+      if (!ws) {
+        const got = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, openLabel: "Chat in this folder" });
+        if (!got || !got.length) return;
+        ws = got[0].fsPath;
+      }
+    }
+    const c = this.createSession({ workspace: ws });
+    await this.setActive(c.id);
+    await this.focus();
+    return c;
   }
 
   /**
@@ -642,12 +767,19 @@ class AgentViewProvider {
     const name = path.basename(ws) || ws;
     const pick = await vscode.window.showQuickPick(
       [
+        { label: "$(comment-discussion) Here, working in “" + name + "”", description: "no window change: the chat's tools, git, checks and memory use that folder", act: "attach" },
         { label: "$(empty-window) New window", description: "open “" + name + "” beside this one and start a chat there", act: "window" },
-        { label: "$(folder-opened) This window", description: "switch this window to “" + name + "”", act: "here" },
+        { label: "$(folder-opened) Switch this window", description: "switch this window to “" + name + "”", act: "here" },
       ],
       { title: "Start a chat in “" + name + "”", placeHolder: ws }
     );
     if (!pick) return;
+    if (pick.act === "attach") {
+      const c = this.createSession({ workspace: ws });
+      await this.setActive(c.id);
+      await this.focus();
+      return;
+    }
     writeHandoff(this.store().root, { workspace: ws, action: "newChat" });
     await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(ws), { forceNewWindow: pick.act === "window" });
   }
@@ -656,10 +788,10 @@ class AgentViewProvider {
    * One !`command` block of a custom command, run in the first folder (the command file is trusted, as
    * in opencode; localAgentBridge.agent.shell = off still turns them off). Returns its output.
    */
-  async commandShell(command) {
+  async commandShell(command, roots) {
     const a = cfg();
     if (a.get("shell", "auto") === "off") return "(not run: localAgentBridge.agent.shell = off)";
-    const ctx = new ToolContext({ roots: folders(), writableRoots: a.get("writableRoots", []), shellMode: "auto", shellTimeoutSec: 60, rgPath: defaultRgPath(vscode.env.appRoot) });
+    const ctx = new ToolContext({ roots: roots && roots.length ? roots : folders(), writableRoots: a.get("writableRoots", []), shellMode: "auto", shellTimeoutSec: 60, rgPath: defaultRgPath(vscode.env.appRoot) });
     const out = await execTool(ctx, "Shell", { command });
     return String(out).replace(/^exit 0 \(cwd [^\n]*\)\n/, "").replace(/^\(no output\)$/, "");
   }
@@ -700,7 +832,7 @@ class AgentViewProvider {
     s.provider = provider;
     s.baseUrl = baseUrl || "";
     s.model = model || "";
-    this.store().update(s.id, { provider: s.provider, baseUrl: s.baseUrl, model: s.model });
+    this.storeFor(s).update(s.id, { provider: s.provider, baseUrl: s.baseUrl, model: s.model });
     this.postSessions();
   }
 
@@ -767,6 +899,7 @@ class AgentViewProvider {
       else if (m.type === "search") this.searchSessions(m.q);
       else if (m.type === "tree") this.postTree();
       else if (m.type === "foreign") await this.openForeign(m.slug, m.id);
+      else if (m.type === "attach") await this.attachChat(m.id, m.workspace || (readForeignChat(this.store().root, m.slug, m.id) || {}).workspace || "");
       else if (m.type === "pinForeign") this.pinForeign(m.slug, m.id);
       else if (m.type === "openFolder" && m.path) await vscode.commands.executeCommand("vscode.openFolder", vscode.Uri.file(String(m.path)), { forceNewWindow: true });
       else if (m.type === "multi") await this.runOnModels(m.text);
@@ -965,7 +1098,7 @@ class AgentViewProvider {
   pullInbox(s) {
     let got = [];
     try {
-      got = steer.takeInbox(this.store().chatDir(s.id));
+      got = steer.takeInbox(this.storeFor(s).chatDir(s.id));
     } catch {
       return 0;
     }
@@ -1086,7 +1219,7 @@ class AgentViewProvider {
     const post = (m) => this.post({ ...m, sid: s.id });
     // /commands, /agents: list them. /name args: a custom command from a Markdown file, expanded first.
     if (/^\/(commands|help|agents)\s*$/i.test(text)) {
-      const roots = folders();
+      const roots = this.rootsFor(s);
       const list = /agents/i.test(text)
         ? agentsLib.loadAgents(roots).filter((x) => !x.hidden).map((x) => "@" + x.name + " (" + x.mode + ") — " + (x.description || "") + (x.file ? " · " + x.file : "")).join("\n")
         : "/compress [focus] — summarise this chat\n/agents — list agents (@name at the start of a message picks one)\n" + commandsLib.listing(commandsLib.loadCommands(roots));
@@ -1095,10 +1228,10 @@ class AgentViewProvider {
       return;
     }
     let cmdAgent = "";
-    const custom = !compress.parseCommand(text) ? commandsLib.match(text, commandsLib.loadCommands(folders())) : null;
+    const custom = !compress.parseCommand(text) ? commandsLib.match(text, commandsLib.loadCommands(this.rootsFor(s))) : null;
     if (custom) {
       post({ type: "status", transient: true, text: "Expanding /" + custom.command.name + "…" });
-      const ex = await commandsLib.expand(custom.command, custom.args, (c) => this.commandShell(c));
+      const ex = await commandsLib.expand(custom.command, custom.args, (c) => this.commandShell(c, this.rootsFor(s)));
       cmdAgent = ex.agent;
       text = (cmdAgent ? "@" + cmdAgent + " " : "") + ex.prompt;
       if (!ex.prompt) return;
@@ -1110,10 +1243,10 @@ class AgentViewProvider {
       post({ type: "busy" });
       return;
     }
-    if (this.store().runningElsewhere(s.id)) {
+    if (this.storeFor(s).runningElsewhere(s.id)) {
       // The window running it reads the chat's inbox and takes the message in there.
       try {
-        steer.postInbox(this.store().chatDir(s.id), { text, mode: steer.modeFor(text, steer.MODES.includes(mode) ? mode : cfg().get("steerDefault", "steer")), from: "another window" });
+        steer.postInbox(this.storeFor(s).chatDir(s.id), { text, mode: steer.modeFor(text, steer.MODES.includes(mode) ? mode : cfg().get("steerDefault", "steer")), from: "another window" });
         post({ type: "status", text: "Sent to this chat in the other CortexIDE window that runs it: “" + text.slice(0, 120) + "”" + (steer.isCommand(text) ? " (runs there when its turn ends)" : "") + ". Its log there shows the reply." });
       } catch (e) {
         vscode.window.showWarningMessage("Could not send to the other window: " + ((e && e.message) || e));
@@ -1147,7 +1280,7 @@ class AgentViewProvider {
       const next = this.nextFollowUp(s, run);
       // The turn is over: other chats may change its files again.
       try {
-        if (!s.deleted) this.store().release(s.id);
+        if (!s.deleted) this.storeFor(s).release(s.id);
       } catch {
         /* index unwritable; claims of a stopped chat are ignored anyway */
       }
@@ -1197,7 +1330,7 @@ class AgentViewProvider {
       if (lim.effort) parts.push("effort " + lim.effort);
       post({ type: "status", transient: true, text: "Limits for this chat: " + lim.label + " · " + parts.join(" · ") + (lim.notes.length ? " (" + lim.notes.join("; ") + ")" : "") });
     }
-    const env = editorEnv();
+    const env = editorEnv(this.rootsFor(s));
     // The agent that runs this turn: "@name" at the start, the composer mode (Plan / Ask), else build.
     let agentList = [];
     try {
@@ -1251,7 +1384,7 @@ class AgentViewProvider {
       // Files edited by this chat are claimed in the folder's main index while it runs, so a
       // chat running beside it cannot overwrite them.
       claim: (abs, kind) => {
-        const o = this.store().claim(s.id, abs, kind);
+        const o = this.storeFor(s).claim(s.id, abs, kind);
         if (!o) return "";
         post({ type: "status", text: "Held back an edit to " + path.basename(abs) + ": chat “" + o.title + "” is changing it." });
         return heldMessage(abs, o);
@@ -1281,6 +1414,18 @@ class AgentViewProvider {
       },
       instructionFiles: env.instructionFiles,
     });
+    // Memory (what the agent keeps between chats) and searching earlier chats, as in Claude.
+    const memOn = a.get("memory", true);
+    if (memOn) {
+      tools.memory = this.memory(s);
+      tools.onMemory = () => this.postPanelsSoon && this.postPanelsSoon();
+      env.memory = tools.memory.promptText({ maxChars: a.get("memoryPromptChars", 6000) });
+      env.memoryOn = true;
+    }
+    if (a.get("memorySearchChats", true)) {
+      tools.chats = { root: this.store().root, folder: path.basename(this.storeFor(s).dir), current: s.id };
+      env.chatSearch = true;
+    }
     if (picked.agent && picked.agent.rules) tools.withAgentRules(picked.agent.rules);
     run.tools = tools;
     run.provider = backend.provider;
@@ -1423,7 +1568,7 @@ class AgentViewProvider {
       if (result.progress) {
         c.progress = result.progress;
         // Each chat has its own progress.md in its session folder: parallel chats never share one.
-        const file = this.store().writeProgress(s.id, new Progress(result.progress).toText());
+        const file = this.storeFor(s).writeProgress(s.id, new Progress(result.progress).toText());
         if (file) post({ type: "status", text: "Progress index: " + file });
       }
       c.status = "done";
@@ -1455,7 +1600,7 @@ class AgentViewProvider {
       }
       if (!s.deleted) {
         try {
-          const st = this.store();
+          const st = this.storeFor(s);
           st.recordTurn(s.id, { prompt: text.slice(0, 300), provider: backend.provider, model, status: c.status, files: card ? card.files.map((f) => f.path) : [] });
           if (card) {
             const shared = st.overlaps(s.id).filter((o) => o.status === "running");
@@ -1469,6 +1614,7 @@ class AgentViewProvider {
           /* the sub-index is a convenience */
         }
       }
+      if (c.status === "done" && backend.provider !== "claude-code") this.generateMemorySoon(s, { backend, model: s.model || model });
       await finish();
     }
   }
@@ -1516,7 +1662,7 @@ class AgentViewProvider {
           // Claude Code edits through its own tools, so the claim can only be recorded (and a
           // clash reported) after the fact.
           try {
-            const o = this.store().claim(c.id, p, "edit");
+            const o = this.storeFor(c).claim(c.id, p, "edit");
             if (o) onEvent({ type: "status", text: "Warning: Claude Code changed " + path.basename(p) + ", which chat “" + o.title + "” is also changing. Check both before keeping either." });
           } catch {
             /* index unwritable */
@@ -1551,6 +1697,211 @@ class AgentViewProvider {
    * /compress [focus]: replace a chat's history with a summary written by the chat's own model,
    * brief on older turns and detailed on the recent ones. Shown and stoppable like a turn.
    */
+  // ---- memory -------------------------------------------------------------------------------
+
+  /** User memory (every workspace) and this workspace's project memory. */
+  memory(s) {
+    const st = s ? this.storeFor(s) : this.store();
+    return new memoryLib.MemoryStore({ root: st.root, projectDir: st.dir });
+  }
+
+  /**
+   * Generate memory from a chat: every localAgentBridge.agent.memoryGenerateEvery turns, the model
+   * reads the turns since the last pass and proposes memory updates. Runs in the background, after
+   * the turn; a failure is only noted.
+   */
+  generateMemorySoon(s, { backend, model, force = false } = {}) {
+    const a = cfg();
+    if (!a.get("memory", true) || (!force && !a.get("memoryGenerate", true))) return;
+    const every = Math.max(1, Number(a.get("memoryGenerateEvery", 3)) || 3);
+    const log = s.log || [];
+    const from = Math.min(Number(s.memoryAt) || 0, log.length);
+    const turns = log.slice(from).filter((e) => e && e.cls === "user" && !e.command).length;
+    if (!force && turns < every) return;
+    if (this.memoryBusy && this.memoryBusy.has(s.id)) return;
+    (this.memoryBusy = this.memoryBusy || new Set()).add(s.id);
+    const post = (m) => this.post({ ...m, sid: s.id });
+    (async () => {
+      try {
+        const r = backend ? { backend, model } : await this.resolveFor(s, false);
+        if (!r.backend || r.backend.provider === "claude-code") return;
+        const tr = compress.buildTranscript({ log: log.slice(from) }, { recentTurns: 6, maxChars: 16000 });
+        if (!tr.turns) return;
+        const store = this.memory(s);
+        const messages = memoryLib.extractionMessages({ transcript: tr.text, existing: store.list(), includeSensitive: a.get("memoryIncludeSensitive", false) });
+        const res = await llm.chat({ backend: r.backend, model: r.model || model, messages, maxTokens: 1500, temperature: 0.1 });
+        const ops = memoryLib.parseOperations(res.content);
+        s.memoryAt = log.length;
+        this.storeFor(s).update(s.id, { memoryAt: s.memoryAt });
+        if (!ops.length) {
+          if (force) post({ type: "status", text: "Memory: nothing new worth remembering in this chat." });
+          return;
+        }
+        const done = memoryLib.applyOperations(store, ops);
+        const parts = [];
+        if (done.added.length) parts.push("added " + done.added.join(", "));
+        if (done.updated.length) parts.push("updated " + done.updated.join(", "));
+        if (done.deleted.length) parts.push("forgot " + done.deleted.join(", "));
+        const note = "Memory " + parts.join("; ") + " (Agent: Manage Memory to review)";
+        (s.log || []).push({ cls: "sys", text: note });
+        post({ type: "status", text: note });
+        await this.saveConv(s);
+      } catch (e) {
+        if (force) post({ type: "status", text: "Memory could not be generated: " + ((e && e.message) || e) });
+      } finally {
+        this.memoryBusy.delete(s.id);
+      }
+    })();
+  }
+
+  /** Agent: Manage Memory — every memory with open / delete, plus add, import, export, settings. */
+  async manageMemory() {
+    const store = this.memory();
+    const qp = vscode.window.createQuickPick();
+    qp.title = "Memory";
+    qp.matchOnDescription = true;
+    qp.matchOnDetail = true;
+    const del = { iconPath: new vscode.ThemeIcon("trash"), tooltip: "Delete this memory" };
+    const edit = { iconPath: new vscode.ThemeIcon("edit"), tooltip: "Edit the file" };
+    const fill = () => {
+      const all = store.list();
+      const actions = [
+        { label: "$(add) Add a memory…", act: "add" },
+        { label: "$(cloud-download) Import memory…", act: "import", description: "from Claude Code or another assistant" },
+        { label: "$(archive) Export memory…", act: "export", description: ".zip of Markdown files" },
+        { label: "$(sparkle) Generate memory from this chat now", act: "generate" },
+        { label: "$(folder-opened) Open the memory folders", act: "folders" },
+        { label: "$(settings-gear) Memory settings", act: "settings" },
+      ];
+      const mem = all.map((m) => ({
+        label: (m.scope === "user" ? "$(account) " : "$(repo) ") + m.name,
+        description: m.type + " · " + (m.scope === "user" ? "about you" : "this project"),
+        detail: m.description,
+        buttons: [edit, del],
+        mem: m,
+      }));
+      qp.items = [...actions, { label: all.length ? all.length + " memories" : "No memories yet", kind: vscode.QuickPickItemKind ? vscode.QuickPickItemKind.Separator : undefined }, ...mem];
+    };
+    fill();
+    qp.onDidTriggerItemButton(async (e) => {
+      const m = e.item.mem;
+      if (!m) return;
+      if (e.button === del) {
+        store.remove(m.name, m.scope);
+        fill();
+      } else {
+        qp.hide();
+        await vscode.window.showTextDocument(vscode.Uri.file(m.file));
+      }
+    });
+    qp.onDidAccept(async () => {
+      const it = qp.selectedItems[0];
+      if (!it) return;
+      qp.hide();
+      if (it.mem) return vscode.window.showTextDocument(vscode.Uri.file(it.mem.file));
+      if (it.act === "add") return this.addMemory();
+      if (it.act === "import") return this.importMemory();
+      if (it.act === "export") return this.exportMemory();
+      if (it.act === "generate") return this.generateMemorySoon(this.active(), { force: true });
+      if (it.act === "settings") return vscode.commands.executeCommand("workbench.action.openSettings", "localAgentBridge.agent.memory");
+      if (it.act === "folders") {
+        for (const sc of store.scopes()) fs.mkdirSync(store.dir(sc), { recursive: true });
+        return vscode.commands.executeCommand("revealFileInOS", vscode.Uri.file(store.dir("user")));
+      }
+    });
+    qp.onDidHide(() => qp.dispose());
+    qp.show();
+  }
+
+  async addMemory() {
+    const body = await vscode.window.showInputBox({ prompt: "What should the agent remember?", placeHolder: "e.g. I prefer PowerShell examples; never commit to main" });
+    if (!body) return;
+    const scope = await vscode.window.showQuickPick(
+      [
+        { label: "About me", description: "every workspace", scope: "user" },
+        { label: "About this project", description: path.basename(folders()[0] || "") || "this workspace", scope: "project" },
+      ],
+      { placeHolder: "Where does it apply?" }
+    );
+    if (!scope) return;
+    const type = await vscode.window.showQuickPick(
+      [
+        { label: "user", description: "who you are, how you work" },
+        { label: "feedback", description: "how the agent should work" },
+        { label: "project", description: "goals and constraints not in the code" },
+        { label: "reference", description: "where something lives" },
+      ],
+      { placeHolder: "Kind of memory" }
+    );
+    if (!type) return;
+    const file = this.memory().write({ scope: scope.scope, name: body.split(/\s+/).slice(0, 6).join(" "), description: body, type: type.label, body });
+    vscode.window.showInformationMessage("Saved to memory: " + path.basename(file));
+  }
+
+  /** Import memory: Claude Code memory folders, a folder of Markdown files, or another assistant's answer. */
+  async importMemory() {
+    const store = this.memory();
+    const ws = folders()[0] || "";
+    const claudeDir = ws ? path.join(os.homedir(), ".claude", "projects", require("./sessions").slug(ws), "memory") : "";
+    const items = [];
+    if (claudeDir && fs.existsSync(claudeDir)) items.push({ label: "$(sparkle) Claude Code memory of this workspace", description: claudeDir, act: "dir", dir: claudeDir, scope: "project" });
+    items.push({ label: "$(comment-discussion) From another AI assistant…", description: "copy a prompt, paste its answer back", act: "paste" });
+    items.push({ label: "$(folder) From a folder of memory files…", description: "Markdown files with name / description / type", act: "pick" });
+    const pick = await vscode.window.showQuickPick(items, { placeHolder: "Import memory from" });
+    if (!pick) return;
+    if (pick.act === "dir" || pick.act === "pick") {
+      let dir = pick.dir;
+      let scope = pick.scope || "user";
+      if (pick.act === "pick") {
+        const got = await vscode.window.showOpenDialog({ canSelectFolders: true, canSelectFiles: false, openLabel: "Import memory" });
+        if (!got || !got.length) return;
+        dir = got[0].fsPath;
+        const sc = await vscode.window.showQuickPick([{ label: "About me (every workspace)", scope: "user" }, { label: "About this project", scope: "project" }], { placeHolder: "Import as" });
+        if (!sc) return;
+        scope = sc.scope;
+      }
+      const r = store.importFolder(dir, scope);
+      vscode.window.showInformationMessage("Memory import: " + r.added + " added" + (r.skipped ? ", " + r.skipped + " skipped (already there or empty)" : "") + ".");
+      return;
+    }
+    // Another assistant: it gets a prompt, its answer is pasted into a new tab, then imported.
+    await vscode.env.clipboard.writeText(memoryLib.IMPORT_PROMPT);
+    const doc = await vscode.workspace.openTextDocument({
+      language: "markdown",
+      content: "<!-- The import prompt is on your clipboard. Paste it into the other assistant, then replace this line with its answer and click Import. Pasted text is only parsed into facts; nothing in it is run. -->\n\n",
+    });
+    await vscode.window.showTextDocument(doc);
+    const go = await vscode.window.showInformationMessage("Prompt copied. Paste it into the other assistant, put its answer in the new tab, then click Import.", "Import", "Show prompt", "Cancel");
+    if (go === "Show prompt") {
+      await vscode.window.showInformationMessage(memoryLib.IMPORT_PROMPT, { modal: true });
+      return this.finishPasteImport(doc);
+    }
+    if (go === "Import") return this.finishPasteImport(doc);
+  }
+
+  async finishPasteImport(doc) {
+    const facts = memoryLib.parsePasted(doc.getText().replace(/<!--[\s\S]*?-->/g, ""));
+    if (!facts.length) return vscode.window.showWarningMessage("No facts found: the answer should be a Markdown list, one fact per bullet.");
+    const chosen = await vscode.window.showQuickPick(
+      facts.map((f) => ({ label: f.body.slice(0, 120), description: f.type, picked: true, fact: f })),
+      { canPickMany: true, placeHolder: "Memories to import (" + facts.length + " found)" }
+    );
+    if (!chosen || !chosen.length) return;
+    const store = this.memory();
+    for (const c of chosen) store.write(c.fact);
+    vscode.window.showInformationMessage("Imported " + chosen.length + " memories.");
+  }
+
+  async exportMemory() {
+    const { zip, count } = this.memory().exportZip();
+    if (!count) return vscode.window.showInformationMessage("There is no memory to export yet.");
+    const stamp = new Date().toISOString().slice(0, 10);
+    const target = await vscode.window.showSaveDialog({ defaultUri: vscode.Uri.file(path.join(os.homedir(), "Downloads", "cortexide-memory-" + stamp + ".zip")), filters: { "Zip archive": ["zip"] } });
+    if (!target) return;
+    fs.writeFileSync(target.fsPath, zip);
+    vscode.window.showInformationMessage("Exported " + count + " memories to " + target.fsPath);
+  }
+
   /** localAgentBridge.agent.autoCompactPercent of the context window is filled by the history alone. */
   async autoCompactDue(s) {
     const pct = Number(cfg().get("autoCompactPercent", 60)) || 0;
@@ -1568,7 +1919,7 @@ class AgentViewProvider {
   async compressChat(s, focus, opts = {}) {
     if (!s) return;
     const post = (m) => this.post({ ...m, sid: s.id });
-    if (this.runs.has(s.id) || this.store().runningElsewhere(s.id)) {
+    if (this.runs.has(s.id) || this.storeFor(s).runningElsewhere(s.id)) {
       // From the menu or command palette while it works: queue it like a typed /compress.
       return this.send("/compress" + (focus ? " " + focus : ""), s.id, "queue");
     }
@@ -1630,6 +1981,7 @@ class AgentViewProvider {
       if (controller.signal.aborted) throw new Error("stopped");
       if (!summary) throw new Error("The model returned an empty summary; the history was left as it was.");
       const before = (s.history || []).reduce((n, h) => n + String(h.content || "").length, 0);
+      this.generateMemorySoon(s, { backend, model, force: false });
       const files = compress.workingFiles(s.progress);
       s.history = compress.summaryHistory(summary, tr.turns, { todos: s.todos || [], files, auto: !!opts.auto });
       s.ccSession = ""; // Claude Code chats start a fresh session that is handed the summary
@@ -1638,7 +1990,7 @@ class AgentViewProvider {
       if (s.progress) {
         s.progress = { ...s.progress, notes: [], searched: [], errors: [] };
         try {
-          this.store().writeProgress(s.id, new Progress(s.progress).toText());
+          this.storeFor(s).writeProgress(s.id, new Progress(s.progress).toText());
         } catch {
           /* progress.md is a convenience */
         }
@@ -2015,7 +2367,7 @@ class AgentViewProvider {
       if (!lines.length) throw new Error("The Problems view has no errors or warnings.");
       items.push({ label: "Problems (" + lines.length + ")", text: lines.slice(0, 300).join("\n") });
     } else if (kind === "chat" && m.id) {
-      const s = this.store().get(String(m.id));
+      const s = this.session(String(m.id));
       if (!s) throw new Error("That chat is not in this workspace's history.");
       items.push({ label: "Chat “" + (s.title || m.id) + "”", text: transcript(s, "").slice(-30000) });
     }
@@ -2220,7 +2572,7 @@ class AgentViewProvider {
   /** The progress digest of the chat on screen (each chat has its own). */
   async openProgress() {
     const s = this.active();
-    const file = s && this.store().progressFile(s.id);
+    const file = s && this.storeFor(s).progressFile(s.id);
     if (file && fs.existsSync(file)) await vscode.window.showTextDocument(vscode.Uri.file(file), { preview: true });
     else vscode.window.showInformationMessage("No progress index for this chat yet — it is written after its first agent turn.");
   }
@@ -2331,6 +2683,11 @@ class AgentViewProvider {
     else if (id === "settings") await vscode.commands.executeCommand("workbench.action.openSettings", "localAgentBridge");
     else if (id === "mcp") await vscode.commands.executeCommand("workbench.action.openSettings", "localAgentBridge.agent.mcp");
     else if (id === "skills") await vscode.commands.executeCommand("localAgentBridge.showCatalog");
+    else if (id === "newIn") await this.newChatInFolder();
+    else if (id === "memory") await this.manageMemory();
+    else if (id === "memoryAdd") await this.addMemory();
+    else if (id === "memoryImport") await this.importMemory();
+    else if (id === "memoryExport") await this.exportMemory();
     else if (id === "sync") await vscode.commands.executeCommand("localAgentBridge.sync");
     this.postInfo(id === "signin" || id === "signout");
   }
@@ -2416,7 +2773,7 @@ class AgentViewProvider {
   async setSessionLimits(s, limits) {
     if (!s) return;
     s.limits = sessionLimits.normalize(limits);
-    this.store().update(s.id, { limits: s.limits });
+    this.storeFor(s).update(s.id, { limits: s.limits });
     if (this.runs.has(s.id)) this.post({ type: "status", sid: s.id, text: "Limits changed to " + sessionLimits.PRESETS[s.limits.preset].label + ": used from this chat's next turn." });
     this.postSessions();
     this.postInfo();
