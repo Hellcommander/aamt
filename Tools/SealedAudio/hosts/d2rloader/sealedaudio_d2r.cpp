@@ -337,7 +337,7 @@ namespace
 		.abiVersion  = D2RL_PLUGIN_ABI_VERSION,
 		.id          = "sealedaudio",
 		.name        = "SealedAudio",
-		.version     = "1.4.0",
+		.version     = "1.4.1",
 		.author      = "Arendeth",
 		.description = "Serves sealed sound archives (*.mtsa) to the game as loose files, for licensed sounds that may not ship as files.",
 		.flags       = D2RL::PluginFlags::Client,
