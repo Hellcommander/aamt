@@ -6,7 +6,8 @@
     "Skeleton (druidhawk): +Y up, +Z forward, +X the bird's left. Wings: collar > shoulder > elbow > hand > finger > middle_base > middle > middle1 (tip), along +-X in the bind pose. Rotations about model axes: +X pitches nose/legs down-back (legs forward = negative), left wing up = +Z, right wing up = -Z, left wing back = +Y, right wing back = -Y. jaw_bind_jnt is the lower beak: +X opens it.",
     "Static base (\"at\": 0): the neutral clip's first pose (the glide pose, wings spread) held for the clip's duration at 60 keys per second, so the edits carry the whole motion and the clip starts and ends in that pose.",
     "Player modes (timing token now the Werewolf's, 40): charge (loop), block, spin (loop, an even 360-degree turn with \"ease\": \"linear\"), throw, leap_windup (ends crouched), leap_air (loop), leap_land and leap_strike (start in leap_air's pose), channel (loop). Loops use waves with \"fade\": false and whole cycles, so their ends meet.",
-    "Own mesh: \"reshape\" (bind-pose model ft; bulk = scale about a pivot by bone share; shape = the same, or an offset, graded along an axis): heavier chest (spine3/4 + collars), belly, head x1.25 about the neck, thick lower beak, deeper upper beak with a hooked tip, a throat ruff pushed down and forward, longer primaries and secondaries, a wedge tail longer in the middle, bigger feet and talons, thicker shanks. retexture: the feather albedo recoloured block by block (darker, faint blue-violet) at a path of the same length, which the rewritten models point at. modelIndexIncludes: QuillRatDruid's models are carried in this mod's model index (install this mod after it)."
+    "Own mesh: \"reshape\" (bind-pose model ft; bulk = scale about a pivot by bone share; shape = the same, or an offset, graded along an axis): heavier chest (spine3/4 + collars), belly, head x1.25 about the neck, thick lower beak, deeper upper beak with a hooked tip, a throat ruff pushed down and forward, longer primaries and secondaries, a wedge tail longer in the middle, bigger feet and talons, thicker shanks. retexture: the feather albedo redrawn at twice the stock size with feather detail and recoloured (darker, faint blue-violet; \"detail\", TextureDetail.py) at a path of the same length, which the rewritten models point at. modelIndexIncludes: QuillRatDruid's models are carried in this mod's model index (install this mod after it).",
+    "Wings under the authored clips (2026-11-19): every clip built on the held glide pose (\"at\": 0) gets a \"layer\" edit of the whole stock neutral clip on L_/R_collar_bind_jnt and below, so the wings keep beating (the stock flap with its own shoulder > elbow > hand > feather follow-through) under each gesture. The layer weight scales the beat (0.6 = 60 % of the hover flap) and dips where a clip's own wing stroke must read (gust, storm, dive, block, ...). Neutral's first and last poses are the held pose, so starts, ends and loop seams are unchanged."
   ],
   "modelIndexIncludes": [
     "../QuillRatDruid"
@@ -309,6 +310,11 @@
             "hue": 245,
             "minSat": 0.25,
             "value": 0.7
+          },
+          "detail": {
+            "kind": "feathers",
+            "scale": 2,
+            "_note": "2026-11-19: the feather albedo at 2048 (stock 1024) with drawn detail per stock card (TextureDetail.py): barbs angled to the tip in clumps with a few vane splits, a soft blue-violet sheen, a rachis highlight, smoothed and slightly frayed alpha edges instead of texel steps. Recolour as before, per texel. BC3 sRGB, 12 mips (texconv, alpha coverage kept for the cutout cards)."
           }
         }
       ],
@@ -550,6 +556,24 @@
               ]
             },
             {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.6
+                ],
+                [
+                  1,
+                  0.6
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. startled flurry: the hover beat at 0.6, 3x fast, under the recoil"
+            },
+            {
               "move": "pelvis_bind_jnt",
               "offset": [
                 [
@@ -784,6 +808,32 @@
                   ]
                 ]
               ]
+            },
+            {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.5
+                ],
+                [
+                  0.35,
+                  0.45
+                ],
+                [
+                  0.55,
+                  0.35
+                ],
+                [
+                  1,
+                  0.5
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. beat at 0.5, eased to 0.35 at the strike (hit 0.55)"
             },
             {
               "move": "pelvis_bind_jnt",
@@ -1124,6 +1174,32 @@
                   ]
                 ]
               ]
+            },
+            {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.5
+                ],
+                [
+                  0.3,
+                  0.15
+                ],
+                [
+                  0.6,
+                  0.15
+                ],
+                [
+                  1,
+                  0.5
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. beat at 0.5 before/after the big gust stroke, 0.15 under it (0.35 up / 0.55 down) so the stroke reads"
             },
             {
               "move": "pelvis_bind_jnt",
@@ -1601,6 +1677,32 @@
               ]
             },
             {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.5
+                ],
+                [
+                  0.4,
+                  0.15
+                ],
+                [
+                  0.6,
+                  0.15
+                ],
+                [
+                  1,
+                  0.5
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. beat at 0.5, 0.15 while the wings fold for the strike (0.45-0.55)"
+            },
+            {
               "move": "pelvis_bind_jnt",
               "offset": [
                 [
@@ -2032,6 +2134,32 @@
               ]
             },
             {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.5
+                ],
+                [
+                  0.55,
+                  0.3
+                ],
+                [
+                  0.8,
+                  0.35
+                ],
+                [
+                  1,
+                  0.5
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. beat at 0.5, 0.3 while the wings spread back at the caw (0.55)"
+            },
+            {
               "move": "pelvis_bind_jnt",
               "offset": [
                 [
@@ -2421,6 +2549,24 @@
               ]
             },
             {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.4
+                ],
+                [
+                  1,
+                  0.4
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. beat at 0.4 under the shake"
+            },
+            {
               "rotate": "pelvis_bind_jnt",
               "axis": [
                 0,
@@ -2698,6 +2844,32 @@
                   ]
                 ]
               ]
+            },
+            {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.5
+                ],
+                [
+                  0.35,
+                  0.15
+                ],
+                [
+                  0.65,
+                  0.15
+                ],
+                [
+                  1,
+                  0.5
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. beat at 0.5, 0.15 under the storm stroke (0.45 up / 0.55 down)"
             },
             {
               "move": "pelvis_bind_jnt",
@@ -3167,6 +3339,24 @@
               ]
             },
             {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.27
+                ],
+                [
+                  1,
+                  0.27
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. loop: one whole hover beat per 0.4 s at 0.27 (deeper strokes would dip the pitched, lowered body into the floor) under the swept-back wings (seamless: whole cycle, constant weight)"
+            },
+            {
               "move": "pelvis_bind_jnt",
               "offset": [
                 [
@@ -3540,6 +3730,32 @@
               ]
             },
             {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.45
+                ],
+                [
+                  0.35,
+                  0.2
+                ],
+                [
+                  0.7,
+                  0.2
+                ],
+                [
+                  1,
+                  0.45
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. beat at 0.45, 0.2 while the wings wrap in front (0.35-0.7)"
+            },
+            {
               "move": "pelvis_bind_jnt",
               "offset": [
                 [
@@ -3893,6 +4109,24 @@
               ]
             },
             {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.6
+                ],
+                [
+                  1,
+                  0.6
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. loop: one whole hover beat per turn at 0.6 (seamless)"
+            },
+            {
               "move": "pelvis_bind_jnt",
               "offset": [
                 [
@@ -4015,6 +4249,32 @@
                   ]
                 ]
               ]
+            },
+            {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.5
+                ],
+                [
+                  0.4,
+                  0.35
+                ],
+                [
+                  0.6,
+                  0.35
+                ],
+                [
+                  1,
+                  0.5
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. beat at 0.5, 0.35 around the release (0.55)"
             },
             {
               "move": "pelvis_bind_jnt",
@@ -4368,6 +4628,24 @@
               ]
             },
             {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.5
+                ],
+                [
+                  1,
+                  0.5
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. beat at 0.5; ends on the cycle start, so the crouched end pose is unchanged"
+            },
+            {
               "move": "pelvis_bind_jnt",
               "offset": [
                 [
@@ -4631,6 +4909,24 @@
               ]
             },
             {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.5
+                ],
+                [
+                  1,
+                  0.5
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. loop: whole beat at 0.5 (seamless); starts and ends on the held pose, as leap_land / leap_strike expect"
+            },
+            {
               "move": "pelvis_bind_jnt",
               "offset": [
                 [
@@ -4849,6 +5145,24 @@
                   ]
                 ]
               ]
+            },
+            {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.5
+                ],
+                [
+                  1,
+                  0.5
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. beat at 0.5"
             },
             {
               "move": "pelvis_bind_jnt",
@@ -5120,6 +5434,32 @@
                   ]
                 ]
               ]
+            },
+            {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.5
+                ],
+                [
+                  0.4,
+                  0.3
+                ],
+                [
+                  0.6,
+                  0.3
+                ],
+                [
+                  1,
+                  0.5
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. beat at 0.5, 0.3 around the strike (0.55)"
             },
             {
               "move": "pelvis_bind_jnt",
@@ -5555,6 +5895,24 @@
                   ]
                 ]
               ]
+            },
+            {
+              "layer": "neutral",
+              "bones": [
+                "L_collar_bind_jnt",
+                "R_collar_bind_jnt"
+              ],
+              "weight": [
+                [
+                  0,
+                  0.45
+                ],
+                [
+                  1,
+                  0.45
+                ]
+              ],
+              "_note": "wings keep beating: the whole stock neutral (hover) wing beat, retimed to this clip, laid on both wing chains from the collar down before the gesture edits, which add on top. Neutral starts and ends in the held glide pose, so the clip still starts and ends where it did and loops stay seamless. loop: whole beat at 0.45 under the raised wings (seamless)"
             },
             {
               "move": "pelvis_bind_jnt",

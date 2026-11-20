@@ -22,7 +22,7 @@ usage:
   ModConverter.py --game <D2R folder> [--d2rmm <D2RMM folder>] [--port 8766] [--no-browser]
   ModConverter.py --game <D2R folder> --update <mod id> [--update <mod id>...] [--source <download>]
                   [--match-trim | --no-match-trim] [--duplicates content|order] [--deleted disable|leave]
-                  [--conflicts mod|earlier] [--files overwrite|keep]
+                  [--conflicts mod|earlier] [--files overwrite|keep] [--base-rows stubs|leave]
       (no page: updates the mods from --source, or from the download each was converted from;
        the row-matching options replace the ones the mod was converted with)
   ModConverter.py --game <D2R folder> --convert <download> [--id <mod id>] [--name N] [--author A]
@@ -453,14 +453,15 @@ class App:
         cmd += ['--match-trim' if want.get('matchTrim', True) not in (False, 'false', 0) else '--no-match-trim',
                 '--duplicates', want.get('duplicates') or 'content', '--deleted', want.get('deleted') or 'disable']
         # load order: defaults of the converted mod's Load order settings
-        cmd += ['--conflicts', want.get('conflicts') or 'mod', '--files', want.get('files') or 'overwrite']
+        cmd += ['--conflicts', want.get('conflicts') or 'mod', '--files', want.get('files') or 'overwrite',
+                '--base-rows', want.get('baseRows') or 'stubs']
         return cmd
 
     @staticmethod
     def row_options(p, settings):
         """Row-matching and load-order options: the page's choice, else what the mod was converted with."""
         out = {}
-        for k in ('matchTrim', 'duplicates', 'deleted', 'conflicts', 'files'):
+        for k in ('matchTrim', 'duplicates', 'deleted', 'conflicts', 'files', 'baseRows'):
             v = p.get(k)
             out[k] = v if v not in (None, '') else settings.get(k)
         return out
@@ -792,6 +793,9 @@ def main():
                     help='with --update: default of the mod\'s Load order > Conflicts setting (default: as converted, else mod)')
     ap.add_argument('--files', choices=('overwrite', 'keep'),
                     help='with --update: default of the mod\'s Load order > Files setting (default: as converted, else overwrite)')
+    ap.add_argument('--base-rows', choices=('stubs', 'leave'),
+                    help='with --update: default of the mod\'s Load order > Classic-rules tables setting: stub rows in '
+                         'global\\excel\\base for missile rows only the main table has (default: as converted, else stubs)')
     args = ap.parse_args()
     if not args.game or not Path(args.game).is_dir():
         raise SystemExit('Pass --game (or set D2R_PATH) to the folder that contains D2R.exe.')
@@ -805,13 +809,14 @@ def main():
     if args.update:
         options = {k: v for k, v in (('matchTrim', args.match_trim), ('duplicates', args.duplicates),
                                      ('deleted', args.deleted), ('conflicts', args.conflicts),
-                                     ('files', args.files)) if v is not None}
+                                     ('files', args.files), ('baseRows', args.base_rows)) if v is not None}
         sys.exit(update_cli(app, args.update, args.source, options))
     if args.convert:
         p = {k: v for k, v in (('id', args.id), ('name', args.name), ('author', args.author), ('version', args.version),
                                ('rows', args.rows), ('plugins', args.plugins), ('matchTrim', args.match_trim),
                                ('duplicates', args.duplicates), ('deleted', args.deleted),
-                               ('conflicts', args.conflicts), ('files', args.files)) if v is not None}
+                               ('conflicts', args.conflicts), ('files', args.files),
+                               ('baseRows', args.base_rows)) if v is not None}
         sys.exit(convert_cli(app, args.convert, p))
     server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(app))
     url = 'http://127.0.0.1:%d/' % args.port

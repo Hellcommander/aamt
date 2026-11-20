@@ -13,6 +13,9 @@
 .EXAMPLE
     .\Update-D2RNativeMod.ps1 -Mod RelicsOfSanctuary
 .EXAMPLE
+    .\Update-D2RNativeMod.ps1 -Mod Inventory10x8 -Source "$env:USERPROFILE\Downloads\Inventory 10x8-1327-1-2-0.zip"
+    (installed with -Patch layout-guard, which every update redoes)
+.EXAMPLE
     .\Update-D2RNativeMod.ps1 -Mod RelicsOfSanctuary -Source "$env:USERPROFILE\Downloads\RelicsOfSanctuary 745 3.6.0 2026-12-01T10-00Z abc.zip"
 #>
 [CmdletBinding(DefaultParameterSetName = 'Update')]
@@ -23,6 +26,8 @@ param(
     [Parameter(ParameterSetName = 'Install')][string]$Id,
     [string]$GamePath = $env:D2R_PATH,
     [string]$D2RMM,
+    # opt-in patches, kept for later updates (layout-guard: Inventory 10x8 below Reimagined)
+    [string[]]$Patch,
     [switch]$DryRun
 )
 $ErrorActionPreference = 'Stop'
@@ -39,6 +44,7 @@ if ($Install) {
     $arguments += @('--update', $Mod)
     if ($Source) { $arguments += @('--source', $Source) }
 }
+foreach ($p in $Patch) { $arguments += @('--patch', $p) }
 if ($DryRun) { $arguments += '--dry-run' }
 & $python @arguments
 exit $LASTEXITCODE

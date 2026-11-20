@@ -46,6 +46,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -53,6 +54,9 @@ HERE = Path(__file__).resolve().parent
 # writes its own for the merged output).
 LOADER_SKIP = ('logs', 'backups', 'metadata.json', 'crashes', 'data')  # data = D2RLoader's own caches
 SKIP_SUFFIXES = ('.log',)
+# Never copied from a data mod (see main): the string id counter D2RMM.getNextStringID() reads, and the
+# game build the data was made for, which D2RMM writes from the game itself at the start of an install.
+NOT_COPIED = ('local/lng/next_string_id.txt', 'global/dataversionbuild.txt')
 
 # Features: every change of the mod belongs to one, and each gets an on/off switch in the D2RMM
 # settings of the converted mod. First match wins (paths relative to data, lower case, '/').
@@ -442,6 +446,63 @@ def apply_strings(van, patch):
     return out + patch['added']
 
 
+# --------------------------------------------------------------------------- JSON key maps
+# HD registries such as hd/missiles/missiles.json or hd/character/monsters.json (one object, key ->
+# value) and hd/items/items.json or uniques.json (a list of single-key objects) are merged key by
+# key instead of copied whole, so a mod below does not wipe the entries the mods above added.
+
+JSONMAP_FILES = _re.compile(r'(?i)^hd/(missiles/missiles|character/monsters|items/(items|uniques|sets)|overlays/overlays)\.json$')
+
+
+def jsonmap_load(path):
+    """-> ('object', dict) / ('list', [(key, value)]) or None when the file has another shape."""
+    try:
+        data = json.loads(path.read_bytes().decode('utf-8-sig'))
+    except (UnicodeDecodeError, ValueError):
+        return None
+    if isinstance(data, dict):
+        return 'object', data
+    if isinstance(data, list) and data and all(isinstance(e, dict) and len(e) == 1 for e in data):
+        # A key listed twice: the later entry counts. Reimagined's uniques.json lists templars_might
+        # and silks_of_the_victor first with the game's generic armor/victors_silk and again at the
+        # end with its own art (hd/items/armor/uniquearmor/*.json, which it ships): its new art only
+        # shows if the later entry wins. So the list is read as the game reads a map: last one wins.
+        last = {}
+        for k, v in (next(iter(e.items())) for e in data):
+            last[k] = v
+        return 'list', list(last.items())
+    return None
+
+
+def jsonmap_patch(van, mod):
+    """{json: shape, set: {key: the mod's value}, before: {key: the game's value} (keys the game has),
+    deleted: [keys the mod dropped]} or None when the shapes differ."""
+    (vs, v), (ms, m) = van, mod
+    if vs != ms:
+        return None
+    vd, md = (dict(v), dict(m)) if vs == 'list' else (v, m)
+    set_ = {k: val for k, val in (m if ms == 'list' else m.items()) if k not in vd or vd[k] != val}
+    deleted = [k for k in vd if k not in md]
+    before = {k: vd[k] for k in list(set_) + deleted if k in vd}
+    return {'json': vs, 'set': set_, 'before': before, 'deleted': deleted}
+
+
+def apply_jsonmap(van, patch):
+    """Python twin of applyJsonMap in mod.js (on the game's file: no other mod above)."""
+    shape, v = van
+    pairs = list(v) if shape == 'list' else list(v.items())
+    keys = [k for k, _ in pairs]
+    d = dict(pairs)
+    for k, val in patch['set'].items():
+        if k not in d:
+            keys.append(k)
+        d[k] = val
+    for k in patch['deleted']:
+        d.pop(k, None)
+    keys = [k for k in keys if k in d]
+    return (shape, [(k, d[k]) for k in keys]) if shape == 'list' else (shape, {k: d[k] for k in keys})
+
+
 # --------------------------------------------------------------------------- copy list
 
 def compress(files, all_files):
@@ -510,7 +571,11 @@ const SCRATCH = 'd2rmm-convert\\' + MOD_ID + '.json';
 //  ROWS   'keep' / 'rebuild' as above;
 //  CELLS  a cell or string an earlier mod changed that this mod changes too: 'mod' this mod's
 //         value, 'earlier' the earlier mod's value (this mod then only fills what nobody touched);
-//  FILES  a file an earlier mod already put in the output: 'overwrite' with this mod's, 'keep' it.
+//  FILES  a file an earlier mod already put in the output: 'overwrite' with this mod's, 'keep' it;
+//  BASE_ROWS  the classic-rules tables (global\excel\base) of the tables in ALIGNED: 'stubs' gives
+//         every row the main table has past the base table's end a stub there (its name and *ID only,
+//         as the game keeps its own Reign of the Warlock rows), so both tables number their rows the
+//         same; 'leave' as the mod left them.
 const SETTING = (id, allowed, fallback) => {
   const v = typeof config === 'object' && config ? config[id] : undefined;
   return allowed.includes(v) ? v : fallback;
@@ -518,6 +583,7 @@ const SETTING = (id, allowed, fallback) => {
 const ROWS = SETTING('loadorderRows', ['keep', 'rebuild'], '__ROWS__');
 const CELLS = SETTING('loadorderCells', ['mod', 'earlier'], '__CELLS__');
 const FILES = SETTING('loadorderFiles', ['overwrite', 'keep'], '__FILES__');
+const BASE_ROWS = SETTING('loadorderBaseRows', ['stubs', 'leave'], '__BASEROWS__');
 const CLASHES = {}; // path -> [count, first few names]
 
 /* @generated-data-begin */
@@ -633,7 +699,42 @@ function applyTable(path, patch) {
     table.headers.filter((h) => !patch.headers.includes(h) && !patch.droppedColumns.includes(h))
   );
   if (missing) console.warn(MOD_ID + ': ' + path + ': ' + missing + ' row(s) the mod changes are gone (removed by an earlier mod?)');
-  D2RMM.writeTsv(path, { headers, rows });
+  D2RMM.writeTsv(path, { headers, rows: actBlocks(path, key, rows, new Map(), patch) });
+}
+
+// monpreset.txt: a map (.ds1) places a monster by number, the how-many-th row of the map's act, and
+// the game finds it as "first row of the act + number", so every act has to stay one block of rows.
+// Rows go back into their act's block (in the order they had); `wants` (new row -> the number the
+// mod's own maps use for it) puts each new row at that number: short acts are filled up with
+// place_nothing rows, and rows earlier mods added at those numbers move behind it (with a warning).
+function actBlocks(path, key, rows, wants, patch) {
+  if (!/(^|\\)monpreset\.txt$/i.test(path)) return rows;
+  const acts = new Map();
+  const listOf = (row) => {
+    const a = keyOf(row, key, patch);
+    if (!acts.has(a)) acts.set(a, []);
+    return acts.get(a);
+  };
+  rows.forEach((row) => wants.has(row) || listOf(row).push(row));
+  const pushed = {};
+  rows.forEach((row) => {
+    if (!wants.has(row)) return;
+    const list = listOf(row);
+    const want = wants.get(row);
+    while (list.length < want) {
+      const blank = {};
+      Object.keys(row).forEach((h) => (blank[h] = ''));
+      blank[key] = row[key];
+      if ('Place' in blank) blank.Place = 'place_nothing';
+      list.push(blank);
+    }
+    if (list.length > want) pushed[row[key]] = (pushed[row[key]] || 0) + 1;
+    list.splice(want, 0, row);
+  });
+  Object.keys(pushed).forEach((a) => console.warn(MOD_ID + ': ' + path + ': act ' + a + ': earlier mods already use '
+    + 'the numbers this mod\'s maps give ' + pushed[a] + ' new row(s); their rows from there on move down, so their maps may '
+    + 'place the wrong monsters (put this mod above them)'));
+  return [].concat(...acts.values());
 }
 
 // ---- 'keep' mode -------------------------------------------------------------------------
@@ -660,6 +761,13 @@ const PARAM_OF = [
   [/^T1Code(\d+)$/, (m) => 'T1Param' + m[1]], [/^mod(\d+)code$/, (m) => 'mod' + m[1] + 'param'],
   [/^((?:[bc] )?mod \d+)$/, (m) => m[1] + ' param'], [/^(\w+Mod\d)Code$/, (m) => m[1] + 'Param'],
 ];
+// The other way round: the property code column a parameter column may belong to (checked with PARAM_OF).
+const CODE_OF = [
+  [/^par(\d+)$/, (m) => 'prop' + m[1]], [/^apar(\d+[ab])$/, (m) => 'aprop' + m[1]],
+  [/^PParam(\d+[ab])$/, (m) => 'PCode' + m[1]], [/^FParam(\d+)$/, (m) => 'FCode' + m[1]],
+  [/^T1Param(\d+)$/, (m) => 'T1Code' + m[1]], [/^mod(\d+)param$/, (m) => 'mod' + m[1] + 'code'],
+  [/^((?:[bc] )?mod \d+) param$/, (m) => m[1]], [/^(\w+Mod\d)Param$/, (m) => m[1] + 'Code'],
+];
 const TARGET_FIRST = ['missiles.txt', 'skills.txt', 'states.txt', 'itemstatcost.txt', 'monstats.txt', 'lvlwarp.txt', 'levels.txt'];
 // (cubemain.txt is not a target; it comes after these, so its portal levels see where levels went.)
 
@@ -679,32 +787,53 @@ function moved(target, value) {
   const to = map ? map[Number(value)] : undefined;
   return to === undefined || to < 0 ? value : String(to);
 }
-// Moves the numbers in `cells` (the mod's values for one row) to where their rows ended up.
-function remap(path, cells, full) {
+function paramOf(code) {
+  const rule = PARAM_OF.find(([re]) => re.test(code));
+  return rule ? rule[1](code.match(rule[0])) : null;
+}
+// The few columns of a table remap looks at, from its headers (the table's and the mod's), worked out
+// once per table: testing every cell of every row against the patterns above was nearly all of a big
+// mod's install time in QuickJS (D2RMM's script engine). refs: [column, tables whose row numbers it
+// holds]; portals: cube outputs that can open a portal; params: [column, the property code columns
+// whose parameter it holds].
+const COLS = {};
+function colsOf(path, headers) {
+  if (COLS[path]) return COLS[path];
   const dir = folderOf(path);
   const name = path.slice(dir.length);
-  ROW_REFS.forEach(([re, col, target]) => {
-    if (!re.test(name)) return;
-    Object.keys(cells).forEach((h) => {
-      if (col.test(h)) cells[h] = moved(dir + target, cells[h]);
-    });
+  const refs = ROW_REFS.filter(([re]) => re.test(name));
+  const cube = /^cubemain\.txt$/i.test(name);
+  const c = { dir, refs: [], portals: [], params: [] };
+  [...new Set(headers)].forEach((h) => {
+    const targets = refs.filter(([, col]) => col.test(h)).map(([, , target]) => dir + target);
+    if (targets.length) c.refs.push([h, targets]);
+    if (cube && /^output( [bc])?$/i.test(h)) c.portals.push(h);
+    const codes = CODE_OF.filter(([re]) => re.test(h)).map(([re, f]) => f(h.match(re))).filter((code) => paramOf(code) === h);
+    if (codes.length) c.params.push([h, codes]);
+  });
+  return (COLS[path] = c);
+}
+// Moves the numbers in `cells` (the mod's values for one row) to where their rows ended up. `row`:
+// the row's cells before (for a property code the mod leaves alone), or `cells` for a new row.
+function remap(path, cells, row) {
+  const c = COLS[path] || colsOf(path, Object.keys(cells).concat(Object.keys(row)));
+  c.refs.forEach(([h, targets]) => {
+    if (h in cells) targets.forEach((target) => (cells[h] = moved(target, cells[h])));
   });
   // A cube recipe that opens a portal names the level in its output ("Red Portal,lvl=139"): that
   // number moves with the mod's levels too.
-  if (/^cubemain\.txt$/i.test(name)) {
-    Object.keys(cells).forEach((h) => {
-      const v = cells[h] == null ? '' : String(cells[h]);
-      if (!/^output( [bc])?$/i.test(h) || !/portal/i.test(v.split(',')[0])) return;
-      cells[h] = v.replace(/(^|,)(\s*lvl\s*=\s*)(\d+)/gi, (m, a, b, n) => a + b + moved(dir + 'levels.txt', n));
-    });
-  }
-  Object.keys(full).forEach((code) => {
-    const rule = PARAM_OF.find(([re]) => re.test(code));
-    if (!rule) return;
-    const param = rule[1](code.match(rule[0]));
-    if (cells[param] === undefined || !SKILL_PROPS.has(String(full[code]).toLowerCase())) return;
-    cells[param] = moved(dir + 'skills.txt', cells[param]);
+  c.portals.forEach((h) => {
+    if (!(h in cells)) return;
+    const v = cells[h] == null ? '' : String(cells[h]);
+    if (!/portal/i.test(v.split(',')[0])) return;
+    cells[h] = v.replace(/(^|,)(\s*lvl\s*=\s*)(\d+)/gi, (m, a, b, n) => a + b + moved(c.dir + 'levels.txt', n));
   });
+  // A skill property's parameter (from the property codes as they are before anything moves).
+  const skills = c.params.filter(([param, codes]) => cells[param] !== undefined && codes.some((code) => {
+    const v = code in cells ? cells[code] : row[code];
+    return (code in cells || code in row) && SKILL_PROPS.has(String(v).toLowerCase());
+  }));
+  skills.forEach(([param]) => (cells[param] = moved(c.dir + 'skills.txt', cells[param])));
   return cells;
 }
 
@@ -730,6 +859,8 @@ function applyTableKeep(path, patch) {
   // Where every row of the mod's file ends up, before any cell moves: a row can point at a later
   // row of its own table (a level's Vis numbers), and new rows go behind what earlier mods added.
   const where = [];
+  const place = []; // per row of the mod's file: its number among the rows with the same first cell
+  const count = {};
   let missing = 0;
   let next = rows.length;
   patch.rows.forEach((entry) => {
@@ -737,10 +868,18 @@ function applyTableKeep(path, patch) {
       const i = at.get(rowId(entry[1][0], entry[1][1]));
       if (i === undefined) missing++;
       where.push(i === undefined ? -1 : i);
+      count[entry[1][0]] = Math.max(count[entry[1][0]] || 0, entry[1][1]);
+      place.push(-1);
     } else {
       where.push(next++);
+      const k = patch.headers.length ? String(entry[1][0] == null ? '' : entry[1][0]) : '';
+      const a = patch.trim ? k.trim() : k;
+      place.push(count[a] || 0);
+      count[a] = (count[a] || 0) + 1;
     }
   });
+  const wants = new Map();
+  colsOf(path, table.headers.concat(patch.headers));
   INDEX[path] = where;
   const idCol = ID_TABLES[path.slice(path.lastIndexOf('\\') + 1).toLowerCase()];
   if (idCol) {
@@ -760,16 +899,57 @@ function applyTableKeep(path, patch) {
       const i = where[n];
       if (i < 0) return;
       const diff = mergeCells(path, rows[i], Object.assign({}, entry[2] || {}), entry[3], entry[1][0]);
-      Object.assign(rows[i], remap(path, diff, Object.assign({}, rows[i], diff)));
+      Object.assign(rows[i], remap(path, diff, rows[i]));
     } else {
       const row = {};
       patch.headers.forEach((h, i) => (row[h] = entry[1][i] == null ? '' : entry[1][i]));
       rows.push(remap(path, row, row));
+      wants.set(row, place[n]);
     }
   });
   const headers = table.headers.concat(patch.headers.filter((h) => !table.headers.includes(h)));
   if (missing) console.warn(MOD_ID + ': ' + path + ': ' + missing + ' row(s) the mod changes are gone (removed by an earlier mod?)');
-  D2RMM.writeTsv(path, { headers, rows });
+  D2RMM.writeTsv(path, { headers, rows: actBlocks(path, key, rows, wants, patch) });
+}
+
+// Tables whose rows the game matches between global\excel and global\excel\base by number: the HD
+// client picks a missile's effect by its row in the main table, also in a classic-rules game that runs
+// on the base table. A data mod that only ships the main table (Rebirth) adds rows there alone, so
+// every row other mods add to both tables afterwards gets a different number in each.
+const ALIGNED = ['missiles.txt'];
+function alignBase(name) {
+  const mainPath = 'global\\excel\\' + name;
+  const basePath = 'global\\excel\\base\\' + name;
+  let main = null;
+  let base = null;
+  try {
+    main = D2RMM.readTsv(mainPath, { removeCarriageReturns: true });
+    base = D2RMM.readTsv(basePath, { removeCarriageReturns: true });
+  } catch (e) {
+    return; // the game has no classic-rules copy of this table
+  }
+  if (!main || !base || base.rows.length >= main.rows.length) return;
+  const key = main.headers[0];
+  const bkey = base.headers[0];
+  const name0 = (row, k) => String(row[k] == null ? '' : row[k]).trim().toLowerCase();
+  const off = base.rows.findIndex((row, i) => name0(row, bkey) !== name0(main.rows[i], key));
+  if (off >= 0) {
+    console.warn(MOD_ID + ': ' + basePath + ': row ' + off + ' is ' + base.rows[off][bkey] + ' but ' + main.rows[off][key] +
+      ' in ' + mainPath + ' (a mod above changed one table only); no stub rows added (Load order > Classic-rules tables)');
+    return;
+  }
+  const idCol = base.headers.find((h) => /^\*id$/i.test(h));
+  const added = main.rows.length - base.rows.length;
+  for (let i = base.rows.length; i < main.rows.length; i++) {
+    const row = {};
+    base.headers.forEach((h) => (row[h] = ''));
+    row[bkey] = main.rows[i][key];
+    if (idCol) row[idCol] = String(i);
+    base.rows.push(row);
+  }
+  D2RMM.writeTsv(basePath, base);
+  console.log(MOD_ID + ': ' + basePath + ': ' + added + ' stub row(s) so its rows are numbered as in ' + mainPath +
+    ' (Load order > Classic-rules tables)');
 }
 
 // Only the fields the mod changed (a language, say) go in, so an earlier mod's other changes to
@@ -779,7 +959,8 @@ function mergeEntry(path, cur, mine, before) {
   const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const out = Object.assign({}, cur);
   new Set(Object.keys(mine).concat(Object.keys(before))).forEach((f) => {
-    if (same(mine[f], before[f])) return; // the mod leaves this field alone
+    // the id stays the one the entry has: tables point at strings by Key, and ids must stay unique
+    if (f === 'id' || same(mine[f], before[f])) return; // the mod leaves this field alone
     if (!same(cur[f], before[f]) && !same(cur[f], mine[f])) {
       clash(path, cur.Key + ' ' + f);
       if (cellsOf(path) === 'earlier') return;
@@ -807,16 +988,91 @@ function applyStrings(path, patch) {
   const at = new Map();
   list.forEach((e, i) => at.has(e.Key) || at.set(e.Key, i));
   const known = new Set(patch.addedKnown || []);
+  // The game gives a Key the same id in strings\ and strings-legacy\: a new entry takes the id its
+  // Key already has in the other folder's file (whichever of the two was merged first numbered it).
+  const twin = new Map();
+  const twinPath = path.replace(/([\\/])strings(-legacy)?([\\/])/i, (m, a, legacy, b) => a + (legacy ? 'strings' : 'strings-legacy') + b);
+  if (twinPath !== path) {
+    try {
+      (D2RMM.readJson(twinPath) || []).forEach((e) => twin.has(e.Key) || twin.set(e.Key, e.id));
+    } catch (err) {
+      // the game has no such file
+    }
+  }
   patch.added.forEach((e, n) => {
     const i = known.has(n) ? undefined : at.get(e.Key);
     if (i === undefined) {
-      list.push(e);
+      // A new entry gets the next free string id, like every other mod's new strings: the ids the
+      // data mod picked were free in its own game files only, and collide with the game's newer
+      // strings, other conversions' and the ids other mods take. Tables use the Key, not the id;
+      // the game keeps most string ids in 16 bits, so an id past 65535 shows another string.
+      // (not when the other file has the data mod's own number for it: a raw copy of the mod's file,
+      // as ConvertReplaceMod's wrapper has in place while it merges)
+      const reuse = twin.has(e.Key) && String(twin.get(e.Key)) !== String(e.id);
+      list.push(Object.assign({}, e, { id: reuse ? twin.get(e.Key) : D2RMM.getNextStringID() }));
       return;
     }
     clash(path, e.Key + ' (added by both)');
     if (cellsOf(path) === 'mod') list[i] = Object.assign({}, e, list[i].id !== undefined ? { id: list[i].id } : {});
   });
   D2RMM.writeJson(path, list);
+}
+
+// HD registries (hd/missiles/missiles.json, hd/items/items.json...) merged key by key: the keys the
+// mod changes or adds go in (CELLS decides a key a mod above changed too), keys the mod dropped go
+// only when no mod above changed them, and every other key keeps what the mods above wrote.
+// patch.json: 'object' ({key: value}) or 'list' ([{key: value}, ...], new keys appended in order).
+function applyJsonMap(path, patch) {
+  let cur = null;
+  try {
+    cur = D2RMM.readJson(path);
+  } catch (e) {
+    cur = null;
+  }
+  const list = patch.json === 'list';
+  if (list ? !Array.isArray(cur) : !cur || typeof cur !== 'object' || Array.isArray(cur)) cur = list ? [] : {};
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  const order = []; // [key] or [null, entry the map does not hold]
+  const map = new Map();
+  if (list) {
+    cur.forEach((e) => {
+      const ks = e && typeof e === 'object' && !Array.isArray(e) ? Object.keys(e) : [];
+      if (ks.length !== 1) return order.push([null, e]);
+      // a key listed twice: the later entry counts (as when the game reads it), one entry is kept
+      if (!map.has(ks[0])) order.push([ks[0]]);
+      map.set(ks[0], e[ks[0]]);
+    });
+  } else {
+    Object.keys(cur).forEach((k) => {
+      map.set(k, cur[k]);
+      order.push([k]);
+    });
+  }
+  Object.keys(patch.set).forEach((k) => {
+    const mine = patch.set[k];
+    if (!map.has(k)) {
+      map.set(k, mine);
+      order.push([k]);
+      return;
+    }
+    const now = map.get(k);
+    if (!same(now, mine) && !(has(patch.before, k) && same(now, patch.before[k]))) {
+      clash(path, k);
+      if (cellsOf(path) === 'earlier') return;
+    }
+    map.set(k, mine);
+  });
+  (patch.deleted || []).forEach((k) => {
+    if (map.has(k) && has(patch.before, k) && same(map.get(k), patch.before[k])) map.delete(k);
+  });
+  if (list) {
+    D2RMM.writeJson(path, order.filter(([k]) => k === null || map.has(k)).map(([k, raw]) => (k === null ? raw : { [k]: map.get(k) })));
+  } else {
+    const out = {};
+    order.forEach(([k]) => map.has(k) && (out[k] = map.get(k)));
+    D2RMM.writeJson(path, out);
+  }
 }
 
 // Item property columns: [code column, (match) -> its param, min and max columns].
@@ -882,7 +1138,7 @@ const SWITCHED_OFF = (id) => LIST_OFF.has(id) || config[id] === false || config[
 const OFF_FEATURES = new Set();
 const WHY_OFF = {};
 (() => {
-  const ids = new Set(COPY.map((e) => e[2]).concat(TABLES.map((e) => e[1]), STRINGS.map((e) => e[1]),
+  const ids = new Set(COPY.map((e) => e[2]).concat(TABLES.map((e) => e[1]), STRINGS.map((e) => e[1]), JSONMAPS.map((e) => e[1]),
     Object.keys(NEEDS), [].concat(...Object.values(NEEDS))));
   ids.forEach((id) => {
     if (id && id !== 'core' && SWITCHED_OFF(id)) {
@@ -905,10 +1161,16 @@ const WHY_OFF = {};
     console.log(MOD_ID + ': ' + id + ' is switched off too: it uses new rows of ' + WHY_OFF[id].join(', ') + ' (switched off).'));
 })();
 const ON = (id) => !id || id === 'core' || FORCED.includes(id) || (!OFF_FEATURES.has(id) && !SWITCHED_OFF(id));
-const COPY_ON = COPY.filter((e) => ON(e[2]) && !skipped(e[0]));
+// Never copied, though conversions made before 2026-11-19 list them: next_string_id.txt is the counter
+// D2RMM.getNextStringID() reads (a data mod's copy, Rebirth's says 65535, makes every later mod number
+// its strings past the game's 16-bit string ids); dataversionbuild.txt is written by D2RMM from the
+// game (a data mod's names the older build it was made for, which D2RLoader reads as the mod build).
+const NOT_COPIED = /(^|\\)(local\\lng\\next_string_id|global\\dataversionbuild)\.txt$/i;
+const COPY_ON = COPY.filter((e) => ON(e[2]) && !skipped(e[0]) && !NOT_COPIED.test(e[0]));
 const LOADER_ON = LOADER.filter((e) => ON(e[2]) && !skipped(e[0]));
 const TABLES_ON = TABLES.filter((e) => ON(e[1]) && !skipped(e[0])).map((e) => e[0]);
 const STRINGS_ON = STRINGS.filter((e) => ON(e[1]) && !skipped(e[0])).map((e) => e[0]);
+const JSONMAPS_ON = JSONMAPS.filter((e) => ON(e[1]) && !skipped(e[0])).map((e) => e[0]);
 
 // 'rebuild' puts the mod's own row order first, which only holds when no mod comes before it.
 if (ROWS === 'rebuild' && typeof D2RMM.getModList === 'function') {
@@ -932,6 +1194,10 @@ if (ROWS === 'keep') {
   TABLES_ON.forEach((path) => applyTable(path, readPatch(path)));
 }
 STRINGS_ON.forEach((path) => applyStrings(path, readPatch(path)));
+JSONMAPS_ON.forEach((path) => applyJsonMap(path, readPatch(path)));
+if (BASE_ROWS === 'stubs') {
+  ALIGNED.filter((name) => TABLES_ON.some((p) => p.toLowerCase() === 'global\\excel\\' + name)).forEach(alignBase);
+}
 if (PROPS_OFF.size) {
   const n = TABLES_ON.reduce((sum, path) => sum + stripProps(path, PROPS_OFF), 0);
   console.log(MOD_ID + ': took ' + [...PROPS_OFF].join(', ') + ' off ' + n + ' row(s) (Options).');
@@ -947,6 +1213,7 @@ if (clashed.length) {
 const off = [...new Set(COPY.concat(LOADER).map((e) => e[2]).concat(TABLES.map((e) => e[1])))].filter((id) => !ON(id));
 console.log(
   MOD_ID + ': ' + TABLES_ON.length + ' tables patched, ' + STRINGS_ON.length + ' string files merged, ' +
+    (JSONMAPS_ON.length ? JSONMAPS_ON.length + ' HD registries merged by key, ' : '') +
     COPY_ON.length + ' files/folders copied, ' + LOADER_ON.length + ' D2RLoader files/folders copied' +
     (off.length ? '; switched off: ' + off.join(', ') : '') + '.'
 );
@@ -1024,9 +1291,20 @@ def installed_targets(d2rmm_loader, mod_id):
     return out
 
 
-def load_order_ui(rows='keep', conflicts='mod', files='overwrite'):
-    """The 'Load order' settings (mod.js reads them as loadorderRows / Cells / Files); the defaults
-    are what the conversion was made with."""
+BASE_ROWS_UI = {
+    'id': 'loadorderBaseRows', 'type': 'select', 'name': 'Classic-rules tables', 'defaultValue': 'stubs',
+    'description': 'The game numbers missiles.txt rows the same in global\\excel (Reign of the Warlock rules) and '
+                   'global\\excel\\base (classic rules): the HD effects are picked by row number. Add stub rows: every '
+                   'row this mod (or a mod above) has only in the main table gets a stub in the base table (name and '
+                   '*ID, as the game keeps its own new rows there), so rows other mods add to both tables keep the same '
+                   'number in each. Leave: the base table as it is (rows mods below add then get other numbers there).',
+    'options': [{'label': 'Add stub rows (default)', 'value': 'stubs'},
+                {'label': 'Leave as they are', 'value': 'leave'}]}
+
+
+def load_order_ui(rows='keep', conflicts='mod', files='overwrite', base_rows='stubs'):
+    """The 'Load order' settings (mod.js reads them as loadorderRows / Cells / Files / BaseRows); the
+    defaults are what the conversion was made with."""
     rebuilt = rows == 'rebuild'
     return {'id': 'loadorder', 'type': 'section', 'name': 'Load order', 'defaultExpanded': False, 'children': [
         {'id': 'loadorderRows', 'type': 'select', 'name': 'Rows', 'defaultValue': rows,
@@ -1049,6 +1327,7 @@ def load_order_ui(rows='keep', conflicts='mod', files='overwrite'):
                         'Overwrite: this mod\'s copy replaces it. Keep: the other mod\'s copy stays.',
          'options': [{'label': 'Overwrite with this mod\'s', 'value': 'overwrite'},
                      {'label': 'Keep the other mod\'s', 'value': 'keep'}]},
+        dict(BASE_ROWS_UI, defaultValue=base_rows),
     ]}
 
 
@@ -1472,6 +1751,12 @@ def main():
     ap.add_argument('--files', choices=('overwrite', 'keep'), default='overwrite',
                     help='default of the Load order > Files setting: a file a mod above already installed; '
                          'overwrite (default) or keep it')
+    ap.add_argument('--base-rows', choices=('stubs', 'leave'), default='stubs',
+                    help='default of the Load order > Classic-rules tables setting: stubs (default) gives the rows '
+                         'missiles.txt has past the end of global\\excel\\base\\missiles.txt a stub row there (name and '
+                         '*ID, as the game keeps its own new rows), so both tables number their rows the same (the HD '
+                         'client picks missile effects by row number; a mod that only ships the main table, such as '
+                         'Rebirth, shifts every row other mods add after it); leave: as the mod left them')
     ap.add_argument('--modlist-rules', help="'My mod list' rules (JSON) for the converted mod's settings, all off by "
                                            'default (default: <D2RMM>\\mods\\modlist-rules.json when it exists; '
                                            'none = no section); see modlist-rules.example.json')
@@ -1493,6 +1778,15 @@ def main():
 
     all_files = sorted(rel(p, data) for p in data.rglob('*') if p.is_file())
     print('%s: %d files under %s' % (mod_id, len(all_files), data), file=sys.stderr)
+    # next_string_id.txt is the counter D2RMM.getNextStringID() reads: the data mod's copy would set it
+    # for every later mod (Rebirth's says 65535, past the game's 16-bit string ids); mod.js numbers the
+    # mod's new strings from the counter instead. dataversionbuild.txt: D2RMM writes the game's own at
+    # the start of an install (the merged output is the current game's data); a data mod's says the
+    # build it was made for (Rebirth 95032, Reimagined 93847), which D2RLoader reads as the mod build.
+    # Kept in all_files (like the loader caches below) so compress() never copies a folder holding one.
+    counter = {f for f in all_files if f.lower() in NOT_COPIED}
+    for f in sorted(counter):
+        print('%s left out (never copied from a data mod).' % f, file=sys.stderr)
     # D2RLoader's table caches (D2RLBIN header) are not compiled tables: D2RLoader writes them from
     # the .txt it loads. Copying them would put the author's tables back over the merged ones.
     loader_caches = set()
@@ -1515,9 +1809,10 @@ def main():
 
     patches_dir = mod / 'd2rmm' / 'patches'
     tables, strings, copies, identical, whole = [], [], [], [], {}
+    jsonmaps = []  # HD registries merged key by key (JSONMAP_FILES)
     stats = {}
     for f in all_files:
-        if f in loader_caches:
+        if f in loader_caches or f in counter:
             continue  # kept in all_files so compress() never copies a folder holding one
         src = data / f
         van = vanilla.get(f)
@@ -1559,6 +1854,20 @@ def main():
                 strings.append(f)
                 stats[f] = st
                 continue
+        elif van is not None and JSONMAP_FILES.match(f):
+            m, v = jsonmap_load(src), jsonmap_load(van)
+            patch = jsonmap_patch(v, m) if m and v else None
+            # the game finds these entries by key: a list in another order with the same entries is the same file
+            if patch is not None and (apply_jsonmap(v, patch) == m or
+                                      (m[0] == 'list' and dict(apply_jsonmap(v, patch)[1]) == dict(m[1]))):
+                out = patches_dir / (f + '.json')
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(json.dumps(patch, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+                jsonmaps.append(f)
+                stats[f] = {'set': len(patch['set']), 'added': sum(1 for k in patch['set'] if k not in patch['before']),
+                            'deleted': len(patch['deleted'])}
+                continue
+            whole[f] = 'not a key map the patch can rebuild (copied whole)'
         copies.append(f)
 
     # Folders are copied whole only when nothing in them is patched or identical (compress checks
@@ -1653,6 +1962,7 @@ def main():
         js_list('LOADER', [[win(p), d, u] for p, d, u in loader], 'D2RLoader files, to D2RMM\'s d2rloader output: [path in the mod folder, is a folder, switch].'),
         js_list('TABLES', [[win(t), feature_of(t)] for t in tables], 'Tables patched row by row (d2rmm\\patches\\<path>.json): [path, switch].'),
         js_list('STRINGS', [[win(s), feature_of(s)] for s in strings], 'String files merged by Key (d2rmm\\patches\\<path>.json): [path, switch].'),
+        js_list('JSONMAPS', [[win(j), feature_of(j)] for j in jsonmaps], 'HD registries merged key by key (d2rmm\\patches\\<path>.json): [path, switch].'),
         '// Features that use new rows of other features: {feature: [features it needs]}; FORCED: the features always-on\n'
         '// tables use (and what those need), which cannot be switched off, with the reason.\n'
         'const NEEDS = %s;\nconst FORCED = %s;\nconst FORCED_WHY = %s;\n' % (
@@ -1667,7 +1977,8 @@ def main():
           .replace('__BY__', ' by ' + args.author if args.author else '')
           .replace('__DATA_WIN__', data_rel).replace('__DATA__', data_rel.replace('\\', '\\\\'))
           .replace('__ID__', mod_id).replace('__ROWS__', args.rows)
-          .replace('__CELLS__', args.conflicts).replace('__FILES__', args.files).replace('__NTABLES__', str(len(tables)))
+          .replace('__CELLS__', args.conflicts).replace('__FILES__', args.files).replace('__BASEROWS__', args.base_rows)
+          .replace('__NTABLES__', str(len(tables)))
           .replace('__NSTRINGS__', str(len(strings))).replace('__NCOPY__', str(len(copy_list))))
     begin, end = '/* @generated-data-begin */\n', '/* @generated-data-end */'
     head, rest = js.split(begin)
@@ -1687,7 +1998,7 @@ def main():
         'author': args.author or info.get('author') or 'unknown',
         'version': version,
         'config': settings_ui(feature_count, loader, duplicates, from_source,
-                              load_order_ui(args.rows, args.conflicts, args.files),
+                              load_order_ui(args.rows, args.conflicts, args.files, args.base_rows),
                               [options_ui(rules), modlist_ui(rules)], links),
     })
     mod_json.write_text(json.dumps(info, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
@@ -1699,6 +2010,7 @@ def main():
         'identicalToGame': len(identical),
         'tablesPatched': {t: stats[t] for t in tables},
         'stringsMerged': {s: stats[s] for s in strings},
+        'jsonMerged': {j: stats[j] for j in jsonmaps},
         'copiedWhole': len(copies),
         'copiedWholeAlthoughInGame': whole,
         'loaderCachesLeftOut': sorted(loader_caches),
@@ -1720,6 +2032,7 @@ def main():
         'settings': {'name': name, 'author': info['author'], 'version': version, 'rows': args.rows,
                      'plugins': args.plugins, 'matchTrim': args.match_trim, 'duplicates': args.duplicates,
                      'deleted': args.deleted, 'conflicts': args.conflicts, 'files': args.files,
+                     'baseRows': args.base_rows,
                      'source': args.source or (previous.get('settings') or {}).get('source')},
     }
     (mod / 'd2rmm').mkdir(exist_ok=True)
@@ -1753,7 +2066,7 @@ def main():
              sorted(set(whole.values())), len(loader)))
 
     if args.check:
-        check(mod, data, cache, tables, strings, copies, loader, args.rows)
+        check(mod, data, cache, tables, strings, copies, loader, args.rows, jsonmaps)
 
 
 README_MARK = '<!-- written by ConvertDataMod.py; rerunning it rewrites this file -->'
@@ -1855,6 +2168,18 @@ def check_keep(mod, data, out, tables, cache):
             else:
                 w.append(appended)
                 appended += 1
+        if t.rsplit('/', 1)[-1].lower() == 'monpreset.txt':
+            # actBlocks in mod.js: one block per act, the mod's rows at their number within the act
+            acts = [r[0].strip() if p.get('trim') else r[0] for r in got[1]]
+            first = {}
+            for n, a in enumerate(acts):
+                first.setdefault(a, n)
+            seen = {}
+            w = []
+            for r in read_table(data / t)[1]:
+                a = r[0].strip() if p.get('trim') else r[0]
+                w.append(first.get(a, -1) + seen.get(a, 0) if a in first else -1)
+                seen[a] = seen.get(a, 0) + 1
         where[t] = w
     # tables numbered by an Id column that skips separator rows (levels.txt): the mod's Id -> its new Id
     idmap = {}
@@ -1926,7 +2251,7 @@ def check_keep(mod, data, out, tables, cache):
     return bad
 
 
-def check(mod, data, cache, tables, strings, copies, loader, rows='rebuild'):
+def check(mod, data, cache, tables, strings, copies, loader, rows='rebuild', jsonmaps=()):
     """Runs mod.js in a mock D2RMM and compares what it writes with the mod's own files."""
     out = Path(tempfile.gettempdir()) / 'ConvertDataModCheck' / mod.name
     if not shutil.which('node'):
@@ -1947,22 +2272,98 @@ def check(mod, data, cache, tables, strings, copies, loader, rows='rebuild'):
         if got != want:
             bad += 1
             print('  DIFFERS: ' + t)
+    # mod.js gives new entries the next free string ids (D2RMM.getNextStringID), not the data mod's:
+    # compare without ids, and check that the ids are unique.
+    no_ids = lambda d: {k: [{f: v for f, v in e.items() if f != 'id'} for e in es] for k, es in d.items()}
     for s in strings:
-        got = by_key(json.loads((out / s).read_text(encoding='utf-8-sig')))
-        want = by_key(read_strings(data / s))
-        if got != want:
+        out_list = json.loads((out / s).read_text(encoding='utf-8-sig'))
+        if no_ids(by_key(out_list)) != no_ids(by_key(read_strings(data / s))):
             bad += 1
             print('  DIFFERS: ' + s)
+        repeated = sorted(i for i, n in Counter(e.get('id') for e in out_list).items() if n > 1)
+        if repeated:  # the game's own files repeat ids only across files, never within one
+            bad += 1
+            print('  REPEATED STRING IDS: %s %s' % (s, repeated[:5]))
+    for j in jsonmaps:
+        got, want = jsonmap_load(out / j), jsonmap_load(data / j)
+        if not got or not want or got[0] != want[0] or dict(got[1] if got[0] == 'list' else got[1].items()) != \
+                dict(want[1] if want[0] == 'list' else want[1].items()):
+            bad += 1
+            print('  DIFFERS: ' + j)
     copied = set(written['data'])
     missing = [c for c in copies if c not in copied]
     extra = [c for c in copied if c not in set(copies)]
-    print('check: %d tables and %d string files rebuilt by mod.js, %d differ; %d of %d copies made, %d unexpected; '
-          '%d D2RLoader files' % (len(tables), len(strings), bad, len(copies) - len(missing), len(copies),
+    print('check: %d tables, %d string files and %d HD registries rebuilt by mod.js, %d differ; %d of %d copies made, '
+          '%d unexpected; %d D2RLoader files' % (len(tables), len(strings), len(jsonmaps), bad, len(copies) - len(missing), len(copies),
                                   len(extra), len(written['loader'])))
     shutil.rmtree(out, ignore_errors=True)
     if bad or missing or extra:
         raise SystemExit('check failed (missing %s, extra %s)' % (missing[:5], extra[:5]))
 
 
+def add_base_rows_setting(mod, base_rows):
+    """Adds Load order > Classic-rules tables to a converted mod's mod.json made before it existed
+    (refresh_js keeps the rest of mod.json as it is)."""
+    path = mod / 'mod.json'
+    try:
+        info = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return
+    section = next((c for c in info.get('config') or [] if c.get('id') == 'loadorder'), None)
+    if section is None or any(c.get('id') == BASE_ROWS_UI['id'] for c in section.get('children', [])):
+        return
+    section.setdefault('children', []).append(dict(BASE_ROWS_UI, defaultValue=base_rows))
+    path.write_text(json.dumps(info, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+    print('%s: mod.json gets the Load order > Classic-rules tables setting (%s)' % (mod.name, base_rows))
+    report_path = mod / 'd2rmm' / 'convert.json'
+    try:
+        report = json.loads(report_path.read_text(encoding='utf-8'))
+        report.setdefault('settings', {}).setdefault('baseRows', base_rows)
+        report_path.write_text(json.dumps(report, indent=1, ensure_ascii=False), encoding='utf-8')
+    except (OSError, ValueError):
+        pass
+
+
+def refresh_js(mod):
+    """Puts the current mod.js code around a converted mod's generated data (the lists between the
+    @generated-data markers), keeping its settings: for code fixes, without converting again."""
+    mod = Path(mod).resolve()
+    old = (mod / 'mod.js').read_text(encoding='utf-8')
+    begin, end = '/* @generated-data-begin */\n', '/* @generated-data-end */'
+    data_block = old.split(begin, 1)[1].split(end, 1)[0]
+    head = _re.search(r'^ \* (.*) - D2RMM version of the data mod "(.*)"(.*)\.$', old, _re.M)
+    pick = lambda pat: _re.search(pat, old, _re.M).group(1)
+    data_rel = pick(r"^const DATA = '(.*)';$").replace('\\\\', '\\')
+    # mod.js from before the Classic-rules tables setting: its default is 'stubs'
+    found = _re.search(r"^const BASE_ROWS = SETTING\('loadorderBaseRows', \[.*\], '(.*)'\);$", old, _re.M)
+    base_rows = found.group(1) if found else 'stubs'
+    js = (MOD_JS.replace('__NAME__', head.group(1)).replace('__ORIG__', head.group(2)).replace('__BY__', head.group(3))
+          .replace('__DATA_WIN__', data_rel).replace('__DATA__', data_rel.replace('\\', '\\\\'))
+          .replace('__ID__', pick(r"^const MOD_ID = '(.*)';$"))
+          .replace('__ROWS__', pick(r"^const ROWS = SETTING\('loadorderRows', \[.*\], '(.*)'\);$"))
+          .replace('__CELLS__', pick(r"^const CELLS = SETTING\('loadorderCells', \[.*\], '(.*)'\);$"))
+          .replace('__FILES__', pick(r"^const FILES = SETTING\('loadorderFiles', \[.*\], '(.*)'\);$"))
+          .replace('__BASEROWS__', base_rows)
+          .replace('__NTABLES__', pick(r'^ \*  - patches (\d+) tables'))
+          .replace('__NSTRINGS__', pick(r'^ \*  - merges (\d+) string files'))
+          .replace('__NCOPY__', pick(r'^ \*  - copies the remaining files \((\d+) files')))
+    h, rest = js.split(begin)
+    _, tail = rest.split(end)
+    new = h + begin + data_block + end + tail
+    add_base_rows_setting(mod, base_rows)
+    if new == old:
+        print('%s: mod.js is up to date' % mod.name)
+        return
+    (mod / 'd2rmm').mkdir(exist_ok=True)
+    (mod / 'd2rmm' / 'mod.js.before-refresh').write_text(old, encoding='utf-8', newline='\n')
+    (mod / 'mod.js').write_text(new, encoding='utf-8', newline='\n')
+    print('%s: mod.js code refreshed (old one in d2rmm\\mod.js.before-refresh)' % mod.name)
+
+
 if __name__ == '__main__':
-    main()
+    if sys.argv[1:2] == ['--refresh-js']:
+        # ConvertDataMod.py --refresh-js <converted mod folder> [...]
+        for m in sys.argv[2:]:
+            refresh_js(m)
+    else:
+        main()

@@ -401,8 +401,10 @@ function scanMod(d2rmm, id) {
   else if (convert) s.hints.push({ group: 'top', why: 'a converted data mod (its README says: top of the list)' });
   if (/\b(install|put|place|keep)\s+(it\s+|this mod\s+)?(LAST|at the BOTTOM)|\bLAST in the (mod )?list\b/i.test(text)) s.hints.push({ group: 'late', why: 'its description says to put it last' });
   else if (/\b(put|place|install)\s+(it\s+|this mod\s+)?(at the )?(TOP|FIRST)\b/i.test(text) && !convert) s.hints.push({ group: 'early', why: 'its description says to put it at the top' });
+  // wrapped by ConvertReplaceMod.py: its whole-file copies are merged row by row now
+  s.wrapped = fs.existsSync(path.join(dir, 'd2rmm', 'original-mod.js')) && fs.existsSync(path.join(dir, 'd2rmm', 'replace.json'));
   // whole tables / string files shipped in the folder and copied over the game's
-  if (!convert && /copyFile\s*\(/.test(js) && fs.existsSync(dir)) {
+  if (!convert && !s.wrapped && /copyFile\s*\(/.test(js) && fs.existsSync(dir)) {
     s.wholeFiles = walkFiles(dir).map((f) => f.replace(/\//g, '\\')).filter((f) => /(^|\\)global\\excel\\(base\\)?[^\\]+\.txt$|(^|\\)local\\lng\\strings(-legacy)?\\[^\\]+\.json$/i.test(f))
       .map((f) => f.replace(/^.*?(global\\excel|local\\lng)/i, '$1')).filter((f, i, a) => a.findIndex((x) => lc(x) === lc(f)) === i);
   }
@@ -516,8 +518,13 @@ function evaluate({ d2rmm, list, lists }) {
     } else if (e.checked && s.version && verCmp(s.version, e.checked) !== 0) {
       say('info', id, `version ${s.version}; the masterlist was written for ${e.checked}, so its rules may be out of date`);
     }
-    if (s.wholeFiles.length && !(e && e.group === 'whole-file')) {
-      say('warn', id, `copies whole game files over what the mods above it wrote: ${s.wholeFiles.slice(0, 6).join(', ')}${s.wholeFiles.length > 6 ? ', ...' : ''}${e ? '' : ' (if those are tables, put it high in the list or add it to the userlist as group "whole-file")'}`);
+    if (s.wrapped && g === 'whole-file') {
+      g = 'default'; // its copies merge now: it can go anywhere
+      say('note', id, 'converted by ConvertReplaceMod: its tables and strings are merged row by row, so it no longer has to go first');
+    } else if (s.wholeFiles.length && !(e && e.group === 'whole-file')) {
+      say('warn', id, `copies whole game files over what the mods above it wrote: ${s.wholeFiles.slice(0, 6).join(', ')}${s.wholeFiles.length > 6 ? ', ...' : ''}. Convert-D2RReplaceMod.ps1 -Mod "${id}" makes it merge them instead`);
+    } else if (s.wholeFiles.length) {
+      say('info', id, `replaces whole files (${s.wholeFiles.slice(0, 3).join(', ')}); it goes first so the mods below patch its copy. Convert-D2RReplaceMod.ps1 -Mod "${id}" makes it merge them instead, so it can go anywhere`);
     }
     group.set(id, g || 'default');
     if (!e) continue;
