@@ -346,7 +346,6 @@ FOREIGN_CUDA_NAMES = [p.strip().lower() for p in
                       (os.environ.get("AAMT_GPU_FOREIGN_NAMES")
                        or "python.exe,pythonw.exe,ollama.exe,ollama_llama_server.exe,llama-server.exe").split(",")
                       if p.strip()]
-VRAM_FRACTION = float(os.environ.get("AAMT_GPU_VRAM_FRACTION") or 0.9)
 
 _unload_hooks: Dict[str, Any] = {}
 _broke_dead_job: Optional[Dict[str, Any]] = None
@@ -610,19 +609,43 @@ def _handover_gate(label: str, timeout: Optional[float], start: float) -> None:
     check_gpu(label, fresh=True)
 
 
-def cap_torch_vram(fraction: Optional[float] = None) -> None:
-    """Make PyTorch raise out-of-memory instead of spilling into shared memory (driver resets,
-    bugcheck 0x116 on 2026-11-19). Only touches processes that already use CUDA."""
+def vram_fraction(free_bytes: int, total_bytes: int, reserved_bytes: int = 0) -> Optional[float]:
+    """The PyTorch cap as a share of the card: what is free right now plus what this process already
+    holds, minus headroom (AAMT_GPU_VRAM_HEADROOM_MIB, 768) for the CUDA context, cuDNN workspaces
+    and extension kernels that bypass PyTorch's allocator. A share of TOTAL memory is wrong: the
+    desktop takes 1.4-1.7 GB of the 11 GB card, so a fixed 90% already reached past physical VRAM.
+    AAMT_GPU_VRAM_FRACTION=<0..1> sets a fixed share instead; 0 turns the cap off (returns None)."""
+    raw = os.environ.get("AAMT_GPU_VRAM_FRACTION")
+    if raw is not None and raw.strip() != "":
+        fixed = float(raw)
+        return None if fixed <= 0 else min(fixed, 1.0)
+    if total_bytes <= 0:
+        return None
+    headroom = float(os.environ.get("AAMT_GPU_VRAM_HEADROOM_MIB") or 768) * 1024 * 1024
+    usable = free_bytes + reserved_bytes - headroom
+    return max(0.05, min(0.98, usable / total_bytes))
+
+
+def cap_torch_vram() -> None:
+    """Make PyTorch raise out-of-memory before the card is physically full instead of spilling into
+    shared memory (driver resets, bugcheck 0x116 on 2026-11-19). Worked out again before every
+    request from the memory free at that moment. Only touches processes that already use CUDA, and
+    leaves alone a process that set its own cap (torch.cuda._aamt_capped, Stable Audio's 60%)."""
     torch = sys.modules.get("torch")
-    if torch is None or os.environ.get("AAMT_GPU_VRAM_FRACTION") == "0":
+    if torch is None:
         return
     try:
         if not torch.cuda.is_initialized() or getattr(torch.cuda, "_aamt_capped", False):
             return
-        frac = float(fraction or VRAM_FRACTION)
-        torch.cuda.set_per_process_memory_fraction(frac, 0)
-        torch.cuda._aamt_capped = True
-        _log(f"PyTorch VRAM cap {frac:.0%} for pid {os.getpid()}")
+        free, total = torch.cuda.mem_get_info(0)
+        frac = vram_fraction(free, total, torch.cuda.memory_reserved(0))
+        if frac is None:
+            return
+        if abs(frac - getattr(torch.cuda, "_aamt_hub_cap", -1.0)) >= 0.01:
+            torch.cuda.set_per_process_memory_fraction(frac, 0)
+            torch.cuda._aamt_hub_cap = frac
+            _log(f"PyTorch VRAM cap {frac:.0%} = {frac * total / 2**20:.0f} MiB "
+                 f"({free / 2**20:.0f} MiB free) for pid {os.getpid()}")
     except Exception as exc:  # noqa: BLE001
         _log(f"VRAM cap skipped: {exc}")
 

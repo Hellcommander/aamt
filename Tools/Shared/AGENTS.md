@@ -73,9 +73,11 @@ evicts servers an earlier job left on the card (SD, TRELLIS, registered ones; Ol
 only unloads), cools down 30 s after a dead holder, then waits until the card is clear
 (no D2R/D2RLoader, no foreign python/ollama CUDA process, VRAM under
 `AAMT_GPU_IDLE_MIB`=3500). A job that starts a server calls `register_server`; in-process
-models call `register_unload`; both leave the card when the lease ends. Requests get a
-PyTorch VRAM cap (`AAMT_GPU_VRAM_FRACTION`, 0.9; SA3 keeps its own 0.6) so OOM is an error,
-not a spill. `python Tools\Common\gpu_hub.py --status` shows lease, card and servers.
+models call `register_unload`; both leave the card when the lease ends. Requests (and the
+SD server at load) get a PyTorch VRAM cap worked out from FREE memory minus 768 MiB headroom
+(`gpu_hub.vram_fraction`; about 80% with the desktop's 1.4-1.7 GB; `AAMT_GPU_VRAM_HEADROOM_MIB`,
+`AAMT_GPU_VRAM_FRACTION`=<share> fixed / 0 off; SA3 keeps its own 0.6) so OOM is an error,
+not a spill. A fixed share of total VRAM is wrong: 90% already reached past physical memory. `python Tools\Common\gpu_hub.py --status` shows lease, card and servers.
 
 ## Audio (Stable Audio 3 + D:\assets\audio)
 

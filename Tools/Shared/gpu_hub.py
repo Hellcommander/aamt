@@ -28,6 +28,7 @@ hold_gpu_job = _mod.hold_gpu_job
 register_server = _mod.register_server
 register_unload = _mod.register_unload
 cap_torch_vram = _mod.cap_torch_vram
+vram_fraction = _mod.vram_fraction
 gpu_clear = _mod.gpu_clear
 check_gpu = _mod.check_gpu
 GpuLostError = _mod.GpuLostError
