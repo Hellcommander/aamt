@@ -68,10 +68,11 @@ def log(msg: str) -> None:
 @contextmanager
 def gpu(label: str):
     try:
-        from gpu_hub import acquire_gpu
+        from gpu_hub import acquire_gpu, register_unload
     except Exception:  # noqa: BLE001  (lock is optional outside the toolkit)
         yield
         return
+    register_unload("refart models", free)  # resident pipelines leave the card with the lease
     with acquire_gpu("refart " + label):
         yield
 

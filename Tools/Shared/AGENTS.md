@@ -65,9 +65,17 @@ Soulash 2 skill icons: `Tools\Soulash2\SkillCreator` — `generate-icons --id <i
 
 Do not use the Caves of Qud Space-Time Vortex generators, or `Common/bake_texture.py` procedural noise, for Transcendence skins.
 
-One 11 GB GPU. Hold `gpu_hub.acquire_gpu` per request, never across server startup.
-Two model servers may be resident; they must not generate at once. Stable Audio 3
-is in-process and also takes that lock — do not run it while SD/TRELLIS is generating.
+One 11 GB GPU, ONE CUDA job at a time (two at once, or a job beside the game, has
+crashed the driver and restarted the PC). Hold `gpu_hub.acquire_gpu` per request;
+call `gpu_hub.hold_gpu_job` before starting a model server, loading in-process weights
+(Stable Audio, refart) or even looking for a running server. Taking the job lease:
+evicts servers an earlier job left on the card (SD, TRELLIS, registered ones; Ollama
+only unloads), cools down 30 s after a dead holder, then waits until the card is clear
+(no D2R/D2RLoader, no foreign python/ollama CUDA process, VRAM under
+`AAMT_GPU_IDLE_MIB`=3500). A job that starts a server calls `register_server`; in-process
+models call `register_unload`; both leave the card when the lease ends. Requests get a
+PyTorch VRAM cap (`AAMT_GPU_VRAM_FRACTION`, 0.9; SA3 keeps its own 0.6) so OOM is an error,
+not a spill. `python Tools\Common\gpu_hub.py --status` shows lease, card and servers.
 
 ## Audio (Stable Audio 3 + D:\assets\audio)
 

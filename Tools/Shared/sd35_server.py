@@ -183,6 +183,12 @@ def load_pipeline():
 
             if not torch.cuda.is_available():
                 raise RuntimeError("CUDA is not available on this Python")
+            # Out-of-memory must be a Python error, not a spill into shared memory: spilling
+            # made the driver reset (bugcheck 0x116, 2026-11-19). AAMT_GPU_VRAM_FRACTION=0 turns it off.
+            _frac = float(os.environ.get("AAMT_GPU_VRAM_FRACTION") or 0.9)
+            if _frac > 0:
+                torch.cuda.set_per_process_memory_fraction(min(_frac, 1.0), 0)
+                print(f"[SD] VRAM cap {min(_frac, 1.0):.0%}", flush=True)
             skip_t5 = _skip_t5()
             t5_ram = _t5_ram()
             seq_len = _max_seq_len()

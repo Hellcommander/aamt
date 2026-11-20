@@ -239,6 +239,9 @@ def _wait_acquire(path: Path, label: str, what: str, timeout: Optional[float],
         holder_pid = int(holder.get("pid") or 0)
         if not _pid_alive(holder_pid):
             if _break_lock_if_unchanged(path, raw, f"holder pid {holder_pid} is dead"):
+                if path == JOB_LOCK_FILE:
+                    global _broke_dead_job
+                    _broke_dead_job = holder  # the hand-over gate cools down before CUDA work
                 continue
 
         waited = time.monotonic() - start
@@ -255,6 +258,373 @@ def _wait_acquire(path: Path, label: str, what: str, timeout: Optional[float],
                 f"'{label}' has waited {waited:.0f}s"
             )
         time.sleep(poll)
+
+
+# --------------------------------------------------------------------------- GPU presence
+# 2026-11-20 the RTX 2080 Ti fell off the bus during a UniRig job ("GPU is lost. Reboot the system
+# to recover this GPU"); queued jobs then each started on the dead device and failed, and the
+# display could not wake until a hard reset. Every GPU call now checks the card is still there
+# (nvidia-smi -L, cached briefly) and stops with GpuLostError instead of queueing on a dead card.
+# GpuWatchdog.ps1 (same folder) writes gpu_lost.json here while the card is gone; it counts too.
+# AAMT_GPU_CHECK=0 skips the check.
+GPU_LOST_FILE = _DEFAULT_DIR / "gpu_lost.json"
+_GPU_CHECK_TTL = 10.0
+_gpu_check_cache: Dict[str, Any] = {"at": 0.0, "ok": True, "detail": ""}
+
+
+class GpuLostError(RuntimeError):
+    """The GPU is gone (driver lost the card); every GPU job fails until it is back (usually a reboot)."""
+
+
+def gpu_present(fresh: bool = False) -> tuple:
+    """(ok, detail). ok is False when nvidia-smi reports the card lost / no device, or the watchdog's
+    gpu_lost.json marker exists. A machine without nvidia-smi counts as ok (nothing to check)."""
+    now = time.monotonic()
+    marker = GPU_LOST_FILE.exists()  # cheap: always looked at, never cached
+    if not marker and not fresh and now - _gpu_check_cache["at"] < _GPU_CHECK_TTL:
+        return _gpu_check_cache["ok"], _gpu_check_cache["detail"]
+    ok, detail = True, ""
+    if marker:
+        try:
+            info = json.loads(GPU_LOST_FILE.read_text(encoding="utf-8-sig"))  # PowerShell 5 writes a BOM
+            detail = f"watchdog: GPU lost since {info.get('since', '?')} ({info.get('detail', '')})"
+        except Exception:  # noqa: BLE001
+            detail = f"watchdog marker {GPU_LOST_FILE}"
+        ok = False
+    else:
+        import shutil
+        import subprocess
+
+        exe = shutil.which("nvidia-smi")
+        if exe:
+            try:
+                r = subprocess.run([exe, "-L"], capture_output=True, text=True, timeout=20,
+                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                out = ((r.stdout or "") + (r.stderr or "")).strip()
+                if r.returncode != 0 or "GPU " not in out or "lost" in out.lower():
+                    ok, detail = False, out.splitlines()[0] if out else f"nvidia-smi exit {r.returncode}"
+            except subprocess.TimeoutExpired:
+                ok, detail = False, "nvidia-smi hung for 20 s (driver not answering)"
+            except OSError as exc:
+                detail = f"nvidia-smi not runnable: {exc}"  # can't tell; don't block
+    _gpu_check_cache.update(at=now, ok=ok, detail=detail)
+    return ok, detail
+
+
+def check_gpu(label: str = "", fresh: bool = False) -> None:
+    """Raise GpuLostError if the card is gone (see gpu_present)."""
+    if os.environ.get("AAMT_GPU_CHECK") == "0":
+        return
+    ok, detail = gpu_present(fresh=fresh)
+    if not ok:
+        _log(f"GPU LOST - not starting '{label}': {detail}")
+        raise GpuLostError(f"GPU lost, not starting '{label}': {detail}. Reboot the PC (or wait for "
+                           f"GpuWatchdog to restart the driver) before any GPU job.")
+
+
+# --------------------------------------------------------------------------- hand-over safety
+# 2026-11-20 the lease alone did not keep the card to one CUDA job: model servers (SD :1338,
+# TRELLIS, Ollama) keep weights on the GPU after the job that started them lets go of the lease,
+# in-process models (Stable Audio, refart) stayed loaded when the idle timer gave the lease away,
+# and a dead holder's lease went to the next job at once while the driver (and the dead job's
+# children) were still busy. The card was lost twice that night, both times at a hand-over.
+# So taking the lease now:
+#   1. evicts every model server another job left running (shutdown, then kill the listener;
+#      Ollama only unloads its models),
+#   2. waits out a cool-down when the previous holder died,
+#   3. waits until the card is clear: no game (AAMT_GPU_BLOCK_PROCESSES), no foreign python /
+#      ollama process with a CUDA context, used VRAM under AAMT_GPU_IDLE_MIB, two polls in a row;
+# and giving it up runs this process's unload hooks and stops the servers it started.
+# AAMT_GPU_EVICT=0 keeps foreign servers (the gate then waits for them to go away by themselves).
+SERVERS_DIR = _DEFAULT_DIR / "servers"
+DEAD_COOLDOWN_SEC = float(os.environ.get("AAMT_GPU_DEAD_COOLDOWN_SEC") or 30)
+IDLE_MIB = float(os.environ.get("AAMT_GPU_IDLE_MIB") or 3500)
+GATE_POLL_SEC = 3.0
+BLOCK_PROCESSES = [p.strip().lower() for p in
+                   (os.environ.get("AAMT_GPU_BLOCK_PROCESSES") or "D2R.exe,D2RLoader.exe").split(",") if p.strip()]
+FOREIGN_CUDA_NAMES = [p.strip().lower() for p in
+                      (os.environ.get("AAMT_GPU_FOREIGN_NAMES")
+                       or "python.exe,pythonw.exe,ollama.exe,ollama_llama_server.exe,llama-server.exe").split(",")
+                      if p.strip()]
+VRAM_FRACTION = float(os.environ.get("AAMT_GPU_VRAM_FRACTION") or 0.9)
+
+_unload_hooks: Dict[str, Any] = {}
+_broke_dead_job: Optional[Dict[str, Any]] = None
+
+
+def _run(cmd: list, timeout: float = 20) -> str:
+    import subprocess
+
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, errors="replace",
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        return r.stdout or ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _shared_setting(fn_name: str, default: Any) -> Any:
+    """Port settings live in Tools\\Shared\\tool_paths.py; fall back to the stock ports."""
+    try:
+        shared = str(Path(__file__).resolve().parent.parent / "Shared")
+        if shared not in sys.path:
+            sys.path.append(shared)
+        import tool_paths  # type: ignore
+
+        return getattr(tool_paths, fn_name)()
+    except Exception:  # noqa: BLE001
+        return default
+
+
+def _known_servers() -> list:
+    """Model servers that keep weights on the GPU between requests, plus registered ones."""
+    servers = [
+        {"name": "SD 3.5", "port": int(_shared_setting("sd_port", 1338)), "kind": "http", "shutdown": "/shutdown"},
+        {"name": "TRELLIS", "port": int(_shared_setting("trellis_port", 7960)), "kind": "http",
+         "shutdown": "/shutdown"},
+    ]
+    ollama = (os.environ.get("OLLAMA_HOST") or "http://127.0.0.1:11434").rstrip("/")
+    try:
+        servers.append({"name": "Ollama", "port": int(ollama.rsplit(":", 1)[1]), "kind": "ollama"})
+    except (IndexError, ValueError):
+        servers.append({"name": "Ollama", "port": 11434, "kind": "ollama"})
+    owners: Dict[int, Dict[str, Any]] = {}
+    if SERVERS_DIR.is_dir():
+        for f in SERVERS_DIR.glob("*.json"):
+            try:
+                entry = json.loads(f.read_text(encoding="utf-8"))
+                owners[int(entry["port"])] = {**entry, "file": str(f)}
+            except Exception:  # noqa: BLE001
+                continue
+    for s in servers:
+        if s["port"] in owners:
+            s.update({k: v for k, v in owners.pop(s["port"]).items() if k not in ("kind", "shutdown")})
+    servers.extend({"kind": "http", "shutdown": "/shutdown", **e} for e in owners.values())
+    return servers
+
+
+def _port_listening(port: int) -> bool:
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.4)
+        return sock.connect_ex(("127.0.0.1", port)) == 0
+
+
+def _listener_pids(port: int) -> list:
+    pids = set()
+    for line in _run(["netstat", "-ano", "-p", "TCP"]).splitlines():
+        parts = line.split()
+        if len(parts) >= 5 and parts[1].endswith(f":{port}") and parts[3].upper() == "LISTENING":
+            try:
+                pids.add(int(parts[4]))
+            except ValueError:
+                pass
+    pids.discard(0)
+    return sorted(pids)
+
+
+def register_server(name: str, port: int, shutdown: str = "/shutdown") -> None:
+    """Record that this job started a model server on `port` (it is stopped when the lease ends,
+    and evicted by the next job if this process died first)."""
+    if os.environ.get("AAMT_GPU_HUB_DISABLE") == "1":
+        return
+    owner = os.environ.get(JOB_OWNER_ENV) or str(os.getpid())
+    try:
+        SERVERS_DIR.mkdir(parents=True, exist_ok=True)
+        (SERVERS_DIR / f"{int(port)}.json").write_text(json.dumps(
+            {"name": name, "port": int(port), "shutdown": shutdown, "owner": int(owner),
+             "started": time.strftime("%Y-%m-%d %H:%M:%S")}, indent=2), encoding="utf-8")
+    except OSError as exc:
+        _log(f"could not register server {name}:{port}: {exc}")
+
+
+def _forget_server(port: int) -> None:
+    try:
+        (SERVERS_DIR / f"{int(port)}.json").unlink()
+    except OSError:
+        pass
+
+
+def _stop_server(s: Dict[str, Any], why: str) -> None:
+    import urllib.request
+
+    port = int(s["port"])
+    if not _port_listening(port):
+        _forget_server(port)
+        return
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    base = f"http://127.0.0.1:{port}"
+    if s.get("kind") == "ollama":
+        try:
+            with opener.open(base + "/api/ps", timeout=5) as r:
+                models = [m.get("name") or m.get("model") for m in json.loads(r.read()).get("models", [])]
+        except Exception:  # noqa: BLE001
+            models = []
+        for m in filter(None, models):
+            _log(f"unloading Ollama model {m} ({why})")
+            try:
+                req = urllib.request.Request(base + "/api/generate", method="POST",
+                                             data=json.dumps({"model": m, "keep_alive": 0}).encode(),
+                                             headers={"Content-Type": "application/json"})
+                opener.open(req, timeout=30).read()
+            except Exception as exc:  # noqa: BLE001
+                _log(f"Ollama unload of {m} failed: {exc}")
+        return
+    _log(f"stopping {s['name']} on :{port} ({why})")
+    try:
+        opener.open(base + s.get("shutdown", "/shutdown"), timeout=5).read()
+    except Exception:  # noqa: BLE001
+        pass
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline and _port_listening(port):
+        time.sleep(1)
+    if _port_listening(port):
+        for pid in _listener_pids(port):
+            _log(f"{s['name']} still up after /shutdown: taskkill pid {pid}")
+            _run(["taskkill", "/F", "/T", "/PID", str(pid)], timeout=30)
+        time.sleep(2)
+    _forget_server(port)
+
+
+def register_unload(name: str, fn: Any) -> None:
+    """In-process models: `fn()` drops them from the GPU; it runs before this process gives up the lease."""
+    _unload_hooks[name] = fn
+
+
+def _run_unload_hooks() -> None:
+    for name, fn in list(_unload_hooks.items()):
+        try:
+            fn()
+            _log(f"unloaded {name} before giving up the GPU")
+        except Exception as exc:  # noqa: BLE001
+            _log(f"unload hook {name} failed: {exc}")
+
+
+def _evict_foreign_servers(me: int) -> None:
+    if os.environ.get("AAMT_GPU_EVICT") == "0":
+        return
+    for s in _known_servers():
+        if int(s.get("owner") or 0) == me:
+            continue
+        if _port_listening(int(s["port"])):
+            _stop_server(s, "left on the GPU by an earlier job")
+        else:
+            _forget_server(int(s["port"]))
+
+
+def _stop_own_servers(me: int) -> None:
+    if os.environ.get("AAMT_GPU_KEEP_SERVERS") == "1":
+        return
+    for s in _known_servers():
+        if int(s.get("owner") or 0) == me:
+            _stop_server(s, "job finished")
+
+
+def _running_blockers() -> list:
+    if not BLOCK_PROCESSES:
+        return []
+    found = []
+    for line in _run(["tasklist", "/FO", "CSV", "/NH"]).splitlines():
+        name = line.split(",", 1)[0].strip('"').lower()
+        if name in BLOCK_PROCESSES:
+            found.append(name)
+    return sorted(set(found))
+
+
+def _foreign_cuda_processes() -> list:
+    """Other python / ollama processes holding a CUDA context (WDDM reports no per-process VRAM,
+    but it does list the processes)."""
+    import shutil
+
+    exe = shutil.which("nvidia-smi")
+    if not exe:
+        return []
+    mine = {os.getpid(), os.getppid()}
+    out = []
+    for line in _run([exe, "--query-compute-apps=pid,process_name", "--format=csv,noheader"]).splitlines():
+        pid_s, _, path = line.partition(",")
+        try:
+            pid = int(pid_s.strip())
+        except ValueError:
+            continue
+        name = Path(path.strip()).name.lower()
+        if pid not in mine and name in FOREIGN_CUDA_NAMES:
+            out.append(f"{pid} {path.strip()}")
+    return out
+
+
+def vram_used_mib() -> Optional[float]:
+    import shutil
+
+    exe = shutil.which("nvidia-smi")
+    if not exe:
+        return None
+    try:
+        return float(_run([exe, "--query-gpu=memory.used", "--format=csv,noheader,nounits"]).splitlines()[0])
+    except (IndexError, ValueError):
+        return None
+
+
+def gpu_clear() -> tuple:
+    """(clear, reasons). The card is clear when no game, no foreign CUDA python and little VRAM in use."""
+    reasons = []
+    games = _running_blockers()
+    if games:
+        reasons.append("game running: " + ", ".join(games))
+    foreign = _foreign_cuda_processes()
+    if foreign:
+        reasons.append("other CUDA processes: " + "; ".join(foreign))
+    used = vram_used_mib()
+    if used is not None and used > IDLE_MIB:
+        reasons.append(f"{used:.0f} MiB VRAM in use (idle limit {IDLE_MIB:.0f}, AAMT_GPU_IDLE_MIB)")
+    return not reasons, reasons
+
+
+def _handover_gate(label: str, timeout: Optional[float], start: float) -> None:
+    """Run right after this process took the job lease, before any CUDA work."""
+    global _broke_dead_job
+    if os.environ.get("AAMT_GPU_GATE") == "0":
+        return
+    dead, _broke_dead_job = _broke_dead_job, None
+    if dead:
+        _log(f"previous GPU job died (pid {dead.get('pid')}: {dead.get('label')!r}); "
+             f"cooling down {DEAD_COOLDOWN_SEC:.0f}s before '{label}'")
+        time.sleep(DEAD_COOLDOWN_SEC)
+    check_gpu(label, fresh=True)
+    _evict_foreign_servers(os.getpid())
+    clear_polls, last_log = 0, -WAIT_LOG_INTERVAL
+    while True:
+        clear, reasons = gpu_clear()
+        clear_polls = clear_polls + 1 if clear else 0
+        if clear_polls >= 2:
+            break
+        waited = time.monotonic() - start
+        if not clear:
+            if timeout is not None and waited >= timeout:
+                raise TimeoutError(f"GPU not clear after {waited:.0f}s for '{label}': " + " | ".join(reasons))
+            if waited - last_log >= WAIT_LOG_INTERVAL:
+                last_log = waited
+                _log(f"'{label}' has the lease but waits for a clear card: " + " | ".join(reasons))
+        time.sleep(GATE_POLL_SEC)
+    check_gpu(label, fresh=True)
+
+
+def cap_torch_vram(fraction: Optional[float] = None) -> None:
+    """Make PyTorch raise out-of-memory instead of spilling into shared memory (driver resets,
+    bugcheck 0x116 on 2026-11-19). Only touches processes that already use CUDA."""
+    torch = sys.modules.get("torch")
+    if torch is None or os.environ.get("AAMT_GPU_VRAM_FRACTION") == "0":
+        return
+    try:
+        if not torch.cuda.is_initialized() or getattr(torch.cuda, "_aamt_capped", False):
+            return
+        frac = float(fraction or VRAM_FRACTION)
+        torch.cuda.set_per_process_memory_fraction(frac, 0)
+        torch.cuda._aamt_capped = True
+        _log(f"PyTorch VRAM cap {frac:.0%} for pid {os.getpid()}")
+    except Exception as exc:  # noqa: BLE001
+        _log(f"VRAM cap skipped: {exc}")
 
 
 def _inherited_job() -> bool:
@@ -278,6 +648,11 @@ def _ensure_job(label: str, timeout: Optional[float], poll: float, start: float)
             return
         _wait_acquire(JOB_LOCK_FILE, f"{Path(sys.argv[0]).name if sys.argv else 'python'}: {label}",
                       "GPU job", timeout, poll, start)
+        try:
+            _handover_gate(label, timeout, start)
+        except BaseException:
+            _release(JOB_LOCK_FILE, "job")
+            raise
         _job_held = True
         os.environ[JOB_OWNER_ENV] = str(os.getpid())
         _log(f"GPU job lease taken by pid {os.getpid()} ({label})")
@@ -289,6 +664,7 @@ def hold_gpu_job(label: str, timeout: Optional[float] = None, poll: float = DEFA
     global _job_active
     if os.environ.get("AAMT_GPU_HUB_DISABLE") == "1":
         return
+    check_gpu(label)
     with _job_mutex:
         _job_active += 1
     try:
@@ -306,6 +682,12 @@ def release_gpu_job() -> None:
         if _job_timer is not None:
             _job_timer.cancel()
             _job_timer = None
+        # Nothing of ours may stay on the card once the next job (or the game) can start.
+        _run_unload_hooks()
+        try:
+            _stop_own_servers(os.getpid())
+        except Exception as exc:  # noqa: BLE001
+            _log(f"stopping own servers failed: {exc}")
         _release(JOB_LOCK_FILE, "job")
         _job_held = False
         if os.environ.get(JOB_OWNER_ENV) == str(os.getpid()):
@@ -368,6 +750,7 @@ def acquire_gpu(
             _tls.depth -= 1
         return
 
+    check_gpu(label)
     start = time.monotonic()
     with _job_mutex:
         _job_active += 1
@@ -377,7 +760,16 @@ def acquire_gpu(
     except BaseException:
         _job_request_done()
         raise
+    # The card can drop out while we waited in the queue: look again before running.
+    try:
+        check_gpu(label, fresh=True)
+    except GpuLostError:
+        _release(LOCK_FILE, label)
+        _job_request_done()
+        release_gpu_job()
+        raise
 
+    cap_torch_vram()
     _tls.depth = 1
     _log(f"acquired for '{label}' (pid {os.getpid()})")
     try:
@@ -404,6 +796,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="GPU hub lock diagnostics/testing")
     parser.add_argument("--status", action="store_true", help="show current holders")
+    parser.add_argument("--check", action="store_true", help="is the GPU still there? exit 0 yes, 3 lost")
     parser.add_argument("--hold", type=float, default=0.0, metavar="SEC",
                         help="acquire the lock and hold it for SEC seconds")
     parser.add_argument("--then", type=float, default=0.0, metavar="SEC",
@@ -412,13 +805,26 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", type=float, default=None)
     args = parser.parse_args()
 
+    if args.check:
+        ok, detail = gpu_present(fresh=True)
+        print(("GPU present" if ok else "GPU LOST") + (f": {detail}" if detail else ""))
+        sys.exit(0 if ok else 3)
+
     if args.status or not args.hold:
+        ok, detail = gpu_present(fresh=True)
+        print("gpu: " + ("present" if ok else f"LOST ({detail})"))
         for name, holder in (("job", current_job()), ("request", current_holder())):
             if holder:
                 alive = _pid_alive(int(holder.get("pid") or 0))
                 print(f"{name}: " + json.dumps({**holder, "pid_alive": alive}, indent=2))
             else:
                 print(f"{name}: free")
+        clear, reasons = gpu_clear()
+        print("card: " + ("clear" if clear else "BUSY - " + " | ".join(reasons)))
+        for s in _known_servers():
+            if _port_listening(int(s["port"])):
+                print(f"server up: {s['name']} :{s['port']}" + (f" (owner pid {s['owner']})" if s.get("owner") else
+                                                                 " (not registered)"))
         sys.exit(0)
 
     with acquire_gpu(args.label, timeout=args.timeout):
