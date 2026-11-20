@@ -60,6 +60,22 @@ no extra care. Take the lock yourself only if you drive a GPU tool directly.
 
 Hold the lock for individual requests, never for server startup.
 
+**A lost card stops the queue.** Every `acquire_gpu` / `hold_gpu_job` first checks that
+`nvidia-smi -L` still sees the card (cached 10 s, checked again after waiting in the queue) and
+raises `GpuLostError` if the driver lost it, instead of starting jobs on a dead device (2026-11-20:
+the card fell off the bus during a UniRig job, the queued jobs then failed one after another and the
+display could not wake). `python Common\gpu_hub.py --check` exits 0 when the card is there, 3 when
+it is lost; `--status` shows it too. `AAMT_GPU_CHECK=0` skips the check.
+
+**Watchdog (optional, needs admin once).** `Common\GpuWatchdog.ps1` checks the card every 30 s. When
+it is lost it writes `%LOCALAPPDATA%\AamtGpuHub\gpu_lost.json` (the hub then refuses every GPU job),
+restarts the NVIDIA display device with `pnputil /restart-device` (at most twice, a minute apart;
+only when elevated), and deletes the marker once the card answers again. A card that fell off the
+bus usually needs a reboot anyway; the marker then stays until the card is back. Install it as a
+logon task from an elevated PowerShell: `Common\Install-GpuWatchdog.ps1` (`-Uninstall` removes it,
+`-DryRun` logs instead of restarting). Log: `%LOCALAPPDATA%\AamtGpuHub\gpu_watchdog.log`. When the
+screen stays black, Win+Ctrl+Shift+B (Windows' own graphics reset) is worth a try before a hard reset.
+
 ## Per-resource notes
 
 ### Stable Diffusion 3.5 (`sd_http_client.py`, `sd35_server.py`)
@@ -134,6 +150,16 @@ UVs are the important part — they're what later baking and skinning bind to.
 Treat the baked textures as a starting point, not a final material.
 
 Resolution is a voxel tier: `512` (safe here), `1024`, `1536`.
+
+**Half precision at 1024 / 1536** (2026-11-19): those tiers run the cascade path
+(`sample_shape_slat_cascade`), which handed float32 conditioning and latents to float16 models
+and failed with HTTP 500 `mat1 and mat2 must have the same dtype, but got Float and Half`.
+`Shared/patches/trellis2_half_cascade.py` patches the install's pipeline file (three casts,
+idempotent, backup beside the file; `--check`, `--revert`); run it again after reinstalling or
+updating TRELLIS. `Shared/patches/test_trellis2_half_cascade.py` (TRELLIS venv, CPU only, no
+weights) fails with that message on an unpatched install and passes on a patched one. Applied
+to `D:	rellis2` on 2026-11-19; a full 1024 generation has not been run since (whether 11 GB
+is enough at that tier is a separate question).
 `mesh_simplify` is a decimation target in thousands of faces.
 
 Weights live in the shared HF cache (`tool_paths.hf_home()`, `D:\hf-cache`) via
