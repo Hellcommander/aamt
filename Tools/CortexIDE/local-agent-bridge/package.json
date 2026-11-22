@@ -2,7 +2,7 @@
   "name": "local-agent-bridge",
   "displayName": "Local Agent Bridge",
   "description": "CortexIDE coding agent on local models (vLLM / Ollama), Claude (Anthropic API) or the Claude Code engine, with file, search and shell tools, SKILL.md skills, .canvas.tsx canvases, and chat import (including Cursor exports).",
-  "version": "2.18.0",
+  "version": "2.20.0",
   "publisher": "arend",
   "engines": {
     "vscode": "^1.80.0"
@@ -155,6 +155,38 @@
         "category": "Local Agent Bridge"
       },
       {
+        "command": "localAgentBridge.agentNewChatInFolder",
+        "title": "Agent: New Chat in Folder…",
+        "icon": "$(folder-library)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.memoryManage",
+        "title": "Agent: Manage Memory",
+        "icon": "$(book)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.memoryAdd",
+        "title": "Agent: Add a Memory",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.memoryImport",
+        "title": "Agent: Import Memory",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.memoryExport",
+        "title": "Agent: Export Memory (.zip)",
+        "category": "Local Agent Bridge"
+      },
+      {
+        "command": "localAgentBridge.memoryGenerate",
+        "title": "Agent: Generate Memory From This Chat",
+        "category": "Local Agent Bridge"
+      },
+      {
         "command": "localAgentBridge.agentAskCanvas",
         "title": "Agent: Ask About This Canvas",
         "icon": "$(sparkle)",
@@ -201,6 +233,11 @@
         }
       ],
       "explorer/context": [
+        {
+          "command": "localAgentBridge.agentNewChatInFolder",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation@90"
+        },
         {
           "command": "localAgentBridge.openCanvas",
           "when": "resourceFilename =~ /\\.canvas\\.tsx$/",
@@ -758,6 +795,37 @@
           ],
           "default": "standard",
           "description": "Output limits new chats start with. Each chat can be changed on its own with “Agent: Set Chat Limits” or the panel menu. Presets only raise the settings; outputs are capped to the model's limit (Claude) or half the context window (local models)."
+        },
+        "localAgentBridge.agent.memory": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Memory between chats: what the agent remembers about you (every workspace) and about this project, as Markdown files under the history folder (`memory/` and `projects/<workspace>/memory/`). The index goes into every prompt, and the agent can save (`MemoryWrite`) and delete (`MemoryDelete`) memories. Review them with *Agent: Manage Memory*."
+        },
+        "localAgentBridge.agent.memoryGenerate": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Generate memory from chats: every `memoryGenerateEvery` turns (and when a chat is compacted), the chat's model reads the recent turns in the background and adds, updates or removes memories. Secrets are never stored. Not on the Claude Code engine, which keeps its own memory."
+        },
+        "localAgentBridge.agent.memoryGenerateEvery": {
+          "type": "number",
+          "default": 3,
+          "minimum": 1,
+          "markdownDescription": "Turns between memory generation passes for a chat."
+        },
+        "localAgentBridge.agent.memoryIncludeSensitive": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Allow generated memory to include sensitive topics you shared, such as health conditions or religious beliefs. Off: they are left out."
+        },
+        "localAgentBridge.agent.memorySearchChats": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Search and reference chats: the agent gets `ChatSearch` and `ChatRead` to find and read your earlier chats (this workspace, or all of them) when you refer to past work."
+        },
+        "localAgentBridge.agent.memoryPromptChars": {
+          "type": "number",
+          "default": 6000,
+          "markdownDescription": "Most characters of memory put into each prompt (the newest memories in full, older ones by their one-line description)."
         },
         "localAgentBridge.agent.autoSwitch": {
           "type": "string",

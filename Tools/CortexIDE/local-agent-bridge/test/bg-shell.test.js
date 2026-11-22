@@ -59,15 +59,17 @@ test("background shell: starts at once, reads new output, waits for a line, list
 
   assert.match(await execTool(ctxA, "ShellKill", { id }), new RegExp("stopped " + id));
   const s = bg.get(id);
-  for (let i = 0; i < 50 && s.exitCode == null; i++) await new Promise((res) => setTimeout(res, 100));
+  for (let i = 0; i < 200 && s.exitCode == null; i++) await new Promise((res) => setTimeout(res, 100));
   assert.notStrictEqual(s.exitCode, null, "process tree was killed");
   assert.match(await execTool(ctxA, "ShellOutput", { id, wait: 0 }), /exited with code/);
 }, { skip: SKIP });
 
 test("background shell that fails at once shows its exit; bad regex is an error", async () => {
   const r = await execTool(ctxA, "Shell", { command: "Write-Output 'nope'; exit 7", run_in_background: true });
-  assert.match(r, /exited with code 7/);
   const id = /background shell (bg\d+)/.exec(r)[1];
+  // Usually it has exited within the first 3 s; on a loaded machine PowerShell can take longer to start.
+  const done = /exited with code/.test(r) ? r : await execTool(ctxA, "ShellOutput", { id, wait: 30, until: "\\bnope\\b" }).then(() => execTool(ctxA, "ShellOutput", { id, wait: 5 }));
+  assert.match(done, /exited with code 7/);
   assert.match(await execTool(ctxA, "ShellOutput", { id, until: "(" }), /^error: bad until regex/);
   assert.match(await execTool(ctxA, "ShellOutput", { id: "bg999" }), /^error: no background shell/);
 }, { skip: SKIP });

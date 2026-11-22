@@ -469,7 +469,23 @@ def generate_image(
     reference_image: Optional[str] = None,
     image_strength: float = 0.65,
 ) -> Path:
+    # Take the GPU job before looking for the server: taking it evicts servers an earlier job
+    # left on the card, so a server found before that could vanish under us.
+    try:
+        from gpu_hub import hold_gpu_job
+
+        hold_gpu_job(f"SD {output_path.name}")
+    except ImportError:
+        pass
     api_url = api_url or detect_server(verbose=True)
+    if not api_url:
+        try:
+            from sd_server_lifecycle import ensure_sd_server
+
+            if ensure_sd_server():
+                api_url = detect_server(verbose=True)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[SD] could not start the server: {exc}", file=sys.stderr)
     if not api_url:
         raise RuntimeError(
             "No Stable Diffusion server detected. Start SD3.5 with "

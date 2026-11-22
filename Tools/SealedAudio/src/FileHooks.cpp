@@ -40,6 +40,14 @@ namespace SealedAudio::Hooks
 			std::int64_t               pos{ 0 };
 			std::uint64_t              bytesRead{ 0 };
 			bool                       overlapped{ false };
+			// I/O completion port emulation. Engines that read through a completion port (D2R's aio library:
+			// CreateIoCompletionPort, then overlapped ReadFile, then GetQueuedCompletionStatusEx) wait for a packet per
+			// read. The stand-in handle is an event, which a real port refuses, so the association is recorded here and
+			// every overlapped read posts its own packet. Without this the engine's first read of a sealed file never
+			// completes and its loader stalls behind it (seen in D2R 2026-11-18: every sound effect went silent).
+			HANDLE                     port{ nullptr };
+			ULONG_PTR                  portKey{ 0 };
+			bool                       skipOnSuccess{ false };
 		};
 
 		std::shared_mutex                                         g_filesLock;
@@ -156,6 +164,10 @@ namespace SealedAudio::Hooks
 		using GetFileInformationByHandle_t = BOOL(WINAPI*)(HANDLE, LPBY_HANDLE_FILE_INFORMATION);
 		using GetFileInformationByHandleEx_t = BOOL(WINAPI*)(HANDLE, FILE_INFO_BY_HANDLE_CLASS, LPVOID, DWORD);
 		using CloseHandle_t = BOOL(WINAPI*)(HANDLE);
+		using CreateIoCompletionPort_t = HANDLE(WINAPI*)(HANDLE, HANDLE, ULONG_PTR, DWORD);
+		using SetFileCompletionNotificationModes_t = BOOL(WINAPI*)(HANDLE, UCHAR);
+		using CancelIoEx_t = BOOL(WINAPI*)(HANDLE, LPOVERLAPPED);
+		using CancelIo_t = BOOL(WINAPI*)(HANDLE);
 		using GetFileAttributesW_t = DWORD(WINAPI*)(LPCWSTR);
 		using GetFileAttributesA_t = DWORD(WINAPI*)(LPCSTR);
 		using GetFileAttributesExW_t = BOOL(WINAPI*)(LPCWSTR, GET_FILEEX_INFO_LEVELS, LPVOID);
@@ -185,6 +197,10 @@ namespace SealedAudio::Hooks
 		GetFileInformationByHandle_t   o_GetFileInformationByHandle{ nullptr };
 		GetFileInformationByHandleEx_t o_GetFileInformationByHandleEx{ nullptr };
 		CloseHandle_t                  o_CloseHandle{ nullptr };
+		CreateIoCompletionPort_t       o_CreateIoCompletionPort{ nullptr };
+		SetFileCompletionNotificationModes_t o_SetFileCompletionNotificationModes{ nullptr };
+		CancelIoEx_t                   o_CancelIoEx{ nullptr };
+		CancelIo_t                     o_CancelIo{ nullptr };
 		GetFileAttributesW_t           o_GetFileAttributesW{ nullptr };
 		GetFileAttributesA_t           o_GetFileAttributesA{ nullptr };
 		GetFileAttributesExW_t         o_GetFileAttributesExW{ nullptr };
@@ -364,13 +380,87 @@ namespace SealedAudio::Hooks
 			if (ov) {
 				ov->Internal = 0;        // STATUS_SUCCESS: GetOverlappedResult reads these
 				ov->InternalHigh = n;
+				if (n == 0 && toRead > 0) {
+					ov->Internal = (ULONG_PTR)0xC0000011L;   // STATUS_END_OF_FILE
+					if (ov->hEvent) {
+						::SetEvent(ov->hEvent);
+					}
+					::SetLastError(ERROR_HANDLE_EOF);    // fails at once: no completion packet, as for a real file
+					return FALSE;
+				}
+				if (vf->port && vf->skipOnSuccess) {
+					if (ov->hEvent) {
+						::SetEvent(ov->hEvent);
+					}
+					::SetLastError(ERROR_SUCCESS);
+					return TRUE;
+				}
+				if (vf->port) {
+					// Report it the way every completion-port engine handles: pending, then one packet on the port.
+					if (ov->hEvent) {
+						::SetEvent(ov->hEvent);
+					}
+					::PostQueuedCompletionStatus(vf->port, n, vf->portKey, ov);
+					::SetLastError(ERROR_IO_PENDING);
+					return FALSE;
+				}
 				if (ov->hEvent) {
 					::SetEvent(ov->hEvent);
 				}
-				if (n == 0 && toRead > 0) {
-					::SetLastError(ERROR_HANDLE_EOF);
-					return FALSE;
+			}
+			::SetLastError(ERROR_SUCCESS);
+			return TRUE;
+		}
+
+		// A virtual file attached to a completion port: the association is ours to keep (see VFile::port).
+		HANDLE WINAPI h_CreateIoCompletionPort(HANDLE file, HANDLE existing, ULONG_PTR key, DWORD threads)
+		{
+			auto vf = Lookup(file);
+			if (!vf) {
+				return o_CreateIoCompletionPort(file, existing, key, threads);
+			}
+			HANDLE port = existing;
+			if (!port) {
+				port = o_CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, threads);
+				if (!port) {
+					return nullptr;
 				}
+			}
+			{
+				std::lock_guard lock(vf->lock);
+				vf->port = port;
+				vf->portKey = key;
+			}
+			::SetLastError(ERROR_SUCCESS);
+			return port;
+		}
+
+		BOOL WINAPI h_SetFileCompletionNotificationModes(HANDLE file, UCHAR flags)
+		{
+			auto vf = Lookup(file);
+			if (!vf) {
+				return o_SetFileCompletionNotificationModes(file, flags);
+			}
+			std::lock_guard lock(vf->lock);
+			vf->skipOnSuccess = (flags & FILE_SKIP_COMPLETION_PORT_ON_SUCCESS) != 0;
+			::SetLastError(ERROR_SUCCESS);
+			return TRUE;
+		}
+
+		// Reads of a virtual file finish before ReadFile returns, so there is never anything left to cancel.
+		BOOL WINAPI h_CancelIoEx(HANDLE file, LPOVERLAPPED ov)
+		{
+			if (!Lookup(file)) {
+				return o_CancelIoEx(file, ov);
+			}
+			::SetLastError(ERROR_NOT_FOUND);
+			return FALSE;
+		}
+
+		BOOL WINAPI h_CancelIo(HANDLE file)
+		{
+			if (!Lookup(file)) {
+				return o_CancelIo(file);
 			}
 			::SetLastError(ERROR_SUCCESS);
 			return TRUE;
@@ -1128,6 +1218,10 @@ namespace SealedAudio::Hooks
 			{ "GetFileInformationByHandle", (void*)&h_GetFileInformationByHandle, (void**)&o_GetFileInformationByHandle },
 			{ "GetFileInformationByHandleEx", (void*)&h_GetFileInformationByHandleEx, (void**)&o_GetFileInformationByHandleEx },
 			{ "CloseHandle", (void*)&h_CloseHandle, (void**)&o_CloseHandle },
+			{ "CreateIoCompletionPort", (void*)&h_CreateIoCompletionPort, (void**)&o_CreateIoCompletionPort },
+			{ "SetFileCompletionNotificationModes", (void*)&h_SetFileCompletionNotificationModes, (void**)&o_SetFileCompletionNotificationModes },
+			{ "CancelIoEx", (void*)&h_CancelIoEx, (void**)&o_CancelIoEx },
+			{ "CancelIo", (void*)&h_CancelIo, (void**)&o_CancelIo },
 			{ "GetFileAttributesW", (void*)&h_GetFileAttributesW, (void**)&o_GetFileAttributesW },
 			{ "GetFileAttributesA", (void*)&h_GetFileAttributesA, (void**)&o_GetFileAttributesA },
 			{ "GetFileAttributesExW", (void*)&h_GetFileAttributesExW, (void**)&o_GetFileAttributesExW },
@@ -1176,6 +1270,10 @@ namespace SealedAudio::Hooks
 		if (!o_GetFileInformationByHandle) o_GetFileInformationByHandle = ::GetFileInformationByHandle;
 		if (!o_GetFileInformationByHandleEx) o_GetFileInformationByHandleEx = ::GetFileInformationByHandleEx;
 		if (!o_CloseHandle) o_CloseHandle = ::CloseHandle;
+		if (!o_CreateIoCompletionPort) o_CreateIoCompletionPort = ::CreateIoCompletionPort;
+		if (!o_SetFileCompletionNotificationModes) o_SetFileCompletionNotificationModes = ::SetFileCompletionNotificationModes;
+		if (!o_CancelIoEx) o_CancelIoEx = ::CancelIoEx;
+		if (!o_CancelIo) o_CancelIo = ::CancelIo;
 		if (!o_GetFileAttributesW) o_GetFileAttributesW = ::GetFileAttributesW;
 		if (!o_GetFileAttributesA) o_GetFileAttributesA = ::GetFileAttributesA;
 		if (!o_GetFileAttributesExW) o_GetFileAttributesExW = ::GetFileAttributesExW;
@@ -1313,6 +1411,8 @@ namespace SealedAudio::Hooks
 	BOOL   TestGetFileSizeEx(HANDLE h, LARGE_INTEGER* size) { return h_GetFileSizeEx(h, size); }
 	BOOL   TestSetFilePointerEx(HANDLE h, LARGE_INTEGER distance, LARGE_INTEGER* newPos, DWORD method) { return h_SetFilePointerEx(h, distance, newPos, method); }
 	BOOL   TestCloseHandle(HANDLE h) { return h_CloseHandle(h); }
+	BOOL   TestReadFileOverlapped(HANDLE h, void* buffer, DWORD toRead, DWORD* read, OVERLAPPED* ov) { return h_ReadFile(h, buffer, toRead, read, ov); }
+	HANDLE TestCreateIoCompletionPort(HANDLE file, HANDLE existing, ULONG_PTR key, DWORD threads) { return h_CreateIoCompletionPort(file, existing, key, threads); }
 	DWORD  TestGetFileAttributesW(const wchar_t* path) { return h_GetFileAttributesW(path); }
 	HANDLE TestCreateFileMapping(HANDLE h) { return h_CreateFileMappingW(h, nullptr, PAGE_READONLY, 0, 0, nullptr); }
 }

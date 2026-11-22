@@ -495,7 +495,8 @@ class SessionStore {
     if (!id || !this.meta(id)) return null;
     const s = this.readSession(id);
     if (!s) return null;
-    return { log: [], history: [], todos: [], progress: null, importedFrom: "", ...s, ...this.meta(id) };
+    // `workspace`: the folder this chat works in (its store's folder), so a window can run chats of other folders.
+    return { log: [], history: [], todos: [], progress: null, importedFrom: "", ...s, ...this.meta(id), workspace: this.workspace };
   }
 
   /** A new chat. `init` may carry provider/baseUrl/model, title, group, log, history, … */
@@ -518,6 +519,7 @@ class SessionStore {
       open: true,
       turns: 0,
       ...init,
+      workspace: this.workspace,
       id: init.id || newId(),
       created: now,
       updated: now,

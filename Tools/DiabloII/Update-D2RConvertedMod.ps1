@@ -14,8 +14,10 @@
     game patch.
     Row matching (-MatchTrim, -Duplicates, -Deleted): left out, each mod keeps what it was converted
     with (or the defaults on, content, disable when it was converted before these existed).
-    Load order (-Conflicts, -Files): the defaults of the mod's Load order settings in D2RMM; left
-    out, as converted (else mod, overwrite). Rows keep/rebuild is a setting there too.
+    Load order (-Conflicts, -Files, -BaseRows): the defaults of the mod's Load order settings in
+    D2RMM; left out, as converted (else mod, overwrite, stubs). Rows keep/rebuild is a setting there
+    too. -BaseRows stubs gives missiles.txt rows that only the main table has a stub row in
+    global\excel\base, so both tables number their rows the same (HD missile effects go by row).
 .EXAMPLE
     .\Update-D2RConvertedMod.ps1 -Mod Rebirth -Conflicts earlier -Files keep
 .EXAMPLE
@@ -35,7 +37,8 @@ param(
     [ValidateSet('content', 'order')][string]$Duplicates,
     [ValidateSet('disable', 'leave')][string]$Deleted,
     [ValidateSet('mod', 'earlier')][string]$Conflicts,
-    [ValidateSet('overwrite', 'keep')][string]$Files
+    [ValidateSet('overwrite', 'keep')][string]$Files,
+    [ValidateSet('stubs', 'leave')][string]$BaseRows
 )
 $ErrorActionPreference = 'Stop'
 if ($Source -and $Mod.Count -gt 1) { throw '-Source goes with one -Mod.' }
@@ -52,5 +55,6 @@ if ($Duplicates) { $arguments += @('--duplicates', $Duplicates) }
 if ($Deleted) { $arguments += @('--deleted', $Deleted) }
 if ($Conflicts) { $arguments += @('--conflicts', $Conflicts) }
 if ($Files) { $arguments += @('--files', $Files) }
+if ($BaseRows) { $arguments += @('--base-rows', $BaseRows) }
 & $python @arguments
 exit $LASTEXITCODE

@@ -110,8 +110,6 @@ def write_static(donor_bytes, part, out_path, scale=1.0):
     names = [m['name'] for m in vertices['$type']]
     if names != ['Position', 'Normal', 'Tangent', 'TextureCoordinates0']:
         raise ValueError(f'the donor mesh has vertex layout {names}; a static mesh with position, normal, tangent and UV is needed')
-    if len(part.positions) > 65535:
-        raise ValueError('the part has more than 65535 vertices')
     positions = part.positions * scale
     reach = float(np.abs(positions).max())
     vertex_scale = max(1.0, reach)
@@ -127,8 +125,7 @@ def write_static(donor_bytes, part, out_path, scale=1.0):
                       'TextureCoordinates0': [float(v) for v in part.uvs[k]]})
     vertices['$items'] = items
     topology = mesh['PrimaryTopology']
-    topology['Indices16'] = [int(v) for v in part.triangles.reshape(-1)]
-    topology['Indices'] = []
+    Granny.set_mesh_indices(topology, part.triangles.reshape(-1), len(items))
     group = copy.deepcopy(topology['Groups'][0])
     group.update({'TriFirst': 0, 'TriCount': int(len(part.triangles))})
     topology['Groups'] = [group]

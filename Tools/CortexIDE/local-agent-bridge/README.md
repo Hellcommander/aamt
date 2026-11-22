@@ -1,6 +1,21 @@
-# Local Agent Bridge for CortexIDE (2.18.0)
+# Local Agent Bridge for CortexIDE (2.20.0)
 
 Turns CortexIDE into a working AI coding toolset on **local models** (vLLM / SGLang router, Ollama, any OpenAI-compatible server) **or on Claude** through the Anthropic Messages API, with file, search and shell tools, `SKILL.md` skills, `.canvas.tsx` canvases, and imported chats (including Cursor exports and agent transcripts).
+
+2.20 lets **every chat work in its own folder from one window**, the way Claude Code's sessions each keep their own working directory:
+- **A chat belongs to a workspace folder** and is kept in that folder's history. When it runs, its tools (relative paths, `Shell`'s working folder, the files it may change), git status, check commands, layout, `AGENTS.md` / `CLAUDE.md`, custom `/commands`, `@agents`, project memory and canvas folder are that folder's, not the window's.
+- **Open another folder's chat here**: click it in the history tree. It opens as a tab in this window (the tab shows its folder; a line under the tabs says "Working in …") and keeps working in its folder. ⋯ on the row still offers a new window, a copy, or a read-only transcript. Closing the tab takes it off this window; it stays in its folder's history.
+- **Start a chat in any folder**: *Agent: New Chat in Folder…* (⋯ menu, command palette, or right-click a folder in the Explorer), or ＋ on a folder in the history tree, which now defaults to "Here, working in …". No window switch.
+- Chats attached to a window are remembered with it, so they come back after a reload.
+
+2.19 adds **memory between chats**, modelled on Claude's memory settings:
+- **Memory files**: what the agent remembers is plain Markdown, one fact per file with `name` / `description` / `type` (user, feedback, project, reference), in two scopes: **about you** (`<history>/memory`, every workspace) and **about this project** (`<history>/projects/<workspace>/memory`). Each scope has a `MEMORY.md` index. The memories go into every prompt (`memoryPromptChars`, newest in full), marked as possibly out of date.
+- **The agent remembers and forgets**: `MemoryWrite` when you say "remember…" or state a lasting preference, correction or project constraint; `MemoryDelete` when you say "forget…" or a memory proves wrong. Anything that looks like a key or token is refused.
+- **Generate memory from chats** (`memoryGenerate`, every `memoryGenerateEvery` = 3 turns, and when a chat is compacted): in the background, the chat's model reads the recent turns and adds, updates or removes memories; the chat notes what changed. **Sensitive topics** (health, religion, politics, sexuality, finances) are left out unless `memoryIncludeSensitive` is on. Not on the Claude Code engine, which has its own memory.
+- **Search and reference chats** (`memorySearchChats`): `ChatSearch` finds earlier chats of this workspace (or all of them) with snippets, and `ChatRead` reads one, when you refer to past work.
+- **Your memory**: *Agent: Manage Memory* (also in the ⋯ menu) lists every memory with edit and delete buttons, plus add, import, export, "generate from this chat now", the folders and the settings.
+- **Import**: Claude Code's memory folder of this workspace (`~/.claude/projects/<slug>/memory`) in one click, any folder of memory files, or another AI assistant: a prompt is copied for you to paste there, and its answer, pasted into a new tab, becomes one memory per bullet after you confirm the list.
+- **Export**: *Agent: Export Memory* saves a `.zip` of the Markdown files.
 
 2.18 makes **`/compact`** (alias `/compress`) work the way Claude Code's does, and adds **auto-switching between Ollama models**:
 - **A summary built to continue from**: the model first drafts notes in `<analysis>`, then writes a `<summary>` with the request and intent, technical context, files and code (with snippets where the next step needs them), errors and fixes, approaches tried, **every user message**, pending tasks, the current work and the next step. Only the summary is kept. `/compact <focus>` steers it, and a `## Compact instructions` section in `AGENTS.md` / `CLAUDE.md` / project rules applies to every compaction.
@@ -285,6 +300,6 @@ Needs Node.js (for the tests, `npx` and the MCP server) and CortexIDE at `D:\too
 
 ## Credits
 
-The look and workflow of this extension take inspiration from other coding environments: the Agent panel, the New Tab page and the canvas host from Cursor and Claude Code, and agents, permissions and commands from [opencode](https://github.com/anomalyco/opencode). Only ideas are borrowed. No code from any of them is copied: everything here is written for this extension from their public documentation and observed behaviour. The `cursor/canvas` runtime is an independent implementation written against the published SDK type definitions, so the same canvas file opens in both places. The extension is not affiliated with or endorsed by the makers of any of these tools.
+The look and workflow of this extension take inspiration from other coding environments: the Agent panel, the New Tab page and the canvas host from Cursor and Claude Code, memory between chats from Claude and Claude Code, and agents, permissions and commands from [opencode](https://github.com/anomalyco/opencode). Only ideas are borrowed. No code from any of them is copied: everything here is written for this extension from their public documentation and observed behaviour. The `cursor/canvas` runtime is an independent implementation written against the published SDK type definitions, so the same canvas file opens in both places. The extension is not affiliated with or endorsed by the makers of any of these tools.
 
 Third-party code that does ship with the VSIX: React 18.3.1 (MIT, Meta), see `THIRD_PARTY.md` at the repository root.

@@ -133,7 +133,7 @@ What the files hold, as found in the Quill Rat (2026-11-13):
 |---|---|
 | Skeleton | bone name, parent, local transform, inverse world matrix. World axes: +Y up, +Z towards the head, units are feet (3.28 per metre) |
 | Mesh vertices | `Position` int16 x 4, normalised, times `VertexScale` from the mesh's extended data; `BoneWeights` / `BoneIndices` uint8 x 4; `Normal` and `Tangent` int8 x 4; `TextureCoordinates0` half x 2. 28 bytes per skinned vertex, 20 for a static prop |
-| Mesh topology | 16-bit triangle indices, material groups, a bone binding list by bone name |
+| Mesh topology | 16-bit triangle indices (32-bit `Indices` on big meshes such as the Druid bear), material groups, a bone binding list by bone name |
 | Mesh extras | `bbMin`, `bbMax`, `VertexScale`, `meshRenderLayer`; the model carries `lodLevel` |
 | Animations | Granny track groups with curve data (not decoded yet) |
 
@@ -142,6 +142,48 @@ GPL (powzix/ooz and ports of it), which LICENSING.md keeps out of AAMT. A
 Python port lives in `%LOCALAPPDATA%\D2RModAssets\thirdparty\bitknit.py` on the
 machine it was made on; `GrannyFile.py` loads it from there, or from the folder
 named by `D2R_BITKNIT`. Without it only uncompressed Granny files can be read.
+
+### Mesh index formats and the vertex limit (2026-11-20)
+
+There is no 65,535-vertex limit in the game: a Granny mesh's `PrimaryTopology` has a 16-bit
+`Indices16` and a 32-bit `Indices` array, and the game draws either. Evidence (game image 95032,
+file offset = RVA; analysis scripts in `<game>/mods/VertexLimits/research`):
+
+- `Mesh::LoadGeometry` (`0xFA04C0`, the function behind the string "bool __cdecl
+  Mesh::LoadGeometry(const char *,const struct granny_model *,struct granny_mesh *)") asks
+  Granny for the bytes per index (`GrannyGetMeshBytesPerIndex` `0x1615E00` -> `0x1624320`: 4 when
+  `Indices` is filled, else 2 when `Indices16` is), asserts "bytesPerIndex == 2 || bytesPerIndex
+  == 4", makes the index buffer with that stride and `count * bytes` size, copies the array that
+  `GrannyGetMeshIndices` (`0x1624370`: `Indices` first) returns, and keeps `bytes == 4` in the
+  mesh (`+0x154`).
+- Every draw passes that flag to the D3D12 back end's set-index-buffer (`0x10F1240`, vtable slot
+  `+0x290`): `DXGI_FORMAT_R32_UINT` (42) when set, `R16_UINT` (57) otherwise, so `Indices16` is
+  read unsigned (0..65535). The CPU copy of the indices (`+0x2D8`, read through `0x103E100`)
+  uses the same 2-or-4 stride. Vertex buffers are `count * stride` in 32 bits; no 16-bit vertex
+  count check was found.
+- Stock files use both: the Druid bear `druidbear/torso_lod0` is one mesh of 74,589 vertices with
+  32-bit `Indices`; the Spirit Wolf's fur mesh (37,258 vertices) is 16-bit with indices past 32,767.
+  A scan of the 80 largest stock models plus 200 at random found 59 32-bit meshes (all past
+  65,535 vertices), among them the skinned Overseer body `overseer1/torso_lod0` at 353,038.
+
+So the limit was the toolkit's: `Indices16` is typed int16, and the writer refused numbers past
+32,767 and the importers stopped at 65,535. Now (`Granny.py`):
+
+- `Granny.mesh_indices(topology)`: the flat index list the game sees (`Indices` when filled, else
+  `Indices16` read unsigned). Use it instead of `topology['Indices16']`.
+- `Granny.set_mesh_indices(topology, flat, vertex_count)`: `Indices16` while the mesh has at most
+  65,536 vertices (stock-sized meshes stay byte for byte as before), `Indices` past that; returns
+  2 or 4. The writer stores `Indices16` numbers 32,768-65,535 as their unsigned 16-bit pattern.
+- `GrannyMesh` (remove, add), `MeshImport` (`_fill_mesh`, LOD counts), `GrannyPart`,
+  `HdToLegacy` and `ScaledMonster` go through these; 32-bit stock bodies (the Druid bear) can be
+  edited and used as templates. `MeshImport` keeps simplifying LOD files past 65,535 vertices by
+  default; the spec's `"max_vertices": 0` (or a bigger number) keeps them, written 32-bit.
+- `python GrannyCrossCheck.py --index-test [--game <D2R>]`: stock bodies written twice (same bytes,
+  same indices), made meshes of 40,000 and 70,000 vertices through `replace_geometry`, then
+  `remove_geometry` (back to 16-bit) and `add_geometry` (32-bit again), each checked by the
+  independent view. 0 failures on 2026-11-20; the stock files also came out byte for byte the
+  same as with the writer before this change. **A body past 65,536 vertices made by the toolkit has
+  not been seen in the game** (the stock Druid bear is the proof that the game draws such meshes).
 
 ### Writing and editing models
 
@@ -176,11 +218,114 @@ bends the ramp) and fades out with distance along the `within` axes. That is
 how the Giant Raven (`Presets/giant_raven.json`) gets a hooked beak tip, a
 throat ruff and a wedge tail longer in the middle than at the sides.
 
+**Removing geometry** (2026-11-16): `"remove"` in `"reshape"` is a list of rules, applied to
+every LOD file after the edits above (`GrannyMesh.remove_geometry`; the file is rebuilt through
+`Granny.py`, so vertex and triangle counts can change):
+
+```json
+"remove": [
+  { "bones": "spike_", "below": true, "weight": 0.6 },
+  { "box": { "min": [-1, 0, 2.5], "max": [1, 1.5, 4] }, "mesh": "QuillratShape" }
+]
+```
+
+- `bones`: triangles whose three vertices follow those bones (a name, a name start, a list, or
+  `{"prefix", "first", "last"}`; `"below": true` adds every bone under them) by at least
+  `weight` in all (default 0.5). A lower weight also takes the parts where they join the body.
+- `box`: triangles whose vertices lie in a model-space box (bind pose); `"outside": true` takes
+  the rest. `"any": true` on a rule takes a triangle when one vertex is selected, not all three.
+  `"mesh"` limits a rule to one mesh.
+- Unused vertices are dropped and renumbered; material groups, the mesh box and each bone
+  binding's box are recomputed (checked: the formula reproduces the stock boxes to 0.0001). The
+  bone bindings stay, so the skin and the donor's animations still fit.
+- `"cap": true` on a rule closes the holes that rule opens (2026-11-19): each hole gets a fan
+  of triangles from its rim to a new vertex in the middle, which copies the skin weights of the
+  nearest rim vertex, takes the mean of the rim's UVs (the texture smears over the cap) and
+  faces out of the hole. Without it the opening stays open. Edges that are open in the stock
+  mesh are left alone, and a rim that does not close into a ring is reported and left open. A
+  fan suits roundish openings (a stump, a limb cut across); a long or bent cut gets a rough cap.
+- A mesh may not lose every triangle (drop the model instead).
+- Command line: `python GrannyMesh.py remove <in.model> <out.model> '<rules JSON or file>'`.
+- Tested 2026-11-16, offline only: the Spike Fiend body without its quills (27541 -> 22312
+  triangles in LOD 0, all five LODs through a preset), and a box cut; not seen in the game.
+  Capping tested 2026-11-19, offline only, on the same body: 60 quill stumps closed with 303
+  triangles, and a box cut across the torso and four legs closed; no edge shared by more than
+  two triangles, caps wind like the stock faces, the file reads and writes back equal.
+
+**Adding geometry** (2026-11-19): `"add"` in `"reshape"` is a list of parts put into the body
+(`GrannyMesh.add_geometry`), applied to every LOD file after the vertex edits and before
+`"remove"`, so a remove rule can trim an added part too:
+
+```json
+"add": [
+  { "from": "hd/vfx/meshes/lit_mesh/bonewall/model_source/fx_mesh_bone_tusk",
+    "bone": "jaw_bind_jnt", "space": "bone", "origin": "center",
+    "scale": 0.5, "rotate": [0, 0, 20], "translate": [0.3, 0.1, 0.3], "twin": "x",
+    "uv": [0.02, 0.02, 0.2, 0.2] },
+  { "pick": { "bones": { "prefix": "spike_", "first": 30, "last": 40 }, "weight": 0.6 },
+    "translate": [0, -0.2, -1.2] }
+]
+```
+
+- `from`: the model the part comes from, an archive path with or without `_lodN.model` (a stem
+  takes the body file's LOD, or the nearest more detailed one the part has). Left out: the body
+  itself, as it was before any rule. `mesh` takes one mesh of it, `pick` some of its triangles
+  (a remove rule's `bones` / `box` selection); `to` / `group` choose the body mesh and material
+  group (default: the first).
+- `bone`: the body bone that carries the part (every added vertex follows it alone; a bone the
+  mesh did not use gets a bone binding). Left out: the part keeps its own skin weights and its
+  bones are found by name in the body's skeleton, which is what a copy of the body's own part,
+  or a part from a model on the same skeleton, needs.
+- Placement: `origin` (a point, `"center"`, or a source bone), then `scale`, `rotate` (degrees,
+  X then Y then Z), `translate`; `"space": "bone"` places it in the bone's bind-pose frame, as
+  attachments are placed, otherwise in model space. `"mirror": "x"` reflects the placed part to
+  the other side; `"twin": "x"` adds the part and its mirror image.
+- Textures: the part wears the **body's** material (every stock model has one material and one
+  group per mesh). `"uv": [u0, v0, u1, v1]` fits its UVs into a patch of the body's texture;
+  without it the UVs stay, which is right for a copy of the body's own part. For a part with
+  textures of its own, write it as its own model on the body's skeleton:
+  `add_geometry(..., alone=True, textures={old: new})` or `GrannyMesh.py add ... --alone
+  --textures '{...}'` keeps only the added parts (with their skin) and renames texture paths (any
+  length). The pipeline does not list such a second model in the definition yet.
+- Normals and tangents turn with the part, a mirrored part gets its winding flipped, boxes are
+  recomputed. When a part reaches past the mesh's `VertexScale` the scale grows and the stock
+  vertices are stored again (they move by less than 0.0001). Past 65,536 vertices the mesh is written with 32-bit indices.
+- An added part is not welded to the skin: it pokes out of the body like a prop, but it is part
+  of the mesh, so it is drawn in one piece with the body and can bend with several bones.
+- Command line: `python GrannyMesh.py add <in.model> <out.model> '<rules JSON or file>' [--game
+  <D2R folder>] [--alone] [--textures '<JSON>']`.
+- Tested 2026-11-19, offline only, on the Spike Fiend body: a static quill mesh rigid on the
+  head, the Act 5 barbarian's horns and the bone wall's tusk from the archive (twin), a copy of
+  ten of its own quills with their skin, a mirrored part, `--alone`, and a preset with `add` +
+  `remove` through all five LODs. Every result reads and writes back equal, has no edge shared
+  by more than two triangles, weights that sum to 1 and faces wound like the stock ones. Not
+  posed with an animation, not seen in the game.
+
+`Granny.py`'s writer could not write a model with materials before this: a member whose type is
+the struct around it (a material map's `Map`, a material) was not handled. The reader now marks
+it `'$recursive'` / `'$recursive:N'` (N structs further out) and the writer resolves both; 45
+character models read and write back equal. The same fix makes animation files the toolkit
+writes carry the same type table as the game's own (before, one such member pointed at the
+wrong type; the game played those files anyway). Clip data is unchanged.
+
 A variant with `"reshape"` can also wear its own textures: `"retexture"`
 entries (`from`, `to`, `format` bc1/bc3/rgba8, `recolor` as in the recoloured
 effect pipeline) write a recoloured copy (block by block, so format and mips
 stay) and point the rewritten models at it. The new path must be as long as the
 old one, because the model's texture name is swapped in place.
+
+`"detail": {"kind": "feathers", "scale": 2, ...}` on a retexture entry redraws a
+feather-card albedo instead (`TextureDetail.py`, 2026-11-19): twice the size,
+the recolour applied per texel, and per stock card (found from the alpha mask:
+axis, tip, rachis) barbs angled to the tip in clumps with a few vane splits, a
+soft sheen (`glossColour`), a rachis highlight, and alpha with the texel steps
+smoothed and the margins slightly frayed, so a scaled-up body shows no saw-tooth
+card edges. It is written in the game's layout (BC3 sRGB, header as
+`HdTexture.from_image_bc3`, full mip chain) through DirectXTex texconv
+(`--keep-coverage 0.5` keeps cutout cards from thinning in the mips; Pillow when
+texconv is missing) and read back before it is kept. `python TextureDetail.py
+feathers <stock.texture> <out.texture> --png <preview.png>` runs it alone. Used by
+the Giant Raven (2048 from the 1024 `druidhawk_feather_alb`); not seen in game.
 
 A preset's `"modelIndexIncludes": ["../OtherMod"]` only matters for a mod that
 still ships the whole index (`model_index.json` `"index": "whole"`): it carries
@@ -392,6 +537,190 @@ from 0.53 to about 0.6 in one pass; the rest is mostly the pose difference
 between the sprite's idle and the HD idle). The AI step is written but has not
 been run here. None of it has been seen in the game yet.
 
+### A body made outside the game (`MeshImport.py`)
+
+For a creature that is new from the ground up (2026-11-19): a mesh from Blender, a sculpt or an
+image-to-3D model takes a donor's place in the game: its skeleton, bone bindings, material slot
+and LOD files, so the donor's clips (and clips authored on its skeleton) move it. The skin is
+carried over by position: every new vertex gets the bone weights of the donor surface nearest
+to it. So the mesh is modelled around the donor in its bind pose.
+
+```
+python MeshImport.py reference --game <D2R> --donor hd/character/enemy/pig/torso --out <folder>
+python MeshImport.py build spec.json --game <D2R> --out <mod folder>
+```
+
+- `reference` writes `donor.obj` (bind pose, +Y up, +Z to the head, one unit = a foot),
+  `donor.png` (its colour texture) and `bones.json` (joint positions): import the OBJ in Blender
+  and build the new body over it, legs on legs, head on head.
+- `build` reads anything `trimesh` reads (`.obj`, `.glb`, `.gltf`, `.ply`, ...) with UVs. Spec:
+  `name`, `mesh`, `donor`, `albedo` (a picture; a `.glb`'s own base colour is the default),
+  optional `normal` / `orm`, `axes` (`{"up": "+z", "forward": "-y"}` for a file in Blender's own
+  space; its glTF and OBJ exports are the default +y / +z), `fit` (`"donor"`: scaled to the
+  donor's length, stood on the ground, centred; `"none"`: already in game space), `scale` /
+  `rotate` / `translate`, `skin`, `lods`, `texture_size`.
+- Skin: nearest donor surface points (the donor's vertices plus 150,000 points spread over its
+  triangles), near ones counting most and surfaces facing the other way hardly at all (the inside
+  of a mouth behind a lip), evened out over the new mesh's own edges (`"smooth"`, default 2),
+  the four strongest bones kept. `"ignore": ["tongue_"]` gives the weight of bones the new body
+  has no part for to the bone above them.
+- Textures: the colour picture becomes a BC3 sRGB texture with a full mip chain, the layout of
+  the game's own body textures (`HdTexture.from_image_bc3`; the header matches a stock file's
+  byte for byte). A normal or ORM map that is not given is written as one flat colour, the
+  donor map's average, so the body is smooth there instead of wearing the donor's detail on the
+  wrong UVs. The model's texture names are changed to the new files.
+- Tangents are computed from the UVs the way the stock bodies store them (direction of u, sign
+  from v; checked against the pig: same handedness on 99.7 % of vertices). Lower LODs are made
+  by merging vertices on a grid, to the donor's own triangle ratios: crude, but there is no
+  decimator on this machine.
+- In a preset a variant takes the spec as `"import"` (name and donor come from the variant, the
+  mesh path is relative to the preset); `"reshape"` with `"add"` / `"remove"` then works on the
+  imported body, and the definition, texture dependencies and model index entry are written as
+  for any reshaped variant. `HdToLegacy.py` draws its legacy sprites from that definition.
+- Checked 2026-11-19, offline only. The pig written out by `reference` and imported back gets
+  the stock weights to within 1 % (without smoothing); pushed 0.05 to 0.15 units off the surface
+  and posed with every pig clip, its vertices land within 0.02 units on average of where the
+  stock skin puts them (body 7.7 long). A stand-in body built from primitives in Blender's axes
+  and metres, with its own texture, imported through a preset (plus added tusks), walks with the
+  pig's clip in rendered stills and went through `HdToLegacy.py`. **Not seen in the game.** The
+  stand-in is a test shape, not art.
+- **Own rig** (2026-11-19): `reference` also writes `donor.glb`, the donor with its armature,
+  skin and texture (`Gltf.py`). A mesh weighted to those bones in Blender and exported as glTF
+  keeps its own weights on import (`"skin": {"from": "auto"}`: the file's rig when one of its
+  joints is a game bone; `"file"` / `"donor"` force it). `.glb` / `.gltf` files are read by
+  `Gltf.py`, which keeps the rig; other formats still go through `trimesh` and get the donor's
+  skin by position.
+- **New bones**: a joint the game skeleton lacks, parented under one of its bones, is added to
+  every model file's skeleton and to a copy of the donor's `.skeleton`
+  (`hd/character/enemy/<name>/skeleton/<name>.skeleton`; a preset points the definition at it,
+  and `own_animations` extends the variant's skeleton the same way). Stock clips have no track
+  for it, so it holds its bind pose on its parent until a clip poses it.
+- **Surface maps**: the game's normal map keeps x in alpha and y in green (red full, blue
+  empty, z worked out), with green running down the picture; its ORM map has occlusion in red
+  and roughness in green (blue is empty in the creature maps looked at). A `.glb`'s own normal,
+  metallic-roughness and occlusion pictures are converted to that, as are `"normal"` / `"orm"`
+  pictures in the usual layouts (`"normal_green": "down"` for a DirectX-style map).
+  `"normal": "from_albedo"` guesses relief from the colour picture when there is no map.
+- **LODs**: with the `meshlib` package (pip; non-commercial licence, see `THIRD_PARTY.md`) the
+  lower LODs are made by quadric edge collapse that only keeps existing vertices and leaves open
+  edges alone, so UVs, normals and skin stay exact and UV seams do not crack; when that stops
+  more than half above the target (seams stay dense) the grid merge finishes the job. Without
+  the package the grid merge does it all (`"simplify": "grid"` forces that).
+- Checked 2026-11-19, offline only: `donor.glb` opened in Blender 5.2.3, a sixth tail bone added
+  there and 41 vertices given to it, exported and imported: weights within 1.2 % of the stock
+  pig's (the new bone folded back), 63 bones in every model and 66 in the skeleton file, and
+  posed with every stock clip the body stays within 0.006 units of the stock pig. On the pig,
+  MeshLib LODs keep all 420 open edges (grid merge: 190 at the same size, i.e. seams welded
+  shut or torn) and far fewer edges shared by three faces (10 against 255 at 6,800 triangles,
+  46 against 188 at 3,000). A `.glb` with normal, roughness and
+  occlusion pictures comes out with the channels where the game has them. **Not seen in the
+  game**, new bones least of all: whether the game accepts a model whose skeleton has more bones
+  than its donor's index entry expects is unknown.
+- **No donor at all** (2026-11-19): leave `"donor"` out (or set `"skeleton": "file"`) and the
+  body is the file's own: its armature becomes the skeleton (every joint, any names), its
+  weights the skin, its animations the clips (`<name>/animation/combined.animations`, sampled at
+  `"fps"`, default 30) and a matching `<name>/skeleton/<name>.skeleton` is written. A stock
+  model (`"template"`, default the Sand Leaper, `hd/character/enemy/sandleaper1/torso`) only
+  lends the file format, the material slot and the LOD file count; it must be a one-mesh body
+  in every LOD file (Quill Rat, Baboon, Scorpion, since 2026-11-20 also the 32-bit Druid Bear;
+  the Spirit Wolf, with two or three meshes, does not). Checked offline with the pig's shape re-rigged under 62 made-up bone names
+  and two clips of its own written as a `.glb`: no stock bone name is left, the rest pose
+  reproduces the mesh exactly, and posed with the converted clips every vertex lands within
+  0.005 units of where the file's own animation puts it (the clips move vertices by up to 0.85).
+  **Not seen in the game.**
+- **Donor-free in a preset** (2026-11-19): a variant with no `"donor"` whose `"import"` file
+  has a rig is built the same way through `ScaledMonster.py`:
+
+  ```json
+  { "name": "my_beast", "template": "sandleaper1", "scale": 1.1,
+    "import": { "mesh": "beast.glb", "modes": { "NU": "idle", "WL": "walk", "A1": "bite" } } }
+  ```
+
+  `"template"` (default `sandleaper1`; any stock monster with a one-mesh body) lends the definition's layout, the state
+  machine's states and transitions, and the file formats. The models, the `.skeleton`, the
+  animation file and the state machine's clip list are the file's own. Each state plays the
+  clip `"modes"` names for its mode; failing that a file clip called like the state's stock
+  clip (`walk`); failing that the idle clip as a stand-in, so no state is without motion
+  (`"fallback": false` leaves such states as the template has them). `"animations"` clip specs
+  build on the file's clips. The template's `IKComponent` is dropped (it names the template's
+  bones). The model index row copies the template's record layout (LOD and mesh counts) with
+  the body's own boxes. Checked offline: the definition, state machine (17 states, three bound by
+  `"modes"`, the rest to the idle stand-in), skeleton and index rows are written, and `HdToLegacy.py`
+  drew three modes of legacy sprites from that definition with the body's own clips.
+- **First real run** (2026-11-19): the AI boar from the toolkit's animate stage
+  (`Tools/Output/D2RBoar/boar2_anim.glb`: UniRig skeleton of 34 joints, eight fitted clips) built
+  with `{"name": "wb_druid_boar", "mesh": "boar2_anim.glb", "template":
+  "hd/character/enemy/sandleaper1/torso", "scale": 5.5, "normal": "from_albedo"}`: five model
+  files, textures, skeleton and `combined.animations` with all eight clips; `GrannyPreview.clip_sheet`
+  on the written files shows the clips moving the mesh. Two fixes came out of it: vertices are
+  welded on import (`"weld"`, default on: Blender's export had split every triangle's corners,
+  76,298 vertices for 25,434 triangles, over the 65,535 a mesh holds; 28,500 after), and the
+  meshlib LOD step now maps the vertices meshlib splits at non-manifold points back to ours.
+  The mesh inside the files keeps the template's mesh name. **Not seen in the game.**
+- **No UVs** (2026-11-19): a file without UVs is unwrapped (`MeshUnwrap.py`): faces that look
+  the same way and are connected form a chart, each chart is flattened by pmp-library's least
+  squares conformal map, scaled to its surface area and packed in rows; vertex colours are
+  baked into the colour texture. On the pig stripped of its UVs: 321 charts, no flipped and no
+  overlapping triangles, 0.2 s. It is an automatic layout with many small charts and seams
+  wherever the facing changes; a hand unwrap is better where there is one.
+- Versions used are listed at the end of `MeshImport.py`'s header.
+- Limits: one mesh and one material per body; without a rig in the file, a part far from
+  anything the donor has (wings on a pig) gets guessed weights; a new bone needs clips that pose
+  it before it does more than follow its parent.
+
+### HD monster to legacy sprites (the look with HD graphics off)
+
+In legacy graphics the game draws a monster from the sprite files of its `monstats.txt` `Code`
+(a two-letter token): per animation mode a DCC file (every frame from every direction, palette
+indices) and a COF file (frames, directions, speed, event frames). A new HD monster has none of
+its own and shows as its donor's token (the Wild Boar form as a Werebear). `HdToLegacy.py` makes
+them from the HD files (2026-11-19):
+
+```
+python HdToLegacy.py build spec.json --game <D2R> --mod <mod folder> [--out <folder>] [--modes nu,wl]
+                                     [--sheets <folder>] [--frames-only]
+```
+
+```json
+{ "token": "wb", "like": "tg",
+  "definition": "hd/character/enemy/wb_wild_boar.json",
+  "albedo": { "torso": "hd/character/enemy/wb_wild_boar/boaralb.texture" },
+  "clips": { "nu": "neutral", "wl": "walk", "rn": "run", "a1": "attack", "gh": "gethit" },
+  "lod": 2 }
+```
+
+- It reads the definition (mod folder first, then the game): its models at the chosen LOD, the
+  props attached to its bones, its scale, and the clips of its state machine. `"clips"` names the
+  clip per mode when the state machine on disk is not the one the mod installs.
+- `"like"` copies a stock token's set of modes with their frame counts, directions (8 or 16),
+  speed and event frames, so the new token is timed exactly like the old one; `"modes"` adds or
+  changes one (`{"dt": {"clip": "death", "frames": 16, "directions": 8, "speed": 256}}`).
+- Every frame is posed (`GrannyAnim`), drawn with the albedo texture and a fixed screen light by
+  a small z-buffer rasteriser (4 x supersampled), fitted to the act palette and encoded.
+- The camera was found by fitting stock HD bodies to their own sprites: 30 degrees down,
+  8 * sqrt(2) = 11.3 pixels per model unit (a model unit is a foot; a subtile is two), mirrored
+  left to right. Directions are stored in the game's order (`LegacySprite.VIEW_ORDER`).
+- Output: `global/monsters/<token>/tr/<token>trlit<mode>hth.dcc`, `.../cof/<token><mode>hth.cof`,
+  an unshifted `palshift.dat`, a picture per mode (`--sheets`) and `legacy_<token>.report.json`,
+  whose `"animdata"` rows go to `AssetMerge.py animdata` (the game only enters a mode its token
+  has timing for). The mod then sets the monster's `Code` to the token and copies `global`.
+- DC6 (interface pictures: skill icons, portraits): `LegacySprite.Dc6(data)` reads, `encode_dc6(directions)`
+  writes (frames read from a file are written back byte for byte); `python LegacySprite.py dc6test --game <D2R>`
+  round-trips the game's `global/ui` DC6 files (2026-11-20: 520 files, 501 also recoded byte for byte).
+- `LegacySprite.py` got the writers: `encode(directions, origin, palette)` (DCC),
+  `encode_cof(...)`, `dc6_size`, `limit_cell_colours`. A DCC cell (4 x 4 pixels) holds at most
+  four colours, transparent included; the encoder reduces a cell that has more to its four most
+  used. Every frame of a direction is stored on one box and an unchanged cell costs one bit.
+- Checked 2026-11-19, offline only: four stock files (Spike Fiend, Fallen, Skeleton) decoded,
+  encoded and decoded again differ in under 0.2 % of pixels (the cell limit on a shifted grid)
+  and a second pass is byte-identical; the per-frame and file size numbers in the headers are
+  the frame's size in the older DC6 coding, and the formula reproduces Blizzard's value for all
+  336 frames tried. A test build from the pig-based Wild Boar gave 11 modes (16, 8 and 1
+  directions, 1,208 frames, 2.1 MB) in 4.5 minutes, all decoding back. **Not seen in the game:**
+  whether the game accepts these files, and whether the size and facing match the HD body in
+  play, is untested. Unknown too: the second layer of a morph mode (the Werebear's `S1` has an
+  `S1` effect layer; only `TR` is written).
+
 ### Skill tree page pictures
 
 `SkillTreeArt.py draw --spec page.json --out <mod>/hd [--class dr] [--name qrskilltree]` redraws a
@@ -416,11 +745,30 @@ harness counts a page whose `Tab<N>` shows a picture a mod ships as framed in ev
 
 Not done yet:
 
-1. **Changing vertex or triangle counts** (new geometry): needs the structural
-   writer in `Granny.py`.
+1. **Welding and own rigs.** Geometry can be removed (`"remove"`, with `"cap"`), added from
+   other models (`"add"`) and brought in whole from outside (`MeshImport.py`), but an added part
+   is not joined to the skin, and a part with its own textures (`alone`) is not yet listed in
+   the definition by the pipeline. New bones from an imported rig are written but unproven in
+   the game, and no tool authors clips for them yet beyond `GrannyAnim`'s clip specs.
+   Layout of written files (corrected 2026-11-19): stock files keep all data in section 0 and
+   the types in section 6, exactly as `Granny.py`'s writer does. What differed was only the
+   section table: sections 1 and 3 (always empty) declare 32-byte alignment, and every variant
+   whose elements hold numbers that are not 32 bits wide (vertex arrays, animation curves) has
+   a marshalling record. The writer now writes both; rewritten stock models, a skeleton and an
+   animation file have the same alignments and the same kinds of records as the originals. What
+   still differs: stock files store equal objects twice where the writer shares one copy.
+   **Two model entries per file** (found the same day): a `_lodN.model` file holds its own LOD
+   level and, for N = 0, 1, 2, a second model entry for level N + 1 with a mesh and skeleton of
+   its own that the root mesh list does not show. Until this was found, `reshape`, `remove`,
+   `add` and the importer edited only the first entry, so the next level kept the donor's
+   stock mesh. All of them now edit every entry (`GrannyMesh.all_meshes`, `bone_lists`,
+   `Model.next_level`); the importer gives the next level a simpler copy by the stock ratio.
+   Mods built before 2026-11-19 with `reshape` have the stock mesh in that second entry and
+   should be rebuilt.
 2. **Normals** are left as they were after a reshape; large edits will shade
    slightly wrong until they are recomputed.
-3. **Animation curves**, to change or add animations.
+
+(Animation curves, once on this list, are handled by `GrannyAnim.py`.)
 
 ### Using the output in a D2RMM mod
 
@@ -574,6 +922,20 @@ player's machine, and nobody can edit the sealed archive. The SealedAudio D2RLoa
    `log_probes = true` in `<scope>\d2rloader\config\sealedaudio.toml`: every open under `hd\global\sfx` (and the other
    `probe_prefixes`) is logged as served, loose or not found. A loose file at the same path always wins.
 
+**Seen in game (2026-11-18), fixed in 1.4.1:** with SealedAudio 1.4.0 every sound effect went silent (music kept
+playing) from the first sealed sound on. D2R reads files through an I/O completion port (its `aio` library:
+`CreateIoCompletionPort`, overlapped `ReadFile`, `GetQueuedCompletionStatusEx`); the stand-in handle of a sealed file
+could not be attached to the port and its reads posted no completion packet, so the loader waited for that read forever
+and every later sound queued behind it (`d2rloader.log`: `BC_ASSERT: existingPort == instance->iocp`, aio.win32.cpp).
+1.4.1 emulates the port for sealed files (association, one packet per read, `CancelIoEx`); `iocp_test.bat` /
+`iocp_test.cpp` in `Tools/SealedAudio/hosts/d2rloader` reproduce the failure on 1.4.0 and pass on 1.4.1 (an ordinary
+file through the same port is checked too). Not yet re-tested in a running game.
+
+**Signer pin:** the plugin is built pinned to the `aamt` signing key (`src/SealedSigner.h`); an archive signed by any
+other key is refused at load (`SealedAudio.log`: "signed by someone other than the signer this plugin was built for").
+Seal with `-KeyName aamt`. Every package must carry the identical `sealedaudio.dll` (D2RMM refuses differing copies),
+so after a plugin rebuild re-pack every `sealedaudio-*.zip`.
+
 The packed game imports no file functions, so the plugin uses the core's `patch_system` (kernel32's file stubs are
 redirected process-wide) plus the import table of D2RLoader's `D2RCore.dll`. Tested so far by loading the built plugin
 through a mock loader with the SDK's own structures (sealed `.flac` served to a caller that resolved `CreateFileW`
@@ -589,6 +951,7 @@ stopped it.
 ## Files
 
 - `ModOrder\ModOrder.js`, `ModOrder\masterlist.json`, `Sort-D2RMods.ps1` - sort and check a D2RMM mod list like LOOT (see "Mod list sorter")
+- `ConvertReplaceMod.py`, `Convert-D2RReplaceMod.ps1` - make a mod that replaces whole tables / string files merge them row by row
 - `Granny.py`, `HdSkeleton.py` - Granny files as editable trees; skeleton decode / encode
 - `LegacyToHd.py`, `Convert-D2RLegacyMonster.ps1` - HD version of a sprite monster from the closest HD one
 - `d2r_casc.py` - read-only archive access (`D2RArchive.read`, `.exists`, `.list`)
@@ -598,6 +961,12 @@ stopped it.
 - `GrannyAnim.py` - read, pose, author and write animation clips
 - `LegacySprite.py`, `SpriteFit.py`, `SpriteMeshAI.py` - legacy sprites to images, fit an HD template to them, AI mesh reference
 - `GrannyPart.py` - cut a part (a quill) out of a body mesh into its own model
+- `MeshImport.py` - a mesh made outside the game (OBJ / glTF) as a skinned body on a donor's skeleton, with its own textures, rig and new bones
+- `Gltf.py` - small glTF reader / writer that keeps the rig and animations (used by `MeshImport.py`)
+- `GrannyCrossCheck.py <files>` - reads a Granny file the way the community Noesis GR2 reader lays it out (sections end to end, relocations as 4-byte offsets, 44-byte type members) and compares that view with `Granny.py`'s: a second opinion on files the toolkit writes; also checks every mesh's index arrays the way the game reads them, and `--index-test` runs the index format tests
+- `ToolJobs.py` (+ `Drop\Queue Noesis check.bat`, `Drop\Run tool jobs.bat`) - a job queue for the downloaded community tools in `third_party` (Noesis export, AnimData editor): jobs are queued by script or assistant, a person runs them, results come back as files; `compare` checks what Noesis read against `Granny.py`
+- `MeshUnwrap.py` - UVs for a mesh without them (charts + pmp-library's conformal map), vertex colours baked to a texture
+- `HdToLegacy.py` - legacy sprites (DCC + COF) drawn from an HD monster's models and clips; `LegacySprite.py` encodes them
 - `SkillTreeArt.py` - skill tree page pictures with frames and arrows for a custom page
 - `ScaledMonster.py` - the pipeline
 - `ModAssets.py`, `ModHarness.js` - the mod test pipeline (below)
@@ -609,7 +978,43 @@ stopped it.
 - `LeakCheck.js` - finds what a total conversion changes in the rows other mods add (below)
 - `PluginSdk.py`, `PluginAddresses.py`, `Update-D2RPlugins.ps1` - keep the D2RLoader plugin sources in step with D2RLoader: SDK and hooked addresses (below)
 - `HdMatch.py` - HD art for mod monsters and items that only have legacy sprites (below)
+- `Ds1Presets.py` - list or move the monster spots of a `.ds1` map (below)
 - `Presets/` - one JSON per job
+
+## Monster spots in a map (`Ds1Presets.py`)
+
+A `.ds1` map places a monster by number: the how-many-th row of the map's own act in
+`global\excel\monpreset.txt`. A map editor numbers the monsters it adds from the plain game's row
+count (Act 3: 39, Act 4: 28). A mod that adds rows to the same act uses the same numbers
+(Reimagined: Act 3 ids 39-42, Act 4 ids 28-33), and a D2RMM mod cannot rewrite a map at install
+time. So a map's added monsters are moved to high, fixed ids once, and the mod's `mod.js` fills
+the act up to them with `place_nothing` rows (The Abyss 4.2.1: `extraMonsters.firstId` 64).
+
+```
+# what the maps use: act, objects, spots per monster id
+python Ds1Presets.py abyss2.ds1 abyss3.ds1
+# an Act 3 map from the editor: ids 39-63 go up by 25 (39 -> 64), in place
+python Ds1Presets.py abyss2.ds1 --move 39:64
+# an Act 4 map: 28 -> 64
+python Ds1Presets.py abyss3.ds1 --move 28:64
+```
+
+- `--move FROM:TO` only touches ids FROM to TO - 1, so a second run changes nothing. The file
+  keeps its size (only the id bytes change). Keep a backup outside the mod's `tiles` folder, which
+  D2RMM copies whole.
+- Run it again after every export of the map from the editor: the export has the editor's ids.
+- First use (2026-11-17): The Abyss failed to install below Reimagined ("Act 3 has 43 rows, the
+  map expects 39"). Checked with `ModHarness.js` (Reimagined, then The Abyss); not yet seen in
+  the game.
+- Converted data mods (`ConvertDataMod.py` / `ConvertReplaceMod.py` mod.js, both row modes) keep
+  `monpreset.txt` one block per act and put each new row at the number the mod's own file gives it
+  (`actBlocks`), so the converted mod's own maps keep their monsters: Reimagined's endgame map
+  bosses (Act 5 ids 58-117 `rmap_*_warden`, 118 Azmodan), Belial/Cydaea (Act 3 40/42), the forge
+  and Izual bosses (Act 4 28-33), the Act 1/2 additions (Pitzilla, the Smith, Maghda...). Before, 'keep' appended new rows
+  at the end of the table, after Act 5, and the game ("first row of the act + number", as in
+  D2MOO) read the wrong rows. Mods above that already use those numbers get a warning; put the
+  converted mod above them. Checked 2026-11-17 with `ModHarness.js`: all 678 monster spots of
+  Reimagined's maps resolve to its rows, alone and with The Abyss below.
 
 ## HD art for mod content without it (`HdMatch.py`)
 
@@ -659,9 +1064,33 @@ report) to the mod folder:
     plugins such as Classless's and other tables point at), rows the mod deleted stay too, the mod's
     new rows go at the end, and row numbers in the mod's cells follow their rows (`missiletype` in
     weapons/misc/armor, skill numbers in item properties). The conversion can sit anywhere in the
-    list; mods made for it go below it.
+    list; mods made for it go below it. A changed row also carries its stock row number (since
+    2026-11-20): when a mod above renamed that row (Reimagined renames 89 uniques and replaces Grim
+    Ward with Korlic's Fury), mod.js finds it by number and the Conflicts setting decides the cells
+    both changed; a row this mod renames too (a skill of its own in place of the stock one: Rebirth's
+    Spirit3) carries its whole row and is added as a new row. Before, all those changes were dropped
+    ("row(s) the mod changes are gone"): Rebirth below Reimagined lost 88 uniques, 18 skills, 10 set
+    items, 4 sets and its Spirit3. Reconvert older conversions to get this.
+- the game's other JSON (since 2026-11-21: `hd\**\*.json`, `*.timelines`, `global\ui\layouts\*.json`)
+  becomes a deep JSON patch (`JsonPatch.py`, shared with ConvertReplaceMod) instead of a whole copy:
+  merged at install time into the file as the mods above left it (comments and trailing commas are
+  read as the game reads them; a file that differs only in formatting is left to the game). Reimagined:
+  223 JSON files patched, none copied whole any more (it used to replace 3645 files, its state
+  machines, timelines, presets and layouts among them). Only binary files (maps, sounds, models,
+  textures) and files the game does not have are still copied.
   - `rebuild`: the table takes the mod's own row order (the data mod exactly), rows earlier mods
     added go after it, deleted rows go. Only for a conversion used alone or at the very top.
+- string files (`local\lng\strings\*.json`) are merged by Key. The mod's new entries get the next
+  free ids from `D2RMM.getNextStringID()` at install time, not the ids the data mod picked (since
+  2026-11-19): those were free only in the game files the mod was made for, and collided with the
+  game's newer strings, with the other conversion and with every mod that numbers from the counter.
+  Changed entries keep their id. `local\lng\next_string_id.txt` (that counter) and
+  `global\dataversionbuild.txt` (D2RMM writes the game's own at the start of an install) are never
+  copied from a data mod: Rebirth's counter said 65535, so every later mod's strings got ids past
+  65535, which the game's 16-bit string references wrap onto ids 0+ (the stock NPC dialog of
+  `vo.json`): "dialog text swapped around". `ConvertDataMod.py --refresh-js <mod folder>...` puts
+  the current mod.js code around an existing conversion's generated data (old one in
+  `d2rmm\mod.js.before-refresh`), for code fixes without converting again.
 - every change belongs to a feature (inventory, cube recipes, runewords, uniques and sets, affixes,
   item bases, drops, monsters, areas, skills, characters, vendors, interface, visuals; tables and
   text everything depends on are "core") and every D2RLoader plugin (DLL with its .mpq/.ini and its
@@ -723,7 +1152,8 @@ file plus `D2RMM.readJson` (D2RMM has no call to read a mod's own files; D2RMM k
 memory and reads them back); the scratch file `d2rmm-convert\<id>.json` is left empty in the output.
 
 In `keep` mode `-Check` compares by row instead: the game's rows at their places with the mod's
-values, the mod's new rows appended in its order, and moved row numbers pointing at the same rows as
+values, the mod's new rows appended in its order (`monpreset.txt`: at their number within their
+act, see "Monster spots in a map"), and moved row numbers pointing at the same rows as
 in the mod's own files. `d2rmm\convert.json` keeps the settings the mod was converted with
 (`settings`: name, author, version, rows, plugins, source), which an update reuses; a rerun keeps
 the name and version in `mod.json` unless `-Name` / `-Version` are given.
@@ -743,6 +1173,17 @@ Notes:
 - Mods that look up plain-game rows by name (Necromancer_V1.6: Confuse, Poison Dagger) go ABOVE a
   conversion that renames or replaces those rows (Reimagined replaces 19 stock skills in place);
   below it they stop. The conversion's "My mod list" rules keep their other changes.
+- HD registries are merged key by key, not copied whole: `hd/missiles/missiles.json`,
+  `hd/character/monsters.json`, `hd/items/items.json`, `uniques.json`, `sets.json` and
+  `hd/overlays/overlays.json` (one object of key -> value, or a list of single-key objects). The
+  mod's changed and new keys go in, keys the mods above added stay, and "Load order > Conflicts"
+  decides a key both changed. Other JSON (layouts, models, presets) is still copied whole.
+  `convert.json` lists them under `jsonMerged`; `-Check` compares them like the tables.
+- Two conversions stacked: put the one with the most new content above and set the lower one's
+  "Load order > Conflicts" to `earlier`, so it only fills what the upper one left alone. With
+  Reimagined above Rebirth on `mod`, Rebirth's stock-based values replaced about 3,600 of
+  Reimagined's (treasure classes, mercenaries, skill values and descriptions, its new arrows'
+  visuals); ModOrder warns about that setting.
 - A mod that ships its tables only as compiled `global\excel\*.bin` (Rebirth) cannot be patched:
   D2RMM runs the game on `.txt` tables, so those files are copied but do nothing. The converter
   warns; such tables have to be decompiled to `.txt` first.
@@ -925,9 +1366,109 @@ This tool installs it as it is, with the same safety as the converter's Update:
     installed menu from mod.js instead, right of the main buttons and below buttons other mods put
     there. The mod's own switch for them still works. The test run fails the install if the merged
     menu lost the game's `PauseTable` / `PauseTableExtra`.
+  - *affix-guard*: Relics of Sanctuary's `applyAffixRework` changes magic affixes matched by row
+    position + name. Below a total conversion that keeps the names but rescales the values
+    (Reimagined: Lucky, Jagged) a change that sets only a max left the min above it, and Charming
+    Vendors stopped the install ("Unsupported stat range in magicprefix.txt"). The guard skips such
+    a change; on the plain game's tables nothing changes. If a new version no longer has the one
+    `Object.assign(target, entry.changes);` the guard goes around, the update stops and the
+    installed version stays, so the patch is never dropped silently.
+- Opt-in patches, asked for once with `-Patch <name>` on `-Install`, kept in `native.json` and
+  redone on every update:
+  - *layout-guard*: for a mod that expects every UI layout widget to have `fields` and a `rect`.
+    Total conversions (Reimagined with its Inventory feature on) ship layouts whose widgets are bare
+    `{type, name}` (fields inherited from the base layout), and the mod stops ("Cannot set
+    properties of undefined (setting 'filename')"). The mod's whole script runs in a block where
+    `D2RMM.readJson` on `global\ui\layouts` files gives bare widgets fields (saved once something
+    is written into them) and a missing rect a stand-in that takes writes but is never saved, so
+    the inherited rect stays; assigning a new rect saves it. It does not depend on the mod's code.
+- A mod with no download kept installs from its own folder:
+  `-Install '<D2RMM>\mods\<id>' -Id <id> [-Patch ...]`. Its next update needs `-Source`.
+- Inventory 10x8 1.1.0 (Bandit, Nexus 1327; no download on disk) was installed that way with
+  `-Patch layout-guard` (2026-11-20). Update it with
+  `.\Update-D2RNativeMod.ps1 -Mod Inventory10x8 -Source <download>`. Harness, Reimagined with
+  `--config inventory=true`: the plain script stops as above; the guarded plain script and the old
+  hand edit (still in its mod.js, now redundant) write byte-identical files; on the plain game the
+  guard changes nothing.
 - Relics of Sanctuary 3.5.0 (2026-11-15): installed and updated with this; its test run flags the
   copied Druid skills "Mythic Armageddon / Hurricane" sharing a tree cell with the originals (the
-  author's design). It goes above BestOf in the D2RMM list. Not yet seen in the game.
+  author's design). It goes above BestOf in the D2RMM list. Reinstalled 2026-11-19 with the
+  affix-guard, which replaces the hand edit of 2026-11-15; checked with Reimagined + Relics +
+  Charming Vendors in the harness (patched: no mod stops; the plain download: Charming Vendors
+  stops on Lucky). Not yet seen in the game.
+
+## Drag and drop (`Drop\`)
+
+Every tool that works on a file or folder has a batch file in `Drop\`: drag the files or folders
+onto it in Explorer (several at once where the tool takes several). The window stays open at the
+end; a batch file opened without anything dropped on it says what to drop. Game, D2RMM and Python
+are found the same way as for the other launchers (`D2RToolPaths.ps1`); the routing is in
+`Drop\_drop.ps1`.
+
+| Batch file | Drop | Runs |
+|---|---|---|
+| `Test mods.bat` | D2RMM mod folders | `Test-D2RMod.ps1 -KeepGoing`, all of them together, in the order dropped |
+| `Make mods merge.bat` | mod folders that copy whole tables | `Convert-D2RReplaceMod.ps1` |
+| `Convert data mod.bat` | a data mod (.mpq folder, packed .mpq, .zip, .7z, .rar) | `Convert-D2RDataMod.ps1`: `-Mod` when it is already in D2RMM's mods folder, else `-Source` (asks for the folder name) |
+| `Update converted mod.bat` | converted mod folders | `Update-D2RConvertedMod.ps1` |
+| `Install D2RMM mod.bat` | a download that is a D2RMM mod (.zip, .7z, .rar, folder) | `Update-D2RNativeMod.ps1 -Install` |
+| `Update model index.bat` | mod folders with HD models | `Update-D2RModelIndex.ps1` |
+| `Extract MPQ.bat` | .mpq archives | `MpqArchive.py extract` into `<name>-extracted` beside it |
+| `Check mod list.bat` | a saved mod list (.json, e.g. `<D2RMM>\modorder-backups\`) | ModOrder on that list; changes nothing |
+| `Restore mod list.bat` | a saved mod list | puts it back into D2RMM (asks first) |
+| `Run bot test.bat` | a bot script (.txt) | `Invoke-D2RBotTest.ps1 -Script` |
+| `Rebuild HD Art Match.bat` | a merged mod data folder | `HdMatch.py build --data`, into `<D2RMM>\mods\HdArtMatch` |
+
+A merged data folder for HD Art Match without installing: `node ModHarness.js --game <D2R>
+--keep-going --out <folder> --out-copied "^(global/(monsters|items)/|hd/(items|character)/)" <mods
+in list order, without HdArtMatch>` (`--out-copied` also saves the copied files the pattern names).
+
+How long a mod takes in D2RMM: `node ModHarness.js --game <D2R> --quickjs <D2RMM source>\node_modules
+<mods>` runs each mod in QuickJS, the script engine D2RMM uses, rather than Node's much faster V8.
+For each mod it prints the time split into the script itself, D2RMM calls, and values copied into
+QuickJS. The harness's own `writeTsv` is slower than D2RMM's, so read that part loosely. A D2RMM
+install uses one core: mods run one after another, each on the files the mods above it left. More
+threads would not help much; a slow mod's script is what to fix. That is how the converted mods'
+`remap` came down from 135 s to 3 s of Reimagined's install.
+
+## Mods that replace whole files (`ConvertReplaceMod.py`)
+
+Some D2RMM mods copy their whole copy of a game table or string file over the output
+(`copyFile('data', 'data')`, or a preset's `ui.json`): every change the mods above made to that
+file is lost. Below Reimagined, Better and New Unique Items wiped about 48,000 of its unique item
+values that way. The converter makes such a mod merge instead:
+
+```
+Convert-D2RReplaceMod.ps1 -Mod 'Better and New Unique Items', 'Better Body Armors__Shields__Weapons'
+Convert-D2RReplaceMod.ps1 -Mod 'Better and New Unique Items' -Undo      # its own mod.js back
+```
+
+- Every table (`global\excel\**.txt`) and string file (`local\lng\strings*\*.json`) the mod ships,
+  in any folder (presets included), is compared with the game's copy, and the difference is stored
+  as a row patch in `<mod>\d2rmm\patches\` (the data-mod converter's format and merge code, rows
+  "keep": rows stay in place, new rows go at the end).
+- Since 2026-11-20 also the game's other JSON: HD files (`hd\**\*.json`, `*.timelines`: state
+  machines, animation timelines, item / missile / overlay / preset definitions) and UI layouts
+  (`global\ui\layouts\*.json`). They become deep JSON patches: objects key by key, lists of named
+  entries by name (added after the same neighbour), other lists by a sequence diff (each stock
+  entry's fingerprint finds it in the list as the mods above left it; the mod's inserts, deletions
+  and in-place changes go in around them; an entry another mod already added is not added twice).
+  A file whose patch does not rebuild the mod's copy is copied as before. First use: Enhanced effects
+  and sounds below Reimagined copied 117 files over Reimagined's; its 44 JSON files now merge (all of
+  Reimagined's changes kept in 28 of the 31 shared files; the other 3 change the same animation
+  timelines, where the converted mod's version wins). Binary files (sounds, models, `.ds1` maps)
+  are still copied: the later mod's file wins.
+- The mod's `mod.js` moves to `d2rmm\original-mod.js`. The new `mod.js` runs it unchanged with a
+  D2RMM whose `copyFile`, when a copy includes one of those files, puts the file back as the mods
+  above left it and merges the mod's patch into it. Its settings, other files and code work as
+  before.
+- The mod's own changes still win cell by cell; the rows, cells and strings it does not touch keep
+  what the mods above wrote. The install log names the merged files and the cells both changed.
+- `-Check` (on by default) runs the converted mod alone in ModHarness. Run alone, the output is
+  the mod's own files (checked on Better and New Unique Items and Better Body Armors: same rows and
+  strings). Rerun after the mod updates; it always wraps `d2rmm\original-mod.js`, never itself.
+- ModOrder knows converted mods (`d2rmm\replace.json`): they leave the "whole-file" group, so they
+  can sit below the conversions and merge into their tables; unconverted ones get a pointer here.
 
 ## Mod list sorter (`ModOrder`, like LOOT)
 
@@ -1016,6 +1557,12 @@ needs" to keep: every game file a script reads is taken from the archive the
 moment it asks for it and kept in a cache (`%LOCALAPPDATA%\D2RModAssets\vanilla`,
 outside the repo; `-Refresh` after a game update). Rows a mod adds are found by
 comparing with the game's tables, so the checks need no naming convention.
+
+`D2RMM.getNextStringID()` works like D2RMM's (since 2026-11-19; it was a fixed 90000): the counter
+is the number in `local\lng\next_string_id.txt` when a mod first asks (the game's, or a copy a mod
+put in), written back after each call. The string check covers all 21 string files: a new entry
+with an id past 65535 (the game's 16-bit string references show `id & 0xFFFF` instead, from 65536
+on the stock NPC dialog) or with an id another Key has after the install is a PROBLEM.
 
 ```powershell
 # one mod
@@ -1125,6 +1672,11 @@ node LeakCheck.js --game '<game>' --python <python> --conversion '<D2RMM>\mods\F
   (needs D2RCore and the StateLimits plugin) or past 32768 (problem); an item, set or cube
   `state` property (in tables a mod wrote) naming a state past the width of stat 98 `state`
   (8 bits, 255: needs StateLimits 0.2.0+), or a state that does not exist (problem).
+- **Name limits**: in the tables a mod wrote (skills, skilldesc, missiles, states, monstats,
+  monstats2, pettype, itemstatcost, overlay, events, monai, montype, monseq), a warning for every
+  row name over 47 characters (the game's Excel reader cuts names to 47) and for names that are
+  the same once cut (D2RLoader then stops the launch with "row N repeats ID M"). Quiet once the
+  NameLimits plugin (`<game>\mods\NameLimits`) is in `<game>\mods\D2RMM\d2rloader\plugins`.
 - **Missiles**: names without spaces or a trailing digit, `Skill`, sub-missiles,
   same row number in the main and the classic-rules table. A warning when a new
   skill's missile takes its damage from another skill. Lists new missiles without an HD entry.

@@ -6,7 +6,8 @@ relative to the offset field itself), then the pixel data.
 
 Formats seen in the game's effect textures (2026-11-13, 1474 files):
   0x1F  RGBA8, uncompressed
-  0x3A  BC1 (DXT1)            colour, 8 bytes per 4x4 block
+  0x39  BC1 (DXT1)            data maps (a fur flow map), 8 bytes per 4x4 block
+  0x3A  BC1 (DXT1), sRGB      colour, 8 bytes per 4x4 block
   0x3D  BC3 (DXT5)            colour + alpha, 16 bytes per block
   0x3E  BC3 (DXT5), sRGB      albedo textures
   0x3F  BC4                   one channel (masks, noise), 8 bytes per block
@@ -27,8 +28,8 @@ import struct
 import sys
 
 MAGIC = b'<DE('
-FORMATS = {0x1F: 'RGBA8', 0x3A: 'BC1', 0x3D: 'BC3', 0x3E: 'BC3 sRGB', 0x3F: 'BC4', 0x41: 'BC5'}
-_FOURCC = {0x3A: b'DXT1', 0x3D: b'DXT5', 0x3E: b'DXT5', 0x3F: b'ATI1', 0x41: b'ATI2'}
+FORMATS = {0x1F: 'RGBA8', 0x39: 'BC1', 0x3A: 'BC1 sRGB', 0x3D: 'BC3', 0x3E: 'BC3 sRGB', 0x3F: 'BC4', 0x41: 'BC5'}
+_FOURCC = {0x39: b'DXT1', 0x3A: b'DXT1', 0x3D: b'DXT5', 0x3E: b'DXT5', 0x3F: b'ATI1', 0x41: b'ATI2'}
 
 
 def header(data):
@@ -72,6 +73,37 @@ def from_image(img):
     pixels = img.tobytes()
     head = MAGIC + bytes([0x1F, 0x00, 0x02, 0x01]) + struct.pack('<IIIIII', w, h, 1, 0, 0, 1)
     return head + struct.pack('<III', 4, len(pixels), 4) + pixels
+
+
+def from_image_bc3(img, srgb=True, size=None):
+    """A Pillow image -> BC3 (DXT5) .texture bytes with a full mip chain, the layout of the
+    game's own character textures (albedo: sRGB, format 0x3E; other maps: 0x3D).
+    size: resize to size x size first (a power of two); otherwise the sides are rounded down to
+    powers of two. Needs a Pillow that writes DXT5 DDS files (10.3 or newer; checked with 12.3.0)."""
+    from PIL import Image
+    img = img.convert('RGBA')
+    w, h = (size, size) if size else (1 << (img.width.bit_length() - 1), 1 << (img.height.bit_length() - 1))
+    if (w, h) != img.size:
+        img = img.resize((w, h), Image.LANCZOS)
+    levels = []
+    level = img
+    while True:
+        buffer = io.BytesIO()
+        level.save(buffer, 'DDS', pixel_format='DXT5')
+        levels.append(buffer.getvalue()[128:])
+        if level.width == 1 and level.height == 1:
+            break
+        level = level.resize((max(1, level.width // 2), max(1, level.height // 2)), Image.BOX)
+    count = len(levels)
+    head = MAGIC + bytes([0x3E if srgb else 0x3D, 0x00, 0x02, count]) + struct.pack('<IIIIII', w, h, 1, 0, 0, count) + struct.pack('<I', 4)
+    table_at = len(head)
+    data_at = table_at + 8 * count
+    table = b''
+    for k, pixels in enumerate(levels):
+        offset_field = table_at + 8 * k + 4
+        table += struct.pack('<II', len(pixels), data_at - offset_field)
+        data_at += len(pixels)
+    return head + table + b''.join(levels)
 
 
 def main():

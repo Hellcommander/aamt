@@ -528,3 +528,78 @@ test("auto-switch: a struggling Ollama model hands the request to a stronger one
     Object.assign(llm, { discover: saved.discover, ollamaSwitchCandidates: saved.cands, ollamaToolAdvice: saved.advice, supportsVision: saved.vision });
   }
 });
+
+test("memory: generated in the background after N turns, then in the next turn's prompt with the memory tools", async () => {
+  settings["localAgentBridge.agent.memoryGenerateEvery"] = 2;
+  try {
+    const a = provider.createSession({ model: "m-mem" });
+    const done = (text) => () => ({ content: "", tool_calls: [{ id: "c", type: "function", function: { name: "attempt_completion", arguments: JSON.stringify({ summary: text }) } }] });
+    let extract = null;
+    scripted.set("m-mem", [
+      done("answer one"),
+      done("answer two"),
+      (req) => ((extract = req), { content: '[{"op":"add","scope":"user","name":"tests-with-run-js","type":"feedback","description":"how the user runs tests","body":"Run tests with node test/run.js."}]', tool_calls: [] }),
+    ]);
+    await provider.send("what does run.js do?", a.id);
+    assert.strictEqual(extract, null, "not after one turn");
+    await provider.send("I always run tests with node test/run.js", a.id);
+    for (let i = 0; i < 100 && !provider.memory().find("tests-with-run-js"); i++) await new Promise((r) => setTimeout(r, 20));
+    assert.ok(extract && /long-term memory/.test(extract.messages[0].content) && /node test\/run\.js/.test(extract.messages[1].content), "the extraction call read the turns");
+    assert.ok(!extract.tools, "no tools on the extraction call");
+    const m = provider.memory().find("tests-with-run-js");
+    assert.ok(m && m.scope === "user" && m.type === "feedback");
+    for (let i = 0; i < 50 && !(provider.store().get(a.id).log || []).some((e) => /^Memory added tests-with-run-js/.test(e.text || "")); i++) await new Promise((r) => setTimeout(r, 20));
+    assert.ok(provider.store().get(a.id).log.some((e) => /^Memory added tests-with-run-js/.test(e.text || "")), "the chat notes it");
+    let next = null;
+    scripted.set("m-mem", [(req) => ((next = req), done("three")())]);
+    await provider.send("third", a.id);
+    assert.match(next.messages[0].content, /tests-with-run-js \(feedback\): Run tests with node test\/run\.js/);
+    assert.ok(next.tools.some((t) => t.function.name === "MemoryWrite") && next.tools.some((t) => t.function.name === "ChatSearch"));
+    settings["localAgentBridge.agent.memory"] = false;
+    scripted.set("m-mem", [(req) => ((next = req), done("four")())]);
+    await provider.send("fourth", a.id);
+    assert.ok(!/tests-with-run-js/.test(next.messages[0].content) && !next.tools.some((t) => t.function.name === "MemoryWrite"), "memory off: none of it");
+  } finally {
+    delete settings["localAgentBridge.agent.memoryGenerateEvery"];
+    delete settings["localAgentBridge.agent.memory"];
+  }
+});
+
+test("a chat can work in another folder from this window: its tools, prompt and history are that folder's", async () => {
+  const other = fs.mkdtempSync(path.join(os.tmpdir(), "view-other-"));
+  after(() => fs.rmSync(other, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(other, "AGENTS.md"), "OTHER FOLDER RULES: use tabs.");
+  const c = await provider.newChatInFolder(other);
+  assert.strictEqual(c.workspace, other);
+  assert.strictEqual(provider.store().get(c.id), null, "not in this window's history");
+  assert.ok(provider.storeOf(other).get(c.id), "in the other folder's history");
+  const listed = [...posted].reverse().find((m) => m.type === "sessions");
+  const item = listed.items.find((e) => e.id === c.id);
+  assert.ok(item && item.folder === path.basename(other) && item.open, "its tab shows here, with its folder");
+  const restore = [...posted].reverse().find((m) => m.type === "restore" && m.sid === c.id);
+  assert.strictEqual(restore.workspace, other, "the panel says where it works");
+  let req = null;
+  scripted.set(c.model || "m-a", []);
+  const model = provider.session(c.id).model || "m-a";
+  scripted.set(model, [
+    (r) => ((req = r), { content: "", tool_calls: [{ id: "w", type: "function", function: { name: "Write", arguments: JSON.stringify({ path: "made.txt", contents: "hi\n" }) } }] }),
+    () => ({ content: "", tool_calls: [{ id: "d", type: "function", function: { name: "attempt_completion", arguments: '{"summary":"made it"}' } }] }),
+  ]);
+  await provider.send("create made.txt", c.id);
+  assert.ok(fs.existsSync(path.join(other, "made.txt")), "a relative path lands in the chat's folder");
+  assert.ok(!fs.existsSync(path.join(ws, "made.txt")));
+  const sys = req.messages[0].content;
+  assert.ok(sys.includes("Workspace folders: " + other) && !sys.includes("Workspace folders: " + ws), "the prompt's workspace is the chat's folder");
+  assert.match(sys, /OTHER FOLDER RULES/, "its AGENTS.md applies");
+  assert.ok(provider.storeOf(other).get(c.id).history.some((h) => /made it/.test(h.content)), "the turn is saved in that folder's history");
+  // The attachment survives a reload of this window's list; closing the tab detaches it.
+  provider.attachedMap = null;
+  assert.ok(provider.session(c.id), "found again from workspaceState");
+  await provider.closeSession(c.id);
+  assert.ok(!provider.attached().has(c.id));
+  assert.ok(provider.storeOf(other).get(c.id), "still in its folder's history");
+  // Clicking it in the tree opens it here again.
+  await onMsg({ type: "attach", workspace: other, id: c.id });
+  assert.strictEqual(provider.activeId, c.id);
+  assert.ok(provider.attached().has(c.id));
+});

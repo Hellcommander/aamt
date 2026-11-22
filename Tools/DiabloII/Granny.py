@@ -194,11 +194,16 @@ class GrannyFile:
         raise ValueError(f'member type {kind}')
 
     def describe(self, type_addr, _seen=None):
-        """A type definition as JSON-ready data (enough to write it back with Writer)."""
-        seen = _seen or set()
+        """A type definition as JSON-ready data (enough to write it back with Writer).
+
+        A member whose type is one of the structs it sits in is marked '$recursive' (the struct
+        that holds the member) or '$recursive:N' (N structs further out: a material map's Map is
+        a material, '$recursive:1')."""
+        seen = _seen or ()
         if type_addr in seen:
-            return '$recursive'
-        seen = seen | {type_addr}
+            up = len(seen) - 1 - seen.index(type_addr)
+            return '$recursive' if up == 0 else '$recursive:%d' % up
+        seen = seen + (type_addr,)
         out = []
         for m in self.type_of(type_addr):
             d = {'name': m['name'], 'type': TYPE_NAMES[m['type']]}
@@ -270,12 +275,24 @@ class Writer:
 
     Objects go to section 0 and type definitions and their names to section 6,
     the split the game's own files use. Sections are stored unpacked.
+
+    The section table follows the game's own files in two more things (found 2026-11-19 by
+    comparing stock models, skeletons and animation files): sections 1 and 3, always empty,
+    declare an alignment of 32, the rest 4; and every variant object or variant array whose
+    element type holds numbers that are not 32 bits wide (a vertex array, an animation curve)
+    gets a marshalling record (element count, where, its type), which a loader on a machine of
+    the other byte order needs to swap such data. The rule reproduces the stock records exactly
+    (checked on models, a skeleton and two animation files). Neither changes a byte of data.
     """
+
+    ALIGNMENT = (4, 32, 4, 32, 4, 4, 4, 4)
 
     def __init__(self, tag=0x80000039, extra_tags=(0, 0, 0, 0)):
         self.tag, self.extra_tags = tag, extra_tags
         self.buf = [bytearray() for _ in range(SECTION_COUNT)]
         self.rel = [[] for _ in range(SECTION_COUNT)]
+        self.mar = [[] for _ in range(SECTION_COUNT)]
+        self._marshalled = set()
         self._types = {}
         self._strings = {}
         self._made = {}              # (type, content) -> where it was written, so equal objects are shared
@@ -293,6 +310,21 @@ class Writer:
         if target is not None:
             self.rel[section].append((offset, target[0], target[1]))
 
+    def _mixed(self, desc, outer=()):
+        """Whether one element of this type stores numbers that are not 32 bits wide."""
+        for m in desc:
+            kind = TYPE_NAMES.index(m['type'])
+            if kind in SCALAR and kind not in (T_REAL32, T_INT32, T_UINT32):
+                return True
+            if kind == T_INLINE and isinstance(m.get('of'), list) and self._mixed(m['of']):
+                return True
+        return False
+
+    def _marshal(self, count, where, desc):
+        if where is not None and count and where not in self._marshalled and self._mixed(desc):
+            self._marshalled.add(where)
+            self.mar[where[0]].append((count, where[1]) + self._type(desc))
+
     def _string(self, text, section):
         key = (section, text)
         if key not in self._strings:
@@ -303,19 +335,20 @@ class Writer:
         return self._strings[key]
 
     # -- types
-    def _type(self, desc):
+    def _type(self, desc, _outer=()):
         key = _freeze(desc)
         if key in self._types:
             return self._types[key]
-        subs = [self._type(m['of']) if isinstance(m.get('of'), list) else None for m in desc]
         at = self._alloc(6, MEMBER_SIZE * (len(desc) + 1))
         here = self._types[key] = (6, at)
+        stack = _outer + (here,)
+        subs = [self._type(m['of'], stack) if isinstance(m.get('of'), list) else None for m in desc]
         for i, m in enumerate(desc):
             o = at + i * MEMBER_SIZE
             struct.pack_into('<I', self.buf[6], o, TYPE_NAMES.index(m['type']))
             self._point(6, o + 4, self._string(m['name'], 6))
-            if m.get('of') == '$recursive':
-                self._point(6, o + 12, here)
+            if _recursion(m.get('of')) is not None:
+                self._point(6, o + 12, stack[-1 - _recursion(m['of'])])
             else:
                 self._point(6, o + 12, subs[i])
             struct.pack_into('<4I', self.buf[6], o + 20, m.get('width', 0), *m.get('extra', (0, 0, 0)))
@@ -335,37 +368,44 @@ class Writer:
         return one * max(1, m.get('width', 0))
 
     # -- objects
-    def _struct(self, desc, obj, section, at):
+    def _struct(self, desc, obj, section, at, outer=()):
+        outer = outer + (desc,)
         for m, name in zip(desc, member_keys(m['name'] for m in desc)):
             width = m.get('width', 0)
             value = obj[name]
             if width:
                 step = self._member_size(m) // width
                 for i in range(width):
-                    self._value(m, value[i], section, at + i * step)
+                    self._value(m, value[i], section, at + i * step, outer)
             else:
-                self._value(m, value, section, at)
+                self._value(m, value, section, at, outer)
             at += self._member_size(m)
 
-    def _new(self, desc, obj):
+    def _new(self, desc, obj, outer=()):
         key = (_freeze(desc), _freeze(obj))
         if key not in self._made:
             at = self._alloc(0, self._size(desc))
             self._made[key] = (0, at)
-            self._struct(desc, obj, 0, at)
+            self._struct(desc, obj, 0, at, outer)
         return self._made[key]
 
-    def _new_array(self, desc, items):
+    def _new_array(self, desc, items, outer=()):
         if not items:
             return None
         key = (_freeze(desc), _freeze(items))
         if key not in self._made:
-            self._made[key] = self._write_array(desc, items)
+            self._made[key] = self._write_array(desc, items, outer)
         return self._made[key]
 
-    def _write_array(self, desc, items):
+    def _write_array(self, desc, items, outer=()):
         if len(desc) == 1 and TYPE_NAMES.index(desc[0]['type']) in SCALAR and not desc[0].get('width'):
             code = SCALAR[TYPE_NAMES.index(desc[0]['type'])]
+            if code == 'h' and max(items) > 32767:
+                # A mesh's Indices16 is typed int16, but Granny and the game read it unsigned
+                # (R16_UINT): vertices 32768-65535 are stored as their 16-bit pattern.
+                if min(items) < -32768 or max(items) > 65535:
+                    raise ValueError(f'a 16-bit array holds {min(items)}..{max(items)}')
+                items, code = [v & 0xFFFF for v in items], 'H'
             raw = struct.pack(f'<{len(items)}{code}', *items)
             at = self._alloc(0, len(raw))
             self.buf[0][at:at + len(raw)] = raw
@@ -373,28 +413,30 @@ class Writer:
         size = self._size(desc)
         at = self._alloc(0, size * len(items))
         for i, item in enumerate(items):
-            self._struct(desc, item, 0, at + i * size)
+            self._struct(desc, item, 0, at + i * size, outer)
         return (0, at)
 
-    def _value(self, m, value, section, at):
+    def _value(self, m, value, section, at, outer=()):
         kind = TYPE_NAMES.index(m['type'])
         b = self.buf[section]
         of = m.get('of')
+        if _recursion(of) is not None:   # a member whose type is a struct it sits in (a material map's Map)
+            of = outer[-1 - _recursion(of)]
         if kind in SCALAR:
             struct.pack_into('<' + SCALAR[kind], b, at, value)
         elif kind == T_STRING:
             if value is not None:
                 self._point(section, at, self._string(value, 0))
         elif kind == T_INLINE:
-            self._struct(of, value, section, at)
+            self._struct(of, value, section, at, outer)
         elif kind == T_REF:
             if value is not None:
-                self._point(section, at, self._new(of, value))
+                self._point(section, at, self._new(of, value, outer))
         elif kind == T_EMPTY_REF:
             pass
         elif kind == T_REF_ARRAY:
             struct.pack_into('<I', self.buf[section], at, len(value))
-            self._point(section, at + 4, self._new_array(of, value))
+            self._point(section, at + 4, self._new_array(of, value, outer))
         elif kind == T_ARRAY_OF_REFS:
             struct.pack_into('<I', self.buf[section], at, len(value))
             if value:
@@ -402,16 +444,20 @@ class Writer:
                 self._point(section, at + 4, (0, table))
                 for i, item in enumerate(value):
                     if item is not None:
-                        self._point(0, table + 8 * i, self._new(of, item))
+                        self._point(0, table + 8 * i, self._new(of, item, outer))
         elif kind == T_VARIANT:
             if value is not None:
                 self._point(section, at, self._type(value['$type']))
-                self._point(section, at + 8, self._new(value['$type'], value['$value']))
+                where = self._new(value['$type'], value['$value'])
+                self._point(section, at + 8, where)
+                self._marshal(1, where, value['$type'])
         elif kind == T_VARIANT_ARRAY:
             if value is not None:
                 self._point(section, at, self._type(value['$type']))
                 struct.pack_into('<I', self.buf[section], at + 8, len(value['$items']))
-                self._point(section, at + 12, self._new_array(value['$type'], value['$items']))
+                where = self._new_array(value['$type'], value['$items'])
+                self._point(section, at + 12, where)
+                self._marshal(len(value['$items']), where, value['$type'])
         elif kind == T_TRANSFORM:
             struct.pack_into('<I16f', self.buf[section], at, value['flags'], *value['position'], *value['orientation'],
                              *[x for row in value['scale_shear'] for x in row])
@@ -428,7 +474,7 @@ class Writer:
         headers = []
         offset = HEADER_SIZE
         for i in range(SECTION_COUNT):
-            headers.append([0, offset, len(self.buf[i]), len(self.buf[i]), 4, len(self.buf[i]), len(self.buf[i])])
+            headers.append([0, offset, len(self.buf[i]), len(self.buf[i]), self.ALIGNMENT[i], len(self.buf[i]), len(self.buf[i])])
             body += self.buf[i]
             offset += len(self.buf[i])
         for i in range(SECTION_COUNT):
@@ -436,7 +482,10 @@ class Writer:
             for r in self.rel[i]:
                 body += struct.pack('<3I', *r)
             offset += 12 * len(self.rel[i])
-            headers[i] += [offset, 0]
+            headers[i] += [offset, len(self.mar[i])]
+            for record in self.mar[i]:
+                body += struct.pack('<4I', *record)
+            offset += 16 * len(self.mar[i])
         total = HEADER_SIZE + len(body)
         tail = b''.join(struct.pack('<11I', *h) for h in headers) + bytes(body)
         out = bytearray(MAGIC_LE64 + struct.pack('<4I', HEADER_SIZE, 0, 0, 0))
@@ -445,6 +494,40 @@ class Writer:
         out += struct.pack('<I', self.tag) + struct.pack('<4I', *self.extra_tags)
         out += bytes(0x20 + 0x48 - len(out))
         return bytes(out) + tail
+
+
+# ---------------------------------------------------------------- mesh indices
+
+INDEX16_VERTICES = 65536     # vertices a 16-bit index reaches (0..65535, read unsigned)
+
+
+def mesh_indices(topology):
+    """A mesh topology's triangle corners as one flat list of vertex numbers.
+
+    The 32-bit `Indices` array wins when it is filled, as in Granny's own GrannyGetMeshIndices and
+    GrannyGetMeshBytesPerIndex (game image 95032: 0x1624370 / 0x1624320); otherwise `Indices16`,
+    read unsigned (its type says int16, the game binds it as R16_UINT)."""
+    if topology.get('Indices'):
+        return [int(v) for v in topology['Indices']]
+    return [int(v) & 0xFFFF for v in topology.get('Indices16') or []]
+
+
+def set_mesh_indices(topology, flat, vertex_count=None):
+    """Stores triangle corners in a mesh topology; returns the bytes per index used (2 or 4).
+
+    16-bit `Indices16` while every vertex fits (as the stock files that size do, so they stay
+    byte for byte the same), the 32-bit `Indices` array past 65,536 vertices. The game's mesh
+    loader (Mesh::LoadGeometry, 0xFA04C0) takes either: index buffer stride = bytes per index,
+    DXGI_FORMAT_R32_UINT for 4 (0x10F1240), and stock bodies such as the spirit wolf ship 32-bit."""
+    flat = [int(v) for v in flat]
+    top = max(vertex_count or 0, (max(flat) + 1) if flat else 0)
+    if 'Indices' not in topology or 'Indices16' not in topology:
+        raise ValueError('the topology type has no Indices / Indices16 member')
+    if top > INDEX16_VERTICES:
+        topology['Indices'], topology['Indices16'] = flat, []
+        return 4
+    topology['Indices16'], topology['Indices'] = flat, []
+    return 2
 
 
 def member_keys(names):
@@ -457,6 +540,13 @@ def member_keys(names):
 
 
 _frozen = {}
+
+
+def _recursion(of):
+    """How many structs out a '$recursive' type marker points (0 = the one holding the member), or None."""
+    if isinstance(of, str) and of.startswith('$recursive'):
+        return int(of.split(':', 1)[1]) if ':' in of else 0
+    return None
 
 
 def _freeze(value):

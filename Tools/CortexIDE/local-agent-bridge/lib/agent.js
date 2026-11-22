@@ -4,7 +4,7 @@
 // Read-only calls in one reply run in parallel; Task runs a read-only sub-agent in its own context.
 
 const llm = require("./llm");
-const { TOOL_DEFS, MUTATING, READ_ONLY, MCP_TOOLS, canonName, execToolRich, clip, renderTodos } = require("./agent-tools");
+const { TOOL_DEFS, MUTATING, READ_ONLY, MCP_TOOLS, MEMORY_TOOLS, CHAT_TOOLS, canonName, execToolRich, clip, renderTodos } = require("./agent-tools");
 const { parseTextCalls, narration, stripThinking, isTutor, looksLikeWork, announcesAction, wantsEdit, wantsVerify } = require("./agent-parse");
 const { Progress, compact, estimateTokens, limitImages, short } = require("./agent-context");
 const { matchSkills } = require("./scan");
@@ -83,8 +83,11 @@ Tool calling: this backend has no native tool calls. To call a tool reply with e
 One call per block; several blocks in one reply are allowed. You may write one short sentence before them. Tools:
 `;
 
-function toolDefsFor(subagent, mcp, agent) {
+function toolDefsFor(subagent, mcp, agent, avail = {}) {
   let defs = subagent ? TOOL_DEFS.filter((t) => READ_ONLY.has(t.function.name)) : TOOL_DEFS;
+  // Memory and past-chat tools exist only when the chat has them turned on.
+  if (!avail.memory) defs = defs.filter((t) => !MEMORY_TOOLS.has(t.function.name));
+  if (!avail.chats) defs = defs.filter((t) => !CHAT_TOOLS.has(t.function.name));
   if (!mcp || !mcp.size) defs = defs.filter((t) => !MCP_TOOLS.has(t.function.name));
   if (agent) {
     // A named agent narrows the set (its tools list, or tools it switches off); it never widens it.
@@ -118,6 +121,13 @@ function systemPrompt({ env, skills, task, prior, textMode, subagent, mcp, agent
   if (env.tree) parts.push("Workspace layout (top two levels):\n" + clip(env.tree, 2500));
   if (!subagent && env.selection) parts.push("Selected text in the active file:\n```\n" + clip(env.selection, 4000) + "\n```");
   if (env.rules) parts.push("Project rules:\n" + clip(env.rules, subagent ? 2000 : 6000));
+  if (!subagent && env.memory) parts.push(env.memory);
+  if (!subagent && (env.memoryOn || env.chatSearch)) {
+    const how = [];
+    if (env.memoryOn) how.push("When the user asks you to remember something, or states a lasting preference, a correction to how you work, or a project constraint, save it with MemoryWrite (one fact per memory; update an existing one rather than adding a near-duplicate). When they ask you to forget something, or a memory proves wrong, use MemoryDelete. Never store secrets.");
+    if (env.chatSearch) how.push("When the user refers to earlier work (\"like last time\", \"what did we decide about…\"), find it with ChatSearch and read it with ChatRead instead of guessing.");
+    parts.push("Memory and past chats:\n" + how.join("\n"));
+  }
   if (!subagent && agents && agents.length) {
     const cat = agentsLib.subagentCatalog(agents);
     if (cat.length > 1) parts.push("Sub-agents for the Task tool (pass agent: <name>; default explore):\n" + cat.join("\n"));
@@ -140,7 +150,7 @@ function systemPrompt({ env, skills, task, prior, textMode, subagent, mcp, agent
     );
   }
   if (!subagent && prior) parts.push("Earlier in this session (programmatic index of past work):\n" + clip(prior, 5000));
-  if (textMode) parts.push(TEXT_TOOL_FORMAT + toolSignatureList(toolDefsFor(subagent, mcp, agent)));
+  if (textMode) parts.push(TEXT_TOOL_FORMAT + toolSignatureList(toolDefsFor(subagent, mcp, agent, { memory: !!env.memoryOn, chats: !!env.chatSearch })));
   return parts.join("\n\n");
 }
 
@@ -197,7 +207,7 @@ async function runAgent(o) {
   const priorText = !subagent && o.prior ? new Progress(o.prior).toText() : "";
   let textMode = !!o.textMode;
   const mcp = o.tools && o.tools.mcp && o.tools.mcp.size ? o.tools.mcp : null;
-  let defs = toolDefsFor(subagent, mcp, agent);
+  let defs = toolDefsFor(subagent, mcp, agent, { memory: !!(o.tools && o.tools.memory), chats: !!(o.tools && o.tools.chats) });
   if (!subagent && o.allowTask === false) defs = defs.filter((t) => t.function.name !== "Task");
   const allowed = new Set(defs.map((t) => t.function.name));
   /** No edit tool: Plan / Ask style agents answer in text and are not pushed to change files. */

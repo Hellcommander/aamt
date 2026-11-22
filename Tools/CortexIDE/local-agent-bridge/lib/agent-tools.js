@@ -11,6 +11,7 @@ const mcpc = require("./mcp-client");
 const perms = require("./permissions");
 const instructions = require("./instructions");
 const toolOutput = require("./tool-output");
+const memoryLib = require("./memory");
 const bg = require("./bg-shell");
 
 const short = (t, n) => { const x = String(t == null ? "" : t).replace(/\s+/g, " ").trim(); return x.length > n ? x.slice(0, n - 1) + "…" : x; };
@@ -127,6 +128,24 @@ const TOOL_DEFS = [
     tool: { type: "string" },
     arguments: { type: "object", description: "Arguments matching the tool's schema" },
   }, ["server", "tool"]),
+  tool("ChatSearch", "Search the user's earlier chats (titles and messages) when they refer to past work (\"like last time\", \"what we decided before\"). Returns chat ids with snippets; read one with ChatRead.", {
+    query: { type: "string", description: "Words that must all appear" },
+    all_workspaces: { type: "boolean", description: "Also search chats of other workspace folders (default: this workspace)" },
+  }, ["query"]),
+  tool("ChatRead", "Read an earlier chat found with ChatSearch: its messages, tool calls and changed files, recent turns in more detail.", {
+    id: { type: "string", description: "Chat id (or its first 6+ characters)" },
+  }, ["id"]),
+  tool("MemoryWrite", "Save a fact to long-term memory for future chats: when the user says to remember something, or states a lasting preference, correction or project constraint. Replaces a memory of the same name.", {
+    name: { type: "string", description: "short-kebab-name" },
+    description: { type: "string", description: "One line saying what it is about" },
+    type: { type: "string", enum: ["user", "feedback", "project", "reference"], description: "user: about the person; feedback: how they want you to work (add Why: and How to apply: lines); project: goals and constraints not visible in the code; reference: where something lives" },
+    scope: { type: "string", enum: ["user", "project"], description: "user: every workspace; project: this workspace only" },
+    body: { type: "string", description: "The fact" },
+  }, ["name", "body"]),
+  tool("MemoryDelete", "Delete a memory that is wrong or that the user asked you to forget.", {
+    name: { type: "string" },
+    scope: { type: "string", enum: ["user", "project"] },
+  }, ["name"]),
   tool("list_skills", "List the skills (SKILL.md workflows) available to follow.", {}, []),
   tool("read_skill", "Read a skill's full instructions by name before following it.", {
     name: { type: "string" },
@@ -172,13 +191,20 @@ const ALIASES = {
   todowrite: "TodoWrite", todo_write: "TodoWrite", todos: "TodoWrite", update_todos: "TodoWrite", plan: "TodoWrite",
   task: "Task", subagent: "Task", agent: "Task", research: "Task",
   list_skills: "list_skills", read_skill: "read_skill", match_skills: "list_skills",
+  chatsearch: "ChatSearch", chat_search: "ChatSearch", search_chats: "ChatSearch", conversation_search: "ChatSearch", search_history: "ChatSearch",
+  chatread: "ChatRead", chat_read: "ChatRead", read_chat: "ChatRead", recent_chats: "ChatRead",
+  memorywrite: "MemoryWrite", memory_write: "MemoryWrite", remember: "MemoryWrite", save_memory: "MemoryWrite", add_memory: "MemoryWrite",
+  memorydelete: "MemoryDelete", memory_delete: "MemoryDelete", forget: "MemoryDelete", delete_memory: "MemoryDelete",
   attempt_completion: "attempt_completion", complete: "attempt_completion", finish: "attempt_completion", done: "attempt_completion",
 };
 
 const NAMES = new Set(TOOL_DEFS.map((t) => t.function.name));
 const MUTATING = new Set(["Shell", "StrReplace", "MultiEdit", "Write", "Delete"]);
 /** Tools that only look: safe to run side by side in one round, and all a sub-agent gets. */
-const READ_ONLY = new Set(["Read", "ReadImage", "AnalyzeFile", "LS", "Glob", "Grep", "WebFetch", "ReadLints", "list_skills", "read_skill", "McpTools"]);
+const READ_ONLY = new Set(["Read", "ReadImage", "AnalyzeFile", "LS", "Glob", "Grep", "WebFetch", "ReadLints", "list_skills", "read_skill", "McpTools", "ChatSearch", "ChatRead"]);
+/** Tools that need memory / chat search turned on in the ToolContext. */
+const MEMORY_TOOLS = new Set(["MemoryWrite", "MemoryDelete"]);
+const CHAT_TOOLS = new Set(["ChatSearch", "ChatRead"]);
 /** Tools that only exist when an MCP server is configured. */
 const MCP_TOOLS = new Set(["McpTools", "McpCall"]);
 
@@ -1400,6 +1426,14 @@ async function dispatch(ctx, name, rawArgs) {
       return mcpTools(ctx, a);
     case "McpCall":
       return mcpCall(ctx, a);
+    case "ChatSearch":
+      return chatSearch(ctx, a);
+    case "ChatRead":
+      return chatRead(ctx, a);
+    case "MemoryWrite":
+      return memoryWrite(ctx, a);
+    case "MemoryDelete":
+      return memoryDelete(ctx, a);
     case "list_skills": {
       const skills = ctx.skills();
       if (!skills.length) return "(no skills found)";
@@ -1416,6 +1450,46 @@ async function dispatch(ctx, name, rawArgs) {
     default:
       return "error: unknown tool " + name + ". Available: " + [...NAMES].join(", ");
   }
+}
+
+// ---- past chats and memory (lib/memory.js) ----
+
+function chatSearch(ctx, a) {
+  if (!ctx.chats) return "error: searching earlier chats is turned off (localAgentBridge.agent.memorySearchChats)";
+  const q = String(a.query || a.pattern || "").trim();
+  if (!q) return "error: missing query";
+  const hits = memoryLib.searchChats(ctx.chats.root, q, { folder: a.all_workspaces ? "" : ctx.chats.folder, exclude: ctx.chats.current, limit: 8 });
+  if (!hits.length) return "(no earlier chat matches “" + q + "”" + (a.all_workspaces ? "" : " in this workspace; try all_workspaces: true") + ")";
+  return hits.map((h) => h.id + " · " + new Date(h.updated).toISOString().slice(0, 10) + " · " + h.title + (h.model ? " · " + h.model : "") + (h.folder !== ctx.chats.folder ? " · " + h.folder : "") + "\n  " + h.snippet).join("\n");
+}
+
+function chatRead(ctx, a) {
+  if (!ctx.chats) return "error: reading earlier chats is turned off (localAgentBridge.agent.memorySearchChats)";
+  const c = memoryLib.findChat(ctx.chats.root, a.id || a.chat_id);
+  if (!c) return "error: no chat " + a.id + ". Find ids with ChatSearch.";
+  const s = memoryLib.readChat(c.file);
+  if (!s) return "error: chat " + c.id + " could not be read";
+  const t = require("./compress").buildTranscript({ log: s.log, history: s.history, progress: s.progress }, { recentTurns: 3, maxChars: 14000 });
+  return "Chat " + c.id + " · " + (s.title || "Untitled") + " · " + new Date(c.updated).toISOString().slice(0, 10) + (s.model ? " · " + s.model : "") + "\n\n" + t.text;
+}
+
+function memoryWrite(ctx, a) {
+  if (!ctx.memory) return "error: memory is not available here";
+  const body = String(a.body || a.content || a.text || "").trim();
+  if (!body) return "error: missing body";
+  if (/(sk-[a-z0-9-]{10,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{12,}|-----BEGIN [A-Z ]*PRIVATE KEY)/i.test(body)) return "error: that looks like a secret (key or token); secrets are never stored in memory";
+  const had = ctx.memory.find(a.name || a.description || body, a.scope);
+  const file = ctx.memory.write({ scope: a.scope || "user", name: a.name || a.description || body, description: a.description, type: a.type, body });
+  if (typeof ctx.onMemory === "function") ctx.onMemory();
+  return (had ? "updated " : "saved ") + "memory " + file;
+}
+
+function memoryDelete(ctx, a) {
+  if (!ctx.memory) return "error: memory is not available here";
+  const m = ctx.memory.remove(a.name, a.scope) || (a.scope ? null : ctx.memory.remove(a.name));
+  if (!m) return "error: no memory named " + a.name + ". Names: " + ctx.memory.list().map((x) => x.scope + "/" + x.name).join(", ");
+  if (typeof ctx.onMemory === "function") ctx.onMemory();
+  return "deleted memory " + m.scope + "/" + m.name;
 }
 
 const NO_MCP = "error: no MCP servers are configured. Add them in localAgentBridge.agent.mcpServers, or fetch REA with Tools\\Fetch-ThirdParty.ps1 -AgentBridge.";
@@ -1570,6 +1644,8 @@ module.exports = {
   MUTATING,
   READ_ONLY,
   MCP_TOOLS,
+  MEMORY_TOOLS,
+  CHAT_TOOLS,
   renderTodos,
   stripLineNumbers,
   canonName,

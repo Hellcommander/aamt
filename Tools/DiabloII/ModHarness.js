@@ -17,10 +17,19 @@
 //   --manifest <file>    write what was read, written, copied and depended on (JSON)
 //   --dump [base]        print the non-empty columns of every row the mods added
 //   --out <folder>       save every file the mods wrote there (compare two runs byte for byte)
+//   --out-copied <regex> with --out: also save the files mods copied from their folders whose path
+//                        matches (e.g. HdMatch's inputs: global/(monsters|items)/|hd/(items|character)/)
 //   --python <exe>       python to run ModAssets.py with (default "python")
 //   --keep-going         like D2RMM: a mod that throws is rolled back and the next mod runs
 //   --trace <file>       record every table cell, string field and file each mod changes, and write
-//                        (JSON) which of them a later mod overwrote: the features a mod order loses
+//                        (JSON) which of them a later mod overwrote: the features a mod order loses;
+//                        each loss counts reverted (the later mod put the plain game's value back: a
+//                        copied stock row or table), removed (cell/row/entry gone) and changed values
+//   --quickjs <folder>   run each mod in QuickJS, the engine D2RMM runs mods in, instead of Node's V8,
+//                        and say where its time goes (the script itself, D2RMM calls, values copied
+//                        into QuickJS). <folder> = a node_modules with quickjs-emscripten-core and
+//                        @jitl/quickjs-wasmfile-release-asyncify (a D2RMM source checkout's). Much
+//                        slower than V8, and close to what D2RMM's install takes.
 //
 // Exit code 0 = no problems, 1 = problems, 2 = a mod script threw (with --keep-going: after
 // every mod ran; the failed ones are listed).
@@ -47,10 +56,12 @@ for (let i = 2; i < process.argv.length; i++) {
   } else if (a === '--max-page') opt.maxPage = Number(next());
   else if (a === '--manifest') opt.manifest = next();
   else if (a === '--out') opt.out = next();
+  else if (a === '--out-copied') opt.outCopied = next();
   else if (a === '--dump') opt.dump = process.argv[i + 1] === 'base' ? next() : 'main';
   else if (a === '--python') opt.python = next();
   else if (a === '--keep-going') opt.keepGoing = true;
   else if (a === '--trace') opt.trace = next();
+  else if (a === '--quickjs') opt.quickjs = next();
   else opt.mods.push(a);
 }
 if (!opt.game || !fs.existsSync(opt.game)) {
@@ -132,7 +143,7 @@ function vanilla(p, kind) {
 // Mock D2RMM
 // ---------------------------------------------------------------------------
 const files = {}; // path -> current content (parsed)
-const record = { read: new Set(), missing: new Set(), written: new Set(), copied: {} };
+const record = { read: new Set(), missing: new Set(), written: new Set(), copied: {}, copyLog: [] };
 // --keep-going: what each file looked like before the running mod first touched it, so a mod
 // that throws can be undone the way D2RMM rolls back its transaction.
 let txn = null;
@@ -189,7 +200,22 @@ function written(v) {
   return typeof v === 'string' ? v : JSON.parse(JSON.stringify(v));
 }
 const write = (p, v) => { noteWrite(norm(p)); touch(norm(p)); files[norm(p)] = written(v); record.written.add(norm(p)); if (txn) txn.wrote.add(norm(p)); };
-let nextId = 90000;
+// Like D2RMM (2.0.2): the string id counter is the number in local/lng/next_string_id.txt when the
+// first mod asks (the game's, or a copy a mod put in), and each call writes the next one back.
+let nextId = null;
+const NEXT_ID_FILE = 'local/lng/next_string_id.txt';
+function nextStringId() {
+  if (nextId === null) {
+    let text = '';
+    try { text = String(load(NEXT_ID_FILE, 'txt')); } catch (e) { /* no counter: D2RMM starts at 0 */ }
+    nextId = parseInt((text.match(/[0-9]+/) || ['0'])[0], 10);
+  }
+  const id = nextId++;
+  let text = null;
+  try { text = String(load(NEXT_ID_FILE, 'txt')); } catch (e) { /* nothing to write back */ }
+  if (text !== null) write(NEXT_ID_FILE, text.replace(/[0-9]+/, String(nextId)));
+  return id;
+}
 let currentMod = null;
 function walk(dir, out, rel) {
   fs.readdirSync(dir, { withFileTypes: true }).forEach((e) => {
@@ -206,7 +232,7 @@ const D2RMM = {
   writeTxt: write,
   readJson: (p) => load(p, 'json'),
   writeJson: write,
-  getNextStringID: () => nextId++,
+  getNextStringID: nextStringId,
   copyFile: (src, dst, overwrite) => {
     const from = path.join(currentMod, src);
     if (!fs.existsSync(from)) {
@@ -223,6 +249,7 @@ const D2RMM = {
       touch(key);
       if (txn) txn.wrote.add(key);
       record.copied[key] = path.join(from, rel);
+      record.copyLog.push({ mod: modList[modIndex] ? modList[modIndex].id : path.basename(currentMod), file: key });
       delete files[key];
     });
   },
@@ -301,6 +328,7 @@ function traceMod(index, name, t) {
 }
 function traceReport() {
   const finals = new Map(); // file -> final state
+  const stocks = new Map(); // file -> the plain game's state (to tell a reverted value from a changed one)
   const losses = new Map(); // "loser\u0000winner\u0000file" -> { count, examples }
   let units = 0;
   traced.forEach((setters, k) => {
@@ -317,15 +345,22 @@ function traceReport() {
       if (winner === m) return;
       units++;
       const lk = `${m}\u0000${winner}\u0000${file}`;
-      if (!losses.has(lk)) losses.set(lk, { count: 0, examples: [] });
+      if (!losses.has(lk)) losses.set(lk, { count: 0, reverted: 0, removed: 0, changed: 0, examples: [] });
       const l = losses.get(lk);
       l.count++;
-      if (l.examples.length < 8) l.examples.push({ unit: unit.replace('\u0001', ' / '), lost: v, final: finalValue });
+      // reverted: the later mod put the plain game's value back (a copied stock row or table);
+      // removed: the cell, row or entry is gone; changed: the later mod set a value of its own.
+      if (!stocks.has(file)) stocks.set(file, stateOf(file, undefined, undefined));
+      const st = stocks.get(file);
+      const stockValue = unit === '(whole file)' ? st.whole : st.units ? (st.units.has(unit) ? st.units.get(unit) : null) : null;
+      const kind = finalValue === null || finalValue === undefined ? 'removed' : finalValue === stockValue && v !== stockValue ? 'reverted' : 'changed';
+      l[kind]++;
+      if (l.examples.length < 8) l.examples.push({ unit: unit.replace('\u0001', ' / '), lost: v, final: finalValue, kind });
     });
   });
   const list = [...losses.entries()].map(([lk, l]) => {
     const [m, w, file] = lk.split('\u0000');
-    return { lost: traceNames[m], to: traceNames[w], lostIndex: Number(m), toIndex: Number(w), file, count: l.count, examples: l.examples };
+    return { lost: traceNames[m], to: traceNames[w], lostIndex: Number(m), toIndex: Number(w), file, count: l.count, reverted: l.reverted, removed: l.removed, changed: l.changed, examples: l.examples };
   }).sort((a, b) => a.lostIndex - b.lostIndex || b.count - a.count);
   fs.writeFileSync(opt.trace, `${JSON.stringify({ mods: traceNames, changedUnits: traced.size, overwrittenUnits: units, losses: list }, null, 1)}\n`);
   console.log(`trace: ${traced.size} changed units, ${units} overwritten by a later mod (${list.length} mod/file pairs), written to ${opt.trace}`);
@@ -362,6 +397,84 @@ let warnings = 0;
 const bad = (msg) => { problems++; console.log('  PROBLEM:', msg); };
 const warn = (msg) => { warnings++; console.log('  warning:', msg); };
 
+// --quickjs: D2RMM (src/main/worker/quickjs.ts) runs a mod in a QuickJS context where every D2RMM
+// call's result is copied in value by value and its arguments copied out (dump); do the same.
+let QJS = null;
+function qjsHandle(ctx, scope, v) {
+  if (v === null) return ctx.null;
+  if (v instanceof Error) return scope.manage(ctx.newError(v.message));
+  if (typeof v === 'boolean') return v ? ctx.true : ctx.false;
+  if (typeof v === 'number') return scope.manage(ctx.newNumber(v));
+  if (typeof v === 'string') return scope.manage(ctx.newString(v));
+  if (Array.isArray(v)) {
+    const a = scope.manage(ctx.newArray());
+    for (let i = 0; i < v.length; i++) ctx.setProp(a, i, qjsHandle(ctx, scope, v[i]));
+    return a;
+  }
+  if (typeof v === 'object') {
+    const o = scope.manage(ctx.newObject());
+    for (const k in v) ctx.setProp(o, k, qjsHandle(ctx, scope, v[k]));
+    return o;
+  }
+  return ctx.undefined;
+}
+function runQuickJs(code, file, config, name) {
+  const { Scope } = QJS.core;
+  const ctx = QJS.module.newContext();
+  const calls = {}; // D2RMM function -> { n, host ms, copy-in ms }
+  const t0 = performance.now();
+  try {
+    Scope.withScope((scope) => {
+      const toGuest = (v) => Scope.withScope((s) => qjsHandle(ctx, s, v).dup());
+      const api = scope.manage(ctx.newObject());
+      Object.keys(D2RMM).forEach((k) => {
+        ctx.setProp(api, k, scope.manage(ctx.newFunction(k, (...args) => {
+          const c = (calls[k] = calls[k] || { n: 0, host: 0, copy: 0 });
+          const a = performance.now();
+          const value = D2RMM[k](...args.map(ctx.dump));
+          const b = performance.now();
+          const h = toGuest(value);
+          c.n++;
+          c.host += b - a;
+          c.copy += performance.now() - b;
+          return h;
+        })));
+      });
+      ctx.setProp(ctx.global, 'D2RMM', api);
+      const con = scope.manage(ctx.newObject());
+      ['log', 'info', 'debug', 'warn', 'error'].forEach((k) => {
+        ctx.setProp(con, k, scope.manage(ctx.newFunction(k, (...args) => { console[k](...args.map(ctx.dump)); })));
+      });
+      ctx.setProp(ctx.global, 'console', con);
+      ctx.setProp(ctx.global, 'config', scope.manage(toGuest(config)));
+    });
+    const res = ctx.evalCode(code, file);
+    if (res.error) {
+      const e = ctx.dump(res.error);
+      res.error.dispose();
+      throw new Error(e && e.message ? `${e.message}\n${e.stack || ''}` : String(e));
+    }
+    res.value.dispose();
+  } finally {
+    ctx.dispose();
+    const total = performance.now() - t0;
+    const list = Object.entries(calls);
+    const host = list.reduce((s, [, c]) => s + c.host, 0);
+    const copy = list.reduce((s, [, c]) => s + c.copy, 0);
+    const s = (ms) => `${(ms / 1000).toFixed(1)} s`;
+    console.log(`quickjs: ${name}: ${s(total)} (script ${s(total - host - copy)}, D2RMM calls ${s(host)}, `
+      + `values copied in ${s(copy)}; slowest calls: ${list.sort((x, y) => (y[1].host + y[1].copy) - (x[1].host + x[1].copy))
+        .slice(0, 3).map(([k, c]) => `${k} x${c.n} ${s(c.host + c.copy)}`).join(', ')})`);
+  }
+}
+
+// The rest runs in an async function so --quickjs can load its WebAssembly first.
+(async () => {
+if (opt.quickjs) {
+  const core = require(path.join(path.resolve(opt.quickjs), 'quickjs-emscripten-core'));
+  const variant = require(path.join(path.resolve(opt.quickjs), '@jitl', 'quickjs-wasmfile-release-asyncify')).default;
+  QJS = { core, module: await core.newQuickJSAsyncWASMModuleFromVariant(variant) };
+}
 const ran = [];
 for (const [index, dir] of opt.mods.entries()) {
   currentMod = dir;
@@ -383,7 +496,8 @@ for (const [index, dir] of opt.mods.entries()) {
     }
     const code = `(function(){${source}\n})()`;
     if (opt.keepGoing || opt.trace) txn = { files: new Map(), copied: new Map(), written: new Set(record.written), nextId, wrote: new Set() };
-    vm.runInNewContext(code, { D2RMM, config, console }, { filename: file });
+    if (QJS) runQuickJs(code, file, config, meta.name);
+    else vm.runInNewContext(code, { D2RMM, config, console }, { filename: file });
     if (opt.trace) traceMod(index, meta.name, txn);
     txn = null;
   } catch (e) {
@@ -412,7 +526,9 @@ const now = (p, kind) => {
 };
 const strings = new Set();
 const stringText = {};
-['local/lng/strings/skills.json', 'local/lng/strings/monsters.json', 'local/lng/strings/ui.json', 'local/lng/strings/item-modifiers.json'].forEach((p) => {
+// The game looks names up across all its string files (a monster's NameStr may live in npcs.json).
+['skills', 'monsters', 'ui', 'item-modifiers', 'item-names', 'item-nameaffixes', 'item-runes', 'levels', 'mercenaries', 'npcs', 'quests', 'commands', 'presence-states', 'shared']
+  .map((f) => `local/lng/strings/${f}.json`).forEach((p) => {
   const list = now(p, 'json');
   if (!list) return;
   // The game's own files have a few doubles; only a double that involves a new entry counts.
@@ -432,6 +548,54 @@ const stringText = {};
     stringText[e.Key] = e.enUS;
   });
 });
+// String ids across every string file the mods wrote or copied. Most string references in the
+// game's tables are 16-bit (60 of the 65 BinTables found), so a new entry's id past 65535 shows the
+// string with id & 0xFFFF (from 65536 on: the stock NPC dialog of vo.json), and two entries with one
+// id show one text for both. Only entries the game does not have count (the game repeats some ids
+// across files).
+{
+  const STRING_FILES = ['bnet', 'chinese-overlay', 'commands', 'item-gems', 'item-modifiers', 'item-nameaffixes',
+    'item-names', 'item-runes', 'keybinds', 'levels', 'mercenaries', 'monsters', 'npcs', 'objects',
+    'presence-states', 'quests', 'shrines', 'skills', 'ui-controller', 'ui', 'vo'].map((n) => `local/lng/strings/${n}.json`);
+  const touched = STRING_FILES.filter((p) => record.written.has(p) || record.copied[p]);
+  if (touched.length) {
+    const stockPair = new Set();
+    const byId = new Map(); // id -> [file, Key] of the first entry with it
+    STRING_FILES.forEach((p) => (vanilla(p, 'json') || []).forEach((e) => {
+      stockPair.add(`${e.id}\t${e.Key}`);
+      if (!byId.has(e.id)) byId.set(e.id, [p, e.Key]);
+    }));
+    const newEntries = [];
+    const present = new Map(); // id -> [[file, Key], ...] after the install
+    STRING_FILES.forEach((p) => {
+      const list = touched.includes(p) ? now(p, 'json') : vanilla(p, 'json');
+      (list || []).forEach((e) => {
+        const id = Number(e.id);
+        (present.get(id) || present.set(id, []).get(id)).push([p, e.Key]);
+        if (!stockPair.has(`${e.id}\t${e.Key}`)) newEntries.push([p, e]);
+      });
+    });
+    let past = 0;
+    let twice = 0;
+    const short = (p) => p.replace('local/lng/strings/', '');
+    newEntries.forEach(([p, e]) => {
+      const id = Number(e.id);
+      if (!(id <= 65535)) {
+        if (past++ < 20) {
+          const shown = byId.get(id & 0xffff);
+          bad(`${p}: string ${e.Key} has id ${e.id}, past 65535: the game's 16-bit string references show id ${id & 0xffff}` +
+            (shown ? ` (${shown[1]} in ${short(shown[0])})` : '') + ' instead');
+        }
+        return;
+      }
+      const others = present.get(id).filter(([, k]) => k !== e.Key);
+      if (others.length && twice++ < 20) bad(`${p}: string ${e.Key} has id ${id}, which ${others.map(([q, k]) => `${k} (${short(q)})`).join(', ')} has too`);
+    });
+    if (past > 20) bad(`... ${past - 20} more strings with ids past 65535`);
+    if (twice > 20) bad(`... ${twice - 20} more string ids used twice`);
+    console.log(`strings: ${newEntries.length} new entries in ${touched.length} string files; ${past} with ids past 65535, ${twice} ids used twice`);
+  }
+}
 const stats = new Set(now('global/excel/itemstatcost.txt', 'tsv').rows.map((r) => lower(r.Stat)));
 const hdMissiles = now('hd/missiles/missiles.json', 'json') || {};
 const layout = now('global/ui/layouts/skillstreepanelhd.json', 'json');
@@ -461,6 +625,12 @@ const missileRows = {};
 const pagesByClass = {}; // page -> Set of classes that use it
 const newMonsters = new Set();
 const DIRS = ['global/excel/', 'global/excel/base/'];
+// Name columns the game keeps a name index for (Excel field types 17-20 in the game image's table
+// loaders), as far as mods add rows to them.
+const NAME_COLUMNS = [['skills', 'skill'], ['skilldesc', 'skilldesc'], ['missiles', 'Missile'], ['states', 'state'], ['monstats', 'Id'], ['monstats2', 'Id'],
+  ['pettype', 'pet type'], ['itemstatcost', 'Stat'], ['overlay', 'overlay'], ['events', 'event'], ['monai', 'AI'], ['montype', 'type'], ['monseq', 'sequence']];
+const NAME_MAX = 47; // TEXCELINDEX_STRSIZE 48 with the NUL
+const nameLimitsInstalled = fs.existsSync(path.join(opt.game, 'mods', 'D2RMM', 'd2rloader', 'plugins', 'namelimits.dll'));
 
 DIRS.forEach((dir) => {
   const skills = now(`${dir}skills.txt`, 'tsv');
@@ -509,6 +679,7 @@ DIRS.forEach((dir) => {
   });
 
   const grid = {};
+  const bigPages = {}; // "class/page" -> the furthest column and row used past 3 x 6
   skills.rows.forEach((r, i) => { if (freshNames.has(lower(r.skill)) && '*Id' in r && r['*Id'] !== String(i)) bad(`skill ${r.skill} has *Id ${r['*Id']} at row ${i}`); });
   // Skill ID limits: the table itself takes 16-bit IDs (plugins check 0x7FFF), but the item stats
   // that name a skill (item_singleskill "+N to <skill>", item_nonclassskill oskills, item_aura) save
@@ -529,6 +700,38 @@ DIRS.forEach((dir) => {
   // 0.2.0 widens it), so an item that sets a state past 255 gets the wrong state after a save.
   if (states.rows.length > 0x8000) bad(`states.txt has ${states.rows.length} rows; units hold at most 32768 states`);
   else if (states.rows.length > 511) warn(`states.txt has ${states.rows.length} rows (the game's limit is 511): needs D2RCore and the StateLimits plugin`);
+  // Name limits: the game's Excel reader cuts every row name (the name column of skills, states,
+  // missiles, monstats, ...) and every reference to one to 47 characters (TEXCELINDEX_STRSIZE 48).
+  // Two names that are the same once cut (the index ignores case) become one: the second row gets
+  // the first one's ID and D2RLoader stops the launch ("Cannot load skills: row N repeats ID M").
+  // A longer name that clashes with nothing still loads, but formulas and plugins that look it up by
+  // its whole name find nothing. The NameLimits plugin (<game>\mods\NameLimits) keeps whole names.
+  NAME_COLUMNS.forEach(([t, col]) => {
+    if (!record.written.has(norm(`${dir}${t}.txt`))) return;
+    const table = now(`${dir}${t}.txt`, 'tsv');
+    if (!table || !table.headers.includes(col)) return;
+    const byCut = new Map();
+    let long = 0;
+    table.rows.forEach((r, i) => {
+      const name = String(r[col] || '');
+      if (!name || Buffer.byteLength(name) <= NAME_MAX) return;
+      long++;
+      const cut = lower(Buffer.from(name).subarray(0, NAME_MAX).toString());
+      if (!nameLimitsInstalled) warn(`${t}.txt row ${i}: ${col} "${name}" is ${Buffer.byteLength(name)} characters; the game cuts names to ${NAME_MAX} (lookups by the whole name in formulas and plugins fail): keep it within ${NAME_MAX} or install the NameLimits plugin`);
+      byCut.set(cut, [...(byCut.get(cut) || []), [i, name]]);
+    });
+    // Short names that equal a long name's cut clash too.
+    table.rows.forEach((r, i) => {
+      const name = String(r[col] || '');
+      if (name && Buffer.byteLength(name) === NAME_MAX && byCut.has(lower(name))) byCut.get(lower(name)).unshift([i, name]);
+    });
+    byCut.forEach((list) => {
+      const names = new Set(list.map(([, n]) => lower(n)));
+      if (names.size < 2 || nameLimitsInstalled) return;
+      warn(`${t}.txt: ${list.map(([i, n]) => `row ${i} "${n}"`).join(', ')} are the same name once the game cuts it to ${NAME_MAX} characters: the later rows get the first one's ID and D2RLoader stops the launch ("row N repeats ID M"). Shorten them or install the NameLimits plugin`);
+    });
+    if (long && nameLimitsInstalled) console.log(`  ${t}.txt: ${long} ${col} name(s) over ${NAME_MAX} characters, kept whole by the installed NameLimits plugin`);
+  });
   const stateStat = now('global/excel/itemstatcost.txt', 'tsv').rows.find((x) => lower(x.Stat) === 'state');
   const stateBits = stateStat && Number(stateStat['Save Param Bits']) > 0 ? Number(stateStat['Save Param Bits']) : 8;
   const stateMax = (1 << stateBits) - 1;
@@ -594,7 +797,14 @@ DIRS.forEach((dir) => {
     if (grid[cell]) bad(`${who} and ${grid[cell]} share the tree cell ${cell}`);
     if (stockCells[cell]) bad(`${who} sits on the stock skill ${stockCells[cell].skill} (cell ${cell})`);
     grid[cell] = who;
-    if (!(Number(d.SkillRow) >= 1 && Number(d.SkillRow) <= 6 && Number(d.SkillColumn) >= 1 && Number(d.SkillColumn) <= 3)) bad(`${who}: tree cell row ${d.SkillRow} column ${d.SkillColumn} is outside 6 x 3`);
+    // SkillTab4 0.11.0 lets a page use rows / columns up to 127: it shows 3 x 6 at a time and scrolls.
+    if (!(Number(d.SkillRow) >= 1 && Number(d.SkillRow) <= 127 && Number(d.SkillColumn) >= 1 && Number(d.SkillColumn) <= 127)) bad(`${who}: tree cell row ${d.SkillRow} column ${d.SkillColumn} is outside 1-127`);
+    else if (Number(d.SkillRow) > 6 || Number(d.SkillColumn) > 3) {
+      const big = (bigPages[`${r.charclass}/${d.SkillPage}`] = bigPages[`${r.charclass}/${d.SkillPage}`] || { cols: 3, rows: 6, skills: 0 });
+      big.cols = Math.max(big.cols, Number(d.SkillColumn));
+      big.rows = Math.max(big.rows, Number(d.SkillRow));
+      big.skills++;
+    }
     if (page > 3) {
       (pagesByClass[page] = pagesByClass[page] || new Set()).add(r.charclass);
       if (page > opt.maxPage) bad(`${who}: SkillPage ${page} is above the plugin's highest page (${opt.maxPage})`);
@@ -614,12 +824,20 @@ DIRS.forEach((dir) => {
     });
     ['descmissile1', 'descmissile2', 'descmissile3'].forEach((c) => { if (d[c] && !missileBy[lower(d[c])]) bad(`${who} skilldesc ${c} = ${d[c]}: no such missile`); });
   });
+  // One line per page bigger than 3 x 6, not one per skill.
+  Object.keys(bigPages).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).forEach((key) => {
+    const big = bigPages[key];
+    console.log(`  note: ${key.replace('/', ' page ')} is ${big.cols} columns x ${big.rows} rows (${big.skills} new skill(s) past 3 x 6): it scrolls by drag, arrow keys or wheel (needs SkillTab4 0.13.0+)`);
+  });
 
   // Missiles.
   const noHd = [];
   missiles.rows.forEach((r, i) => { if (addedNames.has(lower(r.Missile)) && '*ID' in r && r['*ID'] !== String(i)) bad(`missile ${r.Missile} has *ID ${r['*ID']} at row ${i}`); });
   added.forEach((r) => {
-    if (/\d$| /.test(r.Missile)) bad(`missile name "${r.Missile}" ends in a digit or has a space (the HD lookup rewrites those)`);
+    // A stub (name and *ID only, as the game keeps Reign of the Warlock rows in the base tables, and
+    // converted mods add for rows only the main table has) repeats the main table's name: nothing to look up.
+    const stub = Object.keys(r).every((c) => c === 'Missile' || c[0] === '*' || r[c] === '' || r[c] == null);
+    if (!stub && /\d$| /.test(r.Missile)) bad(`missile name "${r.Missile}" ends in a digit or has a space (the HD lookup rewrites those)`);
     if (r.Skill && !skillBy[lower(r.Skill)]) bad(`missile ${r.Missile}.Skill = ${r.Skill}: no such skill`);
     SUB_MISSILE_COLS.forEach((c) => {
       if (!r[c]) return;
@@ -661,7 +879,16 @@ DIRS.forEach((dir) => {
       console.log(`  ${cls} page ${page}:`);
       for (let row = 1; row <= 6; row++) console.log(`    ${[1, 2, 3].map((col) => (grid[`${cls}/${page}/${row}/${col}`] || '.').padEnd(20)).join(' ')}`);
     });
-    console.log(`  ${cls} class skills: ${skills.rows.filter((r) => r.charclass === cls).length}`);
+    // A save counts the class's skills (hidden rows too) in one byte. Past 255 the game cannot
+    // read the save back; the SkillLimits plugin (class_skills_in_saves) reads up to 2047 in 0.2.0,
+    // as the classlesspages plugin does, and up to 32767 (every skill id) in 0.2.1. The game writes
+    // them all, one byte each, into a character save that D2RLoader caps at 65535 bytes (1048576 in
+    // its extended save format), so they share that room with the items (SkillLimits README, Limits).
+    const classSkills = skills.rows.filter((r) => r.charclass === cls).length;
+    console.log(`  ${cls} class skills: ${classSkills}`);
+    if (classSkills > 32767) bad(`${cls} has ${classSkills} class skills; skill ids end at 32767, and the SkillLimits plugin reads no more from a save`);
+    else if (classSkills > 2047) warn(`${cls} has ${classSkills} class skills: its characters only load again with the SkillLimits plugin 0.2.1+ (class_skills_in_saves; 0.2.0 and the classlesspages plugin read up to 2047). They take ${classSkills + 2} bytes of every such character's save, which D2RLoader caps at 65535 bytes (1048576 with d2rcore.save_format mode "extended")`);
+    else if (classSkills > 255) warn(`${cls} has ${classSkills} class skills (a save counts them in one byte, max 255): its characters only load again with the SkillLimits plugin 0.2.0+ (class_skills_in_saves) or the classlesspages plugin`);
   });
   if (dir === DIRS[0]) {
     fresh.forEach((r) => {
@@ -753,6 +980,33 @@ if (layout) {
   const hit = (a, b) => a.x + SLACK < b.x + b.width && b.x + SLACK < a.x + a.width && a.y + SLACK < b.y + b.height && b.y + SLACK < a.y + a.height;
   const classPages = {};
   Object.keys(pagesByClass).forEach((page) => pagesByClass[page].forEach((cls) => (classPages[cls] = classPages[cls] || []).push(page)));
+  // SkillTabLayout 0.2.0 scrolling column (SkillTab4 0.11.0+): a class listed in tabcolumn.txt has
+  // its pages put in the listed slots by the plugin, so the slots are checked instead of the
+  // layout's own spots (pages past the last slot share it there).
+  const CLASS_INDEX = { ama: 0, sor: 1, nec: 2, pal: 3, bar: 4, dru: 5, ass: 6, war: 7 };
+  let columnRows = [];
+  try {
+    let t = now('global/excel/d2rloader/skilltab4/tabcolumn.txt', 'tsv');
+    if (typeof t === 'string') t = parseTsv(t); // written with writeTxt
+    columnRows = t && t.rows ? t.rows.map((r) => ({ kind: Number(r.kind), cls: Number(r.class), page: Number(r.page), order: Number(r.order), x: Number(r.x), y: Number(r.y) })) : [];
+  } catch (e) {
+    columnRows = [];
+  }
+  Object.keys(classPages).sort().forEach((cls) => {
+    const ci = CLASS_INDEX[cls];
+    const listed = columnRows.filter((r) => r.kind === 1 && r.cls === ci).map((r) => String(r.page));
+    if (!listed.length) return;
+    const slots = columnRows.filter((r) => r.kind === 2 && r.cls === ci).map((r) => ({ what: `column slot ${r.order}`, x: r.x, y: r.y, width: 174, height: 82 }));
+    if (!slots.length) bad(`${cls}: tabcolumn.txt lists pages but no slots`);
+    classPages[cls].filter((p) => !listed.includes(String(p))).forEach((p) => bad(`${cls}: page ${p} is missing from its scrolling column (tabcolumn.txt)`));
+    slots.forEach((s, i) => {
+      if (s.x < 0 || s.x + s.width > SCREEN_RIGHT || s.y < 0 || s.y + s.height > 1507) bad(`${cls}: ${s.what} at x ${s.x}, y ${s.y} is off screen`);
+      FIXED.forEach((f) => { if (hit(s, f)) (f.soft ? warn : bad)(`${cls}: ${s.what} at x ${s.x}, y ${s.y} covers the ${f.what}`); });
+      slots.slice(i + 1).forEach((o) => { if (hit(s, o)) bad(`${cls}: ${s.what} and ${o.what} overlap`); });
+    });
+    console.log(`  note: ${cls}: ${listed.length} extra tabs scroll through ${slots.length} slots (SkillTab4 0.13.0+)`);
+    classPages[cls] = [];
+  });
   Object.keys(classPages).sort().forEach((cls) => {
     const pages = classPages[cls].sort((x, y) => x - y);
     const label = (p) => `${stringText[String((byName[`TextTab${p}`] || { fields: {} }).fields.text || '').replace(/^@/, '')] || `page ${p}`} (TextTab${p})`;
@@ -805,7 +1059,17 @@ const need = (p, owner) => {
 [...record.written].filter((k) => k.startsWith('hd/') && k.endsWith('.json')).forEach((k) => {
   const def = files[k];
   if (!def || typeof def !== 'object' || Array.isArray(def)) return;
-  Object.keys(def.dependencies || {}).forEach((kind) => (def.dependencies[kind] || []).forEach((d) => { if (d && d.path) need(d.path, k); }));
+  // Dependencies the game's own copy of the file already lists are Blizzard's (the stock Assassin and
+  // Warlock state machines name clips that are not in the archive); only the mod's additions count.
+  let stock = null;
+  try {
+    stock = vanilla(k, 'json');
+  } catch (e) {
+    stock = null; // no stock copy to compare with (or the archive is busy): every dependency is checked
+  }
+  const stockDeps = new Set();
+  if (stock && typeof stock === 'object') Object.keys(stock.dependencies || {}).forEach((kind) => (stock.dependencies[kind] || []).forEach((d) => { if (d && d.path) stockDeps.add(norm(d.path)); }));
+  Object.keys(def.dependencies || {}).forEach((kind) => (def.dependencies[kind] || []).forEach((d) => { if (d && d.path && !stockDeps.has(norm(d.path))) need(d.path, k); }));
   (def.entities || []).forEach((e) => (e.components || []).forEach((c) => { if (c.type === 'VfxDefinitionComponent' && c.filename) need(c.filename, k); }));
 });
 const vanillaHdMissiles = vanilla('hd/missiles/missiles.json', 'json') || {};
@@ -1068,7 +1332,10 @@ console.log(`HD: ${[...record.written].filter((k) => /^hd\/missiles\/.+\.json$/.
     rows.forEach(({ line, cell }) => {
       const name = cell('name').toUpperCase();
       if (!/^[A-Z0-9_]{1,7}$/.test(name)) return bad(`AssetMerge animdata.txt line ${line}: "${cell('name')}" is not a COF name (1-7 letters/digits)`);
-      const source = cell('source').toUpperCase();
+      // AssetMerge 0.2.0: "?NAME" = gap-only (the row is skipped when name is already in the table).
+      const gapOnly = cell('source').startsWith('?');
+      const source = cell('source').replace(/^\?/, '').toUpperCase();
+      if (gapOnly && names.has(name)) return; // the game's own entry stays; nothing to check
       if (source && !names.has(source) && !seen.has(source)) return bad(`AssetMerge animdata.txt line ${line}: ${name} copies ${source}, which is not in animdata.d2`);
       if (!source && !(Number(cell('frames')) > 0)) return bad(`AssetMerge animdata.txt line ${line}: ${name} needs frames or a source`);
       const ev = cell('events');
@@ -1093,6 +1360,8 @@ if (opt.manifest) {
     askedButMissing: [...record.missing].sort(),
     written: [...record.written].sort(),
     copiedFromModFolder: Object.keys(record.copied).sort(),
+    // every copy in install order: [mod id, file] (the file may be copied by several mods)
+    copies: record.copyLog.map((c) => [c.mod, c.file]),
     gameFilesDependedOn: [...toCheck].sort(),
   };
   fs.writeFileSync(opt.manifest, `${JSON.stringify(manifest, null, 2)}\n`);
@@ -1102,8 +1371,13 @@ if (opt.trace) traceReport();
 if (opt.out) {
   // Every file the mods wrote, as they left it (tables as TSV, JSON pretty-printed), so two runs
   // can be compared byte for byte, e.g. before and after a refactor.
+  // Files a mod copied from its folder are only noted; --out-copied <regex> saves the ones whose
+  // path matches too (copies can be gigabytes: name what is needed, e.g. HdMatch's sprites).
+  const copiedRe = opt.outCopied ? new RegExp(opt.outCopied, 'i') : null;
+  let copiedSaved = 0;
   [...record.written].sort().forEach((key) => {
     const v = files[key];
+    if (v === undefined) return; // copied over after it was written: saved below with the copies
     const text = typeof v === 'string' ? v
       : v && Array.isArray(v.headers) && Array.isArray(v.rows)
         ? [v.headers.join('\t'), ...v.rows.map((r) => v.headers.map((h) => (r[h] === undefined ? '' : r[h])).join('\t'))].join('\n') + '\n'
@@ -1112,7 +1386,16 @@ if (opt.out) {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, text);
   });
-  console.log(`${record.written.size} written files saved under ${opt.out}`);
+  if (copiedRe) {
+    Object.keys(record.copied).sort().forEach((key) => {
+      if (files[key] !== undefined || !copiedRe.test(key)) return; // a later write is saved above
+      const target = path.join(opt.out, key.startsWith('../') ? key.replace(/^(\.\.\/)+/, '_outside/') : key);
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.copyFileSync(record.copied[key], target);
+      copiedSaved++;
+    });
+  }
+  console.log(`written files saved under ${opt.out}${copiedRe ? ` (${copiedSaved} copied files matching --out-copied among them)` : ''}`);
 }
 console.log(problems ? `\n${problems} PROBLEM(S), ${warnings} warning(s)` : `\nno problems found (${warnings} warning(s))`);
 if (failedMods.size) {
@@ -1121,3 +1404,7 @@ if (failedMods.size) {
   process.exit(2);
 }
 process.exit(problems ? 1 : 0);
+})().catch((e) => {
+  console.error(e && e.stack ? e.stack : e);
+  process.exit(2);
+});

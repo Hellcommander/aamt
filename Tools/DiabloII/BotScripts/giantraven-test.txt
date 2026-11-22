@@ -1,0 +1,42 @@
+# In-game check of the Druid Giant Raven page (DruidGiantRaven, testMode on): do the skills affect
+# enemies? Character: the throwaway Druid `rat` (cheats change and save it). Run with -NoWait:
+# this part enters the game, sets the skills and goes to the Blood Moor; casting is then driven
+# step by step with Send-D2RBotCommand.ps1 (bind a skill in the skill menu, then key <n> casts it
+# at the mouse), with `cheat mspawn` packs and a screenshot per skill.
+
+waitfor menu 120000
+waitfor panel CharacterSelectPanel 20000
+wait 2500
+ui MainMenuHD:Play
+waitfor game 60000
+wait 3000
+
+console god 1
+cheat level 30
+cheat sklvl Giant Raven,10
+cheat sklvl Hoarders Eye,5
+cheat sklvl Dread Caw,10
+cheat sklvl Raven Messenger,10
+cheat sklvl Murder of Crows,10
+cheat sklvl Feather Gale,10
+cheat sklvl Thieving Talons,5
+cheat sklvl Carrion Feast,10
+cheat sklvl Molt,10
+cheat sklvl Talon Dive,10
+cheat sklvl Downdraft,10
+cheat sklvl Plumage of Night,5
+cheat sklvl Ill Omen,10
+cheat sklvl Night Descends,10
+cheat sklvl Corvid Mastery,5
+wait 1000
+console goto 2
+waitfor area == 2 30000
+wait 2500
+screenshot blood-moor
+key t
+wait 1500
+screenshot skilltree
+key t
+wait 500
+reset
+state

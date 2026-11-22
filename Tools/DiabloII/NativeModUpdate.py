@@ -16,9 +16,27 @@ Patches (applied to every install, so they come back with each update):
               Dictionary, Loot Guide, Frankenstein...). The copy is taken out and the mod's own
               button tables are merged into the menu at install time instead, right of the main
               buttons. The mod's own switch for those buttons keeps working.
+  affix-guard a mod with Relics of Sanctuary's applyAffixRework (magic affix changes matched by
+              row position + name) skips a change that would leave a stat's min above its max.
+              That happens below a total conversion that keeps the names but rescales the values
+              (Reimagined: Lucky, Jagged), and Charming Vendors then stops the install. On the
+              plain game's tables nothing changes. If the function changed upstream so the guard
+              no longer fits, the update stops (the installed version stays) instead of dropping it.
+
+Opt-in patches (--patch <name> on --install; kept in native.json and redone on every --update):
+  layout-guard  for a mod that expects every UI layout widget to have `fields` and a `rect`
+              (Inventory 10x8). Total conversions (Reimagined with its Inventory feature on) ship
+              layouts whose widgets are bare {type, name}. The mod's whole script runs with a
+              D2RMM.readJson that, for global\\ui\\layouts files, gives bare widgets fields and a
+              missing rect a stand-in that takes writes but is never saved. Independent of the
+              mod's own code, so it survives upstream rewrites; on the plain game's layouts the
+              output is unchanged.
+
+A mod with no download kept can be installed from its own folder in mods\\ (--install
+<D2RMM>\\mods\\<id> --id <id>); its next update then needs --source.
 
 usage:
-  NativeModUpdate.py --game <D2R folder> [--d2rmm <D2RMM folder>] --install <download> [--id <mod id>]
+  NativeModUpdate.py --game <D2R folder> [--d2rmm <D2RMM folder>] --install <download> [--id <mod id>] [--patch layout-guard]
   NativeModUpdate.py --game <D2R folder> [--d2rmm <D2RMM folder>] --update <mod id> [--source <download>]
   add --dry-run to stage, patch and check without touching mods\\
 """
@@ -238,7 +256,98 @@ def patch_pause_menu(mod):
     return 'pause-menu: ' + ', '.join(t.get('name', '?') for t in tables) + ' merged instead of copying the whole menu'
 
 
-PATCHES = [patch_pause_menu]
+AFFIX_MARK = 'AAMT affix min-max guard'
+AFFIX_FUNC = re.compile(r'\nfunction applyAffixRework\s*\(')
+AFFIX_ASSIGN = re.compile(r'(?P<indent>[ \t]*)Object\.assign\(\s*target\s*,\s*entry\.changes\s*\)\s*;')
+
+AFFIX_JS = r"""// --- %(mark)s (NativeModUpdate.py, redone on every update) ---
+// A total conversion above this mod (Reimagined) keeps the affix names but rescales the values,
+// so a change that sets only a max could leave the min above it, which other mods (Charming
+// Vendors) refuse. Such a change is skipped: the row is not the one it was made for.
+const aamtAfter = Object.assign({}, target, entry.changes);
+const aamtBroken = [1, 2, 3].some(i => aamtAfter['mod' + i + 'code']
+  && aamtAfter['mod' + i + 'min'] !== '' && aamtAfter['mod' + i + 'max'] !== ''
+  && Number(aamtAfter['mod' + i + 'min']) >= 0
+  && Number(aamtAfter['mod' + i + 'max']) < Number(aamtAfter['mod' + i + 'min']));
+if (!aamtBroken) Object.assign(target, entry.changes);
+// --- end %(mark)s ---"""
+
+
+def patch_affix_minmax(mod):
+    """Relics of Sanctuary's applyAffixRework edits magic affixes by row position + name; -> what was done, or None."""
+    js_path = mod / 'mod.js'
+    js = js_path.read_text(encoding='utf-8-sig')
+    if AFFIX_MARK in js:
+        return 'affix-guard: already there'
+    f = AFFIX_FUNC.search(js)
+    if not f:
+        return None
+    nxt = re.compile(r'\n(?:async\s+)?function\s').search(js, f.end())
+    end = nxt.start() if nxt else len(js)
+    found = [m for m in AFFIX_ASSIGN.finditer(js, f.end(), end)]
+    if len(found) != 1:
+        raise SystemExit('affix-guard: applyAffixRework no longer has the one "Object.assign(target, entry.changes);" '
+                         'the guard goes around - the mod changed there; look at it and adjust patch_affix_minmax')
+    m = found[0]
+    indent = m.group('indent')
+    code = '\n'.join((indent + ln) if ln else ln for ln in (AFFIX_JS % {'mark': AFFIX_MARK}).splitlines())
+    js_path.write_text(js[:m.start()] + code + js[m.end():], encoding='utf-8')
+    return 'affix-guard: a magic affix change that would leave a min above its max is skipped'
+
+
+PATCHES = [patch_pause_menu, patch_affix_minmax]
+
+
+# Opt-in patches: they change nothing a mod's own code shows, so they cannot detect when they are
+# needed. Asked for with --patch <name> on --install, kept in native.json and redone on --update.
+LAYOUT_MARK = 'AAMT layout bare-entry guard'
+LAYOUT_HEAD = r"""// --- %(mark)s (NativeModUpdate.py, redone on every update) ---
+// Mods above this one (Reimagined) ship UI layouts whose widgets are bare ({type, name}: fields
+// inherited from the base layout). This mod expects every widget to have fields and a rect. For
+// files under global\ui\layouts, D2RMM.readJson gives a bare widget fields that become real once
+// read, and a missing rect a stand-in that takes writes but is never saved (the inherited rect
+// stays); assigning a new rect saves it. Widgets that have both are untouched.
+const aamtLayoutApi = D2RMM;
+{
+const D2RMM = (function (api) {
+  const isLayout = (f) => /(^|[\\/])global[\\/]ui[\\/]layouts[\\/]/i.test(String(f));
+  const own = (o, k, v) => Object.defineProperty(o, k, { value: v, writable: true, enumerable: true, configurable: true });
+  function rectSlot(fields) {
+    if (!fields || typeof fields !== 'object' || 'rect' in fields) return;
+    const stand = {};
+    Object.defineProperty(fields, 'rect', { configurable: true, enumerable: false,
+      get() { return stand; }, set(v) { own(fields, 'rect', v); } });
+  }
+  function guard(node) {
+    if (!node || typeof node !== 'object') return;
+    if (!('fields' in node)) {
+      Object.defineProperty(node, 'fields', { configurable: true, enumerable: false,
+        get() { const f = own(node, 'fields', {}).fields; rectSlot(f); return f; },
+        set(v) { own(node, 'fields', v); } });
+    } else rectSlot(node.fields);
+    if (Array.isArray(node.children)) node.children.forEach(guard);
+  }
+  return new Proxy(api, { get(t, k) {
+    const v = Reflect.get(t, k);
+    if (k === 'readJson') return function (file, ...rest) { const j = v.call(t, file, ...rest); if (isLayout(file)) guard(j); return j; };
+    return typeof v === 'function' ? v.bind(t) : v;
+  } });
+})(aamtLayoutApi);
+// --- the mod's own script ---
+"""
+LAYOUT_TAIL = '\n}\n// --- end %(mark)s ---\n'
+
+
+def patch_layout_guard(mod):
+    js_path = mod / 'mod.js'
+    js = js_path.read_text(encoding='utf-8-sig')
+    if LAYOUT_MARK in js:
+        return 'layout-guard: already there'
+    js_path.write_text(LAYOUT_HEAD % {'mark': LAYOUT_MARK} + js + LAYOUT_TAIL % {'mark': LAYOUT_MARK}, encoding='utf-8')
+    return 'layout-guard: bare UI layout widgets (inherited fields) get fields, a missing rect is left alone'
+
+
+OPTIONAL_PATCHES = {'layout-guard': patch_layout_guard}
 
 
 # --------------------------------------------------------------------------- check
@@ -277,7 +386,7 @@ def replace_dir(src, dst):
         shutil.rmtree(src, ignore_errors=True)
 
 
-def install(source, mod_id, d2rmm, game, record, dry_run):
+def install(source, mod_id, d2rmm, game, record, dry_run, extra_patches=None):
     work = d2rmm / 'converter-work'
     work.mkdir(exist_ok=True)
     root, unpacked = stage(source, work, find_7z())
@@ -292,7 +401,12 @@ def install(source, mod_id, d2rmm, game, record, dry_run):
     shutil.copytree(root, staged, ignore=shutil.ignore_patterns('config.json', 'd2rmm'))
     if unpacked:
         shutil.rmtree(unpacked, ignore_errors=True)
+    wanted = sorted(set(record.get('optional_patches', [])) | set(extra_patches or []))
+    unknown = [p for p in wanted if p not in OPTIONAL_PATCHES]
+    if unknown:
+        raise SystemExit(f'unknown --patch {", ".join(unknown)} (known: {", ".join(OPTIONAL_PATCHES)})')
     applied = [d for d in (p(staged) for p in PATCHES) if d]
+    applied += [OPTIONAL_PATCHES[p](staged) for p in wanted]
     for d in applied:
         log('patch ' + d)
     check(staged, game, work)
@@ -302,11 +416,16 @@ def install(source, mod_id, d2rmm, game, record, dry_run):
     if not m and src.is_dir():
         m = NEXUS_NAME.match(src.parent.name)
     download = src if src.is_file() or not m or NEXUS_NAME.match(src.name) else src.parent
-    record = dict(record, id=mod_id, source=str(download.resolve()), version=meta.get('version'),
-                  name=meta.get('name'), patches=applied, installed=time.strftime('%Y-%m-%d %H:%M'))
+    # the installed folder itself as the source (no download kept): nothing to remember, the
+    # next update needs --source
+    in_place = download.resolve() == target.resolve()
+    record = dict(record, id=mod_id, source=None if in_place else str(download.resolve()), version=meta.get('version'),
+                  name=meta.get('name'), patches=applied, optional_patches=wanted,
+                  installed=time.strftime('%Y-%m-%d %H:%M'))
     if m:
         record.update(name_prefix=m.group('name'), nexus_id=m.group('nexus'))
-    record['search'] = sorted({str(download.resolve().parent)} | set(record.get('search', [])))
+    if not in_place:
+        record['search'] = sorted({str(download.resolve().parent)} | set(record.get('search', [])))
     (staged / 'd2rmm').mkdir(exist_ok=True)
     (staged / 'd2rmm' / 'native.json').write_text(json.dumps(record, indent=2), encoding='utf-8')
 
@@ -341,6 +460,8 @@ def main():
     g.add_argument('--update', metavar='MOD_ID')
     ap.add_argument('--source', help='with --update: this download instead of the newest one')
     ap.add_argument('--id', help='with --install: the folder name in mods\\ (default: the mod folder\'s own name)')
+    ap.add_argument('--patch', action='append', default=[], metavar='NAME',
+                    help='opt-in patch, kept for later updates: ' + ', '.join(OPTIONAL_PATCHES))
     ap.add_argument('--dry-run', action='store_true')
     a = ap.parse_args()
 
@@ -353,7 +474,7 @@ def main():
         record = {}
         if a.id and (d2rmm / 'mods' / a.id / 'd2rmm' / 'native.json').is_file():
             record = read_json(d2rmm / 'mods' / a.id / 'd2rmm' / 'native.json')
-        install(a.install, a.id, d2rmm, game, record, a.dry_run)
+        install(a.install, a.id, d2rmm, game, record, a.dry_run, a.patch)
         return
     rec_path = d2rmm / 'mods' / a.update / 'd2rmm' / 'native.json'
     if not rec_path.is_file():
@@ -363,7 +484,7 @@ def main():
     if not source or not Path(source).exists():
         raise SystemExit('no download found: pass --source')
     log(f'source: {source}')
-    install(source, a.update, d2rmm, game, record, a.dry_run)
+    install(source, a.update, d2rmm, game, record, a.dry_run, a.patch)
 
 
 if __name__ == '__main__':
