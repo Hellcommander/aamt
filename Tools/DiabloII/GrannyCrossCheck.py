@@ -10,7 +10,8 @@ MAGIC_LE64 = bytes([0xE5, 0x9B, 0x49, 0x5E, 0x6F, 0x63, 0x1F, 0x14, 0x1E, 0x13, 
 
 
 def check(path, compare=True):
-    data = open(path, 'rb').read()
+    """path: a file, or the file's bytes."""
+    data = bytes(path) if isinstance(path, (bytes, bytearray)) else open(path, 'rb').read()
     notes, problems = [], []
     if data[:16] != MAGIC_LE64:
         problems.append('magic is not the 64-bit little-endian version 7 one')
@@ -120,6 +121,54 @@ def check(path, compare=True):
         bones, first = struct.unpack_from('<IQ', flat, skeleton + 8)
         view['bones'] = [string(struct.unpack_from('<Q', flat, first + stride * k)[0]) for k in range(bones)]
         view['boneStride'] = stride
+    # Mesh index arrays through the flat view, read the way the game's mesh loader takes them
+    # (Mesh::LoadGeometry, image 95032 0xFA04C0): the 32-bit Indices when filled, else Indices16
+    # as unsigned 16-bit; every index must name a vertex of the mesh.
+    widths = {1: None, 2: 8, 3: 12, 4: 12, 5: 16, 7: 20, 8: 8, 9: 68, 10: 4, 11: 1, 12: 1, 13: 1, 14: 1,
+              15: 2, 16: 2, 17: 2, 18: 2, 19: 4, 20: 4, 21: 2, 22: 8}
+
+    def size(type_at):
+        return sum((size(d) if k == 1 else widths[k]) * max(1, wd) for k, _, d, wd in members(type_at))
+
+    def layout(type_at):
+        out, o = {}, 0
+        for kind, name, definition, width in members(type_at):
+            out.setdefault(name, (o, kind, definition))
+            o += (size(definition) if kind == 1 else widths[kind]) * max(1, width)
+        return out
+
+    view['meshes'] = []
+    count, table = seen.get('Meshes', (0, 0))
+    if count:
+        mesh_layout = layout(next(m[2] for m in root_type if m[1] == 'Meshes'))
+        for k in range(count):
+            mesh = struct.unpack_from('<Q', flat, table + 8 * k)[0]
+            name_ptr = struct.unpack_from('<Q', flat, mesh + mesh_layout['Name'][0])[0]
+            vd = struct.unpack_from('<Q', flat, mesh + mesh_layout['PrimaryVertexData'][0])[0]
+            topo = struct.unpack_from('<Q', flat, mesh + mesh_layout['PrimaryTopology'][0])[0]
+            vertices = struct.unpack_from('<I', flat, vd + layout(mesh_layout['PrimaryVertexData'][2])['Vertices'][0] + 8)[0]
+            topo_layout = layout(mesh_layout['PrimaryTopology'][2])
+            n32, p32 = struct.unpack_from('<IQ', flat, topo + topo_layout['Indices'][0])
+            n16, p16 = struct.unpack_from('<IQ', flat, topo + topo_layout['Indices16'][0])
+            ng, pg = struct.unpack_from('<IQ', flat, topo + topo_layout['Groups'][0])
+            label = string(name_ptr) if name_ptr else f'mesh {k}'
+            index = struct.unpack_from(f'<{n32}i', flat, p32) if n32 else struct.unpack_from(f'<{n16}H', flat, p16) if n16 else ()
+            if n32 and n16:
+                problems.append(f'{label}: both Indices ({n32}) and Indices16 ({n16}) are filled; the game uses Indices')
+            if len(index) % 3:
+                problems.append(f'{label}: {len(index)} indices is not a whole number of triangles')
+            if index and (max(index) >= vertices or min(index) < 0):
+                problems.append(f'{label}: indices reach {min(index)}..{max(index)}, the mesh has {vertices} vertices')
+            for g in range(ng):
+                _, first, tris = struct.unpack_from('<3i', flat, pg + 12 * g)
+                if first < 0 or first + tris > len(index) // 3:
+                    problems.append(f'{label}: group {g} covers triangles {first}..{first + tris}, the mesh has {len(index) // 3}')
+            if vertices > 65536 and not n32:
+                problems.append(f'{label}: {vertices} vertices need 32-bit Indices')
+            view['meshes'].append({'name': label, 'vertices': vertices, 'bytesPerIndex': 4 if n32 else 2, 'index': index})
+        wide = sum(1 for m in view['meshes'] if m['bytesPerIndex'] == 4)
+        notes.append(f'{count} meshes, {sum(m["vertices"] for m in view["meshes"])} vertices, {wide} with 32-bit indices, '
+                     f'largest {max(m["vertices"] for m in view["meshes"])} vertices')
     if compare:
         import Granny
         tree = Granny.read(bytes(data)).root()
@@ -131,10 +180,105 @@ def check(path, compare=True):
         if view.get('bones') is not None and view['bones'] != own_bones:
             problems.append(f'bone names differ between the two views ({len(view["bones"])} against {len(own_bones)})')
         notes.append(f'counts agree with Granny.py: {view["counts"]}; {len(own_bones)} bone names agree: {view.get("bones") == own_bones}')
+        for seen_mesh, mesh in zip(view['meshes'], tree.get('Meshes') or []):
+            if list(seen_mesh['index']) != Granny.mesh_indices(mesh['PrimaryTopology']):
+                problems.append(f'{seen_mesh["name"]}: the indices differ between the two views')
+        if view['meshes']:
+            notes.append('mesh indices agree with Granny.mesh_indices: '
+                         + str(not any('indices differ' in p for p in problems)))
+    for mesh in view['meshes']:
+        del mesh['index']
     return notes, problems, view
 
 
+INDEX_TEST_MODELS = ('hd/character/enemy/sandleaper1/torso_lod0.model', 'hd/character/enemy/quillrat1/torso_lod0.model',
+                     'hd/character/enemy/pig/torso_lod1.model', 'hd/character/enemy/spiritwolf/torso_lod0.model',
+                     'hd/character/enemy/druidbear/torso_lod0.model')
+
+
+def index_test(game, models=INDEX_TEST_MODELS):
+    """Mesh index formats through the toolkit's writers, checked by both views; returns failures.
+
+    Stock files: written by Granny.Writer, read back, written again (same bytes), their indices
+    unchanged and the check view clean. Made meshes of 40,000 and 70,000 vertices: Indices16 holding
+    numbers past 32,767 (stored unsigned), then 32-bit Indices past 65,536; through MeshImport's
+    replace_geometry and GrannyMesh.remove_geometry back below 65,536 (16-bit again)."""
+    import numpy as np
+    import Granny
+    import GrannyMesh
+    import MeshImport
+    from d2r_casc import D2RArchive
+    failures = []
+
+    def expect(ok, what):
+        print(('   ok    ' if ok else '   FAIL  ') + what)
+        if not ok:
+            failures.append(what)
+
+    def write(source, tree):
+        return Granny.Writer(source.tag, tuple(source.extra_tags)).build(source.describe(source.root_type), tree)
+
+    with D2RArchive(game) as arc:
+        stock = {name: arc.read(name) for name in models}
+    for name, data in stock.items():
+        print(name)
+        if data is None:
+            expect(False, f'{name}: not in the archive')
+            continue
+        source = Granny.read(data)
+        tree = source.root()
+        before = [Granny.mesh_indices(m['PrimaryTopology']) for m in tree['Meshes']]
+        once = write(source, tree)
+        again_source = Granny.read(once)
+        again = write(again_source, again_source.root())
+        expect(once == again, f'written twice, same bytes ({len(once)})')
+        after = [Granny.mesh_indices(m['PrimaryTopology']) for m in Granny.read(once).root()['Meshes']]
+        expect(before == after, 'indices unchanged by the writer')
+        notes, problems, view = check(once)
+        expect(not problems, f'check view: {problems or notes[-2]}')
+    # Made meshes on the Sand Leaper body: a grid of n vertices, two triangles per square.
+    base = Granny.read(stock[INDEX_TEST_MODELS[0]])
+    for n, width in ((40000, 2), (70000, 4)):
+        side = int(np.ceil(np.sqrt(n)))
+        x, y = np.meshgrid(np.linspace(-1, 1, side), np.linspace(0, 2, side))
+        positions = np.stack([x.ravel(), y.ravel(), np.zeros(side * side)], 1)[:n]
+        rows = n // side
+        squares = np.array([(r * side + c, r * side + c + 1, (r + 1) * side + c, (r + 1) * side + c + 1)
+                            for r in range(rows - 1) for c in range(side - 1)], dtype=np.int64)
+        triangles = np.concatenate([squares[:, [0, 2, 1]], squares[:, [1, 2, 3]]])
+        triangles = np.concatenate([triangles, [[n - 1, n - 2, n - 3]]])     # reaches the last vertex
+        mesh = MeshImport.Mesh(positions, np.tile([0.0, 0.0, 1.0], (n, 1)), (positions[:, :2] + 1) / 3, triangles)
+        built, lines = MeshImport.replace_geometry(stock[INDEX_TEST_MODELS[0]], mesh)
+        print(f'made mesh, {n} vertices: {lines[0]}')
+        notes, problems, view = check(built)
+        first = view['meshes'][0]
+        expect(not problems and first['vertices'] == n and first['bytesPerIndex'] == width,
+               f'replace_geometry: {first["vertices"]} vertices, {first["bytesPerIndex"]} bytes per index, problems {problems}')
+        reread = Granny.read(built).root()['Meshes'][0]['PrimaryTopology']
+        flat = Granny.mesh_indices(reread)
+        expect(flat == [int(v) for v in triangles.reshape(-1)], 'indices read back as written (unsigned past 32,767)')
+        if width == 4:
+            expect(any(s.startswith('  ') and '32-bit' in s for s in lines), 'the report says 32-bit indices')
+            # Remove the upper half of the grid: 35,000 vertices left, so 16-bit again.
+            out, report = GrannyMesh.remove_geometry(built, [{'box': {'min': [-2, 1.0, -1], 'max': [2, 3, 1]}, 'any': True}])
+            notes, problems, view = check(out)
+            expect(not problems and view['meshes'][0]['bytesPerIndex'] == 2 and view['meshes'][0]['vertices'] < 65536,
+                   f'remove_geometry: {report[0]}; {view["meshes"][0]["bytesPerIndex"]} bytes per index, problems {problems}')
+            # Grow it past 65,536 again by adding the upper half back as a part.
+            out2, report2 = GrannyMesh.add_geometry(out, [{'pick': {'box': {'min': [-2, -1, -1], 'max': [2, 3, 1]}},
+                                                          'translate': [0, 0, 0.5]}])
+            notes, problems, view = check(out2)
+            expect(not problems and view['meshes'][0]['bytesPerIndex'] == 4,
+                   f'add_geometry: {report2[0]}; {view["meshes"][0]["vertices"]} vertices, '
+                   f'{view["meshes"][0]["bytesPerIndex"]} bytes per index, problems {problems}')
+    print(f'{len(failures)} failures')
+    return failures
+
+
 if __name__ == '__main__':
+    if sys.argv[1:2] == ['--index-test']:
+        game = sys.argv[sys.argv.index('--game') + 1] if '--game' in sys.argv else r'D:\games\Steam\steamapps\common\Diablo II Resurrected'
+        sys.exit(1 if index_test(game) else 0)
     for path in sys.argv[1:]:
         notes, problems, view = check(path)
         print(path.replace('\\', '/').split('/')[-1])

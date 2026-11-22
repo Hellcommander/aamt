@@ -118,7 +118,7 @@ class Part:
             self.weights = np.ones((len(items), 1))
             self.indices = np.zeros((len(items), 1), dtype=np.int64)
         topology = mesh['PrimaryTopology']
-        self.triangles = np.array(topology['Indices16'] or topology['Indices'], dtype=np.int64).reshape(-1, 3)
+        self.triangles = np.array(Granny.mesh_indices(topology), dtype=np.int64).reshape(-1, 3)
         self.texture = texture
         self.skeleton = GrannyAnim.Skeleton(tree)
         self.bone = None                # a prop: the body bone that carries it

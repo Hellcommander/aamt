@@ -22,7 +22,9 @@
 //   --python <exe>       python to run ModAssets.py with (default "python")
 //   --keep-going         like D2RMM: a mod that throws is rolled back and the next mod runs
 //   --trace <file>       record every table cell, string field and file each mod changes, and write
-//                        (JSON) which of them a later mod overwrote: the features a mod order loses
+//                        (JSON) which of them a later mod overwrote: the features a mod order loses;
+//                        each loss counts reverted (the later mod put the plain game's value back: a
+//                        copied stock row or table), removed (cell/row/entry gone) and changed values
 //   --quickjs <folder>   run each mod in QuickJS, the engine D2RMM runs mods in, instead of Node's V8,
 //                        and say where its time goes (the script itself, D2RMM calls, values copied
 //                        into QuickJS). <folder> = a node_modules with quickjs-emscripten-core and
@@ -141,7 +143,7 @@ function vanilla(p, kind) {
 // Mock D2RMM
 // ---------------------------------------------------------------------------
 const files = {}; // path -> current content (parsed)
-const record = { read: new Set(), missing: new Set(), written: new Set(), copied: {} };
+const record = { read: new Set(), missing: new Set(), written: new Set(), copied: {}, copyLog: [] };
 // --keep-going: what each file looked like before the running mod first touched it, so a mod
 // that throws can be undone the way D2RMM rolls back its transaction.
 let txn = null;
@@ -247,6 +249,7 @@ const D2RMM = {
       touch(key);
       if (txn) txn.wrote.add(key);
       record.copied[key] = path.join(from, rel);
+      record.copyLog.push({ mod: modList[modIndex] ? modList[modIndex].id : path.basename(currentMod), file: key });
       delete files[key];
     });
   },
@@ -325,6 +328,7 @@ function traceMod(index, name, t) {
 }
 function traceReport() {
   const finals = new Map(); // file -> final state
+  const stocks = new Map(); // file -> the plain game's state (to tell a reverted value from a changed one)
   const losses = new Map(); // "loser\u0000winner\u0000file" -> { count, examples }
   let units = 0;
   traced.forEach((setters, k) => {
@@ -341,15 +345,22 @@ function traceReport() {
       if (winner === m) return;
       units++;
       const lk = `${m}\u0000${winner}\u0000${file}`;
-      if (!losses.has(lk)) losses.set(lk, { count: 0, examples: [] });
+      if (!losses.has(lk)) losses.set(lk, { count: 0, reverted: 0, removed: 0, changed: 0, examples: [] });
       const l = losses.get(lk);
       l.count++;
-      if (l.examples.length < 8) l.examples.push({ unit: unit.replace('\u0001', ' / '), lost: v, final: finalValue });
+      // reverted: the later mod put the plain game's value back (a copied stock row or table);
+      // removed: the cell, row or entry is gone; changed: the later mod set a value of its own.
+      if (!stocks.has(file)) stocks.set(file, stateOf(file, undefined, undefined));
+      const st = stocks.get(file);
+      const stockValue = unit === '(whole file)' ? st.whole : st.units ? (st.units.has(unit) ? st.units.get(unit) : null) : null;
+      const kind = finalValue === null || finalValue === undefined ? 'removed' : finalValue === stockValue && v !== stockValue ? 'reverted' : 'changed';
+      l[kind]++;
+      if (l.examples.length < 8) l.examples.push({ unit: unit.replace('\u0001', ' / '), lost: v, final: finalValue, kind });
     });
   });
   const list = [...losses.entries()].map(([lk, l]) => {
     const [m, w, file] = lk.split('\u0000');
-    return { lost: traceNames[m], to: traceNames[w], lostIndex: Number(m), toIndex: Number(w), file, count: l.count, examples: l.examples };
+    return { lost: traceNames[m], to: traceNames[w], lostIndex: Number(m), toIndex: Number(w), file, count: l.count, reverted: l.reverted, removed: l.removed, changed: l.changed, examples: l.examples };
   }).sort((a, b) => a.lostIndex - b.lostIndex || b.count - a.count);
   fs.writeFileSync(opt.trace, `${JSON.stringify({ mods: traceNames, changedUnits: traced.size, overwrittenUnits: units, losses: list }, null, 1)}\n`);
   console.log(`trace: ${traced.size} changed units, ${units} overwritten by a later mod (${list.length} mod/file pairs), written to ${opt.trace}`);
@@ -515,7 +526,9 @@ const now = (p, kind) => {
 };
 const strings = new Set();
 const stringText = {};
-['local/lng/strings/skills.json', 'local/lng/strings/monsters.json', 'local/lng/strings/ui.json', 'local/lng/strings/item-modifiers.json'].forEach((p) => {
+// The game looks names up across all its string files (a monster's NameStr may live in npcs.json).
+['skills', 'monsters', 'ui', 'item-modifiers', 'item-names', 'item-nameaffixes', 'item-runes', 'levels', 'mercenaries', 'npcs', 'quests', 'commands', 'presence-states', 'shared']
+  .map((f) => `local/lng/strings/${f}.json`).forEach((p) => {
   const list = now(p, 'json');
   if (!list) return;
   // The game's own files have a few doubles; only a double that involves a new entry counts.
@@ -612,6 +625,12 @@ const missileRows = {};
 const pagesByClass = {}; // page -> Set of classes that use it
 const newMonsters = new Set();
 const DIRS = ['global/excel/', 'global/excel/base/'];
+// Name columns the game keeps a name index for (Excel field types 17-20 in the game image's table
+// loaders), as far as mods add rows to them.
+const NAME_COLUMNS = [['skills', 'skill'], ['skilldesc', 'skilldesc'], ['missiles', 'Missile'], ['states', 'state'], ['monstats', 'Id'], ['monstats2', 'Id'],
+  ['pettype', 'pet type'], ['itemstatcost', 'Stat'], ['overlay', 'overlay'], ['events', 'event'], ['monai', 'AI'], ['montype', 'type'], ['monseq', 'sequence']];
+const NAME_MAX = 47; // TEXCELINDEX_STRSIZE 48 with the NUL
+const nameLimitsInstalled = fs.existsSync(path.join(opt.game, 'mods', 'D2RMM', 'd2rloader', 'plugins', 'namelimits.dll'));
 
 DIRS.forEach((dir) => {
   const skills = now(`${dir}skills.txt`, 'tsv');
@@ -681,6 +700,38 @@ DIRS.forEach((dir) => {
   // 0.2.0 widens it), so an item that sets a state past 255 gets the wrong state after a save.
   if (states.rows.length > 0x8000) bad(`states.txt has ${states.rows.length} rows; units hold at most 32768 states`);
   else if (states.rows.length > 511) warn(`states.txt has ${states.rows.length} rows (the game's limit is 511): needs D2RCore and the StateLimits plugin`);
+  // Name limits: the game's Excel reader cuts every row name (the name column of skills, states,
+  // missiles, monstats, ...) and every reference to one to 47 characters (TEXCELINDEX_STRSIZE 48).
+  // Two names that are the same once cut (the index ignores case) become one: the second row gets
+  // the first one's ID and D2RLoader stops the launch ("Cannot load skills: row N repeats ID M").
+  // A longer name that clashes with nothing still loads, but formulas and plugins that look it up by
+  // its whole name find nothing. The NameLimits plugin (<game>\mods\NameLimits) keeps whole names.
+  NAME_COLUMNS.forEach(([t, col]) => {
+    if (!record.written.has(norm(`${dir}${t}.txt`))) return;
+    const table = now(`${dir}${t}.txt`, 'tsv');
+    if (!table || !table.headers.includes(col)) return;
+    const byCut = new Map();
+    let long = 0;
+    table.rows.forEach((r, i) => {
+      const name = String(r[col] || '');
+      if (!name || Buffer.byteLength(name) <= NAME_MAX) return;
+      long++;
+      const cut = lower(Buffer.from(name).subarray(0, NAME_MAX).toString());
+      if (!nameLimitsInstalled) warn(`${t}.txt row ${i}: ${col} "${name}" is ${Buffer.byteLength(name)} characters; the game cuts names to ${NAME_MAX} (lookups by the whole name in formulas and plugins fail): keep it within ${NAME_MAX} or install the NameLimits plugin`);
+      byCut.set(cut, [...(byCut.get(cut) || []), [i, name]]);
+    });
+    // Short names that equal a long name's cut clash too.
+    table.rows.forEach((r, i) => {
+      const name = String(r[col] || '');
+      if (name && Buffer.byteLength(name) === NAME_MAX && byCut.has(lower(name))) byCut.get(lower(name)).unshift([i, name]);
+    });
+    byCut.forEach((list) => {
+      const names = new Set(list.map(([, n]) => lower(n)));
+      if (names.size < 2 || nameLimitsInstalled) return;
+      warn(`${t}.txt: ${list.map(([i, n]) => `row ${i} "${n}"`).join(', ')} are the same name once the game cuts it to ${NAME_MAX} characters: the later rows get the first one's ID and D2RLoader stops the launch ("row N repeats ID M"). Shorten them or install the NameLimits plugin`);
+    });
+    if (long && nameLimitsInstalled) console.log(`  ${t}.txt: ${long} ${col} name(s) over ${NAME_MAX} characters, kept whole by the installed NameLimits plugin`);
+  });
   const stateStat = now('global/excel/itemstatcost.txt', 'tsv').rows.find((x) => lower(x.Stat) === 'state');
   const stateBits = stateStat && Number(stateStat['Save Param Bits']) > 0 ? Number(stateStat['Save Param Bits']) : 8;
   const stateMax = (1 << stateBits) - 1;
@@ -1309,6 +1360,8 @@ if (opt.manifest) {
     askedButMissing: [...record.missing].sort(),
     written: [...record.written].sort(),
     copiedFromModFolder: Object.keys(record.copied).sort(),
+    // every copy in install order: [mod id, file] (the file may be copied by several mods)
+    copies: record.copyLog.map((c) => [c.mod, c.file]),
     gameFilesDependedOn: [...toCheck].sort(),
   };
   fs.writeFileSync(opt.manifest, `${JSON.stringify(manifest, null, 2)}\n`);

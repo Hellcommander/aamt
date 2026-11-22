@@ -171,6 +171,12 @@ def license_tier(pack: str, inner: str = "") -> str:
     if head == OWN_DIR:
         return "own"
     stem = Path(pack).stem.lower()
+    if pack_head == OWN_DIR:
+        # Zips in made/ are our own exports, e.g. Audio Alchemy morph batches ("morphed_<source> <clip>_variations",
+        # "my_morpher_variations_<clip>_variations"). Audio Mutation Synthesis output is a new sound, not a copy of the
+        # source clip (user ruling 2026-11-22), so they are "own". A morph of a Noise Alchemy / Dark Fantasy Studio clip
+        # still owes NOISE_ALCHEMY_CREDIT: see own_credit().
+        return "own"
     if pack_head in RESTRICTED_DIRS or any(stem.startswith(p) for p in NO_AI_PACKS):
         return "restricted"
     if head in DIRECT_USE_DIRS or pack_head in DIRECT_USE_DIRS or stem in DIRECT_USE_DIRS:
@@ -178,6 +184,16 @@ def license_tier(pack: str, inner: str = "") -> str:
     if any(stem.startswith(p) for p in DIRECT_USE_PACKS):
         return "direct"
     return "reference"
+
+
+def own_credit(path: str) -> str:
+    """Credit owed by an Audio Alchemy morph batch in made/, zipped (pass the record's pack) or unpacked into a folder
+    (pass its inner path). They are made from Noise Alchemy / Dark Fantasy Studio clips, so they owe
+    NOISE_ALCHEMY_CREDIT. Other own clips carry their credit in a .meta.json sidecar."""
+    parts = [s.lower() for s in path.replace("\\", "/").split("/")]
+    if not parts or parts[0] != OWN_DIR:
+        return ""
+    return NOISE_ALCHEMY_CREDIT if any(re.match(r"(?:morphed_|my_morpher_variations_)", s) for s in parts[1:-1] + [Path(parts[-1]).stem]) else ""
 
 
 def ai_allowed(pack: str, inner: str = "") -> bool:
@@ -695,6 +711,8 @@ def _iter_seven(path: Path, pack: str) -> Iterable[Tuple[str, str, bytes, str]]:
             low = inner.lower()
             if "reverse" in low or re.search(r"\brev\b", low):
                 continue
+            if f.parent.name == "44.1k" and (f.parent.parent / "48k" / f.name).is_file():
+                continue   # same clip at 48k in the archive: index that copy only
             yield pack, inner, f.read_bytes(), "7z"
     finally:
         shutil.rmtree(scratch, ignore_errors=True)
@@ -732,8 +750,13 @@ def iter_library_entries(root: Path) -> Iterable[Tuple[str, str, bytes, str]]:
             print(f"  [audio-lib] skip zip {pack}: {exc}")
             continue
         with zf:
+            names = {i.filename.replace("\\", "/") for i in zf.infolist()}
             for info in zf.infolist():
                 if info.is_dir() or not _is_audio_name(info.filename):
+                    continue
+                # Exports that carry the same clip at 48k and 44.1k: index the 48k copy only.
+                fn = info.filename.replace("\\", "/")
+                if fn.startswith("44.1k/") and "48k/" + fn[len("44.1k/"):] in names:
                     continue
                 low = info.filename.lower()
                 if "reverse" in low or re.search(r"\brev\b", low):
@@ -754,6 +777,8 @@ def iter_library_entries(root: Path) -> Iterable[Tuple[str, str, bytes, str]]:
         rel = p.relative_to(root).as_posix()
         if rel.split("/", 1)[0] in shadowed:
             continue
+        if p.parent.name == "44.1k" and (p.parent.parent / "48k" / p.name).is_file():
+            continue   # unpacked export with the same clip at 48k: index the 48k copy only
         try:
             yield p.parent.name or "loose", rel, p.read_bytes(), "file"
         except Exception as exc:

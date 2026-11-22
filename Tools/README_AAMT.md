@@ -11,6 +11,7 @@ AAMT provides AI-powered tools for modding multiple games including:
 - **Terraria** - Portal generation, asset creation
 - **Tales of Maj'Eyal** - Asset generation
 - **Transcendence** - Ship generation (uses Transcendence art as reference source)
+- **Two Worlds II** - Texture and mesh tools, SD3.5 texture regeneration on the game's own UV layouts, animation tools ([`TwoWorldsII/README.md`](TwoWorldsII/README.md))
 
 ## Core Features
 

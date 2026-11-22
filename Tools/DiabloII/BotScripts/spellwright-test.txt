@@ -1,0 +1,13 @@
+# In-game check of the Sorceress Spellwright page (SorceressSpellwright 0.4.0 + Spellwright plugin
+# 0.5.0): keys, formulas, clauses (riders), Convergence. Character: the throwaway Sorceress `sorc`
+# (the user agreed 2026-11-21; cheats change and save it). Run with -NoWait: this part stops on the
+# character list (screenshot) so the session can check `sorc` is selected before Play; the rest is
+# driven step by step with Send-D2RBotCommand.ps1 (bind skills in the skill menu to keys, cast at
+# the mouse, read d2rloader\logs\spellwright.log).
+
+focus
+wait 500
+waitfor menu 120000
+waitfor panel CharacterSelectPanel 20000
+wait 2500
+screenshot charselect

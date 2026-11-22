@@ -345,6 +345,10 @@ def reshape_models(archive, definition, variant, out_dir, write, index):
                     donor_tree = Granny.read(donor_data[0]).root()
                     mesh, embedded = MeshImport.load(os.path.join(base_dir, imported['mesh']), imported.get('axes'))
                     mesh, unwrapped = MeshImport.ensure_uvs(mesh, imported)     # a file without UVs is unwrapped
+                    if imported.get('weld', True):                              # as MeshImport.import_body does
+                        mesh, before = MeshImport.weld(mesh)
+                        if before != len(mesh.positions):
+                            unwrapped = unwrapped + [f'welded: {before} vertices -> {len(mesh.positions)} (same point, UV and skin)']
                     embedded = embedded if embedded is not None else mesh.images.get('albedo')
                     standalone = bool(imported.get('_standalone'))
                     if standalone and mesh.joints is None:
@@ -375,7 +379,7 @@ def reshape_models(archive, definition, variant, out_dir, write, index):
                     for path in renames.values():
                         if not any(dep['path'] == path for dep in listed):
                             listed.append({'path': path})
-                    counts = [len(Granny.read(d).root()['Meshes'][0]['PrimaryTopology']['Indices16']) // 3 for d in donor_data]
+                    counts = [len(Granny.mesh_indices(Granny.read(d).root()['Meshes'][0]['PrimaryTopology'])) // 3 for d in donor_data]
                     body = {'mesh': mesh, 'renames': renames, 'notes': unwrapped + placed + [f'textures: {", ".join(sorted(textures))}'],
                             'ratios': imported.get('lods') or [c / counts[0] for c in counts]}
                 for number, source in enumerate(sorted(sources)):
@@ -673,6 +677,14 @@ def own_animations(archive, definition, variant, out_dir, write, audit=None):
     machine = json.loads(text)
     machine['name'] = f'{name}_statemachine'
     bindings = None
+    # Weapon-class keys ("hth") for states the template leaves unbound ({}), e.g. hydra1's
+    # Hydra_Missile_Attack1: binding by the state's own keys would keep {} and the game asserts
+    # "control" (animation_controller.cpp) when such a unit is made.
+    class_keys = next((list(st['animationBindings']) for st in machine['states'] if st.get('animationBindings')), ['hth'])
+
+    def bind(state, clip):
+        state['animationBindings'] = {key: [clip] for key in (state.get('animationBindings') or class_keys)}
+
     if own is not None:
         # The machine keeps the template's states and transitions; its clips are the file's.
         # A state plays the clip "modes" names for its mode ({"NU": "idle", "A1": "bite"}), else
@@ -696,7 +708,7 @@ def own_animations(archive, definition, variant, out_dir, write, audit=None):
             if clip is None and variant['import'].get('fallback', True):
                 clip, how = idle, 'idle clip as stand-in'
             if clip is not None:
-                state['animationBindings'] = {key: [clip] for key in state['animationBindings']}
+                bind(state, clip)
             bindings[state.get('_name') or state['name']] = {'clip': clip, 'by': how} if clip else {'clip': was, 'by': 'left as the template has it (no such clip)'}
         machine['animations'] = [{'type': 'AnimationItem', 'name': clip, 'filename': f'{new_folder}/animation/{clip}.animation'} for clip in animations.names()]
         machine['dependencies']['animations'] = [{'path': item['filename']} for item in machine['animations']]
@@ -711,7 +723,7 @@ def own_animations(archive, definition, variant, out_dir, write, audit=None):
             state = add_sequence_state(machine)
         if state is None:
             raise ValueError(f"{name}: clip {spec['name']} asks for mode {spec['mode']}, which the state machine has no state for")
-        state['animationBindings'] = {key: [spec['name']] for key in state['animationBindings']}
+        bind(state, spec['name'])
         if 'loop' in spec:
             state['loopCount'] = 0 if spec['loop'] else 1
     # Every new clip is listed as an AnimationItem (bound to a state or not), so a mod can bind it

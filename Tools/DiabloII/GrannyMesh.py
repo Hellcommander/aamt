@@ -433,14 +433,12 @@ def remove_geometry(data, rules):
         applies = [r for r in rules if not r.get('mesh') or r['mesh'] == name]
         if not applies:
             continue
-        if topology.get('Indices'):
-            raise ValueError(f'{name}: 32-bit indices are not handled')
         for extra in _TOPOLOGY_EXTRAS:
             if topology.get(extra):
                 raise ValueError(f'{name}: the topology has {extra}, which removing triangles would leave stale')
         if mesh.get('MorphTargets'):
             raise ValueError(f'{name}: morph targets are not handled')
-        triangles = np.array(topology['Indices16'], dtype=np.int64).reshape(-1, 3)
+        triangles = np.array(Granny.mesh_indices(topology), dtype=np.int64).reshape(-1, 3)
         extended = mesh['ExtendedData']['$value']
         scale = float(extended.get('VertexScale') or 1.0)
         positions = np.array([it['Position'][:3] for it in items], dtype=np.float64) / 32767.0 * scale
@@ -539,12 +537,10 @@ def remove_geometry(data, rules):
                 total += len(rows)
         kept = np.concatenate(parts)
         used = np.unique(kept)
-        if len(used) > 65535:
-            raise ValueError(f'{name}: more than 65535 vertices after capping')
         remap = -np.ones(len(items), dtype=np.int64)
         remap[used] = np.arange(len(used))
         vertices['$items'] = [items[i] for i in used]
-        topology['Indices16'] = [int(v) for v in remap[kept].reshape(-1)]
+        Granny.set_mesh_indices(topology, remap[kept].reshape(-1), len(used))
         topology['Groups'] = groups
         left = positions[used]
         extended['bbMin'], extended['bbMax'] = [float(v) for v in left.min(0)], [float(v) for v in left.max(0)]
@@ -572,6 +568,7 @@ class _Geometry:
     """One mesh of a decoded model as arrays (bind pose, model space)."""
 
     def __init__(self, tree, mesh):
+        import Granny
         self.mesh = mesh
         self.name = mesh['Name']
         skeleton = tree['Models'][0]['Skeleton']['Bones'] if tree.get('Models') else []
@@ -580,14 +577,12 @@ class _Geometry:
         self.inverse = {b['Name']: np.array(b['InverseWorldTransform'], dtype=np.float64).reshape(4, 4) for b in skeleton}
         self.items = mesh['PrimaryVertexData']['Vertices']['$items']
         self.topology = mesh['PrimaryTopology']
-        if self.topology.get('Indices'):
-            raise ValueError(f'{self.name}: 32-bit indices are not handled')
         for extra in _TOPOLOGY_EXTRAS:
             if self.topology.get(extra):
                 raise ValueError(f'{self.name}: the topology has {extra}, which a changed triangle list would leave stale')
         if mesh.get('MorphTargets'):
             raise ValueError(f'{self.name}: morph targets are not handled')
-        self.triangles = np.array(self.topology['Indices16'], dtype=np.int64).reshape(-1, 3)
+        self.triangles = np.array(Granny.mesh_indices(self.topology), dtype=np.int64).reshape(-1, 3)
         self.extended = mesh['ExtendedData']['$value']
         self.scale = float(self.extended.get('VertexScale') or 1.0)
         self.positions = np.array([it['Position'][:3] for it in self.items], dtype=np.float64) / 32767.0 * self.scale
@@ -674,6 +669,7 @@ def _binding_slot(geometry, bone):
 def _graft(target, part, rule, label):
     """Puts one source mesh's picked triangles into the target mesh; returns a report line or None."""
     import copy
+    import Granny
     chosen = part.chosen(rule['pick']) if rule.get('pick') else np.ones(len(part.items), dtype=bool)
     per_triangle = chosen[part.triangles]
     taken = per_triangle.any(1) if (rule.get('pick') or {}).get('any') else per_triangle.all(1)
@@ -766,8 +762,6 @@ def _graft(target, part, rule, label):
     quantised = np.clip(np.round(moved / old_scale * 32767.0), -32767, 32767).astype(int)
     template = target.items[0]
     base = len(target.items)
-    if base + len(used) > 65535:
-        raise ValueError(f'{target.name}: {base} + {len(used)} vertices is more than the 65535 that 16-bit indices reach')
     for k in range(len(used)):
         vertex = {}
         for field in template:
@@ -798,7 +792,7 @@ def _graft(target, part, rule, label):
     for later in groups:
         if later is not groups[number] and later['TriFirst'] >= end:
             later['TriFirst'] += len(triangles)
-    target.topology['Indices16'] = [int(v) for v in target.triangles.reshape(-1)]
+    Granny.set_mesh_indices(target.topology, target.triangles.reshape(-1), len(target.items))
     return f'{target.name}: {len(triangles)} triangles and {len(used)} vertices added from {label} ({bound})'
 
 
@@ -926,7 +920,7 @@ def add_geometry(data, rules, load=None, alone=False, textures=None):
             remap[used] = np.arange(len(used))
             target.items[:] = [target.items[i] for i in used]
             target.triangles = remap[kept]
-            target.topology['Indices16'] = [int(v) for v in target.triangles.reshape(-1)]
+            Granny.set_mesh_indices(target.topology, target.triangles.reshape(-1), len(target.items))
             report.append(f'{target.name}: stock geometry dropped, {len(kept)} triangles and {len(used)} vertices stay')
         dropped = [m for m in every if id(m) not in targets]
         if dropped:

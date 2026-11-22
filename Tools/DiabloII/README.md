@@ -133,7 +133,7 @@ What the files hold, as found in the Quill Rat (2026-11-13):
 |---|---|
 | Skeleton | bone name, parent, local transform, inverse world matrix. World axes: +Y up, +Z towards the head, units are feet (3.28 per metre) |
 | Mesh vertices | `Position` int16 x 4, normalised, times `VertexScale` from the mesh's extended data; `BoneWeights` / `BoneIndices` uint8 x 4; `Normal` and `Tangent` int8 x 4; `TextureCoordinates0` half x 2. 28 bytes per skinned vertex, 20 for a static prop |
-| Mesh topology | 16-bit triangle indices, material groups, a bone binding list by bone name |
+| Mesh topology | 16-bit triangle indices (32-bit `Indices` on big meshes such as the Druid bear), material groups, a bone binding list by bone name |
 | Mesh extras | `bbMin`, `bbMax`, `VertexScale`, `meshRenderLayer`; the model carries `lodLevel` |
 | Animations | Granny track groups with curve data (not decoded yet) |
 
@@ -142,6 +142,48 @@ GPL (powzix/ooz and ports of it), which LICENSING.md keeps out of AAMT. A
 Python port lives in `%LOCALAPPDATA%\D2RModAssets\thirdparty\bitknit.py` on the
 machine it was made on; `GrannyFile.py` loads it from there, or from the folder
 named by `D2R_BITKNIT`. Without it only uncompressed Granny files can be read.
+
+### Mesh index formats and the vertex limit (2026-11-20)
+
+There is no 65,535-vertex limit in the game: a Granny mesh's `PrimaryTopology` has a 16-bit
+`Indices16` and a 32-bit `Indices` array, and the game draws either. Evidence (game image 95032,
+file offset = RVA; analysis scripts in `<game>/mods/VertexLimits/research`):
+
+- `Mesh::LoadGeometry` (`0xFA04C0`, the function behind the string "bool __cdecl
+  Mesh::LoadGeometry(const char *,const struct granny_model *,struct granny_mesh *)") asks
+  Granny for the bytes per index (`GrannyGetMeshBytesPerIndex` `0x1615E00` -> `0x1624320`: 4 when
+  `Indices` is filled, else 2 when `Indices16` is), asserts "bytesPerIndex == 2 || bytesPerIndex
+  == 4", makes the index buffer with that stride and `count * bytes` size, copies the array that
+  `GrannyGetMeshIndices` (`0x1624370`: `Indices` first) returns, and keeps `bytes == 4` in the
+  mesh (`+0x154`).
+- Every draw passes that flag to the D3D12 back end's set-index-buffer (`0x10F1240`, vtable slot
+  `+0x290`): `DXGI_FORMAT_R32_UINT` (42) when set, `R16_UINT` (57) otherwise, so `Indices16` is
+  read unsigned (0..65535). The CPU copy of the indices (`+0x2D8`, read through `0x103E100`)
+  uses the same 2-or-4 stride. Vertex buffers are `count * stride` in 32 bits; no 16-bit vertex
+  count check was found.
+- Stock files use both: the Druid bear `druidbear/torso_lod0` is one mesh of 74,589 vertices with
+  32-bit `Indices`; the Spirit Wolf's fur mesh (37,258 vertices) is 16-bit with indices past 32,767.
+  A scan of the 80 largest stock models plus 200 at random found 59 32-bit meshes (all past
+  65,535 vertices), among them the skinned Overseer body `overseer1/torso_lod0` at 353,038.
+
+So the limit was the toolkit's: `Indices16` is typed int16, and the writer refused numbers past
+32,767 and the importers stopped at 65,535. Now (`Granny.py`):
+
+- `Granny.mesh_indices(topology)`: the flat index list the game sees (`Indices` when filled, else
+  `Indices16` read unsigned). Use it instead of `topology['Indices16']`.
+- `Granny.set_mesh_indices(topology, flat, vertex_count)`: `Indices16` while the mesh has at most
+  65,536 vertices (stock-sized meshes stay byte for byte as before), `Indices` past that; returns
+  2 or 4. The writer stores `Indices16` numbers 32,768-65,535 as their unsigned 16-bit pattern.
+- `GrannyMesh` (remove, add), `MeshImport` (`_fill_mesh`, LOD counts), `GrannyPart`,
+  `HdToLegacy` and `ScaledMonster` go through these; 32-bit stock bodies (the Druid bear) can be
+  edited and used as templates. `MeshImport` keeps simplifying LOD files past 65,535 vertices by
+  default; the spec's `"max_vertices": 0` (or a bigger number) keeps them, written 32-bit.
+- `python GrannyCrossCheck.py --index-test [--game <D2R>]`: stock bodies written twice (same bytes,
+  same indices), made meshes of 40,000 and 70,000 vertices through `replace_geometry`, then
+  `remove_geometry` (back to 16-bit) and `add_geometry` (32-bit again), each checked by the
+  independent view. 0 failures on 2026-11-20; the stock files also came out byte for byte the
+  same as with the writer before this change. **A body past 65,536 vertices made by the toolkit has
+  not been seen in the game** (the stock Druid bear is the proof that the game draws such meshes).
 
 ### Writing and editing models
 
@@ -247,7 +289,7 @@ every LOD file after the edits above (`GrannyMesh.remove_geometry`; the file is 
   length). The pipeline does not list such a second model in the definition yet.
 - Normals and tangents turn with the part, a mirrored part gets its winding flipped, boxes are
   recomputed. When a part reaches past the mesh's `VertexScale` the scale grows and the stock
-  vertices are stored again (they move by less than 0.0001). At most 65535 vertices per mesh.
+  vertices are stored again (they move by less than 0.0001). Past 65,536 vertices the mesh is written with 32-bit indices.
 - An added part is not welded to the skin: it pokes out of the body like a prop, but it is part
   of the mesh, so it is drawn in one piece with the body and can bend with several bones.
 - Command line: `python GrannyMesh.py add <in.model> <out.model> '<rules JSON or file>' [--game
@@ -580,8 +622,8 @@ python MeshImport.py build spec.json --game <D2R> --out <mod folder>
   `"fps"`, default 30) and a matching `<name>/skeleton/<name>.skeleton` is written. A stock
   model (`"template"`, default the Sand Leaper, `hd/character/enemy/sandleaper1/torso`) only
   lends the file format, the material slot and the LOD file count; it must be a one-mesh body
-  with 16-bit indices in every LOD file (Quill Rat, Baboon, Scorpion and others qualify; the
-  Spirit Wolf and Druid Bear do not). Checked offline with the pig's shape re-rigged under 62 made-up bone names
+  in every LOD file (Quill Rat, Baboon, Scorpion, since 2026-11-20 also the 32-bit Druid Bear;
+  the Spirit Wolf, with two or three meshes, does not). Checked offline with the pig's shape re-rigged under 62 made-up bone names
   and two clips of its own written as a `.glb`: no stock bone name is left, the rest pose
   reproduces the mesh exactly, and posed with the converted clips every vertex lands within
   0.005 units of where the file's own animation puts it (the clips move vertices by up to 0.85).
@@ -921,7 +963,7 @@ stopped it.
 - `GrannyPart.py` - cut a part (a quill) out of a body mesh into its own model
 - `MeshImport.py` - a mesh made outside the game (OBJ / glTF) as a skinned body on a donor's skeleton, with its own textures, rig and new bones
 - `Gltf.py` - small glTF reader / writer that keeps the rig and animations (used by `MeshImport.py`)
-- `GrannyCrossCheck.py <files>` - reads a Granny file the way the community Noesis GR2 reader lays it out (sections end to end, relocations as 4-byte offsets, 44-byte type members) and compares that view with `Granny.py`'s: a second opinion on files the toolkit writes
+- `GrannyCrossCheck.py <files>` - reads a Granny file the way the community Noesis GR2 reader lays it out (sections end to end, relocations as 4-byte offsets, 44-byte type members) and compares that view with `Granny.py`'s: a second opinion on files the toolkit writes; also checks every mesh's index arrays the way the game reads them, and `--index-test` runs the index format tests
 - `ToolJobs.py` (+ `Drop\Queue Noesis check.bat`, `Drop\Run tool jobs.bat`) - a job queue for the downloaded community tools in `third_party` (Noesis export, AnimData editor): jobs are queued by script or assistant, a person runs them, results come back as files; `compare` checks what Noesis read against `Granny.py`
 - `MeshUnwrap.py` - UVs for a mesh without them (charts + pmp-library's conformal map), vertex colours baked to a texture
 - `HdToLegacy.py` - legacy sprites (DCC + COF) drawn from an HD monster's models and clips; `LegacySprite.py` encodes them
@@ -1022,7 +1064,20 @@ report) to the mod folder:
     plugins such as Classless's and other tables point at), rows the mod deleted stay too, the mod's
     new rows go at the end, and row numbers in the mod's cells follow their rows (`missiletype` in
     weapons/misc/armor, skill numbers in item properties). The conversion can sit anywhere in the
-    list; mods made for it go below it.
+    list; mods made for it go below it. A changed row also carries its stock row number (since
+    2026-11-20): when a mod above renamed that row (Reimagined renames 89 uniques and replaces Grim
+    Ward with Korlic's Fury), mod.js finds it by number and the Conflicts setting decides the cells
+    both changed; a row this mod renames too (a skill of its own in place of the stock one: Rebirth's
+    Spirit3) carries its whole row and is added as a new row. Before, all those changes were dropped
+    ("row(s) the mod changes are gone"): Rebirth below Reimagined lost 88 uniques, 18 skills, 10 set
+    items, 4 sets and its Spirit3. Reconvert older conversions to get this.
+- the game's other JSON (since 2026-11-21: `hd\**\*.json`, `*.timelines`, `global\ui\layouts\*.json`)
+  becomes a deep JSON patch (`JsonPatch.py`, shared with ConvertReplaceMod) instead of a whole copy:
+  merged at install time into the file as the mods above left it (comments and trailing commas are
+  read as the game reads them; a file that differs only in formatting is left to the game). Reimagined:
+  223 JSON files patched, none copied whole any more (it used to replace 3645 files, its state
+  machines, timelines, presets and layouts among them). Only binary files (maps, sounds, models,
+  textures) and files the game does not have are still copied.
   - `rebuild`: the table takes the mod's own row order (the data mod exactly), rows earlier mods
     added go after it, deleted rows go. Only for a conversion used alone or at the very top.
 - string files (`local\lng\strings\*.json`) are merged by Key. The mod's new entries get the next
@@ -1392,6 +1447,17 @@ Convert-D2RReplaceMod.ps1 -Mod 'Better and New Unique Items' -Undo      # its ow
   in any folder (presets included), is compared with the game's copy, and the difference is stored
   as a row patch in `<mod>\d2rmm\patches\` (the data-mod converter's format and merge code, rows
   "keep": rows stay in place, new rows go at the end).
+- Since 2026-11-20 also the game's other JSON: HD files (`hd\**\*.json`, `*.timelines`: state
+  machines, animation timelines, item / missile / overlay / preset definitions) and UI layouts
+  (`global\ui\layouts\*.json`). They become deep JSON patches: objects key by key, lists of named
+  entries by name (added after the same neighbour), other lists by a sequence diff (each stock
+  entry's fingerprint finds it in the list as the mods above left it; the mod's inserts, deletions
+  and in-place changes go in around them; an entry another mod already added is not added twice).
+  A file whose patch does not rebuild the mod's copy is copied as before. First use: Enhanced effects
+  and sounds below Reimagined copied 117 files over Reimagined's; its 44 JSON files now merge (all of
+  Reimagined's changes kept in 28 of the 31 shared files; the other 3 change the same animation
+  timelines, where the converted mod's version wins). Binary files (sounds, models, `.ds1` maps)
+  are still copied: the later mod's file wins.
 - The mod's `mod.js` moves to `d2rmm\original-mod.js`. The new `mod.js` runs it unchanged with a
   D2RMM whose `copyFile`, when a copy includes one of those files, puts the file back as the mods
   above left it and merges the mod's patch into it. Its settings, other files and code work as
@@ -1606,6 +1672,11 @@ node LeakCheck.js --game '<game>' --python <python> --conversion '<D2RMM>\mods\F
   (needs D2RCore and the StateLimits plugin) or past 32768 (problem); an item, set or cube
   `state` property (in tables a mod wrote) naming a state past the width of stat 98 `state`
   (8 bits, 255: needs StateLimits 0.2.0+), or a state that does not exist (problem).
+- **Name limits**: in the tables a mod wrote (skills, skilldesc, missiles, states, monstats,
+  monstats2, pettype, itemstatcost, overlay, events, monai, montype, monseq), a warning for every
+  row name over 47 characters (the game's Excel reader cuts names to 47) and for names that are
+  the same once cut (D2RLoader then stops the launch with "row N repeats ID M"). Quiet once the
+  NameLimits plugin (`<game>\mods\NameLimits`) is in `<game>\mods\D2RMM\d2rloader\plugins`.
 - **Missiles**: names without spaces or a trailing digit, `Skill`, sub-missiles,
   same row number in the main and the classic-rules table. A warning when a new
   skill's missile takes its damage from another skill. Lists new missiles without an HD entry.

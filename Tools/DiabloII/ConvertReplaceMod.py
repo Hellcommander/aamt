@@ -41,6 +41,9 @@ import ConvertDataMod as C  # noqa: E402
 GAME_PATH = re.compile(r'(?i)(?:^|/)((?:global/excel/(?:base/)?[^/]+\.txt)|(?:local/lng/strings(?:-legacy)?/[^/]+\.json))$')
 MARK = '/* ConvertReplaceMod wrapper */'
 
+from JsonPatch import JSON_PATH, json_patch, json_apply, read_json_file  # noqa: E402
+
+
 
 def js_segment(start, end):
     s = C.MOD_JS
@@ -70,7 +73,7 @@ const CELLS = 'mod';
 const cellsOf = () => CELLS;
 
 ''' + part_a + part_b + '''
-// file in the mod (lower case, backslashes) -> [file in the mod, game path, 'table' | 'strings']
+// file in the mod (lower case, backslashes) -> [file in the mod, game path, 'table' | 'strings' | 'json']
 const PATCHED = ''' + json.dumps(patched, ensure_ascii=False, indent=1) + ''';
 const norm = (p) => String(p).replace(/\\//g, '\\\\').replace(/\\\\+$/, '').toLowerCase();
 const MERGED = [];
@@ -94,10 +97,12 @@ SHIM.copyFile = (src, dst, overwrite) => {
   const was = hits.map(([rel, game, kind]) => [rel, game, kind, readOr(kind, game)]);
   const result = D2RMM.copyFile(src, dst, overwrite);
   was.forEach(([rel, game, kind, before]) => {
-    if (!before) return; // nothing to merge into: the copy stays
+    if (!before) return; // nothing to merge into: the copy stays (json: readJson failed)
     if (kind === 'table') {
       D2RMM.writeTsv(game, before);
       applyTableKeep(game, readPatch(rel));
+    } else if (kind === 'json') {
+      D2RMM.writeJson(game, applyJsonPatch(before, readPatch(rel)));
     } else {
       D2RMM.writeJson(game, before);
       applyStrings(game, readPatch(rel));
@@ -158,11 +163,11 @@ def main():
         rel = f.relative_to(mod).as_posix()
         if rel.lower().startswith(('d2rmm/', 'dev/', '.git/')):
             continue
-        m = GAME_PATH.search(rel)
+        m = GAME_PATH.search(rel) or JSON_PATH.search(rel)
         if m:
             files.append((rel, m.group(1).lower()))
     if not files:
-        raise SystemExit('%s ships no tables or string files: nothing to convert' % mod.name)
+        raise SystemExit('%s ships no tables, string files or game JSON: nothing to convert' % mod.name)
     game = Path(args.game)
     cache = Path(args.cache) if args.cache else Path(os.environ.get('LOCALAPPDATA', tempfile.gettempdir())) / 'D2RModAssets' / 'vanilla'
     C.use_d2rmm_casclib(Path(args.d2rmm) if args.d2rmm else mod.parent.parent)
@@ -182,7 +187,21 @@ def main():
         if van.read_bytes() == src.read_bytes():
             report['kept'][rel] = 'the same as the game'
             continue
-        if C.is_table(gpath):
+        if JSON_PATH.search(gpath) and not GAME_PATH.search(gpath):
+            m, v = read_json_file(src), read_json_file(van)
+            if m is None or v is None:
+                report['kept'][rel] = 'not JSON: replaced as before'
+                continue
+            patch = json_patch(v, m)
+            if patch is None:
+                report['kept'][rel] = 'the same as the game (as JSON)'
+                continue
+            if json_apply(v, patch) != m:
+                report['kept'][rel] = 'the patch does not rebuild the file: replaced as before'
+                continue
+            st = {'jsonPatch': len(json.dumps(patch))}
+            kind = 'json'
+        elif C.is_table(gpath):
             m, v = C.read_table(src), C.read_table(van)
             if m is None or v is None:
                 report['kept'][rel] = 'not UTF-8: replaced as before'

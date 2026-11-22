@@ -400,6 +400,12 @@ class Writer:
     def _write_array(self, desc, items, outer=()):
         if len(desc) == 1 and TYPE_NAMES.index(desc[0]['type']) in SCALAR and not desc[0].get('width'):
             code = SCALAR[TYPE_NAMES.index(desc[0]['type'])]
+            if code == 'h' and max(items) > 32767:
+                # A mesh's Indices16 is typed int16, but Granny and the game read it unsigned
+                # (R16_UINT): vertices 32768-65535 are stored as their 16-bit pattern.
+                if min(items) < -32768 or max(items) > 65535:
+                    raise ValueError(f'a 16-bit array holds {min(items)}..{max(items)}')
+                items, code = [v & 0xFFFF for v in items], 'H'
             raw = struct.pack(f'<{len(items)}{code}', *items)
             at = self._alloc(0, len(raw))
             self.buf[0][at:at + len(raw)] = raw
@@ -488,6 +494,40 @@ class Writer:
         out += struct.pack('<I', self.tag) + struct.pack('<4I', *self.extra_tags)
         out += bytes(0x20 + 0x48 - len(out))
         return bytes(out) + tail
+
+
+# ---------------------------------------------------------------- mesh indices
+
+INDEX16_VERTICES = 65536     # vertices a 16-bit index reaches (0..65535, read unsigned)
+
+
+def mesh_indices(topology):
+    """A mesh topology's triangle corners as one flat list of vertex numbers.
+
+    The 32-bit `Indices` array wins when it is filled, as in Granny's own GrannyGetMeshIndices and
+    GrannyGetMeshBytesPerIndex (game image 95032: 0x1624370 / 0x1624320); otherwise `Indices16`,
+    read unsigned (its type says int16, the game binds it as R16_UINT)."""
+    if topology.get('Indices'):
+        return [int(v) for v in topology['Indices']]
+    return [int(v) & 0xFFFF for v in topology.get('Indices16') or []]
+
+
+def set_mesh_indices(topology, flat, vertex_count=None):
+    """Stores triangle corners in a mesh topology; returns the bytes per index used (2 or 4).
+
+    16-bit `Indices16` while every vertex fits (as the stock files that size do, so they stay
+    byte for byte the same), the 32-bit `Indices` array past 65,536 vertices. The game's mesh
+    loader (Mesh::LoadGeometry, 0xFA04C0) takes either: index buffer stride = bytes per index,
+    DXGI_FORMAT_R32_UINT for 4 (0x10F1240), and stock bodies such as the spirit wolf ship 32-bit."""
+    flat = [int(v) for v in flat]
+    top = max(vertex_count or 0, (max(flat) + 1) if flat else 0)
+    if 'Indices' not in topology or 'Indices16' not in topology:
+        raise ValueError('the topology type has no Indices / Indices16 member')
+    if top > INDEX16_VERTICES:
+        topology['Indices'], topology['Indices16'] = flat, []
+        return 4
+    topology['Indices16'], topology['Indices'] = flat, []
+    return 2
 
 
 def member_keys(names):

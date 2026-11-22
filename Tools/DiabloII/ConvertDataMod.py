@@ -49,6 +49,9 @@ import tempfile
 from collections import Counter
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import JsonPatch  # noqa: E402  deep JSON patches for the game's other JSON (shared with ConvertReplaceMod)
+
 HERE = Path(__file__).resolve().parent
 # Left out of the d2rloader folder: run-time output, and the package's metadata.json (D2RMM
 # writes its own for the merged output).
@@ -313,6 +316,7 @@ def table_patch(van, mod, trim=False, duplicates='order', disable=None):
     vids = row_ids(vrows, trim)
     mids = row_ids(mrows, trim)
     vmap = {i: dict(zip(vh, r)) for i, r in zip(vids, vrows)}
+    vindex = {i: n for n, i in enumerate(vids)}  # a stock row's number: mod.js falls back on it when another mod renamed the row
     pre, decided = content_pairs(vh, vrows, vids, mh, mrows, mids) if duplicates == 'content' else ({}, set())
     reserved = set(pre.values())
     renamed = {j: v for j, v in renames(vids, mids).items() if mids[j] not in vmap}
@@ -334,8 +338,16 @@ def table_patch(van, mod, trim=False, duplicates='order', disable=None):
             diff = {h: val for h, val in zip(mh, r) if v.get(h, '') != val}
             if diff:
                 changed += 1
-            # [3]: the game's values of those cells, so mod.js can tell an earlier mod's change (load order)
-            out_rows.append(['=', [match[0], match[1]]] + ([diff, {h: v.get(h, '') for h in diff}] if diff else []))
+            # [1][2]: the stock row's number (mod.js uses it when an earlier mod renamed that row);
+            # [3]: the game's values of those cells, so mod.js can tell an earlier mod's change (load order);
+            # [4]: the mod's whole row when it renames the stock row, so mod.js can add it as a row of its own
+            # when an earlier mod replaced that stock row with something else too.
+            entry = ['=', [match[0], match[1], vindex[match]]]
+            if diff:
+                entry += [diff, {h: v.get(h, '') for h in diff}]
+                if mh and mh[0] in diff:
+                    entry.append(list(r))
+            out_rows.append(entry)
         else:
             out_rows.append(['+', r])
     deleted = [[k, n] for (k, n) in vmap if (k, n) not in used]
@@ -367,7 +379,7 @@ def apply_table(van, patch):
     out = []
     for e in patch['rows']:
         if e[0] == '=':
-            i = tuple(e[1])
+            i = tuple(e[1][:2])
             r = dict(by_id[i])
             used.add(i)
             r.update(e[2] if len(e) > 2 else {})
@@ -863,9 +875,37 @@ function applyTableKeep(path, patch) {
   const count = {};
   let missing = 0;
   let next = rows.length;
-  patch.rows.forEach((entry) => {
+  // A stock row the mod changes may have been renamed by a mod above (Reimagined renames 89 uniques
+  // and replaces Grim Ward with Korlic's Fury). Then the row is found by its stock number ([1][2]),
+  // if no other entry of this mod already uses that row: plain changes go into it (the Conflicts
+  // setting decides the cells both changed); a row this mod renames too ([4], its whole row: a
+  // skill of its own in place of the stock one) is added as a new row instead of being lost.
+  const found = patch.rows.map((entry) => (entry[0] === '=' ? at.get(rowId(entry[1][0], entry[1][1])) : undefined));
+  const claimed = new Set(found.filter((i) => i !== undefined));
+  const asNew = new Map(); // patch row -> the mod's whole row, added as a new row
+  let byNumber = 0;
+  let added = 0;
+  patch.rows.forEach((entry, n) => {
     if (entry[0] === '=') {
-      const i = at.get(rowId(entry[1][0], entry[1][1]));
+      let i = found[n];
+      const k = entry[1][2];
+      if (i === undefined && typeof k === 'number' && k < rows.length && !claimed.has(k)) {
+        if (Array.isArray(entry[4])) {
+          const row = {};
+          patch.headers.forEach((h, c) => (row[h] = entry[4][c] == null ? '' : entry[4][c]));
+          asNew.set(n, row);
+          where.push(next++);
+          const a = String(row[patch.headers[0]] == null ? '' : row[patch.headers[0]]);
+          const a2 = patch.trim ? a.trim() : a;
+          place.push(count[a2] || 0);
+          count[a2] = (count[a2] || 0) + 1;
+          added++;
+          return;
+        }
+        i = k;
+        claimed.add(k);
+        byNumber++;
+      }
       if (i === undefined) missing++;
       where.push(i === undefined ? -1 : i);
       count[entry[1][0]] = Math.max(count[entry[1][0]] || 0, entry[1][1]);
@@ -889,13 +929,17 @@ function applyTableKeep(path, patch) {
     rows.forEach((row) => (top = Math.max(top, num(row[idCol]))));
     let own = -1; // highest Id among the rows the mod already finds in the table
     patch.rows.forEach((entry, n) => {
-      if (entry[0] === '=' && where[n] >= 0) own = Math.max(own, num(rows[where[n]][idCol]));
+      if (entry[0] === '=' && !asNew.has(n) && where[n] >= 0) own = Math.max(own, num(rows[where[n]][idCol]));
     });
     // Ids up to the game's own top stay (the mod may reuse one of them), every one above moves.
     IDS[path] = { own, delta: top - own };
   }
   patch.rows.forEach((entry, n) => {
-    if (entry[0] === '=') {
+    if (asNew.has(n)) {
+      const row = asNew.get(n);
+      rows.push(remap(path, row, row));
+      wants.set(row, place[n]);
+    } else if (entry[0] === '=') {
       const i = where[n];
       if (i < 0) return;
       const diff = mergeCells(path, rows[i], Object.assign({}, entry[2] || {}), entry[3], entry[1][0]);
@@ -908,6 +952,8 @@ function applyTableKeep(path, patch) {
     }
   });
   const headers = table.headers.concat(patch.headers.filter((h) => !table.headers.includes(h)));
+  if (byNumber) console.log(MOD_ID + ': ' + path + ': ' + byNumber + ' row(s) an earlier mod renamed found by their stock row number');
+  if (added) console.log(MOD_ID + ': ' + path + ': ' + added + ' row(s) an earlier mod replaced too added as rows of their own');
   if (missing) console.warn(MOD_ID + ': ' + path + ': ' + missing + ' row(s) the mod changes are gone (removed by an earlier mod?)');
   D2RMM.writeTsv(path, { headers, rows: actBlocks(path, key, rows, wants, patch) });
 }
@@ -1139,7 +1185,7 @@ const OFF_FEATURES = new Set();
 const WHY_OFF = {};
 (() => {
   const ids = new Set(COPY.map((e) => e[2]).concat(TABLES.map((e) => e[1]), STRINGS.map((e) => e[1]), JSONMAPS.map((e) => e[1]),
-    Object.keys(NEEDS), [].concat(...Object.values(NEEDS))));
+    (typeof JSONPATCHES === 'undefined' ? [] : JSONPATCHES).map((e) => e[1]), Object.keys(NEEDS), [].concat(...Object.values(NEEDS))));
   ids.forEach((id) => {
     if (id && id !== 'core' && SWITCHED_OFF(id)) {
       if (FORCED.includes(id)) console.warn(MOD_ID + ': ' + id + ' cannot be switched off: ' + FORCED_WHY[id] + '. Left on.');
@@ -1171,6 +1217,7 @@ const LOADER_ON = LOADER.filter((e) => ON(e[2]) && !skipped(e[0]));
 const TABLES_ON = TABLES.filter((e) => ON(e[1]) && !skipped(e[0])).map((e) => e[0]);
 const STRINGS_ON = STRINGS.filter((e) => ON(e[1]) && !skipped(e[0])).map((e) => e[0]);
 const JSONMAPS_ON = JSONMAPS.filter((e) => ON(e[1]) && !skipped(e[0])).map((e) => e[0]);
+const JSONPATCHES_ON = (typeof JSONPATCHES === 'undefined' ? [] : JSONPATCHES).filter((e) => ON(e[1]) && !skipped(e[0])).map((e) => e[0]);
 
 // 'rebuild' puts the mod's own row order first, which only holds when no mod comes before it.
 if (ROWS === 'rebuild' && typeof D2RMM.getModList === 'function') {
@@ -1195,6 +1242,18 @@ if (ROWS === 'keep') {
 }
 STRINGS_ON.forEach((path) => applyStrings(path, readPatch(path)));
 JSONMAPS_ON.forEach((path) => applyJsonMap(path, readPatch(path)));
+// The game's other JSON: the mod's changes merged into the file as the mods above left it (deep patch;
+// where both changed the same value this mod's wins).
+JSONPATCHES_ON.forEach((path) => {
+  let cur = null;
+  try {
+    cur = D2RMM.readJson(path);
+  } catch (e) {
+    cur = null;
+  }
+  if (cur === null || cur === undefined) return console.warn(MOD_ID + ': ' + path + ' could not be read; left as it is');
+  D2RMM.writeJson(path, applyJsonPatch(cur, readPatch(path)));
+});
 if (BASE_ROWS === 'stubs') {
   ALIGNED.filter((name) => TABLES_ON.some((p) => p.toLowerCase() === 'global\\excel\\' + name)).forEach(alignBase);
 }
@@ -1214,11 +1273,16 @@ const off = [...new Set(COPY.concat(LOADER).map((e) => e[2]).concat(TABLES.map((
 console.log(
   MOD_ID + ': ' + TABLES_ON.length + ' tables patched, ' + STRINGS_ON.length + ' string files merged, ' +
     (JSONMAPS_ON.length ? JSONMAPS_ON.length + ' HD registries merged by key, ' : '') +
+    (JSONPATCHES_ON.length ? JSONPATCHES_ON.length + ' JSON files merged as patches, ' : '') +
     COPY_ON.length + ' files/folders copied, ' + LOADER_ON.length + ' D2RLoader files/folders copied' +
     (off.length ? '; switched off: ' + off.join(', ') : '') + '.'
 );
 '''
 
+
+# The deep JSON patch functions (applyJsonPatch...), before 'My mod list' so ConvertReplaceMod's
+# slice of MOD_JS carries them too.
+MOD_JS = MOD_JS.replace('// My mod list (mod settings', JsonPatch.JSON_JS + '\n// My mod list (mod settings', 1)
 
 def js_list(name, items, comment):
     body = ',\n'.join('  ' + json.dumps(i, ensure_ascii=False) for i in items)
@@ -1810,6 +1874,7 @@ def main():
     patches_dir = mod / 'd2rmm' / 'patches'
     tables, strings, copies, identical, whole = [], [], [], [], {}
     jsonmaps = []  # HD registries merged key by key (JSONMAP_FILES)
+    jsonpatches = []  # the game's other JSON as deep patches (JsonPatch)
     stats = {}
     for f in all_files:
         if f in loader_caches or f in counter:
@@ -1868,6 +1933,23 @@ def main():
                             'deleted': len(patch['deleted'])}
                 continue
             whole[f] = 'not a key map the patch can rebuild (copied whole)'
+        elif van is not None and JsonPatch.JSON_PATH.search(f):
+            # since 2026-11-21: the game's other JSON (state machines, animation timelines, item /
+            # missile / overlay / preset definitions, UI layouts) as a deep JSON patch, so the mods
+            # above keep their changes to the same file (Reimagined copied 117 such files whole)
+            m, v = JsonPatch.read_json_file(src), JsonPatch.read_json_file(van)
+            patch = JsonPatch.json_patch(v, m) if m is not None and v is not None else None
+            if m is not None and v is not None and patch is None:
+                identical.append(f)  # only formatting or comments differ: the game's own file does
+                continue
+            if patch is not None and JsonPatch.json_apply(v, patch) == m:
+                out = patches_dir / (f + '.json')
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(json.dumps(patch, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+                jsonpatches.append(f)
+                stats[f] = {'jsonPatch': len(json.dumps(patch))}
+                continue
+            whole[f] = 'not JSON, or a JSON patch does not rebuild it (copied whole)'
         copies.append(f)
 
     # Folders are copied whole only when nothing in them is patched or identical (compress checks
@@ -1963,6 +2045,7 @@ def main():
         js_list('TABLES', [[win(t), feature_of(t)] for t in tables], 'Tables patched row by row (d2rmm\\patches\\<path>.json): [path, switch].'),
         js_list('STRINGS', [[win(s), feature_of(s)] for s in strings], 'String files merged by Key (d2rmm\\patches\\<path>.json): [path, switch].'),
         js_list('JSONMAPS', [[win(j), feature_of(j)] for j in jsonmaps], 'HD registries merged key by key (d2rmm\\patches\\<path>.json): [path, switch].'),
+        js_list('JSONPATCHES', [[win(j), feature_of(j)] for j in jsonpatches], 'The game' + "'" + 's other JSON merged as deep patches (d2rmm\\patches\\<path>.json): [path, switch].'),
         '// Features that use new rows of other features: {feature: [features it needs]}; FORCED: the features always-on\n'
         '// tables use (and what those need), which cannot be switched off, with the reason.\n'
         'const NEEDS = %s;\nconst FORCED = %s;\nconst FORCED_WHY = %s;\n' % (
@@ -2011,6 +2094,7 @@ def main():
         'tablesPatched': {t: stats[t] for t in tables},
         'stringsMerged': {s: stats[s] for s in strings},
         'jsonMerged': {j: stats[j] for j in jsonmaps},
+        'jsonPatched': {j: stats[j] for j in jsonpatches},
         'copiedWhole': len(copies),
         'copiedWholeAlthoughInGame': whole,
         'loaderCachesLeftOut': sorted(loader_caches),
@@ -2066,7 +2150,7 @@ def main():
              sorted(set(whole.values())), len(loader)))
 
     if args.check:
-        check(mod, data, cache, tables, strings, copies, loader, args.rows, jsonmaps)
+        check(mod, data, cache, tables, strings, copies, loader, args.rows, jsonmaps, jsonpatches)
 
 
 README_MARK = '<!-- written by ConvertDataMod.py; rerunning it rewrites this file -->'
@@ -2164,7 +2248,7 @@ def check_keep(mod, data, out, tables, cache):
         appended = len(got[1]) - sum(1 for e in p['rows'] if e[0] == '+')
         for e in p['rows']:
             if e[0] == '=':
-                w.append(ids.get(tuple(e[1]), -1))
+                w.append(ids.get(tuple(e[1][:2]), -1))
             else:
                 w.append(appended)
                 appended += 1
@@ -2251,7 +2335,7 @@ def check_keep(mod, data, out, tables, cache):
     return bad
 
 
-def check(mod, data, cache, tables, strings, copies, loader, rows='rebuild', jsonmaps=()):
+def check(mod, data, cache, tables, strings, copies, loader, rows='rebuild', jsonmaps=(), jsonpatches=()):
     """Runs mod.js in a mock D2RMM and compares what it writes with the mod's own files."""
     out = Path(tempfile.gettempdir()) / 'ConvertDataModCheck' / mod.name
     if not shutil.which('node'):
@@ -2288,6 +2372,10 @@ def check(mod, data, cache, tables, strings, copies, loader, rows='rebuild', jso
         got, want = jsonmap_load(out / j), jsonmap_load(data / j)
         if not got or not want or got[0] != want[0] or dict(got[1] if got[0] == 'list' else got[1].items()) != \
                 dict(want[1] if want[0] == 'list' else want[1].items()):
+            bad += 1
+            print('  DIFFERS: ' + j)
+    for j in jsonpatches:
+        if JsonPatch.read_json_file(out / j) != JsonPatch.read_json_file(data / j):
             bad += 1
             print('  DIFFERS: ' + j)
     copied = set(written['data'])

@@ -145,5 +145,35 @@
   "name": "Vashka Sootmouth, the Flue-Warden",
   "subdir": "npc",
   "subject": "tall gaunt human woman sorceress with soot-blackened mouth and chin, dark violet robes with brass fittings, holding a soot-black chimney-pipe staff leaking green smoke"
+ },
+ {
+  "short_name": "SMOG_FILTER",
+  "name": "Smog Filter",
+  "subdir": "object",
+  "subject": "brass half-face mask plate with a round ground-glass lens and a cylindrical charcoal filter canister, leather strap, steampunk tinker device"
+ },
+ {
+  "short_name": "PRESSURE_REGULATOR",
+  "name": "Pressure Regulator",
+  "subdir": "object",
+  "subject": "small brass valve with a red handwheel and a round pressure gauge on a steel clamp, steampunk tinker device"
+ },
+ {
+  "short_name": "DERELICT_BOILER",
+  "name": "derelict boiler",
+  "subdir": "object",
+  "subject": "squat soot-caked iron boiler with rivets, a cracked pressure gauge and a leaking valve venting green smoke, steampunk machine"
+ },
+ {
+  "short_name": "SMOG_VENT_IMPLANT",
+  "name": "smog vent implant",
+  "subdir": "object",
+  "subject": "small brass valve implant with rivets and a short exhaust pipe trailing green smoke, grafted onto a patch of skin, steampunk"
+ },
+ {
+  "short_name": "FURNACE_CHIMNEY",
+  "name": "broken furnace chimney",
+  "subdir": "object",
+  "subject": "single tall soot-black brick and iron chimney stack standing alone on stone floor, broken at the base, thick green smoke rising from the top"
  }
 ]

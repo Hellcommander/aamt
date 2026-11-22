@@ -36,6 +36,11 @@ spec.json:
     "texture_size": 1024
     "weld": true      merge vertices that are the same point with the same UV and skin (default;
                       undoes an exporter splitting every triangle's corners apart)
+    "max_vertices": 65535   a LOD file with more vertices is simplified below that (default 65535,
+                      as before). 0 (or a bigger number) keeps such meshes: past 65,536 vertices
+                      they are written with 32-bit indices (Granny's Indices array), which the
+                      game draws as it does the stock Druid bear (74,589 vertices, 32-bit). No
+                      plugin is needed; mind the cost of very dense bodies.
 
 In a ScaledMonster preset a variant takes the same block as `"import"` (name and donor come from
 the variant); `"reshape"`, `"add"` and `"remove"` then work on the imported body.
@@ -60,8 +65,9 @@ animations the clips (hd/character/enemy/<name>/animation/combined.animations, s
 "fps", default 30), and a .skeleton file is written to match. A stock model ("template",
 default hd/character/enemy/sandleaper1/torso) only lends the file format, the material slot and
 the number of LOD files; none of its bones, skin or shape is kept. It has to be a one-mesh body
-with 16-bit indices in every LOD file (2026-11-19 scan: baboon1, bighead1, quillrat1, larva,
-sandleaper1, scorpion, snake, hydra1 and others; not spiritwolf, druidbear or most bosses). Such a file is used as it is
+in every LOD file (2026-11-19 scan: baboon1, bighead1, quillrat1, larva, sandleaper1, scorpion,
+snake, hydra1 and others; not spiritwolf, which has two or three meshes; since 2026-11-20 a
+32-bit template such as druidbear works too). Such a file is used as it is
 ("fit" defaults to "none"). In a preset, a variant with no "donor" does the same and also
 writes the definition and a state machine whose states play the file's clips
 ("modes": {"NU": "idle", "WL": "walk"}; "template": the stock monster that lends the layout).
@@ -212,7 +218,13 @@ def weld(mesh, tolerance=1e-5):
     before = len(mesh.positions)
     parts = [np.round(mesh.positions / tolerance), np.round(mesh.uvs / tolerance)]
     if mesh.joints is not None:
-        parts += [np.asarray(mesh.joints, dtype=np.float64), np.round(np.asarray(mesh.weights, dtype=np.float64) * 1000.0)]
+        # The same skin may list its bones in another slot order per corner (UniRig's export does:
+        # 60,000 corners of 26,506 points stayed apart), so compare the slots sorted by bone.
+        joints = np.asarray(mesh.joints, dtype=np.float64)
+        weights = np.asarray(mesh.weights, dtype=np.float64)
+        joints = np.where(weights > 0, joints, -1.0)
+        order = np.argsort(joints, axis=1, kind='stable')
+        parts += [np.take_along_axis(joints, order, 1), np.round(np.take_along_axis(weights, order, 1) * 1000.0)]
     _, keep, inverse = np.unique(np.hstack(parts), axis=0, return_index=True, return_inverse=True)
     inverse = inverse.reshape(-1)
     if len(keep) == before:
@@ -662,7 +674,7 @@ def replace_geometry(data, mesh, skin_options=None, textures=None, own_skeleton=
     # body: the next level a simpler copy, by the ratio the stock meshes have.
     places = GrannyMesh.all_meshes(tree)
     skeletons = GrannyMesh.bone_lists(tree)
-    stock = [len(m['PrimaryTopology']['Indices16']) // 3 for m in places]
+    stock = [len(Granny.mesh_indices(m['PrimaryTopology'])) // 3 for m in places]
     levels = [mesh] + [mesh if stock[k] >= stock[0] else simplify(mesh, max(64, int(len(mesh.triangles) * stock[k] / stock[0])),
                                                                  (skin_options or {}).get('simplify', 'auto')) for k in range(1, len(places))]
     report = []
@@ -706,8 +718,6 @@ def replace_geometry(data, mesh, skin_options=None, textures=None, own_skeleton=
 
 def _fill_mesh(geometry, mesh, own, added, donor, skin_options):
     """Puts `mesh` into one mesh of the tree (geometry: its GrannyMesh._Geometry); report lines."""
-    if len(mesh.positions) > 65535:
-        raise ValueError(f'{len(mesh.positions)} vertices; a mesh holds at most 65535 (simplify it, or weld its UV seams)')
     if own:
         weights, slots = file_skin(mesh, geometry)
         far = typical = 0.0
@@ -746,7 +756,7 @@ def _fill_mesh(geometry, mesh, own, added, donor, skin_options):
         items.append(vertex)
     geometry.items[:] = items
     topology = geometry.topology
-    topology['Indices16'] = [int(v) for v in mesh.triangles.reshape(-1)]
+    width = Granny.set_mesh_indices(topology, mesh.triangles.reshape(-1), len(items))
     group = dict(topology['Groups'][0])
     group.update({'TriFirst': 0, 'TriCount': len(mesh.triangles)})
     topology['Groups'][:] = [group]
@@ -761,6 +771,8 @@ def _fill_mesh(geometry, mesh, own, added, donor, skin_options):
                   f'(typical distance {typical:.3f}, farthest {far:.3f} units)']
     if donor is not None and far > 0.25 * float((donor.box[1] - donor.box[0]).max()):
         report.append('  some vertices lie far from the donor: their weights are a guess; model closer to the reference')
+    if width == 4:
+        report.append(f'  {len(items)} vertices: over 65,536, so 32-bit indices (Indices); the game reads those (stock bodies use them too)')
     return report
 
 
@@ -912,15 +924,16 @@ def import_body(spec, name, read, names, base_dir='.', log=print):
     renames, out = make_textures(spec, name, folder, read, first, embedded, base_dir, mesh.images)
     bone_names = {b['Name'] for b in first['Models'][0]['Skeleton']['Bones']}
     new_bones = missing_bones(mesh, bone_names) if not standalone and uses_own_rig(mesh, bone_names, spec.get('skin')) else []
-    counts = [len(Granny.read(d).root()['Meshes'][0]['PrimaryTopology']['Indices16']) // 3 for d in donors]
+    counts = [len(Granny.mesh_indices(Granny.read(d).root()['Meshes'][0]['PrimaryTopology'])) // 3 for d in donors]
     ratios = spec.get('lods') or [c / counts[0] for c in counts]
     report = {'name': name, 'donor': f'data/{stem}.model', 'standalone': standalone, 'model': f'data/{folder}/{part}.model', 'notes': notes, 'files': [],
               'textures': sorted(renames.values()), 'box': [mesh.positions.min(0).round(4).tolist(), mesh.positions.max(0).round(4).tolist()]}
     for k, (path, data) in enumerate(zip(files, donors)):
         ratio = ratios[min(k, len(ratios) - 1)]
         level = mesh if ratio >= 1.0 else simplify(mesh, max(64, int(len(mesh.triangles) * ratio)), spec.get('simplify', 'auto'))
-        if len(level.positions) > 65535:
-            level = simplify(level, int(len(level.triangles) * 60000 / len(level.positions)), spec.get('simplify', 'auto'))
+        cap = int(spec.get('max_vertices', 65535) or 0)
+        if cap and len(level.positions) > cap:
+            level = simplify(level, int(len(level.triangles) * cap * 60000 / 65535 / len(level.positions)), spec.get('simplify', 'auto'))
         built, lines = replace_geometry(data, level, spec.get('skin'), renames, standalone)
         target = f'{folder}/{part}{path[len(stem):]}'
         out[target] = built

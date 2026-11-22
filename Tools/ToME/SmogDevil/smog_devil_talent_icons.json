@@ -508,5 +508,35 @@
   "name": "Homunculus Bolt",
   "category": "steamtech/smog-homunculi",
   "subject": "small smog creature spitting a glowing violet arcane mote wrapped in green acid fog"
+ },
+ {
+  "short_name": "SMOG_SOVEREIGN",
+  "name": "Smog Sovereign",
+  "category": "uber/cunning",
+  "subject": "hooded figure enthroned in a towering column of green smog, a brass crown of pipes venting steam, violet eyes glowing"
+ },
+ {
+  "short_name": "STOKE_THE_FIRES",
+  "name": "Stoke the Fires",
+  "category": "steamtech/furnace-heart",
+  "subject": "glowing brass firebox door thrown open, roaring orange flames and green-tinged smoke, coal shovel"
+ },
+ {
+  "short_name": "BELLOWS_BLAST",
+  "name": "Bellows Blast",
+  "category": "steamtech/furnace-heart",
+  "subject": "huge leather-and-brass bellows blasting a wide cone of fire and embers"
+ },
+ {
+  "short_name": "SLAG_ARMOUR",
+  "name": "Slag Armour",
+  "category": "steamtech/furnace-heart",
+  "subject": "armoured forearm coated in cooling black-and-orange molten slag plates, glowing cracks"
+ },
+ {
+  "short_name": "FURNACE_HEART",
+  "name": "Furnace Heart",
+  "category": "steamtech/furnace-heart",
+  "subject": "a riveted brass boiler-heart glowing red-hot inside a chest cavity of smoke, pipes like arteries"
  }
 ]
