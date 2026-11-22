@@ -68,11 +68,17 @@ def log(msg: str) -> None:
 @contextmanager
 def gpu(label: str):
     try:
-        from gpu_hub import acquire_gpu
+        from gpu_hub import acquire_gpu, cap_torch_vram, register_unload
     except Exception:  # noqa: BLE001  (lock is optional outside the toolkit)
         yield
         return
+    register_unload("refart models", free)  # resident pipelines leave the card with the lease
     with acquire_gpu("refart " + label):
+        # refart runs on the GPU in this process: start CUDA now so the hub's VRAM cap (worked out
+        # from free memory) is in place before the first model loads, not only from the 2nd request on.
+        if torch.cuda.is_available():
+            torch.cuda.init()
+            cap_torch_vram()
         yield
 
 

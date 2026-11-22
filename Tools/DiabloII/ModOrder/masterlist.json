@@ -16,14 +16,17 @@
       "ids": ["Rebirth"], "checked": "3.0.1b", "author": "jb-5th", "group": "top", "tags": ["conversion"],
       "after": [{"mod": "Reimagined", "why": "with rows 'keep' Rebirth's 4 new levels (138-141) move behind Reimagined's at install time, with its level presets and portal recipes (converter 2026-11-16)"}],
       "notes": "Converted with rows 'keep' since 2026-11-16 (was 'rebuild'): rows stay where they are, its new rows and levels follow the mods above.",
-      "messages": [{"level": "error", "text": "Its Load order > Rows setting is 'rebuild': its levels 138-141 then land on Reimagined's. Set Rows to 'keep' and put it below Reimagined.", "if": {"ticked": ["Reimagined"], "config": {"loadorderRows": "rebuild"}}}],
+      "messages": [
+        {"level": "error", "text": "Its Load order > Rows setting is 'rebuild': its levels 138-141 then land on Reimagined's. Set Rows to 'keep' and put it below Reimagined.", "if": {"ticked": ["Reimagined"], "config": {"loadorderRows": "rebuild"}}},
+        {"level": "info", "text": "Its Load order > Conflicts setting is 'mod' (the user's choice 2026-11-21: Rebirth has the better player scores, so it wins): where both change a value, Rebirth's stock-based value replaces Reimagined's (about 3,600 values: treasure classes, mercenaries, skills, skill descriptions, its new arrows' visuals). Set Conflicts to 'earlier' so Reimagined's content stays and Rebirth fills only what Reimagined left alone.", "if": {"ticked": ["Reimagined"], "config": {"loadorderCells": "mod"}}}
+      ],
       "incompatible": [
         {"mod": "VanillaDeluxe", "why": "both put their new levels on the same level numbers (from 137)"}
       ]
     },
     {
       "ids": ["Reimagined"], "checked": "3.1.1", "author": "ScottieKnowz", "group": "top", "tags": ["conversion"],
-      "after": [{"tag": "stock-lookup", "why": "that mod looks up plain-game skills by name, which Reimagined renames or replaces"}],
+      "after": [{"tag": "stock-lookup", "why": "that mod looks up plain-game rows by name (skills, uniques, sets, affixes), which Reimagined renames, replaces or redesigns; above it the mod finds them and Reimagined keeps what it changed"}],
       "notes": "Converted with rows 'keep'. Ships whole player state machines and a whole animdata.d2. Replaces 19 stock skills in their rows (Confuse -> Corpse Field, Power Strike -> Toxic Whirl, Psychic Hammer -> Ice Barrage...) and renames 89 uniques and 14 set items.",
       "messages": [{"level": "info", "text": "Necromancer V1.6 is above it: tick its setting 'Necromancer V1.6 above: keep its Necromancer changes' so its other Necromancer changes stay.", "if": {"ticked": ["Necromancer_V1.6"], "config": {"listNecromancerV16": false}}}],
       "incompatible": [
@@ -57,10 +60,36 @@
       "after": [{"tag": "skill-pages", "why": "it builds its pages after the mods that add skills"}, {"tag": "conversion", "why": "it reads the trees the conversion leaves"}],
       "requires": [
         {"plugin": "skilltab4", "min": "0.8.0", "why": "draws the pages"},
-        {"plugin": "classlesspages", "min": "0.1.0", "why": "lets every class use the other trees and raises the per-save skill limit"},
+        {"plugin": "classlesspages", "min": "0.1.1", "why": "lets every class use the other trees and reads saves of more than 255 skills per class; 0.1.0 refuses to load when Skill Limits 0.2.0 patched the same save reader before it"},
         {"plugin": "assetmerge", "min": "0.2.0", "why": "the animation remapper's '?source' rows"}
       ],
       "messages": [{"level": "info", "text": "Use new characters. Legacy (2D) graphics are not covered by the animation remapper."}]
+    },
+    {
+      "ids": ["SkillModifiers"], "checked": "0.5.1", "author": "Arendeth", "group": "late",
+      "after": [
+        {"tag": "skill-pages", "why": "it adds modifiers to the skills as the page mods leave them"},
+        {"tag": "conversion", "why": "it finds the stock skills in the converted tables, also under the names a conversion gave them, and gives alternative modifiers to the ones a conversion changed or replaced"},
+        {"mod": "RevampedSynergies Amazon", "why": "it appends to the calcs Revamped Synergies rewrites"},
+        {"mod": "RevampedSynergies Assassin", "why": "it appends to the calcs Revamped Synergies rewrites"},
+        {"mod": "RevampedSynergies Barbarian", "why": "it appends to the calcs Revamped Synergies rewrites"},
+        {"mod": "RevampedSynergies Druid", "why": "it appends to the calcs Revamped Synergies rewrites"},
+        {"mod": "RevampedSynergies Necromancer", "why": "it appends to the calcs Revamped Synergies rewrites"},
+        {"mod": "RevampedSynergies Paladin", "why": "it appends to the calcs Revamped Synergies rewrites"},
+        {"mod": "RevampedSynergies Sorceress", "why": "it appends to the calcs Revamped Synergies rewrites"},
+        {"mod": "PageBalance", "why": "PageBalance rewrites synergy calcs; below it, the modifier terms are added to its result and not read as synergies"},
+        {"mod": "ClasslessPages", "why": "its modifier nodes stay on their own class's pages, and it sees Classless Pages' settings file for the option 'Skills per class a save can hold' on Automatic"}
+      ],
+      "requires": [
+        {"plugin": "skillmodifiers", "min": "0.3.0", "why": "the modifiers, choices of up to four, and tables past 1024 rows"},
+        {"plugin": "skilltab4", "min": "0.11.0", "why": "scrolls the stock pages to the modifier nodes past column 3", "level": "warn"},
+        {"plugin": "skilllimits", "min": "0.2.0", "why": "the option 'Skills per class a save can hold' is 2047: without it characters of a class past 255 skills do not load again", "if": {"config": {"saveLimit": "2047"}}}
+      ],
+      "messages": [
+        {"level": "info", "text": "Every modifier is a hidden class skill and the game reads 255 skills per class from a save. With many page mods a class fills up (Amazon, Paladin, Druid first): the skills left without modifiers are named in the install log. Turn off the class options you do not play, or enable the Skill Limits plugin (0.2.0) and set the option 'Skills per class a save can hold' to 2047.", "if": {"config": {"saveLimit": "255"}}},
+        {"level": "info", "text": "The option 'Skills per class a save can hold' is 2047: keep the Skill Limits plugin enabled for characters of a class that passed 255 skills.", "if": {"config": {"saveLimit": "2047"}}}
+      ],
+      "notes": "Only adds to skills: their calcs are wrapped (with every modifier off the value is unchanged), empty aurastat columns, its own rows, cells, states and missiles. Options that would replace another mod's work are left out and named in the install log. 0.3.0: renamed or moved skills are found (option Renamed skills for the ones it cannot find). 0.4.0: every choice is a trade inside the skill; a skill another mod changed, reworked or replaced gets alternative trades made from its own columns (option, on). 0.5.0: 113 stock skills (the Warlock's included), up to four choices; stops at 255 skills per class (option). 0.5.1: that option has 2047 for use with the Skill Limits plugin 0.2.0, which reads saves of a class with more than 255 skills."
     },
     {
       "ids": ["SkillTabLayout"], "checked": "0.1.0", "author": "Arendeth", "group": "final",
@@ -72,8 +101,9 @@
       "notes": "Install it last; rerun HdMatch.py build after adding mods with their own sprites."
     },
     {
-      "ids": ["BestOf"], "checked": "3.0.0", "author": "Arendeth", "group": "patch",
-      "notes": "The compatibility patch: repairs what the mods above leave clashing."
+      "ids": ["BestOf"], "checked": "3.1.0", "author": "Arendeth", "group": "patch",
+      "notes": "The compatibility patch: repairs what the mods above leave clashing.",
+      "requires": [{"plugin": "affixlimits", "min": "0.1.0", "why": "its \"Affix rows items can save\" is 32767", "if": {"config": {"affixLimit": "32767"}}}]
     },
     {
       "ids": ["BestOfEarly"], "checked": "1.0.0", "author": "Arendeth",
@@ -83,13 +113,14 @@
     },
     {
       "ids": ["CharmingVendors"], "checked": "1.1.0", "author": "Tim / OpenAI",
-      "requires": [{"mod": "BestOfEarly", "why": "it stops on VanillaDeluxe's 8 vd_hidden_* skills (no required level); Best Of (early part) sets one for it", "if": {"ticked": ["VanillaDeluxe"]}}],
-      "messages": [{"level": "info", "text": "It adds a charm affix per class skill; with many skill page mods the affix count can pass the 2047-affix limit of save files."}]
+      "requires": [{"mod": "BestOfEarly", "why": "it stops on VanillaDeluxe's 8 vd_hidden_* skills (no required level); Best Of (early part) sets one for it", "if": {"ticked": ["VanillaDeluxe"]}},
+                   {"plugin": "affixlimits", "min": "0.1.0", "why": "its \"Affix id limit\" is 32767, which needs affix ids wider than 11 bits in saves", "if": {"config": {"affixLimit": "32767"}}}],
+      "messages": [{"level": "info", "text": "It adds a charm affix per class skill; with many skill page mods magicprefix.txt passes the 2047 rows item saves can name (D2RMM 2026-11-20: 93 of 94 installed). Local change 2026-11-20 (version unchanged): at \"Affix id limit\" 2047 the rows past it are allowed while they cannot roll (singleSkills off); with the Affix Limits plugin set it to 32767."}]
     },
     {
       "ids": ["Better and New Unique Items"], "checked": "1.0", "author": "NudeMortals", "group": "whole-file",
       "files": ["global\\excel\\uniqueitems.txt", "local\\lng\\strings\\item-names.json"],
-      "notes": "Copies its whole uniqueitems.txt and item-names.json: every change a mod above made to them is lost, so it goes right below the conversions and the mods below patch its copy."
+      "notes": "Copies its whole uniqueitems.txt and item-names.json: every change a mod above made to them is lost, so unconverted it goes first and every mod below patches its copy. Converted with Convert-D2RReplaceMod.ps1 it merges them instead (2026-11-16) and can go anywhere."
     },
     {
       "ids": ["FaillesEnChaine"], "checked": "0.6.10+riftlimits.1", "author": "Automatic Rifts", "group": "late",
@@ -110,7 +141,7 @@
       "ids": ["AllDruidVinesTogetherWithBuffedAuras"], "checked": "1.0.13", "author": "luciano96369",
       "incompatible": [{"mod": "AllDruidSpiritsAndVinesTogetherWithBuffedAuras", "why": "they change the same Druid skills; All Druid Spirits And Vines does the same and more", "level": "warn"}]
     },
-    {"ids": ["AllDruidSpiritsAndVinesTogetherWithBuffedAuras"], "checked": "1.0.5", "author": "luciano96369"},
+    {"ids": ["AllDruidSpiritsAndVinesTogetherWithBuffedAuras"], "checked": "1.0.5", "author": "luciano96369", "group": "top", "tags": ["stock-lookup"], "notes": "Rewrites Druid skill and summon rows found by stock name with stock-based values. Below a conversion it reverted 120 of Reimagined's Druid changes (harness 2026-11-20); above it the conversion keeps what it changed and this mod's values stay elsewhere."},
     {
       "ids": ["Necromancer_V1.6"], "checked": "1.6", "author": "Paul", "group": "top", "tags": ["stock-lookup"],
       "before": [{"tag": "conversion", "why": "it looks up plain-game Necromancer skills by name (Confuse, Poison Dagger), which the conversions rename or replace; above them it finds them (harness 2026-11-16: no failure above Reimagined)"}],
@@ -211,7 +242,7 @@
       "ids": ["PaladinShieldsForAll", "PaladinShieldsForAll-1089-1-0-0-1779344490"], "checked": "1.0.0", "author": "start03"
     },
     {"ids": ["RelicsOfSanctuary"], "checked": "3.5.0", "author": "Cpp"},
-    {"ids": ["Better Body Armors__Shields__Weapons"], "checked": "1.0", "author": "NudeMortals", "group": "whole-file", "files": ["global\\excel\\armor.txt", "global\\excel\\weapons.txt", "local\\lng\\strings\\item-modifiers.json"], "notes": "Copies its whole armor.txt, weapons.txt and item-modifiers.json: what the mods above changed in them is lost (conversions included), so it goes right below the top group."},
+    {"ids": ["Better Body Armors__Shields__Weapons"], "checked": "1.0", "author": "NudeMortals", "group": "whole-file", "files": ["global\\excel\\armor.txt", "global\\excel\\weapons.txt", "local\\lng\\strings\\item-modifiers.json"], "notes": "Copies its whole armor.txt, weapons.txt and item-modifiers.json: what the mods above changed in them is lost, so unconverted it goes first. Converted with Convert-D2RReplaceMod.ps1 it merges them instead (2026-11-16)."},
     {"ids": ["RevampedSynergies Amazon"], "checked": "1.1c", "author": "Sadie227"},
     {"ids": ["RevampedSynergies Assassin"], "checked": "1.0", "author": "Sadie227"},
     {"ids": ["RevampedSynergies Barbarian"], "checked": "1.1c", "author": "Sadie227"},
@@ -219,7 +250,7 @@
     {"ids": ["RevampedSynergies Necromancer"], "checked": "1.0b", "author": "Sadie227", "notes": "Adds its golem pet types once per pet type already there (dozens of copies with other mods); Best Of keeps one row each."},
     {"ids": ["RevampedSynergies Paladin"], "checked": "1.1c", "author": "Sadie227"},
     {"ids": ["RevampedSynergies Sorceress"], "checked": "1.1d", "author": "Sadie227"},
-    {"ids": ["Revamped Charms"], "checked": "1.1", "author": "Sadie227"},
+    {"ids": ["Revamped Charms"], "checked": "1.1", "author": "Sadie227", "group": "top", "tags": ["stock-lookup"], "notes": "Rewrites charm affix rows found by stock name with stock-based values (spawnable, rare, ranges). Below a conversion it re-enabled about 500 affix values Reimagined had changed (harness 2026-11-20); above it the conversion keeps them."},
     {"ids": ["Inventory10x8"], "checked": "1.1.0", "author": "Bandit"},
     {"ids": ["FastLeveling"], "checked": "1.0.1", "author": "Arendeth"},
     {"ids": ["Clavis socket 1.1"], "checked": "1.1.0", "author": "johnnygrs"},
@@ -237,17 +268,17 @@
     {"ids": ["MeleeAreaDamage"], "checked": "1.4", "author": "olegbl"},
     {"ids": ["More Mercenary Weapons"], "checked": "1.3", "author": "Iodine131"},
     {"ids": ["OrbValues"], "checked": "1.0.1", "author": "Bandit"},
-    {"ids": ["QoL_Map Waypoint"], "checked": "9.1complete", "author": "yinyin333333", "group": "whole-file", "files": ["local\\lng\\strings\\ui.json"], "notes": "Copies its whole ui.json string file: other mods' interface strings above it are lost."},
+    {"ids": ["QoL_Map Waypoint"], "checked": "9.1complete", "author": "yinyin333333", "group": "whole-file", "files": ["local\\lng\\strings\\ui.json"], "notes": "Copies its whole ui.json string file: other mods' interface strings above it are lost (only with its Reimagined presets and Quick Play on). Converted with Convert-D2RReplaceMod.ps1 it merges them instead (2026-11-16)."},
     {"ids": ["RecallAllies"], "checked": "1.2", "author": "Finkster"},
     {"ids": ["RejuvenationPotionVendor"], "checked": "1.2", "author": "erSch"},
     {"ids": ["RunesAndGemsOnSale"], "checked": "2.1", "author": "griswd"},
     {"ids": ["SocketPunching"], "checked": "1.3", "author": "olegbl"},
     {"ids": ["SoloTrading"], "checked": "0.5", "author": "t.me/jstqw"},
-    {"ids": ["WiderMaggotLair"], "checked": "0.8.1", "author": "Bandit"},
-    {"ids": ["BuffedSetItems"], "checked": "1.0.5", "author": "OGGamerDude"},
-    {"ids": ["BuffedUniqueItems"], "checked": "1.0.3", "author": "OGGamerDude"},
+    {"ids": ["WiderMaggotLair"], "checked": "0.8.1", "author": "Bandit", "messages": [{"level": "warn", "text": "Reimagined already reworks the Maggot Lair: 116 of the same maps (.ds1) and presets. Maps cannot be merged; the mod lower in the list replaces the other's maps (now Wider Maggot Lair's). Untick one of the two to keep a single set of Maggot Lair maps.", "if": {"ticked": ["Reimagined"]}}]},
+    {"ids": ["BuffedSetItems"], "checked": "1.0.5", "author": "OGGamerDude", "group": "top", "tags": ["stock-lookup"], "notes": "Rewrites set bonuses found by stock name with buffed stock values. Below a conversion it reverted Reimagined's redesigned set bonuses (harness 2026-11-20); above it the conversion keeps its sets and the buffs stay on the rest."},
+    {"ids": ["BuffedUniqueItems"], "checked": "1.0.3", "author": "OGGamerDude", "group": "top", "tags": ["stock-lookup"], "notes": "Rewrites whole unique item property sets found by stock name with buffed stock values. Below a conversion it reverted or removed about 620 of Reimagined's and Rebirth's unique item values (harness 2026-11-20); above it the conversions keep their uniques and the buffs stay on the rest."},
     {"ids": ["DruidShapeshiftTeleport"], "checked": "1.0.0", "author": "PyroSplat"},
-    {"ids": ["Enhanced effects and sounds"], "checked": "3.4", "author": "anwjrzlffj"},
+    {"ids": ["Enhanced effects and sounds"], "checked": "3.4", "author": "anwjrzlffj", "group": "top", "before": [{"tag": "conversion", "why": "the user's choice (2026-11-21): the conversions' animations, effects and sounds win where both change the same file"}], "notes": "Copies 50 HD JSON files and about 80 sounds whole. Converted with Convert-D2RReplaceMod.ps1 (2026-11-20, deep JSON patches): its 44 JSON files that the game has merge into what the mods above left (below Reimagined it had replaced 117 of Reimagined's files). Its sounds and 3 models still replace the others' (binary)."},
     {"ids": ["ExpandedCube"], "checked": "1.5", "author": "olegbl"},
     {"ids": ["RichMerchants"], "checked": "1.0", "author": "deo"},
     {"ids": ["ShowItemLevel"], "checked": "1.4", "author": "olegbl"},
@@ -257,6 +288,43 @@
     {"ids": ["ChestsAreBoring"], "checked": "0.1.0", "author": "czubai"},
     {"ids": ["GlyphLootFilter"], "checked": "1.0", "author": "levinium"},
     {"ids": ["Travincal Fix"], "checked": "1.0", "author": "Ubeogesh"},
-    {"ids": ["Quest Rewards"], "checked": "1.0.0", "author": "wild-healer"}
+    {"ids": ["Quest Rewards"], "checked": "1.0.0", "author": "wild-healer"},
+    {"ids": ["SorceressSpellwright"], "checked": "0.2.0", "author": "Arendeth", "tags": ["skill-pages"]},
+    {"ids": ["AmazonArcaneBallistics"], "checked": "0.5.1", "author": "Arendeth", "tags": ["skill-pages"]},
+    {"ids": ["AssassinAstralMagic"], "checked": "0.4.0", "author": "Arendeth", "tags": ["skill-pages"]},
+    {"ids": ["BarbarianChainMagic"], "checked": "0.1.1", "author": "Arendeth", "tags": ["skill-pages"]},
+    {"ids": ["DruidBaromancy"], "checked": "0.4.1", "author": "Arendeth", "tags": ["skill-pages"]},
+    {"ids": ["DruidEarthMagic"], "checked": "0.3.0", "author": "Arendeth", "tags": ["skill-pages"]},
+    {"ids": ["DruidHydromancy"], "checked": "0.3.1", "author": "Arendeth", "tags": ["skill-pages"]},
+    {"ids": ["NecromancerAcidMagic"], "checked": "0.3.1", "author": "Arendeth", "tags": ["skill-pages"]},
+    {"ids": ["NecromancerSanguimancy"], "checked": "0.1.1", "author": "Arendeth", "tags": ["skill-pages"]},
+    {"ids": ["SorceressCosmicMagic"], "checked": "0.2.1", "author": "Arendeth", "tags": ["skill-pages"]},
+    {"ids": ["WarlockEldritchHorror"], "checked": "0.3.0", "author": "Arendeth", "tags": ["skill-pages"]},
+    {"ids": ["WarlockRiftcaller"], "checked": "0.0.4", "author": "Arendeth", "tags": ["skill-pages"]},
+    {"ids": ["WarlockVoidMagic"], "checked": "0.5.2", "author": "Arendeth", "tags": ["skill-pages"]},
+    {
+      "ids": ["DruidCindertusk"], "checked": "0.3.1", "author": "Arendeth", "tags": ["skill-pages"],
+      "after": [{"mod": "DruidWildBoar", "why": "with Wild Boar Form above it the boars use that mod's boar body (otherwise dire wolves)"}]
+    },
+    {
+      "ids": ["PageBalance"], "checked": "0.2.0", "author": "Arendeth", "group": "late",
+      "after": [{"tag": "skill-pages", "why": "it balances the page skills the mods above it added (it reads the finished skills.txt)"}]
+    },
+    {
+      "ids": ["TheAbyss"], "checked": "4.2.1", "author": "reja123456789-pixel", "group": "late",
+      "notes": "Its readme: put it after mods that change items, monsters or loot tables; it adds its rows by name after theirs."
+    },
+    {
+      "ids": ["Custom_Icon_Theme_Hellforged"], "checked": "1.3", "author": "Paul j",
+      "after": [{"mod": "D2RMM_Custom_Icon_Pack_With_Editor", "why": "it is a theme for the Custom Icon Pack (its description: below the main pack)"},
+                {"mod": "Expanded Stash Plus (RoTW)-842-1-22-1775729215", "why": "its description: below storage/interface mods"},
+                {"mod": "Inventory10x8", "why": "its description: below storage/interface mods"}],
+      "requires": [{"mod": "D2RMM_Custom_Icon_Pack_With_Editor", "why": "it needs Custom Icon Pack V3"}]
+    },
+    {"ids": ["Expanded Stash Plus (RoTW)-842-1-22-1775729215"], "names": ["Expanded Stash Plus"], "checked": "1.22", "author": "olegbl, penoplast"},
+    {"ids": ["EndgameMaps"], "names": ["Endgame maps"], "checked": "1.0", "author": "MarekW"},
+    {"ids": ["LegacyOfTerror"], "checked": "1.0.2", "author": "Latedozer"},
+    {"ids": ["D2R Ragdoll Physics Mod"], "checked": "1.0.2", "author": "4Spartah"},
+    {"ids": ["Etherealize"], "checked": "1.0.0", "author": "dumedag"}
   ]
 }

@@ -219,6 +219,12 @@ def ensure_sd_server(
         print(f"[SD] failed to launch start script: {exc}", file=sys.stderr)
         return False
 
+    try:  # this job owns the server now: the hub stops it when the lease ends
+        from gpu_hub import register_server
+
+        register_server("SD 3.5", _sd_port())
+    except Exception:  # noqa: BLE001
+        pass
     if _wait_for_ping_and_load(deadline):
         return True
     print("[SD] timed out waiting for :1338", file=sys.stderr)

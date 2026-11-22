@@ -143,6 +143,19 @@ def server_busy() -> bool:
         return False
 
 
+def _take_gpu_job(label: str, wait_seconds: float) -> None:
+    """Take the GPU job before looking for a running server: taking it evicts servers an earlier
+    job left on the card, so one found before that could vanish under us."""
+    try:
+        from gpu_hub import hold_gpu_job
+    except ImportError:
+        return
+    try:
+        hold_gpu_job(label, timeout=wait_seconds)
+    except TimeoutError as exc:
+        raise RuntimeError(f"GPU job lease not acquired: {exc}") from exc
+
+
 def start_server(wait_seconds: float = STARTUP_TIMEOUT, log_path: Optional[Path] = None) -> Optional[str]:
     """Launch the TRELLIS API server and wait for it to answer /ping."""
     # Model load happens outside any request lock: take the GPU job first.
@@ -206,6 +219,12 @@ def start_server(wait_seconds: float = STARTUP_TIMEOUT, log_path: Optional[Path]
         url = detect_server()
         if url:
             print(f"[OK] TRELLIS ready at {url}", file=sys.stderr)
+            try:  # this job owns the server: the hub stops it when the lease ends
+                from gpu_hub import register_server
+
+                register_server("TRELLIS", _port())
+            except Exception:  # noqa: BLE001
+                pass
             return url
         time.sleep(5)
     raise RuntimeError(f"TRELLIS server did not respond within {wait_seconds:.0f}s; see {log_path}")
@@ -278,6 +297,7 @@ def managed_trellis_server(
     """
     if keep is None:
         keep = keep_server()
+    _take_gpu_job("TRELLIS job", wait_seconds)
     url = detect_server()
     started_here = False
     if not url and autostart:
@@ -346,6 +366,8 @@ def generate_mesh(
         raise RuntimeError(f"Reference image missing: {image_path}")
 
     try:
+        if not base_url:
+            _take_gpu_job(f"TRELLIS {output_path.name}", STARTUP_TIMEOUT)
         base_url = base_url or detect_server(verbose=True)
         if not base_url and autostart:
             base_url = start_server()

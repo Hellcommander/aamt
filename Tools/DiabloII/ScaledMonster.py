@@ -302,7 +302,9 @@ def reshape_models(archive, definition, variant, out_dir, write, index):
     import GrannyMesh
     import GrannyPreview
     name = variant['name']
-    spec = variant['reshape']
+    spec = variant.get('reshape') or {}
+    imported = variant.get('import')
+    body_done = False
     files = archive.list()
     skeleton = next((c['filename'] for e in definition['entities'] for c in e['components']
                      if c['type'] == 'SkeletonDefinitionComponent'), None)
@@ -324,14 +326,112 @@ def reshape_models(archive, definition, variant, out_dir, write, index):
                 stem = component['filename'][len('data/'):-len('.model')]
                 sources = [f for f in files if f == f'{stem}.model' or (f.startswith(f'{stem}_lod') and f.endswith('.model'))]
                 if not sources:
-                    raise FileNotFoundError(f"{name}: no model files for {component['filename']}")
+                    # Some stock definitions list models that are not in the archive at all (the
+                    # Balrog's rhand_flb/wax/wsc/wsd weapon slots); the game skips them. Leave the
+                    # component pointing at its stock path and say so, instead of refusing the variant.
+                    written.append({'file': None, 'from': component['filename'], 'edits': ['not in the archive: left as it is (the game skips it too)']})
+                    continue
                 new_stem = f"hd/character/enemy/{name}/{stem.split('/')[-1]}"
-                for source in sorted(sources):
-                    model = GrannyMesh.Model(fetch(source))
-                    report = GrannyMesh.reshape(model, bones, spec.get('quills'), spec.get('bulk'), spec.get('shape'))
+                body = None
+                if imported and not body_done and imported.get('part', stem.split('/')[-1]) == stem.split('/')[-1]:
+                    # "import": a mesh made outside the game takes this model's place (MeshImport.py):
+                    # the donor's skeleton, skin (by position), material slot and LOD files, with
+                    # the mesh's own textures. The edits below then work on the imported body.
+                    import Granny
+                    import MeshImport
+                    body_done = True
+                    base_dir = imported.get('_dir', '.')
+                    donor_data = [archive.read(f) for f in sorted(sources)]
+                    donor_tree = Granny.read(donor_data[0]).root()
+                    mesh, embedded = MeshImport.load(os.path.join(base_dir, imported['mesh']), imported.get('axes'))
+                    mesh, unwrapped = MeshImport.ensure_uvs(mesh, imported)     # a file without UVs is unwrapped
+                    if imported.get('weld', True):                              # as MeshImport.import_body does
+                        mesh, before = MeshImport.weld(mesh)
+                        if before != len(mesh.positions):
+                            unwrapped = unwrapped + [f'welded: {before} vertices -> {len(mesh.positions)} (same point, UV and skin)']
+                    embedded = embedded if embedded is not None else mesh.images.get('albedo')
+                    standalone = bool(imported.get('_standalone'))
+                    if standalone and mesh.joints is None:
+                        raise ValueError(f'{name}: without a "donor" the mesh file has to bring its own rig (a .glb / .gltf with an armature and weights)')
+                    placed = MeshImport.place(mesh, MeshImport.Donor(donor_tree).box,
+                                              dict(imported, fit=imported.get('fit', 'none')) if standalone else imported)
+                    renames, textures = MeshImport.make_textures(
+                        imported, name, f'hd/character/enemy/{name}',
+                        lambda path: archive.read(path[len('data/'):] if path.startswith('data/') else path),
+                        donor_tree, embedded, base_dir, mesh.images)
+                    # A file with its own rig may bring joints the skeleton lacks: they become
+                    # new bones in every model file (MeshImport.replace_geometry) and in the
+                    # variant's own .skeleton file (below, or own_animations).
+                    known = {b['Name'] for b in donor_tree['Models'][0]['Skeleton']['Bones']}
+                    if standalone:
+                        variant['_own_rig'] = mesh
+                    elif MeshImport.uses_own_rig(mesh, known, imported.get('skin')):
+                        variant['_new_bones'] = MeshImport.missing_bones(mesh, known)
+                    if write:
+                        for path, data in textures.items():
+                            full = os.path.join(out_dir, *path.split('/'))
+                            os.makedirs(os.path.dirname(full), exist_ok=True)
+                            with open(full, 'wb') as f:
+                                f.write(data)
+                    listed = definition['dependencies'].setdefault('textures', [])
+                    for dep in listed:
+                        dep['path'] = renames.get(dep['path'], dep['path'])
+                    for path in renames.values():
+                        if not any(dep['path'] == path for dep in listed):
+                            listed.append({'path': path})
+                    counts = [len(Granny.mesh_indices(Granny.read(d).root()['Meshes'][0]['PrimaryTopology'])) // 3 for d in donor_data]
+                    body = {'mesh': mesh, 'renames': renames, 'notes': unwrapped + placed + [f'textures: {", ".join(sorted(textures))}'],
+                            'ratios': imported.get('lods') or [c / counts[0] for c in counts]}
+                for number, source in enumerate(sorted(sources)):
+                    fetched = fetch(source)
+                    imported_lines = []
+                    if body:
+                        ratio = body['ratios'][min(number, len(body['ratios']) - 1)]
+                        level = body['mesh'] if ratio >= 1.0 else MeshImport.simplify(body['mesh'], max(64, int(len(body['mesh'].triangles) * ratio)), imported.get('simplify', 'auto'))
+                        with open(fetched, 'rb') as f:
+                            built, imported_lines = MeshImport.replace_geometry(f.read(), level, imported.get('skin'), body['renames'],
+                                                                                 bool(imported.get('_standalone')))
+                        with open(fetched, 'wb') as f:
+                            f.write(built)
+                        imported_lines = [f"imported {os.path.basename(imported['mesh'])}"] + (body['notes'] if number == 0 else []) + imported_lines
+                    model = GrannyMesh.Model(fetched)
+                    report = imported_lines + GrannyMesh.reshape(model, bones, spec.get('quills'), spec.get('bulk'), spec.get('shape'))
                     report += point_textures(model, variant.get('retexture', []))
                     target = new_stem + source[len(stem):]
-                    if write:
+                    if spec.get('remove') or spec.get('add'):
+                        # Adding and removing geometry rebuild the file (GrannyMesh.add_geometry,
+                        # remove_geometry), after the in-place edits above: parts are added first,
+                        # so a remove rule can also trim them.
+                        edited = os.path.join(work, 'edited.model')
+                        model.save(edited)
+                        with open(edited, 'rb') as f:
+                            data = f.read()
+                        if spec.get('add'):
+                            lod = source[len(stem):]            # '_lod2.model', or '.model'
+
+                            def part(name, lod=lod):
+                                """A rule's "from": an archive model, by full path or by stem (then this
+                                file's LOD, or the nearest more detailed one the part has)."""
+                                name = name[len('data/'):] if name.startswith('data/') else name
+                                if name in files:
+                                    return archive.read(name)
+                                base = name[:-len('.model')] if name.endswith('.model') else name
+                                levels = sorted(f for f in files if f.startswith(f'{base}_lod') and f.endswith('.model'))
+                                if not levels:
+                                    raise ValueError(f'{variant["name"]}: "from": {name} is not in the game archive')
+                                wanted = f'{base}{lod}'
+                                return archive.read(wanted if wanted in levels else max((f for f in levels if f < wanted), default=levels[0]))
+                            data, lines = GrannyMesh.add_geometry(data, spec['add'], load=part)
+                            report += lines
+                        if spec.get('remove'):
+                            data, lines = GrannyMesh.remove_geometry(data, spec['remove'])
+                            report += lines
+                        if write:
+                            path = os.path.join(out_dir, *target.split('/'))
+                            os.makedirs(os.path.dirname(path), exist_ok=True)
+                            with open(path, 'wb') as f:
+                                f.write(data)
+                    elif write:
                         model.save(os.path.join(out_dir, *target.split('/')))
                     written.append({'file': target, 'from': source, 'edits': report})
                 # The game only draws models listed in hd/model_lod_desc.bin (see ModelLodDesc.py).
@@ -340,6 +440,21 @@ def reshape_models(archive, definition, variant, out_dir, write, index):
                 component['filename'] = f'data/{new_stem}.model'
         for dep in definition['dependencies'].get('models', []):
             dep['path'] = renamed.get(dep['path'], dep['path'])
+        if variant.get('_new_bones') and not variant.get('animations'):
+            # No clips of its own, so no own skeleton file yet: write one with the new bones.
+            import MeshImport
+            component = next(c for e in definition['entities'] for c in e['components'] if c['type'] == 'SkeletonDefinitionComponent')
+            data, added = MeshImport.extend_skeleton(archive.read(component['filename'][len('data/'):]), variant['_new_bones'])
+            new_skeleton = f'data/hd/character/enemy/{name}/skeleton/{name}.skeleton'
+            component['filename'] = new_skeleton
+            for dep in definition['dependencies'].get('skeletons', []):
+                dep['path'] = new_skeleton
+            if write:
+                target = os.path.join(out_dir, *new_skeleton[len('data/'):].split('/'))
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with open(target, 'wb') as f:
+                    f.write(data)
+            written.append({'file': new_skeleton[len('data/'):], 'from': skeleton, 'edits': [f'new bones: {", ".join(added)}']})
     return written
 
 
@@ -371,6 +486,9 @@ def write_textures(archive, definition, variant, out_dir, write):
     "format": "bc3" | "bc1" | "rgba8", "recolor": {"hue", "minSat", "hueShift", "sat", "value"}}.
     Block textures are recoloured block by block (RecolorEffect.py: the two end colours of every
     4x4 block, every mip), so the file keeps its format, size and mips.
+    "detail": {"kind": "feathers", ...TextureDetail options} instead redraws the texture at a
+    higher resolution with procedural detail that follows the stock cards (TextureDetail.py; the
+    recolour is applied per texel first), written as BC3 sRGB with a full mip chain.
     """
     import RecolorEffect
     out = []
@@ -379,6 +497,31 @@ def write_textures(archive, definition, variant, out_dir, write):
         kind = item.get('format', 'bc3')
         _, size, w, h = tex.mips[0]
         per_block = {'bc1': 8, 'bc3': 16}.get(kind)
+        detail = item.get('detail')
+        if detail:
+            import HdTexture
+            import TextureDetail
+            options = {k: v for k, v in detail.items() if k != 'kind' and not k.startswith('_')}
+            options.setdefault('recolor', item.get('recolor'))
+            if detail.get('kind', 'feathers') != 'feathers':
+                raise ValueError(f"retexture: detail kind {detail.get('kind')} is not known (feathers)")
+            image, _ = TextureDetail.feathers(HdTexture.to_image(bytes(tex.data)), options)
+            data, encoder = TextureDetail.encode_bc3(image, srgb=tex.format == 0x3E)
+            checked, _ = TextureDetail.check_texture(data, image.size)
+            if write:
+                target = os.path.join(out_dir, *item['to'][len('data/'):].split('/'))
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                with open(target, 'wb') as f:
+                    f.write(data)
+            textures = definition['dependencies'].setdefault('textures', [])
+            for dep in textures:
+                if dep['path'] == item['from']:
+                    dep['path'] = item['to']
+            if not any(dep['path'] == item['to'] for dep in textures):
+                textures.append({'path': item['to']})
+            out.append({'file': item['to'][len('data/'):], 'from': item['from'][len('data/'):], 'texture': tex.describe(),
+                        'recolor': item.get('recolor'), 'detail': checked, 'encoder': encoder})
+            continue
         if kind == 'rgba8':
             if tex.kind() != 'rgba8':
                 raise ValueError(f"retexture: {item['from']} is not RGBA8 ({tex.describe()})")
@@ -500,11 +643,27 @@ def own_animations(archive, definition, variant, out_dir, write, audit=None):
     old_folder = old_machine[:old_machine.rindex('/')]                  # data/hd/character/enemy/<donor>
     new_folder = f'data/hd/character/enemy/{name}'
     skeleton_bytes = archive.read(skeleton_component['filename'][len('data/'):])
+    if variant.get('_new_bones'):
+        # An imported body brought bones of its own ("import" with a rigged file): the variant's
+        # skeleton gets them too. Clips have no track for them, so they hold their bind pose
+        # against their parent unless a clip spec poses them.
+        import MeshImport
+        skeleton_bytes, _ = MeshImport.extend_skeleton(skeleton_bytes, variant['_new_bones'])
+    own = variant.get('_own_rig')
+    stock_clips = archive.read(f"{old_folder[len('data/'):]}/animation/combined.animations")
+    if own is not None:
+        # A body without a donor: the template's skeleton file and animation file are only
+        # containers for the file's own rig and clips; clip specs then build on those clips.
+        import MeshImport
+        if not own.model.clips:
+            raise ValueError(f'{name}: the mesh file has no animations; a body with its own skeleton needs its own clips')
+        skeleton_bytes = MeshImport.own_skeleton_file(skeleton_bytes, own)
+        stock_clips, _ = MeshImport.own_clips(own, stock_clips, skeleton_bytes, float(variant['import'].get('fps', 30.0)))
     skeleton = GrannyAnim.Skeleton(skeleton_bytes)
-    animations = GrannyAnim.load(archive.read(f"{old_folder[len('data/'):]}/animation/combined.animations"))
+    animations = GrannyAnim.load(stock_clips)
     stock = animations.names()
     added = []
-    for spec in variant['animations']:
+    for spec in variant.get('animations', []):
         marks = clip_marks(audit, spec)
         keys = GrannyAnim.build_clip(animations, skeleton, spec, marks)
         entry = {'clip': spec['name'], 'base': spec.get('base') or '+'.join(part['base'] for part in spec['parts']), 'seconds': round(keys.duration, 3), 'keys': len(keys.times),
@@ -517,9 +676,45 @@ def own_animations(archive, definition, variant, out_dir, write, audit=None):
     text = json.dumps(machine, separators=(',', ':')).replace(f'{old_folder}/animation/', f'{new_folder}/animation/')
     machine = json.loads(text)
     machine['name'] = f'{name}_statemachine'
+    bindings = None
+    # Weapon-class keys ("hth") for states the template leaves unbound ({}), e.g. hydra1's
+    # Hydra_Missile_Attack1: binding by the state's own keys would keep {} and the game asserts
+    # "control" (animation_controller.cpp) when such a unit is made.
+    class_keys = next((list(st['animationBindings']) for st in machine['states'] if st.get('animationBindings')), ['hth'])
+
+    def bind(state, clip):
+        state['animationBindings'] = {key: [clip] for key in (state.get('animationBindings') or class_keys)}
+
+    if own is not None:
+        # The machine keeps the template's states and transitions; its clips are the file's.
+        # A state plays the clip "modes" names for its mode ({"NU": "idle", "A1": "bite"}), else
+        # a clip called like the state's stock clip (a file clip named "walk"), else the idle
+        # clip, so that no state is left without motion ("fallback": false leaves those alone,
+        # as stock machines often name clips their animation file does not have).
+        clips = animations.names() + [spec['name'] for spec in variant.get('animations', [])]
+        wanted = {key.upper(): value for key, value in (variant['import'].get('modes') or {}).items()}
+        for code, clip in wanted.items():
+            if code not in MODE_STATES:
+                raise ValueError(f'{name}: "modes" has no mode {code} (known: {" ".join(MODE_STATES)})')
+            if clip not in clips:
+                raise ValueError(f'{name}: mode {code} asks for clip "{clip}"; the file has {", ".join(clips)}')
+        idle = wanted.get('NU') or next((c for c in clips if c.lower() in ('neutral', 'idle')), clips[0])
+        codes = {state_name: code for code, state_name in MODE_STATES.items()}
+        bindings = {}
+        for state in machine['states']:
+            code = codes.get(state['name'])
+            was = next(iter(state['animationBindings'].values()), [None])[0]
+            clip, how = (wanted[code], 'modes') if code in wanted else (was, 'same name') if was in clips else (None, None)
+            if clip is None and variant['import'].get('fallback', True):
+                clip, how = idle, 'idle clip as stand-in'
+            if clip is not None:
+                bind(state, clip)
+            bindings[state.get('_name') or state['name']] = {'clip': clip, 'by': how} if clip else {'clip': was, 'by': 'left as the template has it (no such clip)'}
+        machine['animations'] = [{'type': 'AnimationItem', 'name': clip, 'filename': f'{new_folder}/animation/{clip}.animation'} for clip in animations.names()]
+        machine['dependencies']['animations'] = [{'path': item['filename']} for item in machine['animations']]
     # A clip with "mode" is bound to that mode's state under its own name (a clip called
     # "charge" on S3), instead of having to be named after the state's stock clip.
-    for spec in variant['animations']:
+    for spec in variant.get('animations', []):
         if not spec.get('mode'):
             continue
         state_name = MODE_STATES.get(spec['mode'].upper())
@@ -528,12 +723,12 @@ def own_animations(archive, definition, variant, out_dir, write, audit=None):
             state = add_sequence_state(machine)
         if state is None:
             raise ValueError(f"{name}: clip {spec['name']} asks for mode {spec['mode']}, which the state machine has no state for")
-        state['animationBindings'] = {key: [spec['name']] for key in state['animationBindings']}
+        bind(state, spec['name'])
         if 'loop' in spec:
             state['loopCount'] = 0 if spec['loop'] else 1
     # Every new clip is listed as an AnimationItem (bound to a state or not), so a mod can bind it
     # by name in states of its own, e.g. skill-indexed states its install script adds.
-    for spec in variant['animations']:
+    for spec in variant.get('animations', []):
         clip_path = f"{new_folder}/animation/{spec['name']}.animation"
         if not any(a['name'] == spec['name'] for a in machine['animations']):
             machine['animations'].append({'type': 'AnimationItem', 'name': spec['name'], 'filename': clip_path})
@@ -554,7 +749,12 @@ def own_animations(archive, definition, variant, out_dir, write, audit=None):
         os.makedirs(os.path.dirname(target), exist_ok=True)
         with open(target, 'wb') as f:
             f.write(skeleton_bytes)
-    return {'stockClips': stock, 'added': added, 'stateMachine': new_machine[len('data/'):], 'skeleton': new_skeleton[len('data/'):]}
+    out = {'stockClips': stock, 'added': added, 'stateMachine': new_machine[len('data/'):], 'skeleton': new_skeleton[len('data/'):]}
+    if own is not None:
+        out.update({'ownRig': {'bones': len(own.joint_names)}, 'ownClips': {clip: round(seconds, 3) for clip, seconds in own.model.clips.items()},
+                    'stateClips': bindings})
+        del out['stockClips']
+    return out
 
 
 def sprite_scale(archive, variant, audit, definition_models_height=None):
@@ -595,13 +795,22 @@ def run(preset, game_path, casclib, out_dir, audit_only):
     index = []
     with D2RArchive(game_path, casclib) as archive:
         for variant in preset['variants']:
-            donor = variant['donor']
+            # A variant whose "import" brings its own rig needs no donor: skeleton, skin and clips
+            # are the file's ("skeleton": "file", or simply no "donor"). A stock monster
+            # ("template", default sandleaper1) then only lends the definition's layout, the state
+            # machine's states and the file formats.
+            imported = variant.get('import')
+            if imported is not None:
+                imported['_standalone'] = imported.get('skeleton') == 'file' or 'donor' not in variant
+            elif 'donor' not in variant:
+                raise ValueError(f"{variant.get('name')}: a variant needs a \"donor\", or an \"import\" with its own rig")
+            donor = variant.get('donor') or variant.get('template') or 'sandleaper1'
             if donor not in report['audits']:
                 report['audits'][donor] = audit_animations(archive, donor)
             audit = report['audits'][donor]
             if not audit['hdHasModel']:
                 raise ValueError(f'{donor} has no HD model in the archive, so it cannot be a donor')
-            scale = variant['scale']
+            scale = variant.get('scale', 1.0)
             sized = None
             if isinstance(scale, dict) and 'sprite' in scale:
                 scale, sized = sprite_scale(archive, variant, audit)
@@ -626,7 +835,9 @@ def run(preset, game_path, casclib, out_dir, audit_only):
                 attach_props(definition, variant['name'], attachments, part, part_variant)
             if variant.get('retexture') and not variant.get('reshape'):
                 raise ValueError(f"{variant['name']}: \"retexture\" needs \"reshape\" (the variant's own model files to point at the textures)")
-            if variant.get('reshape'):
+            if variant.get('import'):
+                variant['import'].setdefault('_dir', preset.get('_dir', '.'))
+            if variant.get('reshape') or variant.get('import'):
                 entry['models'] = reshape_models(archive, definition, variant, out_dir, not audit_only, index)
             if variant.get('retexture'):
                 entry['textures'] = write_textures(archive, definition, variant, out_dir, not audit_only)
@@ -642,8 +853,20 @@ def run(preset, game_path, casclib, out_dir, audit_only):
                 scale = round(scale * donor_height / new_height, 3)
                 sized.update({'donorMeshHeight': round(donor_height, 3), 'reshapedMeshHeight': round(new_height, 3)})
                 entry['scale'] = scale
-            if variant.get('animations'):
+            if variant.get('animations') or variant.get('_own_rig') is not None:
                 entry['animations'] = own_animations(archive, definition, variant, out_dir, not audit_only, audit)
+            if variant.get('_own_rig') is not None:
+                entry['standalone'] = True
+                entry['template'] = entry.pop('donor')
+                entry['donor'] = None
+                # Components that name the template's bones cannot work on another skeleton.
+                dropped = []
+                for entity in definition['entities']:
+                    for component in list(entity['components']):
+                        if component['type'] == 'IKComponent':
+                            entity['components'].remove(component)
+                            dropped.append(component['type'])
+                entry['droppedComponents'] = dropped
             prop_definitions = {name: build_prop_definition(archive, name, preset['props'][name]) for name in used_props}
             if not audit_only:
                 write_json(out_dir, entry['file'], definition)
@@ -690,10 +913,12 @@ def print_report(report, audit_only):
             z = v['sizedFromSprite']
             extra += f", sized from sprite {z['sprite']} ({z['spriteHeightPx']} px over {z['donorToken']} {z['donorHeightPx']} px)"
         if v.get('animations'):
-            extra += f", own animations: +{' +'.join(a['clip'] for a in v['animations']['added'])}"
+            mine = list(v['animations'].get('ownClips', {})) + [a['clip'] for a in v['animations']['added']]
+            extra += f", own animations: +{' +'.join(mine)}"
         if v.get('models'):
             extra += f", {len(v['models'])} model files reshaped"
-        print(f"{'would build' if audit_only else 'built'} {v['file']}  ({v['donor']} x{v['scale']}{extra})")
+        origin = f"own rig, template {v['template']}" if v.get('standalone') else v['donor']
+        print(f"{'would build' if audit_only else 'built'} {v['file']}  ({origin} x{v['scale']}{extra})")
 
 
 def main():
@@ -711,6 +936,7 @@ def main():
         ap.error('--out is required unless --audit is given')
     with open(args.preset, encoding='utf-8') as f:
         preset = json.load(f)
+    preset['_dir'] = os.path.dirname(os.path.abspath(args.preset))
     report = run(preset, args.game, args.casclib, args.out, args.audit)
     print_report(report, args.audit)
     return 0

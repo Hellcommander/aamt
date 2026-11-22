@@ -34,6 +34,9 @@
   .tab:hover{color:var(--vscode-foreground);border-color:var(--accent)}
   .tab.on{color:var(--vscode-foreground);background:var(--vscode-input-background);border-color:var(--accent)}
   .tab .tt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tab .tf{flex:none;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;padding:0 5px;border-radius:4px;background:var(--vscode-badge-background,rgba(128,128,128,.2));color:var(--vscode-badge-foreground,inherit)}
+  #where{display:none;margin:6px 14px 0;padding:4px 9px;border-radius:6px;font-size:11px;color:var(--muted);background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.12));white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #where.on{display:block}
   .tab.unread .tt,.hrow.unread .ht{font-weight:700}
   .tab .x{flex:none;width:16px;height:16px;line-height:15px;text-align:center;border-radius:50%;opacity:.6}
   .tab .x:hover{opacity:1;background:var(--vscode-toolbar-hoverBackground,rgba(128,128,128,.25))}
@@ -382,6 +385,12 @@
     <button data-cmd="progress"><span>Open this chat's progress</span></button>
     <button data-cmd="indexes"><span>Session indexes…</span><small>master · folder · chat</small></button>
     <button data-cmd="new"><span>New chat</span></button>
+    <button data-cmd="newIn"><span>New chat in folder…</span><small>works there, opens here</small></button>
+    <div class="sec">Memory</div>
+    <button data-cmd="memory"><span>Manage memory…</span><small>view · edit · delete</small></button>
+    <button data-cmd="memoryAdd"><span>Add a memory…</span></button>
+    <button data-cmd="memoryImport"><span>Import memory…</span><small>Claude Code · other assistants</small></button>
+    <button data-cmd="memoryExport"><span>Export memory…</span><small>.zip</small></button>
     <div class="sec">Skills</div>
     <button data-cmd="skills"><span>Skills &amp; canvases catalog</span></button>
     <button data-cmd="sync"><span>Sync skills now</span></button>
@@ -397,6 +406,7 @@
   </div></div>
   <div id="ctx" role="menu" aria-label="File"></div>
   <div id="tabs"></div>
+  <div id="where" title="This chat works in another folder: its tools, git, checks and project memory use that folder"></div>
   <div id="hist" role="dialog" aria-label="Chat history">
     <div id="histhd"><input id="histq" type="text" placeholder="Search chats (titles, models, messages)…"/><button class="btn2" type="button" data-cmd="new">＋ New</button><button class="icon" id="histx" type="button" title="Close">✕</button></div>
     <div id="histlist"></div>
@@ -488,6 +498,7 @@ function paintTabs(){
     b.title = e.title + "\n" + modelLabel(e) + " · " + (e.status || "idle") + "\nMiddle-click or × closes the tab; the chat stays in history.";
     b.appendChild(dot(e.status));
     const t = document.createElement("span"); t.className = "tt"; t.textContent = e.title; b.appendChild(t);
+    if (e.folder){ const f = document.createElement("span"); f.className = "tf"; f.textContent = e.folder; b.appendChild(f); b.title = e.title + "\nWorks in " + e.workspace + "\n" + modelLabel(e) + " · " + (e.status || "idle"); }
     const x = document.createElement("span"); x.className = "x"; x.textContent = "×"; x.title = "Close tab (keeps the chat in history)";
     x.onclick = (ev) => { ev.stopPropagation(); vs.postMessage({ type: "close", id: e.id }); };
     b.appendChild(x);
@@ -518,7 +529,7 @@ function chatRow(e, w, opts = {}){
   const here = !!w.here;
   const r = el("div", "hrow tree" + (here && e.id === sid ? " on" : "") + (e.unread ? " unread" : ""));
   r.tabIndex = 0;
-  r.title = e.title + "\n" + modelLabel(e) + " · " + (e.turns ? e.turns + " turn" + (e.turns === 1 ? "" : "s") : "empty") + " · " + (e.status || "idle") + (here ? "" : "\nIn " + (w.workspace || w.name) + ": click to open that folder, continue the chat here, or read it.");
+  r.title = e.title + "\n" + modelLabel(e) + " · " + (e.turns ? e.turns + " turn" + (e.turns === 1 ? "" : "s") : "empty") + " · " + (e.status || "idle") + (here ? "" : "\nIn " + (w.workspace || w.name) + ": click to open it here (it keeps working in that folder); ⋯ for a new window, a copy, or a read-only transcript.");
   r.appendChild(dot(e.status));
   if (e.pinned && !opts.inPinned) r.appendChild(el("span", "pinned", "★"));
   r.appendChild(el("span", "ht", e.title));
@@ -531,10 +542,11 @@ function chatRow(e, w, opts = {}){
     acts.appendChild(histButton("🗑", "Delete from history", () => vs.postMessage({ type: "delete", id: e.id })));
   } else {
     acts.appendChild(histButton(e.pinned ? "★" : "☆", e.pinned ? "Unpin" : "Pin to the top", () => vs.postMessage({ type: "pinForeign", slug: w.slug, id: e.id }), e.pinned ? "pinned" : ""));
+    acts.appendChild(histButton("⋯", "More: open its folder in a new window, copy it here, read it", () => vs.postMessage({ type: "foreign", slug: w.slug, id: e.id })));
   }
   r.appendChild(acts);
   const open = () => {
-    if (!here){ vs.postMessage({ type: "foreign", slug: w.slug, id: e.id }); return; }
+    if (!here){ openHistory(false); vs.postMessage({ type: "attach", slug: w.slug, workspace: w.workspace || "", id: e.id }); return; }
     openHistory(false); if (e.id !== sid) vs.postMessage({ type: "switch", id: e.id });
   };
   r.onclick = open;
@@ -559,8 +571,9 @@ function paintHistory(){
   const needle = $("histq").value.trim().toLowerCase();
   const deep = found && found.q.toLowerCase() === needle ? new Set(found.ids) : null;
   // This window's folder is drawn from the live list; the others from the master index.
-  let folders = tree.map((w) => (w.here ? Object.assign({}, w, { chats: sessions }) : w));
-  if (!folders.some((w) => w.here)) folders.unshift({ slug: "", name: "This workspace", workspace: "", here: true, current: true, exists: true, chats: sessions });
+  const mine = sessions.filter((e) => !e.workspace);
+  let folders = tree.map((w) => (w.here ? Object.assign({}, w, { chats: mine }) : w));
+  if (!folders.some((w) => w.here)) folders.unshift({ slug: "", name: "This workspace", workspace: "", here: true, current: true, exists: true, chats: mine });
   const hit = (e, w) => !needle || (e.title + " " + modelLabel(e) + " " + w.name).toLowerCase().includes(needle) || (w.here && deep && deep.has(e.id));
   let shown = 0;
   // Pinned: every workspace's pinned chats, newest first
@@ -1180,7 +1193,7 @@ window.addEventListener("message", (e) => {
   if (m.sid && m.sid !== sid && m.type !== "restore") return;
   if (m.type === "header") header(m);
   else if (m.type === "info"){ info = m; paintInfo(); paintHint(); }
-  else if (m.type === "restore"){ sid = m.sid || ""; log.innerHTML = ""; live.textContent = ""; (m.log || []).forEach(add); todos(m.todos); welcome(); busy(!!m.busy); pend = m.pending || []; paintPend(); log.scrollTop = log.scrollHeight; paintTabs(); }
+  else if (m.type === "restore"){ const wh = $("where"); wh.textContent = m.workspace ? "Working in " + m.workspace : ""; wh.classList.toggle("on", !!m.workspace); sid = m.sid || ""; log.innerHTML = ""; live.textContent = ""; (m.log || []).forEach(add); todos(m.todos); welcome(); busy(!!m.busy); pend = m.pending || []; paintPend(); log.scrollTop = log.scrollHeight; paintTabs(); }
   else if (m.type === "pending"){ pend = m.items || []; paintPend(); }
   else if (m.type === "panels"){ panels = Object.assign({ tabs: [], canvases: [], custom: [], commands: [], agents: [] }, m); welcome(); }
   else if (m.type === "attached") addAtt(m.items);

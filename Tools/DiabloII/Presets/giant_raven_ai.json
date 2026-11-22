@@ -1,0 +1,771 @@
+{
+  "name": "Giant Raven, AI body (Druid Giant Raven mod): the form's own raven, made from the ground up",
+  "notes": [
+    "Written by DruidGiantRaven\\dev\\raven_clips.py; edit that script, not this file.",
+    "Body, texture, skeleton (UniRig + the mod's wing chains, 24 bones), skin and the ten base clips: the toolkit AI chain (SD 3.5 + refart from the user's concept -> TRELLIS.2 -> UniRig -> Wan2.2 clips), see DruidGiantRaven\\dev\\make_raven_ai.py. No stock raven is in its lineage.",
+    "template sandleaper1: only the file format, definition layout, material slot and LOD file count (MeshImport donor-free mode).",
+    "Size: 11.0 feet across the wing tips at root scale 1; the mod's size setting scales the root."
+  ],
+  "variants": [
+    {
+      "name": "rv_raven_ai",
+      "template": "sandleaper1",
+      "scale": 1.0,
+      "import": {
+        "mesh": "C:\\Users\\Arend\\AppData\\Local\\D2RModAssets\\bodies\\DruidGiantRaven\\raven_anim.glb",
+        "scale": 11.0,
+        "normal": "from_albedo",
+        "texture_size": 2048,
+        "max_vertices": 0,
+        "modes": {
+          "NU": "hover",
+          "WL": "fly",
+          "RN": "run",
+          "GH": "gethit",
+          "A1": "peck",
+          "A2": "dive",
+          "BL": "block",
+          "SC": "spell",
+          "DT": "fall",
+          "DD": "dead",
+          "S1": "caw",
+          "S2": "dive",
+          "S3": "gust",
+          "S4": "leap_strike"
+        }
+      },
+      "animations": [
+        {
+          "name": "hover",
+          "base": "idle",
+          "seamless": 0.15
+        },
+        {
+          "name": "fidget_01",
+          "base": "idle2"
+        },
+        {
+          "name": "fly",
+          "base": "move",
+          "seamless": 0.12
+        },
+        {
+          "name": "run",
+          "base": "move",
+          "from": 0.0,
+          "duration": 0.9,
+          "edits": [
+            {
+              "rotate": "bone_0",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  14
+                ],
+                [
+                  1,
+                  14
+                ]
+              ]
+            }
+          ],
+          "seamless": 0.1
+        },
+        {
+          "name": "fall",
+          "base": "death"
+        },
+        {
+          "name": "dead",
+          "base": "death",
+          "at": 1.98,
+          "duration": 1.0
+        },
+        {
+          "name": "gethit",
+          "base": "hit",
+          "from": 0.0,
+          "duration": 0.3
+        },
+        {
+          "name": "block",
+          "base": "dodge",
+          "from": 0.3,
+          "duration": 0.2,
+          "to": 0.75
+        },
+        {
+          "name": "peck",
+          "base": "attack",
+          "from": 0.0,
+          "duration": 0.45
+        },
+        {
+          "name": "dive",
+          "base": "attack2",
+          "from": 0.0,
+          "duration": 0.5
+        },
+        {
+          "name": "throw",
+          "base": "attack",
+          "from": 0.0,
+          "duration": 0.45,
+          "edits": [
+            {
+              "rotate": "wingR0",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0.0
+                ],
+                [
+                  0.4,
+                  12.0
+                ],
+                [
+                  0.6,
+                  -9.0
+                ],
+                [
+                  1,
+                  0.0
+                ]
+              ]
+            },
+            {
+              "rotate": "wingL0",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0.0
+                ],
+                [
+                  0.4,
+                  -12.0
+                ],
+                [
+                  0.6,
+                  9.0
+                ],
+                [
+                  1,
+                  0.0
+                ]
+              ]
+            },
+            {
+              "rotate": "wingR1",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0.0
+                ],
+                [
+                  0.4,
+                  5.0
+                ],
+                [
+                  0.6,
+                  -3.75
+                ],
+                [
+                  1,
+                  0.0
+                ]
+              ]
+            },
+            {
+              "rotate": "wingL1",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0.0
+                ],
+                [
+                  0.4,
+                  -5.0
+                ],
+                [
+                  0.6,
+                  3.75
+                ],
+                [
+                  1,
+                  0.0
+                ]
+              ]
+            },
+            {
+              "rotate": "wingR2",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0.0
+                ],
+                [
+                  0.4,
+                  3.0
+                ],
+                [
+                  0.6,
+                  -2.25
+                ],
+                [
+                  1,
+                  0.0
+                ]
+              ]
+            },
+            {
+              "rotate": "wingL2",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0.0
+                ],
+                [
+                  0.4,
+                  -3.0
+                ],
+                [
+                  0.6,
+                  2.25
+                ],
+                [
+                  1,
+                  0.0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "spell",
+          "base": "cast",
+          "from": 0.0,
+          "duration": 0.6
+        },
+        {
+          "name": "gust",
+          "base": "cast",
+          "from": 0.2,
+          "duration": 0.5
+        },
+        {
+          "name": "storm",
+          "base": "cast",
+          "from": 0.0,
+          "duration": 0.6,
+          "edits": [
+            {
+              "rotate": "bone_0",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 2,
+                "amplitude": 12
+              }
+            }
+          ]
+        },
+        {
+          "name": "caw",
+          "base": "special",
+          "from": 0.15,
+          "duration": 0.55,
+          "to": 1.15
+        },
+        {
+          "name": "molt",
+          "base": "special",
+          "from": 0.6,
+          "duration": 0.5,
+          "to": 1.3,
+          "edits": [
+            {
+              "rotate": "bone_0",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  0
+                ]
+              ],
+              "wave": {
+                "cycles": 5,
+                "amplitude": 6
+              }
+            }
+          ]
+        },
+        {
+          "name": "channel",
+          "base": "idle",
+          "from": 0.0,
+          "duration": 0.5,
+          "to": 1.0,
+          "edits": [
+            {
+              "rotate": "bone_0",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  -10
+                ],
+                [
+                  1,
+                  -10
+                ]
+              ]
+            },
+            {
+              "rotate": "wingR0",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  9.0
+                ],
+                [
+                  1,
+                  9.0
+                ]
+              ]
+            },
+            {
+              "rotate": "wingL0",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  -9.0
+                ],
+                [
+                  1,
+                  -9.0
+                ]
+              ]
+            },
+            {
+              "rotate": "wingR1",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  3.75
+                ],
+                [
+                  1,
+                  3.75
+                ]
+              ]
+            },
+            {
+              "rotate": "wingL1",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  -3.75
+                ],
+                [
+                  1,
+                  -3.75
+                ]
+              ]
+            },
+            {
+              "rotate": "wingR2",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  2.25
+                ],
+                [
+                  1,
+                  2.25
+                ]
+              ]
+            },
+            {
+              "rotate": "wingL2",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  -2.25
+                ],
+                [
+                  1,
+                  -2.25
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "charge",
+          "base": "move",
+          "from": 0.0,
+          "duration": 0.4,
+          "to": 0.92,
+          "edits": [
+            {
+              "rotate": "bone_0",
+              "axis": [
+                1,
+                0,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  26
+                ],
+                [
+                  1,
+                  26
+                ]
+              ]
+            },
+            {
+              "rotate": "wingR0",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  -12.0
+                ],
+                [
+                  1,
+                  -12.0
+                ]
+              ]
+            },
+            {
+              "rotate": "wingL0",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  12.0
+                ],
+                [
+                  1,
+                  12.0
+                ]
+              ]
+            },
+            {
+              "rotate": "wingR1",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  -5.0
+                ],
+                [
+                  1,
+                  -5.0
+                ]
+              ]
+            },
+            {
+              "rotate": "wingL1",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  5.0
+                ],
+                [
+                  1,
+                  5.0
+                ]
+              ]
+            },
+            {
+              "rotate": "wingR2",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  -3.0
+                ],
+                [
+                  1,
+                  -3.0
+                ]
+              ]
+            },
+            {
+              "rotate": "wingL2",
+              "axis": [
+                0,
+                0,
+                1
+              ],
+              "degrees": [
+                [
+                  0,
+                  3.0
+                ],
+                [
+                  1,
+                  3.0
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "spin",
+          "base": "idle",
+          "from": 0.0,
+          "duration": 0.4,
+          "to": 0.8,
+          "edits": [
+            {
+              "rotate": "bone_0",
+              "axis": [
+                0,
+                1,
+                0
+              ],
+              "degrees": [
+                [
+                  0,
+                  0
+                ],
+                [
+                  1,
+                  360
+                ]
+              ],
+              "ease": "linear"
+            }
+          ]
+        },
+        {
+          "name": "leap_windup",
+          "base": "dodge",
+          "from": 0.0,
+          "duration": 0.3,
+          "to": 0.35
+        },
+        {
+          "name": "leap_air",
+          "base": "dodge",
+          "from": 0.35,
+          "duration": 0.4,
+          "to": 0.8,
+          "edits": [
+            {
+              "move": "bone_0",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    1.6,
+                    0.3
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    1.6,
+                    0.3
+                  ]
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leap_land",
+          "base": "dodge",
+          "from": 0.8,
+          "duration": 0.3,
+          "to": 1.2,
+          "edits": [
+            {
+              "move": "bone_0",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    1.6,
+                    0.3
+                  ]
+                ],
+                [
+                  0.6,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "name": "leap_strike",
+          "base": "attack2",
+          "from": 0.0,
+          "duration": 0.35,
+          "edits": [
+            {
+              "move": "bone_0",
+              "offset": [
+                [
+                  0,
+                  [
+                    0,
+                    1.6,
+                    0.3
+                  ]
+                ],
+                [
+                  0.5,
+                  [
+                    0,
+                    0.4,
+                    0.5
+                  ]
+                ],
+                [
+                  1,
+                  [
+                    0,
+                    0,
+                    0
+                  ]
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

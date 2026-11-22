@@ -164,6 +164,7 @@ def _cap_gpu_fraction(fraction: float) -> None:
 		frac = float(max(0.15, min(1.0, fraction)))
 		# Leave a slice of VRAM for the OS / compositor / other tools.
 		torch.cuda.set_per_process_memory_fraction(frac, device=0)
+		torch.cuda._aamt_capped = True  # the GPU hub's own (larger) cap must not replace this one
 		print(f"[SA3] GPU VRAM cap {frac:.0%} (AAMT_STABLE_AUDIO_GPU_FRACTION)", flush=True)
 	except Exception as exc:
 		print(f"[SA3] GPU VRAM cap skipped ({exc})", flush=True)
@@ -294,6 +295,17 @@ def _apply_hybrid_offload(sa_model: Any, gpu_device: str = "cuda") -> None:
 		torch.cuda.empty_cache()
 
 
+def unload_model() -> None:
+	"""Drop the cached model from the GPU (the GPU hub calls this before it gives the card away)."""
+	global _MODEL, _MODEL_ID, _MODEL_MODE
+	if _MODEL is None:
+		return
+	_MODEL = None
+	_MODEL_ID = None
+	_MODEL_MODE = None
+	_clear_cuda()
+
+
 def get_model(model_name: Optional[str] = None, device: Optional[str] = None):
 	"""Lazy-load and cache StableAudioModel (hybrid GPU+RAM by default)."""
 	global _MODEL, _MODEL_ID, _MODEL_MODE, _LAST_ERROR
@@ -326,6 +338,15 @@ def get_model(model_name: Optional[str] = None, device: Optional[str] = None):
 		mid = "small-sfx"
 
 	if load_device == "cuda":
+		# The load puts weights on the GPU outside any request: it needs the GPU job first
+		# (2026-11-20 the card was lost while an SA3 load ran at a queue hand-over).
+		try:
+			from gpu_hub import hold_gpu_job, register_unload
+		except ImportError:
+			pass
+		else:
+			hold_gpu_job(f"SA3 load {mid}")
+			register_unload("Stable Audio", unload_model)
 		_cap_gpu_fraction(DEFAULT_GPU_FRACTION)
 
 	# Hybrid loads into RAM first so T5 never occupies VRAM, then places DiT/AE.

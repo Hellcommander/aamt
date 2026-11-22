@@ -42,6 +42,7 @@ from audio_asset_library import (  # noqa: E402
     RetrievalHit,
     blend_waveforms,
     load_asset_audio,
+    own_credit,
 )
 
 DEFAULT_NEGATIVE = (
@@ -488,7 +489,12 @@ def _attribution(lib: AudioLibrary, records: Sequence[Any]) -> str:
         tier = rec.license_tier()
         if tier in ("reference", "restricted"):
             credits.append(NOISE_ALCHEMY_CREDIT)
+        elif tier == "own" and rec.source != "file":
+            if own_credit(rec.pack):
+                credits.append(own_credit(rec.pack))
         elif tier == "own" and rec.source == "file":
+            if own_credit(rec.inner):
+                credits.append(own_credit(rec.inner))
             try:
                 side = json.loads((lib.library / Path(rec.inner).with_suffix(".meta.json")).read_text(encoding="utf-8"))
             except (OSError, ValueError):

@@ -16,7 +16,7 @@
 
 namespace
 {
-	constexpr const char* kVersion = "SealedAudio core 1.4.0 (MTSA1, MTSA2 signed)";
+	constexpr const char* kVersion = "SealedAudio core 1.4.1 (MTSA1, MTSA2 signed)";
 	std::atomic<bool>     g_initialized{ false };
 	std::wstring          g_dataDir;
 	SealedAudio::Hooks::Options g_hookOptions;
@@ -212,6 +212,24 @@ extern "C"
 			check(view && std::memcmp(view, "RIFF", 4) == 0, "the mapped view starts with the sound's bytes");
 			if (view) ::UnmapViewOfFile(view);
 			::CloseHandle(map);
+		}
+		// A completion-port engine (D2R's aio): attach the handle to a port, read overlapped, get one packet back.
+		{
+			HANDLE port = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, nullptr, 0, 1);
+			check(port && Hooks::TestCreateIoCompletionPort(h, port, 0x5A, 0) == port, "the handle attaches to a completion port");
+			char buf[12]{};
+			OVERLAPPED ov{};
+			DWORD n = 0;
+			const BOOL done = Hooks::TestReadFileOverlapped(h, buf, 12, &n, &ov);
+			check(!done && ::GetLastError() == ERROR_IO_PENDING, "an overlapped read on it reports pending");
+			DWORD bytes = 0;
+			ULONG_PTR key = 0;
+			LPOVERLAPPED got_ov = nullptr;
+			const BOOL packet = port && ::GetQueuedCompletionStatus(port, &bytes, &key, &got_ov, 1000);
+			check(packet && bytes == 12 && key == 0x5A && got_ov == &ov && std::memcmp(buf, "RIFF", 4) == 0, "the port gets one packet with the bytes, key and OVERLAPPED");
+			const BOOL extra = port && ::GetQueuedCompletionStatus(port, &bytes, &key, &got_ov, 50);
+			check(!extra, "no second packet for the same read");
+			if (port) ::CloseHandle(port);
 		}
 		check(Hooks::TestCloseHandle(h) == TRUE, "closing the handle works");
 		std::uint32_t total = 0;

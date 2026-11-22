@@ -2701,9 +2701,11 @@ _LAYER_DEFS: List[Dict[str, Any]] = [
     {"id": "gas_steam", "z": "back", "mutations": (
         "steamgeneration", "steamvents", "steambreath", "steamglands", "freezinggas",
         "plasmagas", "plasmageneration", "plasmaemission", "heatvent", "wizsteam")},
+    # The darkness around the figure shows only while it surrounds the character: Umbrameum / Light Occlusion's
+    # "shade self" puts the Darkening effect on it (user, 2026-11-19). Obfuscate, invisibility, fear aura, lich and
+    # Sciophagia are not darkness and drew it on characters without Light Occlusion.
     {"id": "shadow", "z": "back", "mutations": (
-        "lightocclusion", "umbrameum", "shadowking", "darklord", "longnight", "sciophagia",
-        "invisibility", "obfuscate", "fearaura", "lich", "witchinghour", "abyssal")},
+        "shadowking", "darklord", "longnight", "witchinghour", "abyssal"), "effects": ("darkening",)},
     {"id": "speed", "z": "back", "mutations": (
         "heightenedspeed", "heightenedquickness", "adrenal", "rundown", "rushdown")},
     {"id": "levitate", "z": "back", "mutations": ("levitat", "gravityfield")},

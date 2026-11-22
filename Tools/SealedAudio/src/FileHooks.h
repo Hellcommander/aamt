@@ -62,6 +62,8 @@ namespace SealedAudio::Hooks
 	BOOL    TestGetFileSizeEx(HANDLE h, LARGE_INTEGER* size);
 	BOOL    TestSetFilePointerEx(HANDLE h, LARGE_INTEGER distance, LARGE_INTEGER* newPos, DWORD method);
 	BOOL    TestCloseHandle(HANDLE h);
+	BOOL   TestReadFileOverlapped(HANDLE h, void* buffer, DWORD toRead, DWORD* read, OVERLAPPED* ov);
+	HANDLE TestCreateIoCompletionPort(HANDLE file, HANDLE existing, ULONG_PTR key, DWORD threads);
 	DWORD   TestGetFileAttributesW(const wchar_t* path);
 	HANDLE  TestCreateFileMapping(HANDLE h);
 }

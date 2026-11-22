@@ -112,6 +112,14 @@ def generate(
     from stable_audio_3 import StableAudioModel
 
     model_id = _normalize_model(model_name)
+    if (device or "cuda") != "cpu":
+        # Load and generate inside the GPU job: this tool used to bypass the hub entirely.
+        try:
+            from gpu_hub import hold_gpu_job
+        except ImportError:
+            pass
+        else:
+            hold_gpu_job(f"SA3 CLI {model_id}")
     print(f"Loading Stable Audio 3 model: {model_id} ...")
     load_kwargs = {}
     if device:
@@ -132,12 +140,19 @@ def generate(
 
     print(f"Generating {seconds}s SFX: {prompt!r}")
     try:
-        audio = model.generate(**gen_kwargs)
-    except TypeError:
-        # Older/narrower signature
-        for drop in ("negative_prompt", "steps", "seed"):
-            gen_kwargs.pop(drop, None)
-        audio = model.generate(prompt=prompt, duration=float(seconds))
+        from gpu_hub import acquire_gpu
+    except ImportError:
+        import contextlib
+
+        acquire_gpu = lambda label: contextlib.nullcontext()  # noqa: E731
+    with acquire_gpu(f"SA3 {prompt[:48]}"):
+        try:
+            audio = model.generate(**gen_kwargs)
+        except TypeError:
+            # Older/narrower signature
+            for drop in ("negative_prompt", "steps", "seed"):
+                gen_kwargs.pop(drop, None)
+            audio = model.generate(prompt=prompt, duration=float(seconds))
 
     sample_rate = getattr(model, "sample_rate", None) or 44100
     out = _save_wav(audio, Path(output), sample_rate=sample_rate)

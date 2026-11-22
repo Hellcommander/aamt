@@ -126,6 +126,8 @@ const MATCH = [
   // load order: defaults of the converted mod's Load order settings in D2RMM (--conflicts, --files)
   ['conflicts', 'Load order: cells/strings a mod above changed too', [['mod', 'This mod wins'], ['earlier', 'Mods above win']]],
   ['files', 'Load order: files a mod above already put in', [['overwrite', 'Overwrite with this mod\'s'], ['keep', 'Keep the other mod\'s']]],
+  // --base-rows: missiles.txt rows only in the main table get stubs in global\excel\base, so both number their rows the same
+  ['baseRows', 'Load order: classic-rules tables (missile rows only in the main table)', [['stubs', 'Add stub rows so both tables number rows the same'], ['leave', 'Leave as they are']]],
 ];
 function matchControls(prefix) {
   $(prefix + '-match').innerHTML = MATCH.map(([k, label, opts]) => '<div><label for="' + prefix + '-' + k + '">' + esc(label) + '</label><select id="' + prefix + '-' + k + '">' +
@@ -137,7 +139,7 @@ function matchValues(prefix) {
   return out;
 }
 function setMatch(prefix, s) {
-  const d = { matchTrim: true, duplicates: 'content', deleted: 'disable', conflicts: 'mod', files: 'overwrite' };
+  const d = { matchTrim: true, duplicates: 'content', deleted: 'disable', conflicts: 'mod', files: 'overwrite', baseRows: 'stubs' };
   MATCH.forEach(([k]) => { const v = s && s[k] != null ? s[k] : d[k]; $(prefix + '-' + k).value = String(v); });
 }
 matchControls('c'); matchControls('u');
