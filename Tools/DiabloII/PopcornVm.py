@@ -32,17 +32,26 @@ Instructions (opcode byte first):
   76 dst, a, b, m, s         integer a / b, b a constant; m and s are the compiler's
                              magic multiplier and shift for it (b 100: m 0x51EB851F, s 5).
                              First seen 2026-11-16 in one script of the game's newer files.
-  70 sub, dst, a, b          compare and logic, see SUB70
-  77 sub, dst, a             one-argument function, see SUB77 (few are identified)
-  78 sub, dst, a, b          two-argument function, see SUB78
-  79 sub, dst, a, b, c       three-argument function (not identified)
+  70 sub, dst, a, b          integer / bool operations and comparisons, see SUB70
+  77 sub, dst, a             one-argument function, see FUNCTIONS
+  78 sub, dst, a, b          two-argument function, see FUNCTIONS
+  79 sub, dst, a, b, c       three-argument function: lerp, clamp, within (SUB79)
   7A dst, a, b, mask         choose: mask ? b : a
   7B flag, i16 obj, u16 fn, u8 argc, dst, argc x (u8 tag, reg)
                              call function `fn` of the script's f4 table; obj is -1 or
                              a name index (a sampler or event the call acts on)
 
-"presumed" marks names read from how the instruction is used, not proven.
+Names (2026-11-26): read from the game's own VM, in the D2R memory image (image 95032 =
+Steam): the bytecode loader at RVA 0x16D155A dispatches opcodes 69-7D through a table at
+0x2A05A30, followed by the VM's own name lists (0x2A05AD8): the three-argument functions
+(lerp clamp within), the opcode mnemonics (ld st stz cvt vct swz dup mop add sub mul div
+madd idivmi mfn1 mfn2 mfn3 sel call prlg eplg), the 70 sub-operations and the 53 one- and
+two-argument functions, indexed by sub-code ("hp" = precise, "lp" = fast). The script-
+language names in FUNCTIONS are the ones the function descriptors carry (table 0x1DA4330,
+looked up through 0x1DD8D20 by 0xC49F30). Every name fits how the game's 15176 distinct
+scripts use it (operand types, argument counts, constants).
 """
+import re
 import struct
 
 TYPE_NAMES = {0x20: 'f1', 0x21: 'f2', 0x22: 'f3', 0x23: 'f4', 0x1A: 'i1', 0x1B: 'i2', 0x1C: 'i3', 0x1D: 'i4',
@@ -53,12 +62,20 @@ KIND_NAMES = {0x00: 'c', 0x20: 'p', 0x40: 'q', 0x60: 'r', 0x80: '#'}
 OPS = {0x7C: 'begin', 0x7D: 'end', 0x69: 'load', 0x6A: 'store', 0x6B: 'keep', 0x6C: 'convert', 0x6F: 'spread',
        0x6D: 'vector', 0x6E: 'swizzle', 0x71: 'add', 0x72: 'sub', 0x73: 'mul', 0x74: 'div', 0x75: 'muladd', 0x76: 'idiv',
        0x70: 'logic', 0x77: 'fn1', 0x78: 'fn2', 0x79: 'fn3', 0x7A: 'choose', 0x7B: 'call'}
-# 0x10 / 0x11 also take bools, so they are the equality tests; the order of the four
-# inequalities is presumed apart from 0x0C (used as "length squared < 1e-16").
-SUB70 = {0x04: 'op04', 0x05: 'neg', 0x08: 'and', 0x09: 'or', 0x0A: 'xor', 0x0B: 'not', 0x0C: 'lt', 0x0D: 'le?',
-         0x0E: 'gt?', 0x0F: 'ge?', 0x10: 'eq', 0x11: 'ne'}
-SUB77 = {0x20: 'rsqrt'}
-SUB78 = {0x1B: 'min', 0x1C: 'max', 0x1D: 'dot', 0x1E: 'cross'}
+# The game VM's own mnemonics for opcodes 69-7D (OPS above are this module's readable names).
+VM_MNEMONICS = dict(zip(range(0x69, 0x7E), 'ld st stz cvt vct swz dup mop add sub mul div madd idivmi mfn1 mfn2 mfn3 '
+                                           'sel call prlg eplg'.split()))
+# 70 sub-operations, by sub-code (the VM's names: cmplt, cmple, ...).
+SUB70 = dict(enumerate('add sub mul div mod neg sll sar and or xor not lt le gt ge eq ne'.split()))
+# 77 / 78 functions, by sub-code: one table for both (1D dot and the others from 19 on take two).
+FUNCTIONS = dict(enumerate(
+    'sqrt rsqrt cbrt length normalize sin cos sincos tan asin acos atan atan2 exp exp2 log log2 rcp '
+    'abs sign ceil floor frac fracSign saturate step discretize min max dot cross '
+    'fast_sqrt fast_rsqrt fast_cbrt fast_length fast_normalize fast_sin fast_cos fast_sincos fast_tan fast_asin '
+    'fast_acos fast_atan fast_atan2 fast_exp fast_exp2 fast_log fast_log2 fast_rcp all any isfinite isinf'.split()))
+SUB77 = FUNCTIONS
+SUB78 = FUNCTIONS
+SUB79 = {0: 'lerp', 1: 'clamp', 2: 'within'}
 
 # opcode -> (has sub byte, number of register operands, trailing u16 fields)
 _FIXED = {0x6C: (False, 2), 0x6F: (False, 2), 0x71: (False, 3), 0x72: (False, 3), 0x73: (False, 3), 0x74: (False, 3),
@@ -208,8 +225,17 @@ def show_mask(mask, width):
     return ''.join(parts)
 
 
+def function_label(functions, i):
+    """A call's function as the listing shows it: its name, "name@i" when the script's function
+    table has that name more than once, "fn<i>" when it has none."""
+    if not functions or i >= len(functions) or functions[i] is None:
+        return 'fn%d' % i
+    name = functions[i]
+    return name if functions.count(name) == 1 else '%s@%d' % (name, i)
+
+
 def listing(instructions, constants=None, names=None, functions=None):
-    """Readable text, one instruction per line."""
+    """Readable text, one instruction per line. assemble() reads it back."""
     def ext(i):
         return names[i] if names and i < len(names) and names[i] is not None else 'name%d' % i
 
@@ -240,7 +266,7 @@ def listing(instructions, constants=None, names=None, functions=None):
         elif op == 0x75:
             text = '%s = %s * %s + %s' % tuple(regs)
         elif op == 0x76:
-            text = '%s = %s / %s   (integer; magic %s, shift %s)' % tuple(regs)
+            text = '%s = %s / %s   (integer: magic %s, shift %s)' % tuple(regs)
         elif op == 0x7A:
             text = '%s = %s ? %s : %s' % (regs[0], regs[3], regs[2], regs[1])
         elif op == 0x70:
@@ -250,9 +276,9 @@ def listing(instructions, constants=None, names=None, functions=None):
         elif op == 0x78:
             text = '%s = %s(%s)' % (regs[0], SUB78.get(sub, 'fn2_%02X' % sub), ', '.join(regs[1:]))
         elif op == 0x79:
-            text = '%s = fn3_%02X(%s)' % (regs[0], sub, ', '.join(regs[1:]))
+            text = '%s = %s(%s)' % (regs[0], SUB79.get(sub, 'fn3_%02X' % sub), ', '.join(regs[1:]))
         elif op == 0x7B:
-            fn = functions[ins['fn']] if functions and ins['fn'] < len(functions) else 'fn%d' % ins['fn']
+            fn = function_label(functions, ins['fn'])
             target = '' if ins['obj'] < 0 else ' on %s' % ext(ins['obj'])
             args = ', '.join('%s' % a for a in regs[1:])
             head = '' if regs[0] == '-' else '%s = ' % regs[0]
@@ -261,3 +287,187 @@ def listing(instructions, constants=None, names=None, functions=None):
             text = '?? %02X' % op
         lines.append('%04X  %s' % (ins['at'], text))
     return '\n'.join(lines)
+
+
+# --- text back to instructions --------------------------------------------------------------
+
+_TYPE_CODES = {v: k for k, v in TYPE_NAMES.items() if v}
+_KIND_CODES = {v: k for k, v in KIND_NAMES.items() if v != '#'}
+_OPERAND = re.compile(r'-(?![\w.])|[pqr]\d+:\w*|\w+\(#\d+\)|\w+\([^()]*\)\[c\d+\]|[fib]\d\([^()#]*\)(?!\[)')
+_NONE = (0xFFFF, 0xFF, 0xFF)
+
+
+def _type_code(name):
+    if name in _TYPE_CODES:
+        return _TYPE_CODES[name]
+    if name == 'ctx':
+        return 0x00
+    if re.fullmatch(r't[0-9A-Fa-f]{2}', name):
+        return int(name[1:], 16)
+    raise ValueError('unknown operand type "%s"' % name)
+
+
+def pack_constant(type_name, values):
+    """32 bytes for a constant of that operand type: its numbers repeated over the eight lanes,
+    the way the compiler writes them (x y z x y z x y for a float3)."""
+    values = list(values)
+    width = TYPE_WIDTH.get(type_name, 1)
+    if len(values) != width:
+        raise ValueError('%s takes %d number(s), not %d' % (type_name, width, len(values)))
+    lanes = [values[i % width] for i in range(8)]
+    if type_name.startswith('f'):
+        return struct.pack('<8f', *[float(v) for v in lanes])
+    return struct.pack('<8i', *[int(v) for v in lanes])
+
+
+def parse_operand(text, pool=None):
+    """'p3:f1' (register), 'f1(0.5)[c3]' (constant 3; the value shown is not read), 'i1(#2)'
+    (immediate), '-' (none) -> (index, kind, type). With `pool` (the script's constants, a list
+    of 32-byte values, extended in place) a value without an index, 'f3(1, 0.5, 0)', is a new
+    constant: an equal one is reused, otherwise it is added."""
+    text = text.strip()
+    if text == '-':
+        return _NONE
+    m = re.fullmatch(r'([pqr])(\d+):(\w*)', text)
+    if m:
+        return int(m.group(2)), _KIND_CODES[m.group(1)], _type_code(m.group(3) or 'ctx')
+    m = re.fullmatch(r'(\w+)\(#(\d+)\)', text)
+    if m:
+        return int(m.group(2)), 0x80, _type_code(m.group(1))
+    m = re.fullmatch(r'(\w+)\([^()]*\)\[c(\d+)\]', text)
+    if m:
+        return int(m.group(2)), 0x00, _type_code(m.group(1))
+    m = re.fullmatch(r'([fib]\d)\(([^()#]*)\)', text)
+    if m and pool is not None:
+        numbers = [float(v) for v in m.group(2).split(',')]
+        raw = pack_constant(m.group(1), numbers)
+        if raw not in pool:
+            pool.append(raw)
+        return pool.index(raw), 0x00, _type_code(m.group(1))
+    raise ValueError('cannot read operand "%s"' % text)
+
+
+def _operands(text, pool=None):
+    found = _OPERAND.findall(text)
+    if re.sub(r'[\s,]', '', ''.join(found)) != re.sub(r'[\s,]', '', text):
+        raise ValueError('cannot read operands "%s"' % text)
+    return [parse_operand(o, pool) for o in found]
+
+
+def _by_name(table, label, kind):
+    """Index of an external ("name<i>" when it has no name) or a call's function ("name@i", "fn<i>")."""
+    m = re.fullmatch(r'(.*)@(\d+)', label)
+    if m:
+        return int(m.group(2))
+    m = re.fullmatch(r'(?:name|fn)(\d+)', label)
+    if m and (not table or label not in table):
+        return int(m.group(1))
+    if table and label in table:
+        if table.count(label) > 1:
+            raise ValueError('%s "%s" is in the table more than once; write %s@<index>' % (kind, label, label))
+        return table.index(label)
+    raise ValueError('no %s "%s" in this script (it has: %s)' % (kind, label, ', '.join(str(n) for n in table or [])))
+
+
+_NAMED = {name: (0x70, sub) for sub, name in SUB70.items()}
+_NAMED.update({name: (0x79, sub) for sub, name in SUB79.items()})
+_FUNCTION_CODES = {name: sub for sub, name in FUNCTIONS.items()}
+_ARITH = {'+': 0x71, '-': 0x72, '*': 0x73, '/': 0x74}
+
+
+def assemble(text, names=None, functions=None, constants=None):
+    """Listing text (as listing() or `PopcornBaked.py dis` prints it) -> instructions for encode().
+
+    One instruction per line; a leading hex address, "#..." header lines, blank lines and
+    "; comments" are ignored. Externals and functions are written by name and resolved in the
+    script's own tables (`names`, `functions`); constants by their [cN] index (the value shown
+    beside it is not read). A value written without an index, f1(2.5) or f3(1, 0, 0), becomes a
+    constant of the script when `constants` (its list of 32-byte constants) is given: an equal
+    one is reused, a new one is appended to the list."""
+    out = []
+    for number, raw in enumerate(text.splitlines(), 1):
+        line = raw.split(';', 1)[0].strip()
+        line = re.sub(r'^[0-9A-Fa-f]{4,}\s+', '', line)
+        if not line or line.startswith('#'):
+            continue
+        try:
+            out.append(_assemble_line(line, names, functions, constants))
+        except (ValueError, KeyError, IndexError) as e:
+            raise ValueError('line %d: %s\n    %s' % (number, e, raw.strip())) from None
+    return out
+
+
+def _assemble_line(line, names, functions, pool=None):
+    def operand(t):
+        return parse_operand(t, pool)
+
+    def operands(t):
+        return _operands(t, pool) if t.strip() else []
+
+    if line == 'begin':
+        return {'op': 0x7C, 'sub': 0, 'regs': []}
+    if line == 'end':
+        return {'op': 0x7D, 'regs': []}
+    m = re.fullmatch(r'keep (.+)', line)
+    if m:
+        return {'op': 0x6B, 'name': _by_name(names, m.group(1), 'external'), 'regs': []}
+    m = re.fullmatch(r'store (.+?) = (.+)', line)
+    if m:
+        return {'op': 0x6A, 'name': _by_name(names, m.group(1), 'external'), 'regs': [operand(m.group(2))]}
+    m = re.fullmatch(r'(?:(\S+) = )?call (\S+?)\((.*)\)(?: on (.+?))?\s+\(flag ([0-9A-Fa-f]{2}), tags ?([0-9A-Fa-f ]*)\)', line)
+    if m:
+        args = operands(m.group(3))
+        tags = [int(t, 16) for t in m.group(6).split()]
+        if len(tags) != len(args):
+            raise ValueError('a call needs one tag per argument')
+        return {'op': 0x7B, 'sub': int(m.group(5), 16), 'fn': _by_name(functions, m.group(2), 'function'),
+                'obj': -1 if m.group(4) is None else _by_name(names, m.group(4), 'external'),
+                'regs': [operand(m.group(1)) if m.group(1) else _NONE] + args, 'tags': tags}
+    m = re.fullmatch(r'(\S+) = (.+)', line)
+    if not m:
+        raise ValueError('cannot read this instruction')
+    dst, rest = operand(m.group(1)), m.group(2).strip()
+    m = re.fullmatch(r'load (.+)', rest)
+    if m:
+        return {'op': 0x69, 'name': _by_name(names, m.group(1), 'external'), 'regs': [dst]}
+    m = re.fullmatch(r'(convert|spread) (\S+)', rest)
+    if m:
+        return {'op': 0x6C if m.group(1) == 'convert' else 0x6F, 'regs': [dst, operand(m.group(2))]}
+    m = re.fullmatch(r'vector\((.*)\)', rest)
+    if m:
+        return {'op': 0x6D, 'regs': [dst] + operands(m.group(1))}
+    m = re.fullmatch(r'(.+)\.[\w?]+\s+\(swizzle ([0-9A-Fa-f]{2})/([0-9A-Fa-f]{4})\)', rest)
+    if m:
+        return {'op': 0x6E, 'sub': int(m.group(2), 16), 'mask': int(m.group(3), 16), 'regs': [dst, operand(m.group(1))]}
+    m = re.fullmatch(r'(.+) / (.+?)\s+\(integer: magic (.+), shift (.+)\)', rest)
+    if m:
+        return {'op': 0x76, 'regs': [dst] + [operand(g) for g in m.groups()]}
+    m = re.fullmatch(r'(.+) \* (.+) \+ (.+)', rest)
+    if m:
+        return {'op': 0x75, 'regs': [dst] + [operand(g) for g in m.groups()]}
+    m = re.fullmatch(r'(.+) \? (.+) : (.+)', rest)
+    if m:
+        mask, b, a = (operand(g) for g in m.groups())
+        return {'op': 0x7A, 'regs': [dst, a, b, mask]}
+    m = re.fullmatch(r'(\w+)\((.*)\)', rest)
+    if m and not re.fullmatch(r'\w+\(#\d+\)', rest) and not re.fullmatch(r'\w+\([^()]*\)\[c\d+\]', rest):
+        name, args = m.group(1), operands(m.group(2))
+        if name in _NAMED:
+            op, sub = _NAMED[name]
+            if op == 0x70:
+                args = (args + [_NONE, _NONE])[:2]
+            return {'op': op, 'sub': sub, 'regs': [dst] + args}
+        if name in _FUNCTION_CODES:
+            if len(args) not in (1, 2):
+                raise ValueError('%s takes one or two arguments' % name)
+            return {'op': 0x77 if len(args) == 1 else 0x78, 'sub': _FUNCTION_CODES[name], 'regs': [dst] + args}
+        m2 = re.fullmatch(r'(fn[123]|logic)_?([0-9A-Fa-f]{2})', name)
+        if m2:
+            op = {'fn1': 0x77, 'fn2': 0x78, 'fn3': 0x79, 'logic': 0x70}[m2.group(1)]
+            return {'op': op, 'sub': int(m2.group(2), 16), 'regs': [dst] + args}
+        raise ValueError('unknown function "%s"' % name)
+    for symbol, op in _ARITH.items():
+        parts = rest.split(' %s ' % symbol)
+        if len(parts) == 2:
+            return {'op': op, 'regs': [dst, operand(parts[0]), operand(parts[1])]}
+    raise ValueError('cannot read "%s"' % rest)

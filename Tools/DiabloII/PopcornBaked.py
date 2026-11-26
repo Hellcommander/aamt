@@ -80,6 +80,7 @@ usage:
   PopcornBaked.py props <file> [--platform PC]          renderers and their properties
   PopcornBaked.py code <file>                           compiled scripts: names, constants, bytecode size
   PopcornBaked.py dis <file> [object number ...]        compiled scripts as readable instructions
+  PopcornBaked.py asm <file> <object> <listing> --out <file>   a script from edited listing text
   PopcornBaked.py diff <old file> <new file>            what changed, by object and field
   PopcornBaked.py check <file or folder> ...            consistency checks (run them on an edited file)
   PopcornBaked.py roundtrip <file or folder> ... [--check]
@@ -245,6 +246,18 @@ class Obj:
         vm = _vm()
         prog = self.program()
         return vm.listing(vm.decode(prog['code']), prog['constants'], self.names(), self.functions())
+
+    def assemble(self, text):
+        """For a CCompilerBlobCache: replaces its bytecode with listing text (as disassemble() and
+        `dis` print it, edited). Externals and functions must be ones the script already has;
+        constants are referred to by index, or written as values (f1(2.5), f3(1, 0, 0)), which
+        reuses an equal constant or adds one. Header counts are recomputed."""
+        vm = _vm()
+        prog = self.program()
+        constants = list(prog['constants'])
+        prog['code'] = vm.encode(vm.assemble(text, self.names(), self.functions(), constants))
+        prog['constants'] = constants
+        self.set_program(prog)
 
     def encode(self):
         if self.fields is None:
@@ -679,6 +692,11 @@ def main(argv=None):
     p = sub.add_parser('dis')
     p.add_argument('file')
     p.add_argument('objects', nargs='*', type=int)
+    p = sub.add_parser('asm', help='replace a script with edited listing text')
+    p.add_argument('file')
+    p.add_argument('object', type=int, help='the CCompilerBlobCache object number (as dis shows it)')
+    p.add_argument('listing', help='a text file in the dis format')
+    p.add_argument('--out', required=True, help='where to write the changed .particles file')
     p = sub.add_parser('diff')
     p.add_argument('old')
     p.add_argument('new')
@@ -722,6 +740,28 @@ def main(argv=None):
                 continue
             print('\n'.join('    ' + line for line in text.split('\n')))
         return status
+    elif args.cmd == 'asm':
+        baked = load(args.file)
+        o = baked.obj(args.object)
+        if o is None or o.cls_name != 'CCompilerBlobCache':
+            print('object %d is not a compiled script' % args.object)
+            return 2
+        with open(args.listing, encoding='utf-8') as f:
+            text = f.read()
+        before = o.program()['header'][0]
+        try:
+            o.assemble(text)
+        except ValueError as e:
+            print('not assembled: %s' % e)
+            return 1
+        data = baked.encode()
+        problems = Baked(data).validate()
+        if problems:
+            print('not written, the result fails its checks:\n' + '\n'.join('   ' + p for p in problems))
+            return 1
+        with open(args.out, 'wb') as f:
+            f.write(data)
+        print('#%d: %d -> %d instructions; written %s' % (args.object, before, o.program()['header'][0], args.out))
     elif args.cmd == 'diff':
         lines = diff(load(args.old), load(args.new))
         print('\n'.join(lines) if lines else 'no differences')
