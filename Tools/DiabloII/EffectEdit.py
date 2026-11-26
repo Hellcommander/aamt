@@ -296,8 +296,9 @@ class Effect:
             if len(value) == 1:
                 lanes = [conv(value[0])] * 8
             elif len(value) <= 4:
-                for i, v in enumerate(value):       # a vector sits in lanes 0-3 and again in 4-7
-                    lanes[i] = lanes[i + 4] = conv(v)
+                # The compiler repeats a vector's numbers over the eight lanes (x y z x y z x y for
+                # a float3), as 99.8% of the game's vector constants are; f4 fills lanes 0-3 and 4-7.
+                lanes = [conv(value[i % len(value)]) for i in range(8)]
             elif len(value) == 8:
                 lanes = [conv(v) for v in value]
             else:

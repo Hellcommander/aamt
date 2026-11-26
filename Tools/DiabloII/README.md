@@ -1820,9 +1820,24 @@ same when nothing is changed.
   the instruction count their header gives and encode back to the same bytes. The listing
   shows loads and stores by name, arithmetic, comparisons, vector building, and calls with the
   function's own name (`self.kill_bool_pCtxS`, `effect.age_pCtxI`, `samplerCurve1:sample_float`).
-- Not identified yet: most one-argument math functions (shown as `fn1_XX`), the three-argument
-  ones, and the exact order of the four inequality tests. The module's docstring marks what
-  is presumed.
+- Every instruction and function is named (2026-11-26), with the game's own names, read from its
+  VM in the D2R memory image (`d2rloader\data\skilltab4-probe\image-95032.bin`; addresses in
+  `PopcornVm.py`): 53 math functions (`sqrt`, `sincos`, `fast_rsqrt`, `saturate`, `discretize`,
+  `isfinite` ...), the three-argument `lerp` / `clamp` / `within`, the integer and comparison
+  operations (`mod`, `sll`, `sar`, `lt le gt ge eq ne`) and the VM's opcode mnemonics. Every name
+  fits how the game's 15176 distinct scripts use it (types, argument counts, constants).
+- **Scripts can be edited as text** (2026-11-26): `PopcornBaked.py dis` prints a script,
+  `PopcornBaked.py asm <file> <n> <edited listing> --out <file>` puts it back (`PopcornVm.assemble`).
+  Instructions can be changed, added or removed; externals and functions are written by name
+  (the ones the script already has), constants by `[cN]` index or as new values (`f1(2.5)`,
+  `f3(1, 0, 0)`: an equal constant is reused, a new one appended). Header counts follow; the
+  result must pass `check`. Checked: all 15176 scripts printed and assembled back give the same
+  bytes. A changed script has still not been seen in the game.
+- **Vector constants fill the eight lanes cyclically** (x y z x y z x y for a float3), as 99.8% of
+  the game's are. `EffectEdit`'s `constant` edit wrote f2 / f3 values into lanes 0-2 and 4-6
+  instead (right only for f4); it now writes them the game's way. Effects rebuilt with an f3
+  `tint` (EffectLooks) or f3 `constant` edit change bytes; whether the old layout showed wrong
+  in the game is not known.
 - Rechecked 2026-11-16 on the game's current 2206 files (11849 distinct scripts): all round-trip
   and pass `check`. They added opcode 76, integer division by a constant (one script, in
   `rmagan\manashielddir00_overlay`).
@@ -1841,6 +1856,7 @@ same when nothing is changed.
 python PopcornBaked.py props <file.particles> [--platform PC]  renderers and their properties
 python PopcornBaked.py code <file.particles>        compiled scripts: the names they use and their constants
 python PopcornBaked.py dis <file.particles> [n ...]  compiled scripts as readable instructions
+python PopcornBaked.py asm <file.particles> <n> <listing.txt> --out <new.particles>   a script from edited text
 python PopcornBaked.py dump <file.particles> [--class <name>]
 python PopcornBaked.py diff <old.particles> <new.particles>   what an edit changed, by object and field
 python PopcornBaked.py check <file or folder> ...   consistency checks (exit 1 on problems)
