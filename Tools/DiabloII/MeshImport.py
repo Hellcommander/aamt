@@ -791,13 +791,16 @@ def donor_textures(tree):
 def normal_to_game(picture, green='up'):
     """A tangent-space normal map as modelling programs write it (x in red, y in green, z in
     blue) -> the game's layout: x in alpha, y in green, red full, blue empty (z is worked out
-    from x and y). The game's green runs down the picture (its bitangent is dP/dv with v down),
-    so a map with green up (glTF, Blender, OpenGL; the default) is flipped; "down" is DirectX."""
+    from x and y). The game's green points up the picture (its shader's green axis is the
+    opposite of dP/dv, v running down; stock maps, shader and an in-game test agree, see the
+    README), so a map with green up (glTF, Blender, OpenGL; the default) is kept as it is and
+    a "down" (DirectX) map is flipped. Before 2026-11-26 this was the other way round: bodies
+    built before then carry upside-down relief until their textures are made again."""
     from PIL import Image
     rgb = np.asarray(picture.convert('RGB'), dtype=np.uint8)
     out = np.zeros(rgb.shape[:2] + (4,), dtype=np.uint8)
     out[..., 0] = 255
-    out[..., 1] = 255 - rgb[..., 1] if green == 'up' else rgb[..., 1]
+    out[..., 1] = 255 - rgb[..., 1] if green == 'down' else rgb[..., 1]
     out[..., 3] = rgb[..., 0]
     return Image.fromarray(out, 'RGBA')
 

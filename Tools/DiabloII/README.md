@@ -596,10 +596,12 @@ python MeshImport.py build spec.json --game <D2R> --out <mod folder>
   and `own_animations` extends the variant's skeleton the same way). Stock clips have no track
   for it, so it holds its bind pose on its parent until a clip poses it.
 - **Surface maps**: the game's normal map keeps x in alpha and y in green (red full, blue
-  empty, z worked out), with green running down the picture; its ORM map has occlusion in red
+  empty, z worked out), with green pointing up the picture; its ORM map has occlusion in red
   and roughness in green (blue is empty in the creature maps looked at). A `.glb`'s own normal,
   metallic-roughness and occlusion pictures are converted to that, as are `"normal"` / `"orm"`
-  pictures in the usual layouts (`"normal_green": "down"` for a DirectX-style map).
+  pictures in the usual layouts (`"normal_green": "down"` for a DirectX-style map, which is
+  flipped; a green-up map from glTF or Blender is kept). Until 2026-11-26 the importer flipped
+  the wrong one: bodies imported before then have upside-down relief until imported again.
   `"normal": "from_albedo"` guesses relief from the colour picture when there is no map.
 - **LODs**: with the `meshlib` package (pip; non-commercial licence, see `THIRD_PARTY.md`) the
   lower LODs are made by quadric edge collapse that only keeps existing vertices and leaves open
@@ -884,6 +886,20 @@ rest-pose scale, rest-pose position, in the skeleton or in the model) shapes the
 body on the character screen; where the game takes its bind pose from is not
 known. Not tried: bone orientation, renaming, adding or removing bones, and a
 monster in a game (only the character screen).
+**Corrected 2026-11-26: bind matrices do shape the body.** Seen in the game (bot harness, the
+Warlock on the character screen): with the `head` bone's `InverseWorldTransform` multiplied
+by 1.8 in its first three columns (all four rows), written with `Granny.py` into BOTH
+`warlock.skeleton` and `head_lod0` to `head_lod4.model`, the head is drawn about 1.8 times
+its size, in place on the neck, body unchanged. So the "no visible change" rows above for
+bind matrices do not hold; why those edits showed nothing is not known (they were made in
+place with `GrannyFile.py`, and the skeleton one scaled the whole matrix). A second run with
+ONLY `warlock.skeleton` edited (stock head models) gave the same enlarged head: **the game
+takes a bone's bind matrix from the `.skeleton` file.** The copy inside a model was not seen
+to matter (edited alone on 2026-11-13: no change), so `HdSkeleton.py` edits to
+`InverseWorldTransform` are what reshape a body.
+Offline facts that bear on it: a part model carries only the bones its mesh uses (head 159,
+torso 54-67, arms 22, legs 10, shoulder pads 2; only the head models have `head`), the
+`.skeleton` has all 198, and the `.animations` files hold no skeleton and no bind clip.
 Encoded files are unpacked, so several times the size of the stock ones
 (fallen1: 43 KB stock, 330 KB encoded; `-Strip` drops the Maya attributes: 33 KB).
 They are edited copies of game art: keep them in your mod, out of this repository.
@@ -948,8 +964,85 @@ was accepted by the unpinned plugin and refused by the pinned one; no RIFF/WAVE 
 library was untouched by `-Remove`; the script's zip held only the dll and the archive, and a stray `.wav` in the mod
 stopped it.
 
+## Other HD file types: sprites, collision, cloth, small text files
+
+Decoded 2026-11-26 against build 3.4.95041. Each tool's docstring has the byte layout.
+
+- **`HdSprite.py`** - `.sprite` interface pictures: `info`, `to-png [--frame N]`, `from-png [--frames N] [--lowend <file>]`.
+  The u16 at offset 4 is the pixel format, the same codes as `.texture`: 31 = RGBA8 (3,028 files),
+  61 = BC3 (the loading screen, 2 files), 50 = 16-bit float RGBA (the HDR calibration picture, 2 files);
+  all three decode. Frames lie left to right; a frame's cell is often 1 or 2 pixels wider than the
+  frame-width field, so frame i is cut at `round(i * sheet width / count)`. The u32 at 0x10 is a
+  cursor's hot spot (taken to be; only cursors have it). The field at 0x1C is one stray byte (not 0 in
+  578 files, matching nothing in the picture; taken to be leftover memory), so writing 0 is right.
+- **`HdPhysics.py`** - `.physics` collision meshes (`terrain.physics` of a preset or cluster,
+  `<name>_collision.physics` of a model): `info`, `to-obj`, `from-obj`, `check`. One triangle mesh with a
+  bounding-box tree; every field is accounted for and all 3,031 files pass the checks (tree covers every
+  triangle once, edge neighbours, area, depth). `from-obj` builds a new file; the game has not been seen
+  loading one.
+- **`HdCloth.py`** - `.cloth` simulation data of banners, canopies and capes: `info`, `to-obj`, `check`.
+  All 26 sections are placed and all 545 files pass the checks: particles (position, normal, inverse
+  mass; the pinned ones come first), triangles, a path from every particle back to a pinned one (steps,
+  length, parent, root), distance constraints in four groups cut into batches, bending constraints
+  (two particles and the one between them) with weights that follow from the masses, and two kinds
+  of collision shape (capsules: two radii and a length; and a 48-byte kind with two sizes). The
+  per-particle frame is the normal, the direction to one neighbour, and their cross product. The
+  bending weights block holds exactly half the bytes its rows need (it looks sized with the 2-byte
+  index type), so only the first half of the rows carry weights. The header names a driver mesh in
+  the `.model` beside the file (same vertices and triangles, all 545 files), and the header's order
+  table says which particle sits at each of that mesh's vertices (checked against the models: 515
+  files in full, 5 for the 256 vertices they list, 25 have no table). Left open: which size of the
+  48-byte shape is which, and why some rest lengths differ from the stored distances. No writer:
+  nothing built outside the game's exporter has been tried in the game.
+- **Plain text behind odd extensions** (no tool needed): `.timelines`, `.frontend`, `.fltr` and `.sh3` are
+  JSON (`.sh3`: nine `{x, y, z}` values, the light of an `.ibls` cube map as spherical harmonics);
+  `.params` (`hd/ui/**`) is the text `-frames N`, the frame count its sprite sheet was built with;
+  `.ibls` is a DDS cube map.
+- **`HdShader.py`** - the compiled shaders, `hd/shaders/*.bin` (162 files, 10,847 programs): `info`,
+  `extract`, `disasm`. A file is one shader in every variant: a list of compile switches (names and
+  values) and one Direct3D 11 program per combination; all 162 files parse and the program count is
+  the product of the switches in each. `disasm` prints a program as assembly (Windows, through
+  `d3dcompiler_47.dll`). Not decoded: 14 words per program that look like masks of what it uses.
+- **`HdPacks.py`** - `global/tiles/<act>/combined_ds1.bin` (every `.ds1` of an act, with names) and
+  `global/allcofs.bin` (every `.cof`, keyed by the FNV-1a hash of its lower-case base name): `list`,
+  `extract`, `build-ds1`. Both rebuild byte for byte from their parts, and every body equals the loose
+  file. Whether the game reads the pack or the loose file when a mod changes one is not tested.
+  It also lists and extracts the eight older `.cof` packs (`global/chars_cof.d2`, `cmncof_a1` to
+  `_a7.d2`: named records, 6,726 in all, 129 of them older copies that differ from today's loose file).
+  `global/expfield.d2` is a 256 x 256 lookup grid: which of eight directions a point lies in.
+- **`LegacyTiles.py`** - legacy map tiles, `.dt1`: `info`, `to-png` (one picture per tile, named by the
+  orientation / main / sub index a `.ds1` cell uses), `check`. 260 of 266 files read and pass (16,597
+  tiles); six act 1 files are an older layout (version 4.1) and are not read.
+- **`LegacyFont.py`** - legacy bitmap fonts in `local/font/`: `info` (glyph metrics from the `Woo!`
+  `.tbl`), `to-png` (the 256 glyphs of a `.dc6` or `.dh6` as one sheet). `.dh6` (latin2 only) is the
+  DC6 frame table with raw 24-bit pixels instead of run-length coded palette indices; which byte is
+  red is not settled. `default.map` (character code to Unicode) is read by `read_map`.
+- **No tool, layout known**: `pal.pl2` (16 files, 443,175 bytes each) is the palette plus its lookup
+  tables in the order documented for the classic game (256 x 4 colours, 32 light levels, 16 inverse,
+  1 selected-unit, 3 alpha-blend 256 x 256 tables, additive, multiplicative, 111 hue shifts, red /
+  green / blue tones, 14 more shifts, a max-blend table, a darkening shift, 13 text colours and their
+  13 shifts); those sizes add up to the file size exactly, the tables themselves were not checked.
+  `local/macui/*.pcx` are ordinary PCX pictures and `*.rsrc` classic Mac resource files (leftovers).
+
+`hd/texture_desc_cache.json` is decoded too (notes in `HdTexture.py`): one entry per texture with the
+header fields and the smallest mips as a thumbnail; `HdTexture.py cache-entry` builds an entry and
+gives the stored one for 300 of 300 textures tried. Normal and ORM channel packing is in the same
+notes. **Green points UP the picture in the game's normal maps** (2026-11-26): the stock maps measure
+that way (34 of 40), and the model pixel shader, disassembled with `HdShader.py`, builds its green
+axis as sign x cross(Tangent, Normal), the opposite of the +v direction the models' tangent sign
+encodes. `MeshImport.normal_to_game` used to assume the opposite and flipped green-up (glTF,
+Blender) maps; since 2026-11-26 it keeps them and flips `"normal_green": "down"` maps instead.
+Seen in the game 2026-11-26 (bot harness, Sorceress on the character screen): her light-armour
+normal map was replaced by one baked from the meshes so that every normal leans towards the head,
+the torso baked for the green-up reading and the legs for green-down. The torso came out pale and
+lit from above, the boots black. With the scene's light coming from above (as the stock picture
+shows on shoulders and head), that is green up, in agreement with the shader.
+
+The bind pose question is answered under "Skeleton decoder" above: the `.skeleton` file's bind matrices (seen in the game 2026-11-26).
+
 ## Files
 
+- `HdSprite.py`, `HdPhysics.py`, `HdCloth.py`, `HdShader.py`, `HdPacks.py`, `LegacyTiles.py`, `LegacyFont.py` - interface sprites, collision meshes, cloth data, compiled shaders, the ds1 / cof pack files, legacy map tiles and bitmap fonts (see "Other HD file types")
 - `ModOrder\ModOrder.js`, `ModOrder\masterlist.json`, `Sort-D2RMods.ps1` - sort and check a D2RMM mod list like LOOT (see "Mod list sorter")
 - `ConvertReplaceMod.py`, `Convert-D2RReplaceMod.ps1` - make a mod that replaces whole tables / string files merge them row by row
 - `Granny.py`, `HdSkeleton.py` - Granny files as editable trees; skeleton decode / encode
