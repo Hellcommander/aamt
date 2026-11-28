@@ -96,7 +96,7 @@ def read_old_cof_pack(data):
     out, at = [], 0
     while at < len(data):
         first, zero, size, name, second = struct.unpack_from('<3i8si', data, at)
-        if first != -1 or second != -1 or zero != 0 or at + 24 + size > len(data):
+        if first != -1 or second != -1 or zero != 0 or size < 0 or at + 24 + size > len(data):
             raise ValueError(f'unexpected record at {at}')
         out.append((name.split(b'\0')[0].decode('latin1') + '.cof', data[at + 24:at + 24 + size]))
         at += 24 + size
@@ -107,6 +107,8 @@ def kind(data):
     if data[:8] == b'\xff\xff\xff\xff\0\0\0\0':
         return 'oldcof'
     count = struct.unpack_from('<I', data, 0)[0]
+    if count == 0:                      # an empty pack of either kind is the count alone
+        return 'ds1'
     return 'ds1' if 4 + 48 * count <= len(data) and struct.unpack_from('<I', data, 4)[0] == 4 + 48 * count else 'cof'
 
 
@@ -151,8 +153,11 @@ def main():
     else:
         if len(a.args) != 2:
             raise SystemExit('extract needs <pack> <out folder>')
+        root = os.path.realpath(a.args[1])
         for name, body in files:
-            path = os.path.join(a.args[1], name.replace('/', os.sep))
+            path = os.path.realpath(os.path.join(root, name.replace('/', os.sep)))
+            if os.path.commonpath([root, path]) != root:      # a name from the pack must stay inside
+                raise SystemExit(f'{name}: the pack names a file outside the output folder')
             os.makedirs(os.path.dirname(path) or '.', exist_ok=True)
             with open(path, 'wb') as f:
                 f.write(body)

@@ -106,8 +106,7 @@ def main():
         for frame in LegacySprite.Dc6(data).frames[0]:
             rgba = np.zeros(frame.pixels.shape + (4,), 'u1')
             drawn = frame.pixels >= 0
-            rgba[drawn] = np.asarray(palette, 'u1')[frame.pixels[drawn]]
-            rgba[drawn, 3] = 255
+            rgba[drawn] = np.asarray(palette, 'u1')[frame.pixels[drawn]]     # index 0 stays see-through
             frames.append(rgba)
         picture = sheet(frames)
         mode = 'RGBA'

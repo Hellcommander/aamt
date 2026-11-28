@@ -109,7 +109,7 @@ def read(data):
         a = np.frombuffer(data, dtype, count * width, offsets[section])
         return a.reshape(count, width) if width > 1 else a
     pairs = array(14, '<u2', counts[8], 2)
-    real = (pairs < n).all(axis=1) if len(pairs) else np.zeros(0, bool)
+    real = ~(pairs == n).all(axis=1) if len(pairs) else np.zeros(0, bool)     # padding is exactly (N, N)
     group = np.full(counts[8], -1)
     batches = {}
     for section, index in ((18, 4), (19, 5), (20, 6), (21, 7)):
@@ -155,6 +155,8 @@ def problems(c):
         out.append('pinned particles are not the leading ones without mass')
     if len(c['triangles']) and c['triangles'].max() >= n:
         out.append('a triangle names a particle that does not exist')
+    if len(c['constraints']) and c['constraints'].max() >= n:
+        return out + ['a distance constraint names a particle that does not exist']
     free = np.arange(n) >= pinned
     if pinned and free.any():
         parent = c['parent'][free].astype(int)

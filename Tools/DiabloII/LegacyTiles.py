@@ -148,8 +148,7 @@ def main():
             continue
         rgba = np.zeros(indices.shape + (4,), 'u1')
         drawn = indices >= 0
-        rgba[drawn] = palette[indices[drawn]]
-        rgba[drawn, 3] = 255
+        rgba[drawn] = palette[indices[drawn]]       # index 0 stays see-through, as the palette has it
         Image.fromarray(rgba, 'RGBA').save(os.path.join(a.args[1], f"{t['orientation']}_{t['main']}_{t['sub']}_{n}.png"))
         written += 1
     print(f'{a.args[1]}: {written} pictures of {len(tiles)} tiles')
